@@ -1,0 +1,909 @@
+#dataViewerRoot {
+  user-select: none;
+
+  input,
+  select,
+  textarea {
+    &:focus-within {
+      outline: 1px solid var(--color-siki-outline);
+    }
+  }
+
+  color: var(--color-siki-foreground);
+  font-family: var(--font-regular);
+
+  .a {
+    &.inner {
+      color: var(--color-thread-inLinkForeground);
+    }
+  }
+
+  .dvw-main {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-backimage-body);
+    overflow: hidden;
+    height: 100vh;
+    min-height: 100vh;
+    outline: none;
+    opacity: 0;
+    animation: fadein 500ms cubic-bezier(.2, .8, .2, 1) forwards;
+  }
+
+  .dv-highlight {
+    background: var(--color-thread-searchHighlightBackground, rgba(255, 230, 128, 0.65));
+    color: var(--color-thread-highlightForeground, inherit);
+    padding: 0 1px;
+    border-radius: 2px;
+  }
+
+  .dvw-header {
+    background: var(--color-backimage-header);
+    -webkit-app-region: drag;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 12px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 15;
+    flex-shrink: 0;
+  }
+
+  .dvw-content {
+    background: var(--color-backimage-thread);
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    margin-left: var(--dvw-side-width, 300px);
+  }
+
+  .dvw-sidePanel {
+    width: clamp(var(--dvw-side-min, 160px), var(--dvw-side-width, 300px), var(--dvw-side-max, 600px));
+    background: var(--color-backimage-sidepane);
+    border-right: 1px solid var(--color-siki-thinForeground);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--dvw-header-height, 50px));
+    overflow: hidden;
+    position: fixed;
+    left: 0;
+    top: var(--dvw-header-height, 50px);
+    z-index: 5;
+
+
+    select::picker(select) {
+      min-width: calc(var(--dvw-side-width, 300px) - 24px);
+    }
+
+    .dvw-resizer {
+      position: absolute;
+      top: 0;
+      right: -3px;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 6;
+      background: transparent;
+      transition: background-color 0.4s ease;
+
+      &:hover {
+        background: color-mix(in oklab, transparent, var(--color-siki-systemAccent) 50%);
+      }
+    }
+
+    .dvw-sp-header {
+      padding: 12px;
+      border-bottom: 1px solid var(--color-siki-thinForeground);
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-auto-rows: auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .dvw-sp-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-siki-foreground);
+      margin: 0;
+      margin-bottom: 0;
+      grid-column: 1 / -1;
+    }
+
+    .dvw-sp-dbSelector {
+      width: 100%;
+      background: var(--color-siki-baseBackground);
+      color: var(--color-siki-foreground);
+      border: 1px solid var(--color-siki-thinForeground);
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 12px;
+      grid-column: 1 / 2;
+    }
+
+    .dvw-sp-dbOpenBtn {
+      grid-column: 2 / 3;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 100%;
+      padding: 6px 10px;
+      line-height: 1;
+      color: var(--color-siki-foreground);
+      background: var(--color-siki-baseBackground);
+      border: 1px solid var(--color-siki-thinForeground);
+      border-radius: 4px;
+      cursor: pointer;
+
+      & i {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      &:hover {
+        background: var(--color-siki-button-hover);
+      }
+
+      &:focus-visible {
+        outline: 1px solid var(--color-siki-focusring);
+        outline-offset: 1px;
+      }
+    }
+
+    .dvw-main--no-anim {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+
+    .dvw-sp-content {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .dvw-sp-optionList {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .dvw-sp-section {
+      margin-bottom: 20px;
+
+      &>div {
+        margin-bottom: 6px;
+      }
+    }
+
+    .dvw-sp-sectionTitle {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-siki-foreground);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .dvw-sp-searchInput {
+      width: 100%;
+      background: var(--color-siki-baseBackground);
+      color: var(--color-siki-foreground);
+      border: 1px solid var(--color-siki-thinForeground);
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .dvw-sp-searchButton,
+    .dvw-sp-clearButton {
+      width: 100%;
+      background: var(--color-siki-baseBackground);
+      color: var(--color-siki-foreground);
+      border: 1px solid var(--color-siki-thinForeground);
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+
+      &:hover:not(:disabled) {
+        background: var(--color-siki-button-hover);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+      }
+    }
+
+    .dvw-sp-filterToggle {
+      background: transparent;
+      color: var(--color-siki-foreground);
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      text-decoration: underline;
+      padding: 0;
+      margin-bottom: 8px;
+      opacity: 0.8;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
+
+    .dvw-sp-filterRow {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .dvw-sp-filterInput {
+      flex: 1;
+      background: var(--color-siki-baseBackground);
+      color: var(--color-siki-foreground);
+      border: 1px solid var(--color-siki-thinForeground);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 11px;
+      width: 100%;
+    }
+
+    .dvw-sp-inputActive {
+      border-color: var(--color-siki-systemAccent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-siki-systemAccent) 60%, transparent);
+      background: color-mix(in srgb, var(--color-siki-systemAccent) 12%, var(--color-siki-baseBackground));
+    }
+
+    .dvw-sp-filterLabel {
+      font-size: 10px;
+      color: var(--color-siki-foreground);
+      opacity: 0.7;
+      margin-bottom: 2px;
+    }
+
+    .dvw-sp-filterLabel--active {
+      color: var(--color-siki-systemAccent);
+      opacity: 1;
+      font-weight: 600;
+      position: relative;
+      padding-left: 12px;
+    }
+
+    .dvw-sp-filterLabel--active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--color-siki-systemAccent);
+      box-shadow: 0 0 6px color-mix(in srgb, var(--color-siki-systemAccent) 60%, transparent);
+    }
+
+    .dvw-sp-stats {
+      padding: 8px 12px;
+      background: var(--color-siki-subBackground);
+      border-top: 1px solid var(--color-siki-thinForeground);
+      font-size: 11px;
+      color: var(--color-siki-foreground);
+      opacity: 0.7;
+      flex-shrink: 0;
+      margin-top: auto;
+    }
+
+    .dvw-sp-subLabel {
+      font-size: 11px;
+      margin-bottom: 6px;
+      opacity: 0.8;
+    }
+
+    .dvw-sp-rowCenter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .dvw-sp-checkItem {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dvw-sp-buttonRow {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+  }
+
+  .dvw-headerTitle {
+    font-weight: 600;
+  }
+
+  .dvw-headerRight {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+  }
+
+  .dvw-statusText {
+    opacity: 0.7;
+    font-size: 12px;
+  }
+
+  .dv-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden;
+    flex: 1;
+
+    .modal-dialog {
+      max-width: 860px;
+    }
+  }
+
+  .dv-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-siki-thinForeground);
+    flex-shrink: 0;
+  }
+
+  .dv-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+  }
+
+  .dv-paginationButton {
+    background: var(--color-siki-baseBackground);
+    color: var(--color-siki-foreground);
+    border: 1px solid color-mix(in oklab, var(--color-siki-thinForeground), var(--color-siki-foreground) 10%);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.2;
+    min-width: 32px;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, transform 60ms ease;
+  }
+
+  .dv-paginationButton:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--color-siki-subBackground), var(--color-siki-systemAccent) 10%);
+    border-color: color-mix(in oklab, var(--color-siki-thinForeground), var(--color-siki-systemAccent) 40%);
+  }
+
+  .dv-paginationButton:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .dv-paginationButton.is-active,
+  .dv-paginationButton[aria-current="page"] {
+    color: var(--color-siki-systemAccentForeground);
+    background: color-mix(in oklab, var(--color-siki-baseBackground), var(--color-siki-systemAccent) 65%);
+    border-color: var(--color-siki-systemAccent);
+    cursor: default;
+  }
+
+  .dv-paginationButton.is-active:hover {
+    filter: brightness(1.03);
+  }
+
+  .dv-paginationButton:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--color-siki-systemAccent), white 10%);
+    outline-offset: 2px;
+  }
+
+  .dv-pageInfo {
+    font-size: 12px;
+    color: var(--color-siki-foreground);
+    opacity: 0.8;
+    margin: 0 8px;
+  }
+
+  .dv-pageNumbers {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 0 4px;
+    border-radius: 6px;
+  }
+
+  .dv-paginationEllipsis {
+    color: color-mix(in oklab, var(--color-siki-foreground), var(--color-siki-thinForeground) 30%);
+    padding: 0 4px;
+    min-width: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dv-refreshButton {
+    background: var(--color-siki-baseBackground);
+    color: var(--color-siki-foreground);
+    border: 1px solid var(--color-siki-thinForeground);
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: auto;
+  }
+
+  .dv-refreshButton:hover:not(:disabled) {
+    background: var(--color-siki-button-hover);
+  }
+
+  .dv-refreshButton:disabled {
+    opacity: 0.5;
+  }
+
+  .dv-tableContainer {
+    flex: 1;
+    overflow: auto;
+    height: auto;
+    margin-bottom: 0.5em;
+    margin-right: 5px;
+  }
+
+  .dv-table {
+    width: -webkit-fill-available;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+
+    .dv-th {
+      text-align: left;
+      border-bottom: 2px solid var(--color-siki-thinForeground);
+      padding: 8px 4px;
+      background: var(--color-siki-subBackground);
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+      color: var(--color-siki-foreground);
+      backdrop-filter: blur(5px);
+      z-index: 1;
+      overflow: visible;
+
+      &:last-child .dv-colResizer {
+        right: 0px
+      }
+    }
+
+    .dv-th.is-drag-over {
+      outline: 2px dashed var(--color-siki-systemAccent);
+      outline-offset: -2px;
+      background: color-mix(in oklab, var(--color-siki-subBackground), var(--color-siki-systemAccent) 10%);
+    }
+
+    .dv-colResizer {
+      position: absolute;
+      top: 0;
+      right: -3px;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      user-select: none;
+      touch-action: none;
+      background: transparent;
+      transition: background 120ms ease;
+      z-index: 2;
+    }
+
+    .dv-colResizer:hover,
+    .dv-colResizer:active,
+    body.dv-isColumnResizing .dv-colResizer {
+      background: color-mix(in oklab, transparent, var(--color-siki-systemAccent) 20%);
+    }
+
+    .dv-td {
+      padding: 6px 4px;
+      border-bottom: 1px solid var(--color-siki-thinForeground);
+      vertical-align: top;
+      user-select: text;
+    }
+
+    .dv-condList {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      .click-edit {
+        display: none;
+      }
+    }
+
+    .cond-container {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cond-container .target {
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    tbody tr {
+      transition: background-color 220ms ease;
+    }
+
+    tbody tr.dv-row:hover {
+      background: color-mix(in oklab, var(--color-siki-background), var(--color-siki-systemAccent) 16%);
+    }
+
+    tbody tr.dv-row.is-selected {
+      background: color-mix(in oklab, var(--color-siki-subBackground), var(--color-siki-systemAccent) 16%);
+      outline: 1px solid color-mix(in oklab, var(--color-siki-systemAccent), black 10%);
+      outline-offset: -1px;
+    }
+
+    .menu_target {
+      background: color-mix(in oklab, var(--color-siki-background), var(--color-siki-systemAccent) 16%);
+    }
+
+    .dv-cellText {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: block;
+    }
+
+    .dv-cellTextWide {
+      white-space: pre-wrap;
+      display: block;
+      max-width: 50vw;
+      overflow-wrap: break-word;
+    }
+
+    .dv-cellMute {
+      color: var(--color-siki-danger);
+    }
+
+    .dv-cellEmphasis {
+      color: var(--color-siki-success);
+    }
+
+    .dv-cellStars {
+      .star1 {
+        color: var(--color-siki-starColor1);
+      }
+
+      .star2 {
+        color: var(--color-siki-starColor2);
+      }
+
+      .star3 {
+        color: var(--color-siki-starColor3);
+      }
+
+      .star4 {
+        color: var(--color-siki-starColor4);
+      }
+
+      .star5 {
+        color: var(--color-siki-starColor5);
+      }
+    }
+
+
+    .dv-cellBoolean {
+      .fa-check {
+        color: var(--color-siki-success);
+      }
+
+      .fa-xmark {
+        color: var(--color-siki-danger);
+      }
+    }
+
+    .fa-checkbox {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5em;
+      color: var(--color-siki-foreground);
+    }
+
+    .fa-check-square {
+      color: var(--color-siki-systemAccent);
+    }
+
+    .fa-checkbox:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .fa-checkbox:focus-visible {
+      outline: 2px solid #4d90fe;
+      outline-offset: 2px;
+    }
+  }
+
+  .dv-monospace {
+    font-family: monospace;
+  }
+
+  .dv-headerContent {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    padding-right: 6px;
+  }
+
+  .dv-dragHandle {
+    color: var(--color-siki-foreground);
+    opacity: 0.6;
+    cursor: grab;
+    -webkit-user-drag: element;
+  }
+
+  .dv-dragHandle:hover {
+    opacity: 0.9;
+  }
+
+  .dv-dropIndicator {
+    position: absolute;
+    right: -2px;
+    top: 2px;
+    bottom: 2px;
+    width: 3px;
+    background: var(--color-siki-systemAccent);
+    border-radius: 2px;
+  }
+
+  .dv-sortButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    padding: 2px 4px;
+    cursor: pointer;
+  }
+
+  .dv-sortButton.is-active .dv-sortIcon {
+    color: var(--color-siki-systemAccent);
+  }
+
+  .dv-sortLabel {
+    font-weight: 600;
+  }
+
+  .dv-sortIcon {
+    opacity: 0.8;
+  }
+
+  .dv-errorMessage {
+    color: var(--color-siki-danger);
+    padding: 12px;
+    border: 1px solid var(--color-siki-danger);
+    border-radius: 4px;
+    margin: 8px 12px;
+  }
+
+  .dv-loadingMessage {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-siki-foreground);
+    opacity: 0.7;
+  }
+
+  .dv-noDataMessage {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--color-siki-foreground);
+    opacity: 0.5;
+    font-size: 14px;
+  }
+
+  .dv-checkbox {
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .dv-selectAllButton {
+    background: transparent;
+    border: none;
+    color: var(--color-siki-foreground);
+    cursor: pointer;
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
+  .dv-selectAllButton:hover {
+    opacity: 1;
+  }
+
+  .dv-imagePreview {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    cursor: pointer;
+    border: 1px solid var(--color-siki-thinForeground);
+    border-radius: 4px;
+  }
+
+  .dv-videoPreview {
+    max-width: 100%;
+    max-height: 300px;
+    min-height: 100px;
+    object-fit: contain;
+    cursor: pointer;
+    border: 1px solid var(--color-siki-thinForeground);
+    border-radius: 4px;
+  }
+
+  .dv-imageModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    cursor: pointer;
+  }
+
+  .dv-imageModalContent {
+    max-width: 90%;
+    max-height: 90%;
+    border: 2px solid white;
+    border-radius: 8px;
+  }
+
+  /* Floating selection action bar */
+  .dv-selectionFloat {
+    position: absolute;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 100;
+    border: 1px solid var(--color-siki-thinForeground);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    padding: 12px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    backdrop-filter: blur(6px);
+
+    .dv-selectionFloat.is-deleting {
+      opacity: .7;
+      pointer-events: none;
+    }
+
+    .dv-selectionFloat-count {
+      font-weight: 600;
+
+      i {
+        color: var(--color-siki-success)
+      }
+    }
+
+    .dv-selectionFloat-actions {
+      display: inline-flex;
+      gap: 8px;
+    }
+  }
+
+  .dv-btn {
+    cursor: pointer;
+    border: 1px solid var(--color-siki-thinForeground);
+    border-radius: 6px;
+    padding: 6px 10px;
+    background: var(--color-siki-baseBackground);
+    color: var(--color-siki-foreground);
+    font-size: 12px;
+
+    &:hover {
+      background: var(--color-siki-button-hover);
+    }
+
+    &:disabled {
+      opacity: .6;
+      cursor: default;
+    }
+  }
+
+  .dv-cellBtn {
+    background: transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--color-siki-foreground);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    &:hover {
+      background: var(--color-siki-button-hover);
+    }
+
+    .fa-lock {
+      color: var(--color-siki-success);
+    }
+  }
+
+
+  .dv-menuBtn {
+    display: block;
+    -webkit-app-region: no-drag;
+    border: none;
+    background: transparent;
+  }
+
+  .dv-btn-danger {
+    background: var(--color-siki-danger);
+    color: #fff;
+    border-color: var(--color-siki-danger);
+  }
+
+  .dv-btn-danger:hover {
+    background: color-mix(in srgb, var(--color-siki-danger), var(--color-siki-foreground) 15%);
+  }
+
+  .dv-container.is-drag-select {
+    user-select: none;
+    cursor: crosshair;
+  }
+
+  .dv-toggleButton {
+    background: var(--color-siki-baseBackground);
+    color: var(--color-siki-foreground);
+    border: 1px solid var(--color-siki-thinForeground);
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .dv-toggleButton.is-active {
+    background: color-mix(in oklab, var(--color-siki-baseBackground), var(--color-siki-systemAccent) 25%);
+    border-color: var(--color-siki-systemAccent);
+  }
+}
+
+body.dv-isColumnResizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.dv-isColumnResizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500" xmlns:bx="https://boxy-svg.com">
+  <circle style="stroke: rgb(0, 0, 0); transform-origin: -20.058px -8.28px; fill: rgb(41, 149, 255); stroke-width: 0px;" cx="250" cy="250" r="250"/>
+  <rect rx="30" ry="30" style="stroke: rgb(0, 0, 0); stroke-opacity: 0.2; fill: rgb(241, 241, 241); transform-box: fill-box; transform-origin: 50% 50%;" height="200" transform="matrix(1, -0.000047, 0.000047, 1, 8.212712, 23.016777)" x="241.792" y="201.989" width="150"/>
+  <rect rx="30" ry="30" style="stroke: rgb(0, 0, 0); stroke-opacity: 0.2; fill: rgb(241, 241, 241); transform-box: fill-box; transform-origin: 50% 50%;" height="125" transform="matrix(1, 0.000034, -0.000034, 1, 27.078871, 27.542553)" x="222.919" y="47.46" width="150"/>
+  <rect rx="30" ry="30" style="stroke: rgb(0, 0, 0); paint-order: stroke; stroke-opacity: 0.2; fill: rgb(241, 241, 241); transform-box: fill-box; transform-origin: 50% 50%;" height="350" transform="matrix(1, -0.000076, 0.000076, 1, 46.9727, 30.046764)" x="53.043" y="44.958" width="125"/>
+  <defs>
+    <bx:grid x="0" y="0" width="50" height="50"/>
+  </defs>
+</svg>
