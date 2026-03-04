@@ -1,0 +1,11 @@
+{
+  "name": "battleboard-poc",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "express": "^4",
+    "iconv-lite": "^0.6",
+    "@google/generative-ai": "^0.21",
+    "dotenv": "^16"
+  }
+}
