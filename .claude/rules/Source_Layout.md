@@ -1,0 +1,116 @@
+---
+paths:
+  - "src/**/*"
+---
+
+## ソースコード配置ガイド
+
+### プロジェクト全体構造
+
+```
+battle_board/
+  CLAUDE.md                      # 大域ルール（本ファイル）
+  docs/                          # 仕様・設計ドキュメント
+  features/                      # BDDシナリオ（受け入れ基準の正本）
+  sql/                           # DBマイグレーション
+  tmp/                           # エージェント間共有領域
+  .github/workflows/             # GitHub Actions
+  src/                           # ソースコード（以下で詳述）
+```
+
+### src/ 配下の構成
+
+| ディレクトリ | 役割 | 置くもの | 置かないもの |
+|---|---|---|---|
+| `src/app/(web)/` | Web UI ページ | `page.tsx`, `layout.tsx`, React コンポーネント | ビジネスロジック |
+| `src/app/api/` | Web API ルート | `route.ts`（リクエスト受付 → Service 呼び出し → レスポンス返却） | DB直接操作、複雑なロジック |
+| `src/app/(senbra)/` | 専ブラ互換ルート | `route.ts`（Shift_JIS変換・DAT生成 → Service 呼び出し） | — |
+| `src/lib/services/` | ユースケース実行 | トランザクション制御、Service 間連携、エラーハンドリング | DB操作の直接実装 |
+| `src/lib/domain/models/` | 型定義 | `interface`, `type`, `enum`（薄いデータ型） | ロジック、外部依存 |
+| `src/lib/domain/rules/` | 純粋関数 | 判定ロジック、計算、パース（外部依存なし、テスト容易） | DB操作、API呼び出し |
+| `src/lib/infrastructure/repositories/` | DB操作 | Supabase クエリ、CRUD | ビジネス判定ロジック |
+| `src/lib/infrastructure/adapters/` | フォーマット変換 | DAT形式、subject.txt、bbs.cgi パース/生成 | — |
+| `src/lib/infrastructure/encoding/` | 文字コード変換 | Shift_JIS ↔ UTF-8 | — |
+| `src/lib/infrastructure/supabase/` | DB接続 | Supabase クライアント初期化 | — |
+| `src/types/` | 共有型定義 | 複数レイヤで使う型 | — |
+
+### 依存方向（厳守）
+
+```
+src/app/  →  src/lib/services/  →  src/lib/domain/
+                                →  src/lib/infrastructure/
+
+src/lib/domain/ は何にも依存しない（純粋）
+```
+
+- `app/` のファイルは `lib/services/` を呼ぶ。`lib/infrastructure/` を直接呼ばない
+- `lib/services/` は `lib/domain/` と `lib/infrastructure/` を使う
+- `lib/domain/` は外部に一切依存しない（import できるのは他の domain ファイルのみ）
+- `lib/infrastructure/` は Supabase 等の外部ライブラリに依存してよい
+
+### BDD 開発のファイル配置
+
+BDDシナリオ（受け入れ基準）を起点に実装する。
+
+```
+features/                             # BDDシナリオ（人間が書く。AIは変更不可）
+  phase1/
+    thread.feature                    # スレッド作成・閲覧
+    posting.feature                   # 書き込み
+    authentication.feature            # 認証
+    currency.feature                  # 通貨
+    incentive.feature                 # インセンティブ
+    admin.feature                     # 管理
+    mypage.feature                    # マイページ
+  phase2/
+    command_system.feature            # コマンド基盤
+    ai_accusation.feature             # AI告発
+    bot_system.feature                # ボットシステム
+  constraints/
+    specialist_browser_compat.feature # 専ブラ互換
+
+features/step_definitions/            # ステップ定義（AIが実装）
+  thread.steps.ts
+  posting.steps.ts
+  ...
+
+features/support/                     # テストヘルパー
+  world.ts                            # Cucumber World（共有コンテキスト）
+  hooks.ts                            # Before/After フック
+
+src/__tests__/                        # 単体テスト（Vitest）
+  lib/domain/rules/
+    daily-id.test.ts
+    command-parser.test.ts
+    incentive-rules.test.ts
+  lib/services/
+    post-service.test.ts
+    currency-service.test.ts
+    ...
+  lib/infrastructure/adapters/
+    dat-formatter.test.ts
+    shift-jis.test.ts
+```
+
+### 実装時の作業フロー
+
+1. **Feature を読む** — 対象の `.feature` ファイルで受け入れ基準を確認
+2. **ステップ定義を書く** — `features/step_definitions/{name}.steps.ts` に Given/When/Then を実装
+3. **domain を実装** — `src/lib/domain/models/` に型、`rules/` に純粋関数
+4. **infrastructure を実装** — `src/lib/infrastructure/repositories/` に DB 操作
+5. **service を実装** — `src/lib/services/` にユースケース（domain + infrastructure を組み合わせ）
+6. **route を実装** — `src/app/api/` or `src/app/(senbra)/` にエンドポイント（service を呼ぶだけ）
+7. **UI を実装**（必要なら）— `src/app/(web)/` にページ
+8. **単体テストを書く** — `src/__tests__/` に Vitest テスト（特に domain/rules は必須）
+9. **BDD テスト実行** — `npx cucumber-js` で受け入れ基準をパス
+10. **単体テスト実行** — `npx vitest run` で回帰テストをパス
+
+### 判断に迷ったときの配置ルール
+
+| 迷い | 判断基準 |
+|---|---|
+| Service に書くか domain/rules に書くか | DB や外部APIに触れるなら Service。純粋な計算・判定なら rules |
+| Repository に書くか Service に書くか | SQLクエリは Repository。複数テーブルのトランザクション制御は Service |
+| app/api/ の route.ts にロジックを書いてよいか | ダメ。リクエスト検証 → Service 呼び出し → レスポンス整形のみ |
+| 型定義を domain/models/ と types/ のどちらに置くか | エンティティの型は domain/models/。API リクエスト/レスポンスの型は types/ |
+| テストを __tests__/ と step_definitions/ のどちらに書くか | ユーザーの振る舞い検証は step_definitions/（BDD）。関数単位の検証は __tests__/（単体） |

@@ -37,6 +37,15 @@
 | コンポーネント設計書 (D-08) | `docs/architecture/components/{component}.md` |
 | 内部BDDシナリオ | `features/internal/*.feature` |
 
+## ソースコード
+
+  | ソースコード | パス | 説明 |
+  |---|---|---|
+  | Next.js App Router | `src/app/` | ページ・APIルート・専ブラルート |
+  | ビジネスロジック | `src/lib/` | サービス・ドメイン・インフラ |
+  | 共有型定義 | `src/types/` | 横断的な型 |
+
+
 ## コーディング規約
 
 - 変数名・関数名・クラス名はユビキタス言語辞書 (D-02) に従う
