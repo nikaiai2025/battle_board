@@ -1,0 +1,79 @@
+# D-06 画面要素定義書: スレッド一覧
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1
+
+screen_id: SCR-001
+name: スレッド一覧
+route: /
+description: >
+  掲示板のトップページ。最終書き込み日時の新しい順に最大50件のスレッドを表示する。
+  スレッド作成フォームを含む。
+
+api_dependencies:
+  - GET /api/threads (listThreads)
+  - POST /api/threads (createThread)
+
+# =============================================
+# 画面要素
+# =============================================
+elements:
+  - id: header
+    type: component
+    description: ヘッダーナビゲーション
+    children:
+      - id: site-title
+        type: text
+        content: BattleBoard
+      - id: nav-mypage
+        type: link
+        label: マイページ
+        href: /mypage
+        condition: 認証済みの場合のみ表示
+
+  - id: thread-create-form
+    type: form
+    description: スレッド作成フォーム
+    condition: 認証済みの場合のみ表示
+    fields:
+      - id: thread-title-input
+        type: text-input
+        label: スレッドタイトル
+        placeholder: スレッドタイトルを入力
+        maxLength: 96
+        required: true
+      - id: thread-body-input
+        type: textarea
+        label: 本文（1レス目）
+        placeholder: 本文を入力
+        required: true
+      - id: thread-submit-btn
+        type: button
+        label: スレッドを立てる
+        action: POST /api/threads
+
+  - id: thread-list
+    type: list
+    description: スレッド一覧（最大50件）
+    emptyMessage: スレッドがありません
+    sortOrder: last_post_at DESC
+    maxItems: 50
+    itemTemplate:
+      - id: thread-title
+        type: link
+        source: thread.title
+        href: "/threads/{thread.id}"
+      - id: thread-post-count
+        type: text
+        source: thread.postCount
+        format: "({postCount})"
+      - id: thread-last-post-at
+        type: datetime
+        source: thread.lastPostAt
+        format: relative  # 「3分前」「1時間前」等
+
+  - id: auth-prompt
+    type: component
+    description: 未認証ユーザーへの認証案内
+    condition: 未認証の場合のみ表示
+    content: 書き込みするには認証が必要です

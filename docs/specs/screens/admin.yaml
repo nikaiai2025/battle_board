@@ -1,0 +1,121 @@
+# D-06 画面要素定義書: 管理画面
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1
+
+screen_id: SCR-005
+name: 管理画面
+route: /admin
+description: >
+  管理者専用の画面。レス・スレッドの削除操作を行う。
+  管理者ログイン（メール+パスワード）で認証後にアクセス可能。
+
+api_dependencies:
+  - POST /api/admin/login (adminLogin)
+  - DELETE /api/admin/posts/{postId} (adminDeletePost)
+  - DELETE /api/admin/threads/{threadId} (adminDeleteThread)
+
+access_control: 管理者のみ（admin_session Cookie）
+
+# =============================================
+# ログイン画面
+# =============================================
+login_screen:
+  screen_id: SCR-005-LOGIN
+  route: /admin/login
+  elements:
+    - id: admin-login-header
+      type: heading
+      content: 管理者ログイン
+
+    - id: admin-login-form
+      type: form
+      fields:
+        - id: admin-email-input
+          type: text-input
+          label: メールアドレス
+          inputType: email
+          required: true
+        - id: admin-password-input
+          type: text-input
+          label: パスワード
+          inputType: password
+          required: true
+        - id: admin-login-btn
+          type: button
+          label: ログイン
+          action: POST /api/admin/login
+
+    - id: admin-login-error
+      type: text
+      condition: ログイン失敗時
+      style: error
+      content: メールアドレスまたはパスワードが正しくありません
+
+# =============================================
+# 管理操作画面
+# =============================================
+elements:
+  - id: admin-header
+    type: heading
+    content: 管理画面
+
+  # --- スレッド管理 ---
+  - id: admin-thread-section
+    type: section
+    label: スレッド管理
+    description: スレッド一覧から削除対象を選択
+    children:
+      - id: admin-thread-list
+        type: list
+        source: threads
+        itemTemplate:
+          - id: admin-thread-title
+            type: text
+            source: thread.title
+          - id: admin-thread-post-count
+            type: text
+            source: thread.postCount
+            format: "({postCount}件)"
+          - id: admin-thread-delete-btn
+            type: button
+            label: スレッド削除
+            action: DELETE /api/admin/threads/{thread.id}
+            confirm: "スレッド「{thread.title}」と全レスを削除しますか？"
+            style: danger
+
+  # --- レス管理 ---
+  - id: admin-post-section
+    type: section
+    label: レス管理
+    description: スレッドを選択してレスを表示し、削除対象を選択
+    children:
+      - id: admin-thread-selector
+        type: select
+        label: スレッドを選択
+        source: threads
+        displayField: title
+
+      - id: admin-post-list
+        type: list
+        source: selectedThread.posts
+        itemTemplate:
+          - id: admin-post-number
+            type: text
+            source: post.postNumber
+            format: ">>{postNumber}"
+          - id: admin-post-body
+            type: text
+            source: post.body
+            truncate: 200
+          - id: admin-post-status
+            type: badge
+            condition: post.isDeleted
+            content: 削除済み
+          - id: admin-post-delete-btn
+            type: button
+            condition: post.isDeleted == false
+            label: レス削除
+            action: DELETE /api/admin/posts/{post.id}
+            confirm: "レス >>{post.postNumber} を削除しますか？"
+            style: danger

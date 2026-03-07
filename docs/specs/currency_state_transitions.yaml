@@ -1,0 +1,188 @@
+# D-05 通貨（Currency）状態遷移仕様書
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1 + Phase 2 (MVP)
+
+entity: Currency
+description: >
+  ゲーム内通貨の残高変動ルールを定義する。
+  通貨はボーナスイベントで増加し、コマンド実行コストで減少する。
+  残高がマイナスになる操作は実行されない。
+
+# =============================================
+# 残高の制約
+# =============================================
+constraints:
+  - name: non_negative
+    description: 残高がマイナスになる操作は実行されない
+    enforcement: >
+      UPDATE currencies SET balance = balance - :cost
+      WHERE user_id = :uid AND balance >= :cost
+      → affected rows = 0 なら残高不足エラー
+    feature_ref: currency.feature#通貨残高がマイナスになる操作は実行されない
+
+  - name: no_double_spend
+    description: 同時操作による二重消費が発生しない
+    enforcement: >
+      楽観的ロック（WHERE balance >= :cost）により、
+      並行する2つの操作のうち1つのみが成功する
+    feature_ref: currency.feature#同時操作による通貨の二重消費が発生しない
+
+  - name: initial_balance
+    description: 新規ユーザー登録時に初期通貨 50 が付与される
+    value: 50
+    feature_ref: currency.feature#新規ユーザー登録時に初期通貨 50 が付与される
+
+# =============================================
+# 通貨増加イベント（Phase 1: インセンティブ）
+# =============================================
+increase_events:
+  - event: daily_login_bonus
+    label: 書き込みログインボーナス
+    amount: 10
+    frequency: 1日1回（初回書き込み時）
+    condition: 今日まだ書き込みをしていない
+    feature_ref: incentive.feature#その日の初回書き込みでログインボーナス +10 が付与される
+
+  - event: thread_creation_bonus
+    label: スレッド作成ログインボーナス
+    amount: 10
+    frequency: 1日1回（初回スレッド作成時）
+    condition: 今日まだスレッドを作成していない
+    note: 書き込みログインボーナスとは独立（両方もらえる）
+    feature_ref: incentive.feature#その日の初回スレッド作成でボーナス +10 が付与される
+
+  - event: thread_growth_10
+    label: スレッド成長ボーナス（10レス）
+    amount: 50
+    condition: スレッドのレス数が10に到達 AND ユニークID数 >= 3
+    recipient: スレッド作成者
+    feature_ref: incentive.feature#スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
+
+  - event: thread_growth_100
+    label: スレッド成長ボーナス（100レス）
+    amount: 100
+    condition: スレッドのレス数が100に到達 AND ユニークID数 >= 10
+    recipient: スレッド作成者
+    feature_ref: incentive.feature#スレッドにレスが100個付き、ユニークID 10個以上で +100 ボーナス
+
+  - event: reply_bonus
+    label: 返信ボーナス
+    amount: 5
+    condition: 他ユーザーからアンカー付き返信が付く
+    frequency: 同一IDからは1日1回のみ
+    feature_ref: incentive.feature#他のユーザーから返信が付くと +5 ボーナスが付与される
+
+  - event: hot_post_bonus
+    label: ホットレスボーナス
+    amount: 15
+    condition: 60分以内に3人以上の異なるIDから返信が付く
+    frequency: 1レスにつき1回
+    evaluation: 非同期（返信書き込み時に過去レスをチェック）
+    feature_ref: incentive.feature#60分以内に3人以上から返信が付くと +15 ボーナスが付与される
+
+  - event: new_thread_join_bonus
+    label: 新スレッド参加ボーナス
+    amount: 3
+    condition: 過去に書き込んだことがないスレッドへの初書き込み
+    frequency: 1日3スレッドまで
+    feature_ref: incentive.feature#未参加のスレッドに初めて書き込むと +3 ボーナスが付与される
+
+  - event: thread_revival_bonus
+    label: スレッド復興ボーナス
+    amount: 10
+    condition: >
+      低活性スレッド（24時間以上レスなし）に書き込み後、
+      30分以内に別ユーザーのレスが付く
+    frequency: 1スレッド1日1回
+    evaluation: 非同期（後続書き込み時にチェック）
+    feature_ref: incentive.feature#低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと +10 ボーナスが付与される
+
+  - event: streak_bonus_7
+    label: ストリークボーナス（7日）
+    amount: 20
+    condition: 7日連続で書き込みログインボーナスを獲得
+    feature_ref: incentive.feature#7日連続書き込みで +20 ストリークボーナスが付与される
+
+  - event: streak_bonus_30
+    label: ストリークボーナス（30日）
+    amount: 100
+    condition: 30日連続で書き込みログインボーナスを獲得
+    feature_ref: incentive.feature#30日連続書き込みで +100 ストリークボーナスが付与される
+
+  - event: milestone_post_100
+    label: キリ番ボーナス（100の倍数）
+    amount: 10
+    condition: スレッド内のレス番号が100の倍数（1000を除く）
+    feature_ref: incentive.feature#レス番号 >>100 を踏むと +10 ボーナスが付与される
+
+  - event: milestone_post_1000
+    label: キリ番ボーナス（1000）
+    amount: 100
+    condition: スレッド内のレス番号が1000
+    feature_ref: incentive.feature#レス番号 >>1000 を踏むと +100 ボーナスが付与される
+
+# =============================================
+# 通貨増加イベント（Phase 2: ゲーム報酬）
+# =============================================
+  - event: accusation_success_bonus
+    label: AI告発成功ボーナス
+    amount: TBD
+    condition: "!tell で対象がAIボットだった"
+    feature_ref: ai_accusation.feature#AI告発に成功すると結果がスレッド全体に公開される
+
+  - event: false_accusation_bonus
+    label: 冤罪ボーナス
+    amount: TBD
+    recipient: 被告発者（人間）
+    condition: "!tell で対象が人間だった"
+    feature_ref: ai_accusation.feature#AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+
+  - event: elimination_reward
+    label: 撃破報酬
+    amount: "base + survival_days * multiplier (TBD)"
+    condition: ボットのHPを0以下にした
+    recipient: 撃破者
+    feature_ref: bot_system.feature#HPが0になったボットが撃破される
+
+# =============================================
+# 通貨減少イベント（Phase 2）
+# =============================================
+decrease_events:
+  - event: accusation_cost
+    label: AI告発コスト
+    amount: TBD
+    trigger: "!tell コマンド実行"
+    note: 成功・失敗に関わらず消費される
+    feature_ref: command_system.feature#コマンド実行に通貨コストが必要な場合は通貨が消費される
+
+  - event: attack_cost
+    label: 攻撃コスト
+    amount: TBD
+    trigger: BOTマーク付きボットへの攻撃実行
+    feature_ref: bot_system.feature#BOTマーク付きのボットに攻撃してHPを減少させる
+
+# =============================================
+# 書き込み報酬について
+# =============================================
+note_on_post_reward: >
+  書き込み自体に通貨報酬は発生しない。
+  通貨はログインボーナス等のインセンティブイベントで増加する。
+  （incentive.feature v4 および posting.feature で統一済み）
+
+# =============================================
+# TBD項目
+# =============================================
+tbd:
+  - id: TBD-01
+    item: 経済バランス（通貨の発行量・消費量のバランス、インフレ対策）
+    deadline: 設計フェーズ
+    owner: プロダクトオーナー
+
+  - id: TBD-03
+    item: 各コマンドの具体的な仕様（コスト・効果・クールダウン等）
+    deadline: 設計フェーズ
+    owner: プロダクトオーナー
+    note: >
+      告発コスト、攻撃コスト、告発成功ボーナス、冤罪ボーナス額、
+      撃破報酬の計算式はここで決定される

@@ -1,0 +1,116 @@
+# D-05 ユーザー状態遷移仕様書
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1 + Phase 2 (MVP)
+
+entity: User
+description: >
+  ユーザーの認証状態とアカウント種別の遷移を定義する。
+  一般ユーザーはedge-token + 認証コードで認証し、
+  管理者はメール+パスワードで認証する。
+
+# =============================================
+# 認証状態
+# =============================================
+auth_states:
+  - name: unauthenticated
+    label: 未認証
+    description: edge-token を持たない、または期限切れの状態
+    initial: true
+
+  - name: code_issued
+    label: 認証コード発行済み
+    description: 認証コードと edge-token が発行されたが、まだ認証コード未入力の状態
+
+  - name: authenticated
+    label: 認証済み
+    description: edge-token が有効化され、書き込みが可能な状態
+
+auth_transitions:
+  - from: unauthenticated
+    to: code_issued
+    trigger: 書き込みリクエスト送信
+    action:
+      - 6桁認証コードを発行
+      - edge-token Cookie を発行（未有効化）
+      - 認証コード入力ページへ案内
+    feature_ref: authentication.feature#未認証ユーザーが書き込みを行うと認証コードが案内される
+
+  - from: code_issued
+    to: authenticated
+    trigger: 正しい認証コード + Turnstile検証成功
+    guard:
+      - 認証コードが有効期限内
+      - Turnstile検証に成功
+      - IP整合性チェックに成功
+    action:
+      - edge-token を有効化
+      - users レコードを作成（初回の場合）
+      - author_id_seed を生成（IPベース）
+    feature_ref: authentication.feature#正しい認証コードとTurnstileで認証に成功する
+
+  - from: code_issued
+    to: unauthenticated
+    trigger: 認証失敗
+    guard:
+      - Turnstile検証失敗 OR 認証コード期限切れ
+    action:
+      - エラーメッセージ表示
+      - edge-token は有効化されない
+    feature_ref: authentication.feature#Turnstile検証に失敗すると認証に失敗する
+
+  - from: authenticated
+    to: unauthenticated
+    trigger: edge-token期限切れ / Cookie削除
+    action:
+      - 次回書き込み時に再認証フロー開始
+    note: >
+      Cookie削除後に再認証しても、同日・同一回線では同一の日次リセットIDが
+      生成される（IPベースseedのため）
+
+# =============================================
+# アカウント種別
+# =============================================
+account_states:
+  - name: free_user
+    label: 無料ユーザー
+    description: >
+      アカウント登録済みの一般ユーザー。
+      表示名は「名無しさん」固定。ユーザーネーム設定不可。
+    initial: true
+
+  - name: premium_user
+    label: 有料ユーザー
+    description: >
+      課金済み（MVP期はモック）のユーザー。
+      ユーザーネームの設定が可能。
+
+account_transitions:
+  - from: free_user
+    to: premium_user
+    trigger: 課金ボタン押下（モック実装）
+    action:
+      - is_premium = true に更新
+      - ユーザーネーム設定を解放
+    feature_ref: mypage.feature#無料ユーザーが課金ボタンで有料ステータスに切り替わる
+    note: MVP期は実決済なし。ボタン押下で即時切り替え
+
+  # MVP期は有料→無料への戻しは未定義
+
+# =============================================
+# 日次リセットID
+# =============================================
+daily_id_lifecycle:
+  description: >
+    ユーザーごとに1日単位で生成される識別子のライフサイクル。
+    同日中はスレッドを跨いでも同一。翌日(JST 0:00)にリセット。
+
+  generation:
+    formula: "truncate(sha256(date_jst + board_id + author_id_seed), 8)"
+    seed_source: "sha512(reduced_ip)"
+    timing: 初回書き込み時に遅延生成（日次バッチではない）
+
+  reset:
+    trigger: JST 0:00
+    behavior: 次回書き込み時に新しいIDが生成される
+    feature_ref: authentication.feature#翌日になると日次リセットIDがリセットされる

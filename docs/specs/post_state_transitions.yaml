@@ -1,0 +1,148 @@
+# D-05 レス（Post）状態遷移仕様書
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1 + Phase 2 (MVP)
+
+entity: Post
+description: >
+  スレッド内の個々の書き込み（レス）の状態遷移を定義する。
+  通常のユーザー書き込みとシステムメッセージの2種類がある。
+
+# =============================================
+# レスの種別
+# =============================================
+post_types:
+  - name: user_post
+    label: ユーザー書き込み
+    description: 人間ユーザーまたはAIボットによる書き込み
+    fields:
+      author_id: ユーザーID（人間の場合）
+      bot_id: ボットID（ボットの場合、NULLなら人間）
+      display_name: "「名無しさん」/ ユーザーネーム"
+      daily_id: 日次リセットID（人間）/ 偽装ID（ボット）
+      is_system_message: false
+
+  - name: system_message
+    label: システムメッセージ
+    description: コマンド実行結果やイベント通知
+    fields:
+      author_id: "NULL"
+      bot_id: "NULL"
+      display_name: "[システム]"
+      daily_id: "SYSTEM"
+      is_system_message: true
+
+# =============================================
+# レスの状態
+# =============================================
+states:
+  - name: active
+    label: 通常表示
+    description: 書き込まれた本文がそのまま表示される状態
+    initial: true
+
+  - name: deleted
+    label: 削除済み
+    description: >
+      管理者により削除された状態。
+      本文は「このレスは削除されました」に置換表示される。
+      レス番号は保持される（欠番にならない）。
+
+  - name: accused_hit
+    label: AI告発的中
+    description: >
+      AI告発（!tell）により対象がAIボットだと判明した状態。
+      BOTマーク(🤖)とHP情報が付加表示される。
+      元の本文はそのまま表示される。
+    note: レスの状態というよりボットの状態に紐づくが、表示に影響するためここに記載
+
+# =============================================
+# 状態遷移
+# =============================================
+transitions:
+  - from: active
+    to: deleted
+    trigger: 管理者によるレス削除
+    guard:
+      - 操作者が管理者権限を持つ
+      - 対象レスが存在する
+    action:
+      - is_deleted = true に更新
+      - 表示時に本文を「このレスは削除されました」に置換
+      - レス番号は変更しない
+    feature_ref: admin.feature#管理者が指定したレスを削除する
+    note: 物理削除ではなく論理削除（DBレコードは保持）
+
+  - from: active
+    to: accused_hit
+    trigger: AI告発（!tell）成功
+    guard:
+      - 対象レスの書き込み者がAIボット（bot_id IS NOT NULL）
+      - 告発者が告発コスト分の通貨を保有
+      - 同一告発者による同一レスへの告発が未実行
+      - 対象レスが自分の書き込みではない
+      - 対象レスがシステムメッセージではない
+    action:
+      - accusations レコードを INSERT（result='hit'）
+      - 対象ボットの is_revealed = true に更新
+      - 告発成功ボーナスを告発者に付与
+      - システムメッセージをスレッドに追加
+    feature_ref: ai_accusation.feature#AI告発に成功すると結果がスレッド全体に公開される
+
+# =============================================
+# AI告発の判定フロー
+# =============================================
+accusation_flow:
+  trigger: "!tell >>N"
+  preconditions:
+    - 告発者が認証済みユーザー
+    - 告発対象のレスが存在する
+    - 告発対象が自分の書き込みではない
+    - 告発対象がシステムメッセージではない
+    - 同一告発者による同一レスへの告発が未実行
+    - 告発者の通貨残高 >= 告発コスト
+
+  outcomes:
+    - condition: 対象レスの bot_id IS NOT NULL
+      result: hit（成功）
+      effects:
+        - 告発コスト消費
+        - 告発成功ボーナスを告発者に付与
+        - 対象ボットに BOTマーク付与
+        - HP状況を公開
+        - システムメッセージ: ">>N は… AIでした！🤖"
+      feature_ref: ai_accusation.feature#AI告発に成功すると結果がスレッド全体に公開される
+
+    - condition: 対象レスの bot_id IS NULL
+      result: miss（失敗）
+      effects:
+        - 告発コスト消費
+        - 被告発者（人間）に冤罪ボーナス付与
+        - システムメッセージ: ">>N は… 人間でした！"
+      feature_ref: ai_accusation.feature#AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+
+# =============================================
+# コマンド解析フロー
+# =============================================
+command_parsing:
+  description: >
+    書き込み本文中の「!コマンド名」を検出し、コマンドとして解析するフロー。
+    コマンド解析は書き込みINSERT後に同一トランザクション内で実行される。
+
+  flow:
+    - step: 本文から "!xxx" パターンを検出
+    - step: コマンド定義テーブル/マップに存在するか確認
+    - step: 存在しない場合 → 無視（通常の書き込みとして扱う）
+    - step: 存在する場合 → コスト確認
+    - step: 通貨不足 → エラーのシステムメッセージを追加、コマンドは実行しない
+    - step: 通貨十分 → コマンド実行、通貨消費、結果のシステムメッセージを追加
+
+  stealth_commands:
+    description: >
+      ステルス系コマンドの場合、コマンド文字列を書き込み本文から除去して表示する。
+      効果だけが後から現れる。
+    behavior:
+      - コマンド文字列を本文から除去してINSERT
+      - コマンドは裏で実行される
+      - 発動結果は後から全公開される場合がある
+    feature_ref: command_system.feature#ステルス系コマンドの文字列はスレッドに表示されない

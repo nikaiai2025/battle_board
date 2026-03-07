@@ -1,0 +1,111 @@
+# D-06 画面要素定義書: スレッド閲覧
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1 + Phase 2
+
+screen_id: SCR-002
+name: スレッド閲覧
+route: /threads/{threadId}
+description: >
+  スレッド内のレスを書き込み順に表示する。書き込みフォーム、
+  コマンド実行結果のシステムメッセージ表示を含む。
+
+api_dependencies:
+  - GET /api/threads/{threadId} (getThread)
+  - POST /api/threads/{threadId}/posts (createPost)
+
+# =============================================
+# 画面要素
+# =============================================
+elements:
+  - id: thread-header
+    type: component
+    description: スレッドヘッダ
+    children:
+      - id: thread-title
+        type: heading
+        source: thread.title
+      - id: back-to-list
+        type: link
+        label: 一覧に戻る
+        href: /
+
+  - id: post-list
+    type: list
+    description: レス一覧（書き込み順）
+    sortOrder: post_number ASC
+    itemTemplate:
+      - id: post-number
+        type: text
+        source: post.postNumber
+        format: ">>{postNumber}"
+        style: bold
+
+      - id: post-header
+        type: component
+        description: レスヘッダー行
+        children:
+          - id: post-display-name
+            type: text
+            source: post.displayName
+            style:
+              system_message: "[システム] プレフィックス付き、背景色変更"
+              bot_marked: "🤖 マーク付き"
+          - id: post-daily-id
+            type: text
+            source: post.dailyId
+            format: "ID:{dailyId}"
+          - id: post-datetime
+            type: datetime
+            source: post.createdAt
+            format: "YYYY/MM/DD(ddd) HH:mm:ss"
+
+      - id: post-body
+        type: text
+        source: post.body
+        conditions:
+          - if: post.isDeleted
+            display: このレスは削除されました
+            style: strikethrough, muted
+          - if: post.isSystemMessage
+            style: system-message-bg
+        features:
+          - anchor-link: ">>N 形式をクリック可能なリンクに変換"
+
+      - id: post-bot-info
+        type: component
+        condition: post.botMark != null
+        description: BOTマーク・HP表示
+        children:
+          - id: bot-mark
+            type: badge
+            content: "🤖 BOT"
+          - id: bot-hp
+            type: text
+            source: post.botMark.hp
+            format: "HP:{hp}/{maxHp}"
+
+  - id: post-form
+    type: form
+    description: 書き込みフォーム
+    condition: 認証済みの場合のみ表示
+    fields:
+      - id: post-body-input
+        type: textarea
+        label: 書き込み
+        placeholder: "本文を入力（コマンド例: !tell >>5）"
+        required: true
+      - id: post-submit-btn
+        type: button
+        label: 書き込む
+        action: POST /api/threads/{threadId}/posts
+
+  - id: command-help
+    type: component
+    description: コマンドヘルプ（折りたたみ）
+    collapsible: true
+    defaultCollapsed: true
+    content: |
+      利用可能なコマンド:
+      - !tell >>N — AI告発（通貨消費）
+      - !attack >>N — BOTマーク付きボットへの攻撃（通貨消費）

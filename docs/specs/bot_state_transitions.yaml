@@ -1,0 +1,173 @@
+# D-05 ボット（Bot）状態遷移仕様書
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 2 (MVP) — 運営ボット（荒らし役）のみ
+
+entity: Bot
+description: >
+  AIボット（Phase 2では運営ボット荒らし役のみ）の状態遷移を定義する。
+  ボットは「潜伏 → 告発で暴露 → 攻撃でHP減少 → 撃破」の
+  ライフサイクルを持ち、翌日にはBOTマークがリセットされて再び潜伏する。
+
+# =============================================
+# ボットの状態
+# =============================================
+states:
+  - name: lurking
+    label: 潜伏中
+    description: >
+      人間と区別できない状態で書き込みを行っている。
+      偽装ID・「名無しさん」表示で人間の書き込みと外見上区別がつかない。
+      is_revealed = false
+    initial: true
+
+  - name: revealed
+    label: 暴露済み（BOTマーク表示中）
+    description: >
+      AI告発（!tell）成功により正体が暴かれた状態。
+      書き込みにBOTマーク(🤖)とHP状況が表示される。
+      攻撃の対象となる。ボット自体は書き込みを継続する。
+      is_revealed = true
+
+  - name: eliminated
+    label: 撃破済み
+    description: >
+      HPが0以下になり撃破された状態。
+      以降の書き込みを行わなくなる。
+      戦歴（生存日数、総書き込み数、被告発回数）が全公開される。
+      is_active = false
+
+# =============================================
+# 状態遷移
+# =============================================
+transitions:
+  - from: lurking
+    to: revealed
+    trigger: AI告発（!tell）成功
+    guard:
+      - ボットの書き込みが告発対象に指定される
+      - 告発者が告発コスト分の通貨を保有
+    action:
+      - is_revealed = true に更新
+      - revealed_at = NOW() に更新
+      - accused_count を +1
+      - 告発者に告発成功ボーナスを付与
+      - システムメッセージ: ">>N は… AIでした！🤖"
+      - BOTマーク(🤖)とHP状況をスレッドに公開
+    feature_ref: ai_accusation.feature#告発成功したボットにBOTマークが表示される
+
+  - from: revealed
+    to: revealed
+    trigger: 追加攻撃（HPが0より大きい間）
+    guard:
+      - ボットにBOTマークが表示されている
+      - 攻撃者が攻撃コスト分の通貨を保有
+      - ボットのHPが0より大きい
+    action:
+      - 攻撃コスト分の通貨を消費
+      - ボットのHPを攻撃力分だけ減少
+      - システムメッセージ: "名無しさん(ID:xxx)が 🤖{名前} に攻撃！ HP:N→M"
+    feature_ref: bot_system.feature#BOTマーク付きのボットに攻撃してHPを減少させる
+
+  - from: revealed
+    to: eliminated
+    trigger: 攻撃によりHPが0以下になる
+    guard:
+      - 攻撃後のHPが0以下
+    action:
+      - is_active = false に更新
+      - eliminated_at = NOW() に更新
+      - eliminated_by = 撃破者のuser_id に更新
+      - 戦歴をシステムメッセージで全公開
+      - 撃破者に撃破報酬を付与
+    feature_ref: bot_system.feature#HPが0になったボットが撃破される
+
+  - from: revealed
+    to: lurking
+    trigger: 日次リセット（JST 0:00）
+    guard:
+      - HPが0より大きい（撃破されていない）
+    action:
+      - is_revealed = false に更新
+      - revealed_at = NULL に更新
+      - daily_id を新しい偽装IDに再生成
+      - daily_id_date を当日に更新
+      - survival_days を +1
+    feature_ref: bot_system.feature#翌日になるとBOTマークがリセットされる
+    note: >
+      翌日は新しい偽装IDで再び潜伏する。
+      再度 !tell で正体を暴く必要がある。
+
+# =============================================
+# 状態遷移図
+# =============================================
+#
+#                    !tell 成功
+#    ┌──────────┐  ───────────►  ┌──────────┐
+#    │  lurking │                │ revealed │◄──┐
+#    │  (潜伏)  │◄───────────── │(BOTマーク)│───┘
+#    └──────────┘   日次リセット  └────┬─────┘  攻撃
+#                   (HP > 0)          │        (HP > 0)
+#                                     │
+#                                     │ 攻撃
+#                                     │ (HP ≦ 0)
+#                                     ▼
+#                               ┌───────────┐
+#                               │eliminated │
+#                               │  (撃破)    │
+#                               └───────────┘
+#                               ※ 終端状態
+
+# =============================================
+# 撃破報酬
+# =============================================
+elimination_reward:
+  description: >
+    撃破報酬は生存日数に応じて増加する。
+    長く生存したボットほど撃破報酬が高い。
+  formula_concept: "base_reward + (survival_days * multiplier)"
+  note: >
+    具体的な数値（base_reward, multiplier）は TBD-03（コマンド仕様詳細）で決定。
+  feature_ref: bot_system.feature#長く生存したボットほど撃破報酬が高い
+
+# =============================================
+# 戦歴（撃破時に全公開）
+# =============================================
+battle_record:
+  fields:
+    - name: survival_days
+      label: 生存日数
+    - name: total_posts
+      label: 総書き込み数
+    - name: accused_count
+      label: 被告発回数
+  display_format: >
+    [システム] ⚔️ ボット「{name}」が撃破されました！
+    生存日数：{survival_days}日 / 総書き込み：{total_posts}件 / 被告発：{accused_count}回
+    撃破者：ID:{eliminator_daily_id} に撃破報酬 +{reward}
+  feature_ref: bot_system.feature#HPが0になったボットが撃破される
+
+# =============================================
+# 偽装IDライフサイクル
+# =============================================
+fake_daily_id:
+  generation:
+    timing: ボット作成時 + 日次リセット時
+    method: ランダム生成（人間の日次リセットIDと同じ形式・桁数）
+  persistence: 同日中は一貫して同一IDを使用
+  reset:
+    trigger: JST 0:00
+    behavior: 新しいランダムIDを生成
+  feature_ref: bot_system.feature#運営ボットの偽装IDは同日中一貫している
+
+# =============================================
+# Phase 2 の運営ボット構成
+# =============================================
+phase2_bots:
+  - name: 荒らし役
+    role: チュートリアルMob
+    hp: 30
+    description: >
+      新規ユーザーが初めて !tell を使い、初めてボットを撃破する体験を
+      提供するための「倒しやすい敵」。低HPで撃退難易度が低い。
+    feature_ref: bot_system.feature#荒らし役ボットが低HPのチュートリアルMobとして存在する

@@ -1,0 +1,904 @@
+openapi: 3.1.0
+info:
+  title: BattleBoard API
+  version: 0.1.0
+  description: |
+    BattleBoard の Web API 仕様。
+    5ch専ブラ互換APIは別セクション（paths末尾）に記載。
+
+    ## 認証方式
+    - 一般ユーザー: edge-token Cookie（書き込みAPI）
+    - 管理者: admin_session Cookie（管理API）
+    - ボット: X-Bot-API-Key ヘッダ（書き込みAPI）
+
+    ## ステータス
+    ドラフト（Phase 1 + Phase 2 MVP）
+
+servers:
+  - url: https://{domain}
+    description: 本番環境（Vercel）
+    variables:
+      domain:
+        default: battleboard.vercel.app
+
+# =============================================
+# セキュリティ定義
+# =============================================
+components:
+  securitySchemes:
+    edgeTokenCookie:
+      type: apiKey
+      in: cookie
+      name: edge-token
+      description: 一般ユーザーの書き込み認証トークン
+
+    adminSessionCookie:
+      type: apiKey
+      in: cookie
+      name: admin_session
+      description: 管理者セッション Cookie
+
+    botApiKey:
+      type: apiKey
+      in: header
+      name: X-Bot-API-Key
+      description: 運営ボット用サービスアカウントAPIキー
+
+  # =============================================
+  # スキーマ定義
+  # =============================================
+  schemas:
+    Thread:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        threadKey:
+          type: string
+          description: 10桁UNIXタイムスタンプ（専ブラ用キー）
+          example: "1741305600"
+        title:
+          type: string
+          maxLength: 96
+          example: 今日の雑談
+        postCount:
+          type: integer
+          example: 42
+        lastPostAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, threadKey, title, postCount, lastPostAt, createdAt]
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        threadId:
+          type: string
+          format: uuid
+        postNumber:
+          type: integer
+          minimum: 1
+          example: 5
+        displayName:
+          type: string
+          example: 名無しさん
+        dailyId:
+          type: string
+          example: Ax8kP2Lm
+        body:
+          type: string
+        isSystemMessage:
+          type: boolean
+        isDeleted:
+          type: boolean
+        botMark:
+          type: object
+          nullable: true
+          description: BOTマーク情報（告発成功後のみ）
+          properties:
+            hp:
+              type: integer
+            maxHp:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, threadId, postNumber, displayName, dailyId, body, isSystemMessage, isDeleted, createdAt]
+
+    CurrencyBalance:
+      type: object
+      properties:
+        balance:
+          type: integer
+          minimum: 0
+          example: 150
+      required: [balance]
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        isPremium:
+          type: boolean
+        username:
+          type: string
+          nullable: true
+        balance:
+          type: integer
+        streakDays:
+          type: integer
+      required: [id, isPremium, balance, streakDays]
+
+    PostHistory:
+      type: object
+      properties:
+        postId:
+          type: string
+          format: uuid
+        threadId:
+          type: string
+          format: uuid
+        threadTitle:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [postId, threadId, threadTitle, body, createdAt]
+
+    Notification:
+      type: object
+      description: |
+        通知データ。Phase 1 では枠として存在し、空配列を返す。
+        Phase 2 以降で通知種別（告発結果、ボーナス、システム等）を具体化する。
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: 通知種別（Phase 2 以降で具体的な値を定義）
+        message:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, message, read, createdAt]
+
+    # --- リクエスト ---
+
+    CreateThreadRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 96
+          minLength: 1
+        body:
+          type: string
+          minLength: 1
+      required: [title, body]
+
+    CreatePostRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+      required: [body]
+
+    VerifyAuthCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+          description: 6桁認証コード
+        turnstileToken:
+          type: string
+          description: Cloudflare Turnstile の検証トークン
+      required: [code, turnstileToken]
+
+    SetUsernameRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 20
+          minLength: 1
+      required: [username]
+
+    AdminLoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    # --- レスポンス ---
+
+    AuthCodeIssuedResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: 認証コードを入力してください
+        authCodeUrl:
+          type: string
+          example: /auth/auth-code
+      required: [message, authCodeUrl]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error, message]
+
+    CommandResult:
+      type: object
+      description: コマンド実行結果（システムメッセージとしてスレッドにも表示される）
+      properties:
+        commandName:
+          type: string
+          example: "!tell"
+        success:
+          type: boolean
+        systemMessage:
+          type: string
+          description: スレッドに追加されたシステムメッセージの本文
+      required: [commandName, success]
+
+# =============================================
+# パス定義
+# =============================================
+paths:
+
+  # -----------------------------------------
+  # 認証
+  # -----------------------------------------
+  /api/auth/auth-code:
+    post:
+      operationId: verifyAuthCode
+      summary: 認証コード検証
+      description: |
+        6桁認証コードと Turnstile トークンを検証し、edge-token を有効化する。
+        成功時に edge-token Cookie が有効化される。
+      tags: [認証]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyAuthCodeRequest"
+      responses:
+        "200":
+          description: 認証成功。edge-token が有効化される
+          headers:
+            Set-Cookie:
+              description: edge-token Cookie（有効化済み）
+              schema:
+                type: string
+        "400":
+          description: 認証失敗（コード不正/期限切れ/Turnstile失敗）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # スレッド
+  # -----------------------------------------
+  /api/threads:
+    get:
+      operationId: listThreads
+      summary: スレッド一覧取得
+      description: |
+        最終書き込み日時の新しい順に最大50件のスレッドを返す。
+      tags: [スレッド]
+      responses:
+        "200":
+          description: スレッド一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  threads:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Thread"
+                    maxItems: 50
+
+    post:
+      operationId: createThread
+      summary: スレッド作成
+      description: |
+        新しいスレッドを作成する。1件目のレスとして本文が書き込まれる。
+        未認証の場合は 401 で認証コード案内を返す。
+      tags: [スレッド]
+      security:
+        - edgeTokenCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateThreadRequest"
+      responses:
+        "201":
+          description: スレッド作成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Thread"
+        "400":
+          description: バリデーションエラー（タイトル空/文字数超過等）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証。認証コード案内を返す
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthCodeIssuedResponse"
+          headers:
+            Set-Cookie:
+              description: edge-token Cookie（未有効化）+ 認証コード
+              schema:
+                type: string
+
+  /api/threads/{threadId}:
+    get:
+      operationId: getThread
+      summary: スレッド閲覧（レス一覧）
+      description: |
+        スレッド内の全レスを書き込み順（レス番号順）に返す。
+      tags: [スレッド]
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: スレッドの詳細とレス一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  thread:
+                    $ref: "#/components/schemas/Thread"
+                  posts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+        "404":
+          description: スレッドが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # 書き込み
+  # -----------------------------------------
+  /api/threads/{threadId}/posts:
+    post:
+      operationId: createPost
+      summary: 書き込み（レス投稿）
+      description: |
+        スレッドにレスを書き込む。
+        本文中に !command を含む場合はコマンドとして解析・実行される。
+        未認証の場合は 401 で認証コード案内を返す。
+
+        レスポンスには書き込まれたレスと、コマンド実行結果（ある場合）を含む。
+      tags: [書き込み]
+      security:
+        - edgeTokenCookie: []
+        - botApiKey: []
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: 書き込み成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  post:
+                    $ref: "#/components/schemas/Post"
+                  commandResult:
+                    $ref: "#/components/schemas/CommandResult"
+                    nullable: true
+                    description: コマンドが含まれていた場合のみ
+                  bonuses:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        amount:
+                          type: integer
+                    description: 付与されたボーナス一覧
+        "400":
+          description: バリデーションエラー（本文空等）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証。認証コード案内を返す
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthCodeIssuedResponse"
+        "404":
+          description: スレッドが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # マイページ
+  # -----------------------------------------
+  /api/mypage:
+    get:
+      operationId: getMypage
+      summary: マイページ情報取得
+      description: |
+        ユーザーの基本情報（アカウント種別、通貨残高、ストリーク）を返す。
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: マイページ情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/mypage/username:
+    put:
+      operationId: setUsername
+      summary: ユーザーネーム設定
+      description: |
+        有料ユーザーのみ。ユーザーネームを設定/変更する。
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUsernameRequest"
+      responses:
+        "200":
+          description: 設定成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+        "403":
+          description: 無料ユーザーは設定不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/mypage/upgrade:
+    post:
+      operationId: upgradeToPremium
+      summary: 課金（モック実装）
+      description: |
+        無料ユーザーを有料ユーザーに切り替える。
+        MVPでは実決済なし。ボタン押下で即時切り替え。
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: 有料ユーザーに切り替え成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isPremium:
+                    type: boolean
+                    example: true
+        "409":
+          description: 既に有料ユーザー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/mypage/history:
+    get:
+      operationId: getPostHistory
+      summary: 書き込み履歴取得
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: 書き込み履歴
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PostHistory"
+                  total:
+                    type: integer
+
+  /api/mypage/notifications:
+    get:
+      operationId: getNotifications
+      summary: 通知一覧取得
+      description: |
+        Phase 2以降で本格利用。Phase 1では枠として存在。
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: 通知一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+
+  # -----------------------------------------
+  # 通貨
+  # -----------------------------------------
+  /api/currency/balance:
+    get:
+      operationId: getCurrencyBalance
+      summary: 通貨残高取得
+      tags: [通貨]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: 通貨残高
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrencyBalance"
+
+  # -----------------------------------------
+  # 管理者
+  # -----------------------------------------
+  /api/admin/login:
+    post:
+      operationId: adminLogin
+      summary: 管理者ログイン
+      tags: [管理者]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginRequest"
+      responses:
+        "200":
+          description: ログイン成功
+          headers:
+            Set-Cookie:
+              description: admin_session Cookie
+              schema:
+                type: string
+        "401":
+          description: 認証失敗
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/posts/{postId}:
+    delete:
+      operationId: adminDeletePost
+      summary: レス削除（管理者）
+      description: |
+        指定レスを論理削除する。
+        表示位置に「このレスは削除されました」と表示される。
+        レス番号は保持。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 削除成功
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: レスが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/threads/{threadId}:
+    delete:
+      operationId: adminDeleteThread
+      summary: スレッド削除（管理者）
+      description: |
+        スレッドと全レスを論理削除する。
+        スレッド一覧から消える。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: 削除成功
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: スレッドが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # 5ch専ブラ互換 API
+  # -----------------------------------------
+  /bbsmenu.html:
+    get:
+      operationId: getBbsMenu
+      summary: 板一覧メニュー
+      description: |
+        専ブラの板メニューに登録するためのHTML。
+        Shift_JIS（CP932）エンコーディング。
+      tags: [専ブラ互換]
+      responses:
+        "200":
+          description: 板一覧HTML
+          content:
+            text/html:
+              schema:
+                type: string
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: "text/html; charset=Shift_JIS"
+
+  /{boardId}/subject.txt:
+    get:
+      operationId: getSubjectTxt
+      summary: スレッド一覧（subject.txt）
+      description: |
+        スレッドキー.dat<>タイトル (レス数) 形式。
+        bump順（最終書き込み順）。Shift_JIS。
+      tags: [専ブラ互換]
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: subject.txt
+          content:
+            text/plain:
+              schema:
+                type: string
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: "text/plain; charset=Shift_JIS"
+
+  /{boardId}/dat/{threadKey}.dat:
+    get:
+      operationId: getDatFile
+      summary: スレッドデータ（DATファイル）
+      description: |
+        名前<>メール<>日付とID<>本文<>スレッドタイトル 形式。
+        Shift_JIS。Range ヘッダによる差分取得に対応。
+      tags: [専ブラ互換]
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: threadKey
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+            example: "bytes=15024-"
+        - name: If-Modified-Since
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: DAT全体
+          content:
+            text/plain:
+              schema:
+                type: string
+        "206":
+          description: 差分データ（Partial Content）
+          content:
+            text/plain:
+              schema:
+                type: string
+        "304":
+          description: 更新なし
+
+  /{boardId}/SETTING.TXT:
+    get:
+      operationId: getSettingTxt
+      summary: 板設定（SETTING.TXT）
+      tags: [専ブラ互換]
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SETTING.TXT
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /test/bbs.cgi:
+    post:
+      operationId: bbsCgi
+      summary: 書き込み/スレッド作成（bbs.cgi）
+      description: |
+        専ブラからの書き込み・スレッド作成リクエスト。
+        application/x-www-form-urlencoded（Shift_JIS）。
+        コマンド（!tell等）を含む場合はコマンドとして実行される。
+
+        レスポンスはHTMLで、<title>タグの内容で成否を判定:
+        - 成功: 「書きこみました」
+        - エラー: 「ＥＲＲＯＲ」
+        - 認証要求: 認証コード案内
+      tags: [専ブラ互換]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                bbs:
+                  type: string
+                  description: 板ID
+                key:
+                  type: string
+                  description: スレッドキー（新規作成時は空）
+                FROM:
+                  type: string
+                  description: 名前
+                mail:
+                  type: string
+                  description: メール欄（sage等）
+                MESSAGE:
+                  type: string
+                  description: 本文（コマンド含む可能性あり）
+                subject:
+                  type: string
+                  description: スレッドタイトル（新規作成時のみ）
+                submit:
+                  type: string
+                  description: 送信ボタンキャプション
+                time:
+                  type: string
+                  description: UNIXタイムスタンプ
+            encoding:
+              bbs:
+                contentType: text/plain; charset=Shift_JIS
+      responses:
+        "200":
+          description: 書き込み成功/エラー（HTMLで返却）
+          content:
+            text/html:
+              schema:
+                type: string

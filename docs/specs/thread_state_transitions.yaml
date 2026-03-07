@@ -1,0 +1,113 @@
+# D-05 スレッド（Thread）状態遷移仕様書
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1 + Phase 2 (MVP)
+
+entity: Thread
+description: >
+  スレッドの表示状態と一覧上の可視性に関する遷移を定義する。
+  スレッドタイプは現在「ノーマルタイプ」のみ。
+
+# =============================================
+# スレッドの状態
+# =============================================
+states:
+  - name: listed
+    label: 一覧表示中
+    description: >
+      スレッド一覧（最新50件）に表示されている状態。
+      最終書き込み日時でソートされ、新しいものが上に来る。
+    initial: true
+
+  - name: unlisted
+    label: 一覧非表示
+    description: >
+      スレッドが51件目以降となり、一覧に表示されていない状態。
+      URLを知っていれば閲覧・書き込みは可能。
+      書き込みがあれば last_post_at が更新され、一覧に復活しうる。
+
+  - name: deleted
+    label: 削除済み
+    description: >
+      管理者により削除された状態。
+      一覧から消え、全レスも削除扱いとなる。
+      URLでのアクセスも不可。
+
+# =============================================
+# 状態遷移
+# =============================================
+transitions:
+  - from: listed
+    to: unlisted
+    trigger: 他スレッドの書き込みにより順位が51位以下に落ちる
+    guard:
+      - アクティブなスレッド数が50件を超える
+      - 当該スレッドの last_post_at が51位以下
+    action:
+      - 一覧表示から除外（動的クエリによる自動判定）
+    feature_ref: thread.feature#スレッド一覧には最新50件のみ表示される
+    note: >
+      明示的な状態フラグではなく、last_post_at によるソートの結果として
+      動的に決定される。DBに unlisted フラグは持たない。
+
+  - from: unlisted
+    to: listed
+    trigger: 一覧外のスレッドに書き込みがある
+    action:
+      - last_post_at を更新
+      - 一覧表示に復活（ソート順で上位50件に入る）
+    feature_ref: thread.feature#一覧外のスレッドに書き込むと一覧に復活する
+
+  - from: listed
+    to: deleted
+    trigger: 管理者によるスレッド削除
+    guard:
+      - 操作者が管理者権限を持つ
+    action:
+      - is_deleted = true に更新
+      - 一覧から除外
+      - 全レスも削除扱い
+    feature_ref: admin.feature#管理者が指定したスレッドを削除する
+
+  - from: unlisted
+    to: deleted
+    trigger: 管理者によるスレッド削除
+    guard:
+      - 操作者が管理者権限を持つ
+    action:
+      - is_deleted = true に更新
+      - 全レスも削除扱い
+    feature_ref: admin.feature#管理者が指定したスレッドを削除する
+
+# =============================================
+# 一覧表示ルール
+# =============================================
+listing_rules:
+  max_listed: 50
+  sort_key: last_post_at DESC
+  filter: is_deleted = false
+  note: >
+    一覧表示の50件制限は threads テーブルへのフラグではなく、
+    クエリの LIMIT 50 + ORDER BY last_post_at DESC で実現する。
+    listed/unlisted は概念上の状態であり、DBに明示的なカラムは持たない。
+
+# =============================================
+# インセンティブ関連の条件
+# =============================================
+incentive_conditions:
+  thread_growth:
+    description: スレッド成長ボーナスの判定条件
+    milestones:
+      - post_count: 10
+        unique_ids: 3
+        bonus: 50
+      - post_count: 100
+        unique_ids: 10
+        bonus: 100
+    recipient: スレッド作成者（created_by）
+    feature_ref: incentive.feature#スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
+
+  inactive_thread:
+    description: 低活性スレッド判定（スレッド復興ボーナスの前提条件）
+    condition: "last_post_at < NOW() - INTERVAL '24 hours'"
+    feature_ref: incentive.feature#低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと +10 ボーナスが付与される

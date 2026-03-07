@@ -1,0 +1,71 @@
+# D-06 画面要素定義書: 認証コード入力
+# ステータス: ドラフト
+# 作成日: 2026-03-07
+# 対象: Phase 1
+
+screen_id: SCR-004
+name: 認証コード入力
+route: /auth/auth-code
+description: >
+  未認証ユーザーが書き込みを試みた際にリダイレクトされる認証画面。
+  6桁認証コードの入力と Cloudflare Turnstile CAPTCHA を含む。
+
+api_dependencies:
+  - POST /api/auth/auth-code (verifyAuthCode)
+
+# =============================================
+# 画面要素
+# =============================================
+elements:
+  - id: auth-header
+    type: heading
+    content: 書き込み認証
+
+  - id: auth-description
+    type: text
+    content: >
+      書き込みするには認証コードの入力が必要です。
+      以下のコードを入力してください。
+
+  - id: auth-code-display
+    type: text
+    description: 発行された6桁認証コードの表示
+    source: authCode
+    style: large, monospace, highlight
+    note: >
+      認証コードは画面に表示される（メール送信ではない）。
+      ボット防止が目的であり、人間であることの確認のみ。
+
+  - id: auth-form
+    type: form
+    fields:
+      - id: auth-code-input
+        type: text-input
+        label: 認証コード
+        placeholder: 6桁の数字を入力
+        maxLength: 6
+        pattern: "[0-9]{6}"
+        inputMode: numeric
+        required: true
+
+      - id: turnstile-widget
+        type: component
+        description: Cloudflare Turnstile CAPTCHA ウィジェット
+        note: 自動的にチャレンジが実行される
+
+      - id: auth-submit-btn
+        type: button
+        label: 認証する
+        action: POST /api/auth/auth-code
+
+  - id: auth-error
+    type: text
+    condition: 認証失敗時
+    style: error
+    content: 認証に失敗しました。もう一度お試しください。
+
+  - id: auth-expires
+    type: text
+    description: 認証コードの有効期限表示
+    format: "有効期限: 残り {remainingSeconds} 秒"
+    style: muted
