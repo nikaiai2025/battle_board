@@ -34,7 +34,6 @@
 | 状態遷移仕様書 (D-05) | `docs/specs/{entity}_state_transitions.yaml` |
 | 画面要素定義書 (D-06) | `docs/specs/screens/{screen_id}.yaml` |
 | アーキテクチャ設計書 (D-07) | `docs/architecture/architecture.md` |
-| コンポーネント設計書 (D-08) | `docs/architecture/components/{component}.md` |
 | 内部BDDシナリオ | `features/internal/*.feature` |
 
 ## ソースコード
