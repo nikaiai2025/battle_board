@@ -1,0 +1,99 @@
+# D-08 コンポーネント境界設計書: Posting（書き込み）
+
+> ステータス: ドラフト / 2026-03-08
+> 関連D-07: § 3.2 PostService / § 7 投稿処理の原子性
+
+---
+
+## 1. 分割方針
+
+「書き込みという行為に伴う副作用の統括」を単一の責務とする。
+Web API・専ブラ互換Adapterの2経路が存在するため、経路ごとに散らばりがちな副作用処理（コマンド転送・インセンティブ判定・日次ID生成等）を本コンポーネントに集約し、**経路に依存しない一貫した処理保証**を実現する。
+
+コマンド実行・通貨操作・インセンティブ判定を自身のサービスから分離する理由は、それぞれが独立したトランザクション失敗ポリシーを持つため（書き込みを巻き戻さずコマンドだけスキップする等）。
+
+---
+
+## 2. 公開インターフェース
+
+### 2.1 入力型（PostInput）
+
+両経路が共通して渡すべき正規化済み構造体。経路固有の情報（Shift_JIS / form-urlencoded 等）はAdapterで除去済みであること。
+
+```
+PostInput {
+  threadId:   UUID
+  body:       string          // UTF-8済み本文
+  edgeToken:  string | null   // 未認証時はnull → 認証フロー起動
+  ipHash:     string          // 発行時IPのSHA-512ハッシュ
+  displayName?: string        // 省略 → "名無しさん"
+  email?:     string          // 省略 → ""
+  isBotWrite: boolean         // BotServiceからの呼び出し時true（認証スキップ用）
+}
+```
+
+`isBotWrite` フラグの扱い：edge-token検証をスキップするが、それ以外の処理（コマンド・インセンティブ等）は人間と同一パスを通る。ボットか人間かをこのコンポーネント以下で意識させない。
+
+### 2.2 出力型（PostResult）
+
+```
+PostResult {
+  postId:          UUID
+  postNumber:      number
+  systemMessages:  { postId: UUID; body: string }[]  // 同一Txで挿入されたシステムメッセージ
+  authRequired?:   { code: string; token: string }    // edgeTokenがnullだった場合のみ
+}
+```
+
+### 2.3 その他公開操作
+
+| 操作 | 用途 |
+|---|---|
+| `createThread(ThreadInput)` | スレッド新規作成 |
+| `getThreadList(boardId, cursor?)` | 一覧取得（subject.txt / Web UI共用） |
+| `getPostList(threadId, range?)` | レス取得（.dat Range / Web UI共用） |
+
+---
+
+## 3. 依存関係
+
+### 3.1 依存先
+
+| コンポーネント | 依存の性質 |
+|---|---|
+| AuthService | `createPost` 冒頭でedge-token検証。未認証時は認証フローをAuthServiceに委譲し、PostResultに認証情報を添付して早期リターン |
+| CommandService | 本文中にコマンドを検出した場合のみ呼び出す。失敗しても書き込みはコミット済み |
+| IncentiveService | 書き込み成功後に呼び出す。失敗しても書き込みを巻き戻さない |
+| PostRepository | 書き込みレコードのINSERT、スレッド内レスの取得 |
+| ThreadRepository | post_count / last_post_at の更新、スレッド取得 |
+| UserRepository | ユーザー特定・streak更新 |
+| `domain/rules/daily-id` | 日次リセットID生成（純粋関数。副作用なし） |
+| `domain/rules/command-parser` | コマンド有無の検出（純粋関数。副作用なし） |
+
+### 3.2 被依存（呼び出し元）
+
+```
+Web APIルートハンドラ  →  PostService
+専ブラ互換Adapter      →  PostService
+BotService             →  PostService（isBotWrite=trueで呼び出す）
+```
+
+---
+
+## 4. 隠蔽する実装詳細
+
+- トランザクション境界の実装（Supabase RPC / pg関数 / アプリ層での逐次実行 のいずれか）
+- レス番号採番の排他制御方式（SERIALIZABLEかアドバイザリロックか）
+- `bot_posts` テーブルへのレコード挿入タイミング（PostServiceが行うのかBotServiceが後続で行うのか）→ **BotServiceが `createPost` 完了後に `bot_posts` INSERTを行う**責務とし、PostService内では意識しない
+
+---
+
+## 5. 設計上の判断
+
+### コマンド検出を Parsing と Execution に分離
+
+`command-parser`（純粋関数）でコマンドの有無だけを検出し、CommandServiceに渡す。PostServiceはコマンドの種類・コストを知らない。これによりコマンド仕様の変更がPostServiceに波及しない。
+
+### `getThreadList` / `getPostList` の共用
+
+Web UI（SSR）と専ブラ互換Adapterは同一のクエリ結果を使う。フォーマット変換（DAT形式・JSON等）はそれぞれの呼び出し元が行う。PostServiceはUTF-8のドメインオブジェクトを返すのみ。

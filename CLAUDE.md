@@ -25,16 +25,17 @@
 
 ## 仕様ドキュメント
 
-| ドキュメント | パス |
-|---|---|
-| 要件定義書 (D-01) | `docs/requirements/requirements.md` |
-| ユビキタス言語辞書 (D-02) | `docs/requirements/ubiquitous_language.yaml` |
-| BDDシナリオ集 (D-03) | `features/*.feature` |
-| OpenAPI仕様書 (D-04) | `docs/specs/openapi.yaml` |
-| 状態遷移仕様書 (D-05) | `docs/specs/{entity}_state_transitions.yaml` |
-| 画面要素定義書 (D-06) | `docs/specs/screens/{screen_id}.yaml` |
-| アーキテクチャ設計書 (D-07) | `docs/architecture/architecture.md` |
-| 内部BDDシナリオ | `features/internal/*.feature` |
+| ドキュメント | パス | 説明 |
+|---|---|---|
+| 要件定義書 (D-01) | `docs/requirements/requirements.md` | ビジネス要件・ユーザーストーリー・非機能要件を統合した要件の正本 |
+| ユビキタス言語辞書 (D-02) | `docs/requirements/ubiquitous_language.yaml` | ドメイン用語の定義集。全ドキュメント・コードで用語を統一するための権威源 |
+| BDDシナリオ集 (D-03) | `features/*.feature` | 受け入れ基準となる振る舞いシナリオ集。UIの振る舞いも含む単一ソース |
+| OpenAPI仕様書 (D-04) | `docs/specs/openapi.yaml` | APIインターフェースの単一ソース。スタブ生成・バリデーションの根拠 |
+| 状態遷移仕様書 (D-05) | `docs/specs/{entity}_state_transitions.yaml` | エンティティの状態と遷移条件を機械可読形式で定義 |
+| 画面要素定義書 (D-06) | `docs/specs/screens/{screen_id}.yaml` | UI要素の静的カタログ（ID・種類・ラベル）。振る舞いはD-03で定義 |
+| アーキテクチャ設計書 (D-07) | `docs/architecture/architecture.md` | 技術的実現方針と技術的意思決定記録（TDR）を含む設計書 |
+| コンポーネント境界設計書 (D-08) | `docs/architecture/components/{component}.md` | コンポーネントの分割方針・責務の割り当て・依存関係等 |
+
 
 ## ソースコード
 
