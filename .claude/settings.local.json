@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs ls -la)"
+      "Bash(xargs ls -la)",
+      "Bash(npm install:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx cucumber-js:*)"
     ]
   }
 }

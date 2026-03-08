@@ -766,7 +766,16 @@ src/
   workflows/
     bot-scheduler.yml               # 運営ボット定期実行
     daily-maintenance.yml           # 日次メンテナンス（ID/BOTマーク リセット等）
+
+supabase/
+  migrations/
+    {timestamp}_create_tables.sql   # テーブル作成（threads, posts, users, currencies 等）
+    {timestamp}_create_indexes.sql  # インデックス定義（§11.2）
+    {timestamp}_rls_policies.sql    # RLSポリシー（§10.1.1）
+  config.toml                       # Supabase CLI 設定（自動生成）
 ```
+
+> **マイグレーション管理方針（TDR-005）**: DBスキーマ変更は必ず `supabase migration new {name}` でファイルを作成し、`supabase db push` で適用する。Supabase ダッシュボードやpsqlでの直接実行は禁止し、全変更をリポジトリで追跡する。
 
 ---
 
@@ -905,6 +914,17 @@ src/
 - **決定日**: 2026-03-07
 - **対象**: ホットレスボーナス、スレッド復興ボーナス
 - **理由**: 条件が「未来の書き込み」に依存するため、書き込み時点での判定が不可能。後続の書き込みトランザクション内で過去レスをチェックして発火する（メッセージキュー等の非同期基盤は使用しない）
+
+### TDR-005: DBマイグレーション管理に Supabase CLI を採用
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-08
+- **方針**:
+  - `supabase/migrations/{timestamp}_{name}.sql` 形式でマイグレーションファイルをバージョン管理する
+  - マイグレーション適用は `supabase db push` コマンドで行う
+  - 新規マイグレーションファイルは `supabase migration new {name}` で作成する
+  - 生SQL手動実行は禁止（CLI経由のみ）。適用済みSQLはファイルとして必ずリポジトリに残す
+- **理由**: マイグレーション履歴をコードとして追跡し、Supabase ダッシュボードでの直接手動実行による管理不能な状態を防ぐ
 
 ---
 
