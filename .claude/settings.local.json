@@ -6,7 +6,9 @@
       "Bash(mkdir:*)",
       "Bash(touch:*)",
       "Bash(npx vitest:*)",
-      "Bash(npx cucumber-js:*)"
+      "Bash(npx cucumber-js:*)",
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
