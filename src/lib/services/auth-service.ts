@@ -21,6 +21,7 @@ import { supabaseAdmin } from '../infrastructure/supabase/client'
 import * as UserRepository from '../infrastructure/repositories/user-repository'
 import * as AuthCodeRepository from '../infrastructure/repositories/auth-code-repository'
 import { verifyTurnstileToken } from '../infrastructure/external/turnstile-client'
+import { initializeBalance } from './currency-service'
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -203,6 +204,10 @@ export async function issueEdgeToken(
     isPremium: false,
     username: null,
   })
+
+  // 新規ユーザーに初期通貨 50 を付与する
+  // See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+  await initializeBalance(user.id)
 
   return { token, userId: user.id }
 }

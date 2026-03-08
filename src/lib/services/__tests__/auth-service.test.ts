@@ -7,6 +7,7 @@
  * テスト方針:
  *   - UserRepository, AuthCodeRepository, TurnstileClient はモック化する
  *   - Supabase Admin クライアントはモック化する
+ *   - CurrencyService はモック化する（issueEdgeToken が initializeBalance を呼ぶため）
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
  */
 
@@ -41,6 +42,12 @@ vi.mock('@/lib/infrastructure/external/turnstile-client', () => ({
   verifyTurnstileToken: vi.fn(),
 }))
 
+// currency-service をモック化する（issueEdgeToken 内で initializeBalance が呼ばれるため）
+// See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+vi.mock('@/lib/services/currency-service', () => ({
+  initializeBalance: vi.fn(),
+}))
+
 // ---------------------------------------------------------------------------
 // インポート（モック宣言後）
 // ---------------------------------------------------------------------------
@@ -58,6 +65,7 @@ import {
 import * as UserRepository from '@/lib/infrastructure/repositories/user-repository'
 import * as AuthCodeRepository from '@/lib/infrastructure/repositories/auth-code-repository'
 import * as TurnstileClient from '@/lib/infrastructure/external/turnstile-client'
+import * as CurrencyService from '@/lib/services/currency-service'
 import { supabaseAdmin } from '@/lib/infrastructure/supabase/client'
 
 // ---------------------------------------------------------------------------
@@ -288,6 +296,11 @@ describe('AuthService', () => {
   // =========================================================================
 
   describe('issueEdgeToken', () => {
+    beforeEach(() => {
+      // initializeBalance は常に成功するデフォルトモックを設定する
+      vi.mocked(CurrencyService.initializeBalance).mockResolvedValue(undefined)
+    })
+
     describe('正常系', () => {
       it('新しい edge-token とユーザーIDを返す', async () => {
         const user = makeUser({ id: 'new-user-uuid', authToken: 'generated-token' })
@@ -335,6 +348,18 @@ describe('AuthService', () => {
             username: null,
           })
         )
+      })
+
+      it('新規ユーザー登録時に CurrencyService.initializeBalance を呼び出す', async () => {
+        // See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+        const user = makeUser({ id: 'user-for-currency-init' })
+        vi.mocked(UserRepository.create).mockResolvedValue(user)
+
+        await issueEdgeToken('ip-hash-abc123')
+
+        // ユーザー作成後に initializeBalance がユーザーIDで呼ばれることを検証する
+        expect(CurrencyService.initializeBalance).toHaveBeenCalledWith('user-for-currency-init')
+        expect(CurrencyService.initializeBalance).toHaveBeenCalledTimes(1)
       })
     })
 
