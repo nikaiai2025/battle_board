@@ -188,6 +188,49 @@ BattleBoard は「5chライクな匿名掲示板 + AIボット混在 + ゲーミ
 | **Accusation** | 告発の成功/失敗判定・重複チェック・ボーナス計算 |
 | **Incentive** | 各ボーナスイベントの発火条件・金額計算 |
 
+### 3.3 サービス間依存関係
+
+各サービスの依存先一覧。依存方向は Application → Infrastructure（Repository）が基本。サービス間の依存は PostService を起点としたファンアウト構造。
+
+```
+PostService
+  ├── PostRepository, ThreadRepository, UserRepository
+  ├── CommandService, IncentiveService, AuthService
+
+CommandService
+  ├── CommandParser, CommandHandlerRegistry
+  ├── CurrencyService, AccusationService, BotService
+  └── PostRepository（システムメッセージ INSERT）
+
+AccusationService
+  ├── PostRepository, BotRepository, AccusationRepository
+  └── CurrencyService
+
+BotService
+  ├── BotRepository, PostRepository
+  ├── CurrencyService, AuthService
+
+CurrencyService
+  └── CurrencyRepository
+
+IncentiveService
+  ├── CurrencyService, IncentiveLogRepository
+  ├── PostRepository, ThreadRepository, UserRepository
+
+AuthService
+  ├── AuthCodeRepository, UserRepository
+  ├── TurnstileClient, SupabaseAuth
+
+AdminService
+  ├── PostRepository, ThreadRepository
+  └── AuditLogRepository
+
+専ブラ互換 Adapter
+  ├── ShiftJisEncoder, DatFormatter, SubjectFormatter
+  ├── BbsCgiParser, BbsCgiResponseBuilder
+  └── PostService, ThreadRepository, PostRepository
+```
+
 #### Infrastructure Layer（インフラ層）
 
 | コンポーネント | 責務 |
@@ -196,7 +239,7 @@ BattleBoard は「5chライクな匿名掲示板 + AIボット混在 + ゲーミ
 | **Encoding** | Shift_JIS ↔ UTF-8 変換（iconv-lite）。専ブラ互換 Adapter から利用 |
 | **External API Client** | Cloudflare Turnstile 検証 API・AI API（GitHub Actions 経由）|
 
-### 3.3 2経路の統一処理フロー
+### 3.4 2経路の統一処理フロー
 
 **設計原則 P-1** に基づき、Web と専ブラの2経路は Presentation Layer で分岐し、Application Layer 以下は共通のサービスを通る。
 
@@ -480,9 +523,11 @@ daily_reset_id = truncate(sha256(
 ), 8)
 ```
 
+- `reduced_ip` の定義: IPv4 はそのまま、IPv6 は先頭48ビット（/48 プレフィックス）に縮約（同一回線判定）
 - 同日・同回線で同一IDになりやすい
 - Cookie削除・再認証後も同一性が継続しうる（IP依存度: 強め）
 - 翌日（JST 0:00）にリセットされる
+- IP整合チェック方針: edge-token 使用時に発行時IPと比較し、不一致時は**警告ログ記録のみで通過**させる（モバイル回線等のIP変動を考慮）
 
 ### 5.3 管理者認証
 
@@ -541,6 +586,7 @@ app/
 | **HTMLエスケープ** | 本文の `<`, `>`, `"` を `&lt;`, `&gt;`, `&quot;` に変換 |
 | **改行変換** | 本文の改行を `<br>` に変換（DAT上では1レス=1物理行） |
 | **システムメッセージ統合** | コマンド実行結果のシステムメッセージを後続レスとして DAT に含める |
+| **BOTマーク絵文字変換** | `🤖` 等の絵文字は Shift_JIS 変換不可のため、DAT出力時は `[BOT]` テキスト代替に置換。Web UI では絵文字をそのまま表示 |
 
 ### 6.3 認証連携（専ブラ）
 
@@ -572,9 +618,17 @@ BEGIN TRANSACTION
 COMMIT
 ```
 
-### 7.2 遅延評価ボーナス
+### 7.2 同時実行制御
 
-以下のボーナスは、条件が「未来の書き込み」に依存するため、書き込み時点では確定しない。**後続の書き込みトランザクション内で**過去レスをチェックして発火する（メッセージキューやバックグラウンドジョブではない）。
+| 対象 | 方式 | 備考 |
+|---|---|---|
+| レス番号採番 | SERIALIZABLE またはアドバイザリロック | `(thread_id, post_number)` UNIQUE制約で最終防衛 |
+| 通貨操作 | 楽観的ロック (`WHERE balance >= :cost`) | TDR-003 参照 |
+| インセンティブ重複 | `ON CONFLICT DO NOTHING` | incentive_logs のユニーク制約で冪等性担保 |
+
+### 7.3 遅延評価ボーナス
+
+以下のボーナスは、条件が「未来の書き込み」に依存するため、書き込み時点では確定しない。**後続の書き込みトランザクション内で**過去レスをチェックして発火する（メッセージキューやバックグラウンドジョブではない）。インセンティブの判定エラーは書き込み自体を巻き戻さない（ボーナスをスキップしてエラーログに記録、後で手動補填可能）。
 
 | 処理 | 評価タイミング | 理由 |
 |---|---|---|
@@ -582,7 +636,7 @@ COMMIT
 | **スレッド復興ボーナス** | 後続の書き込み時 | 30分以内に別ユーザーのレスが付くか、書き込み時点では未確定 |
 | **スレッド成長ボーナス** | 後続の書き込み時 | マイルストーン（10件/100件）到達 + ユニークID数の検証が必要 |
 
-### 7.3 失敗時の方針
+### 7.4 失敗時の方針
 
 **原則: 書き込みの成功を最優先する。** コマンドやボーナスの失敗で書き込み自体を巻き戻さない。
 
