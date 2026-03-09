@@ -1,0 +1,195 @@
+/**
+ * PostItem — 1レスの表示コンポーネント（共用コンポーネント）
+ *
+ * - レス番号、表示名、日次ID、書き込み日時、本文を表示
+ * - 削除済みレスは「このレスは削除されました」と表示
+ * - 本文内の >>N 形式のアンカーをページ内リンクに変換
+ * - dangerouslySetInnerHTML 禁止（白スペース表示は white-space: pre-wrap で対応）
+ * - 日時フォーマット: YYYY/MM/DD(ddd) HH:mm:ss
+ *
+ * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/phase1/thread.feature @レス内のアンカーで他のレスを参照できる
+ * See: docs/specs/screens/thread-view.yaml > elements > post-list > itemTemplate
+ * See: docs/architecture/components/web-ui.md §6 > dangerouslySetInnerHTML使用禁止
+ */
+
+import Link from "next/link";
+
+// ---------------------------------------------------------------------------
+// 型定義
+// ---------------------------------------------------------------------------
+
+/** APIから返されるPostデータの型 */
+export interface Post {
+  id: string;
+  threadId: string;
+  postNumber: number;
+  displayName: string;
+  dailyId: string;
+  body: string;
+  isSystemMessage: boolean;
+  isDeleted: boolean;
+  botMark?: { hp: number; maxHp: number } | null;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// ユーティリティ関数
+// ---------------------------------------------------------------------------
+
+/** 曜日の表示名（日本語） */
+const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"] as const;
+
+/**
+ * 日時を YYYY/MM/DD(ddd) HH:mm:ss 形式にフォーマットする。
+ *
+ * See: docs/specs/screens/thread-view.yaml > post-datetime > format
+ *
+ * @param dateStr - ISO8601形式の日時文字列
+ * @returns フォーマット済み日時文字列
+ */
+export function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const dayName = DAY_NAMES[date.getDay()];
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+
+  return `${year}/${month}/${day}(${dayName}) ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * 本文内の >>N 形式アンカーを解析してReact要素配列に変換する。
+ *
+ * dangerouslySetInnerHTML を使わずに Reactの標準エスケープを利用する。
+ * >> の後に続く数字列をページ内リンク（#post-N）に変換する。
+ *
+ * See: features/phase1/thread.feature @レス内のアンカーで他のレスを参照できる
+ * See: docs/architecture/components/web-ui.md §6 > dangerouslySetInnerHTML使用禁止
+ *
+ * @param body - 本文テキスト
+ * @returns アンカーリンク変換済みのReact要素配列
+ */
+export function parseAnchorLinks(
+  body: string
+): (string | React.ReactElement)[] {
+  // >>N 形式を分割するための正規表現
+  const anchorPattern = /(>>(\d+))/g;
+  const parts: (string | React.ReactElement)[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = anchorPattern.exec(body)) !== null) {
+    // アンカーより前のテキスト部分を追加
+    if (match.index > lastIndex) {
+      parts.push(body.slice(lastIndex, match.index));
+    }
+    // アンカーリンクをReact要素として追加
+    const postNumber = match[2];
+    parts.push(
+      <Link
+        key={`anchor-${match.index}`}
+        href={`#post-${postNumber}`}
+        className="text-blue-600 hover:underline"
+      >
+        {match[1]}
+      </Link>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  // 末尾の残りテキストを追加
+  if (lastIndex < body.length) {
+    parts.push(body.slice(lastIndex));
+  }
+
+  return parts;
+}
+
+// ---------------------------------------------------------------------------
+// コンポーネント
+// ---------------------------------------------------------------------------
+
+interface PostItemProps {
+  post: Post;
+}
+
+/**
+ * 1レスの表示コンポーネント（PostList・PostListLiveWrapper の両方から使用）
+ *
+ * See: docs/specs/screens/thread-view.yaml > elements > post-list > itemTemplate
+ */
+export default function PostItem({ post }: PostItemProps) {
+  // 削除済みレスの場合は代替テキストを表示
+  // See: docs/specs/screens/thread-view.yaml > post-body > conditions > isDeleted
+  const isDeleted = post.isDeleted;
+
+  // システムメッセージの場合は背景色を変える
+  // See: docs/specs/screens/thread-view.yaml > post-display-name > style > system_message
+  const isSystemMessage = post.isSystemMessage;
+
+  return (
+    <article
+      id={`post-${post.postNumber}`}
+      className={`py-2 border-b border-gray-200 text-sm ${
+        isSystemMessage ? "bg-yellow-50" : ""
+      }`}
+    >
+      {/* レスヘッダー行: レス番号・表示名・日次ID・日時
+          See: docs/specs/screens/thread-view.yaml > post-header */}
+      <div className="flex flex-wrap items-center gap-2 mb-1">
+        {/* post-number: レス番号（>>N 形式、太字）
+            See: docs/specs/screens/thread-view.yaml > post-number */}
+        <span className="font-bold text-gray-700">
+          &gt;&gt;{post.postNumber}
+        </span>
+
+        {/* post-display-name: 表示名
+            See: docs/specs/screens/thread-view.yaml > post-display-name */}
+        <span
+          className={`font-semibold ${
+            isSystemMessage ? "text-red-700" : "text-green-700"
+          }`}
+        >
+          {isSystemMessage ? `[システム] ${post.displayName}` : post.displayName}
+        </span>
+
+        {/* post-daily-id: 日次リセットID
+            See: docs/specs/screens/thread-view.yaml > post-daily-id */}
+        <span className="text-gray-500 text-xs">
+          ID:{post.dailyId}
+        </span>
+
+        {/* post-datetime: 書き込み日時（YYYY/MM/DD(ddd) HH:mm:ss）
+            See: docs/specs/screens/thread-view.yaml > post-datetime */}
+        <time
+          className="text-gray-500 text-xs"
+          dateTime={post.createdAt}
+        >
+          {formatDateTime(post.createdAt)}
+        </time>
+      </div>
+
+      {/* post-body: 本文
+          削除済みの場合は削除メッセージを表示。
+          通常は white-space: pre-wrap で改行を表現（dangerouslySetInnerHTML 禁止）。
+          >>N 形式のアンカーはクリック可能なリンクに変換。
+          See: docs/specs/screens/thread-view.yaml > post-body */}
+      <div
+        className={`pl-6 whitespace-pre-wrap break-words ${
+          isDeleted ? "text-gray-400 line-through" : "text-gray-800"
+        }`}
+      >
+        {isDeleted ? (
+          <span className="text-gray-400 not-italic">このレスは削除されました</span>
+        ) : (
+          parseAnchorLinks(post.body)
+        )}
+      </div>
+    </article>
+  );
+}
