@@ -3,12 +3,14 @@
  *
  * See: features/phase1/posting.feature
  * See: features/phase1/thread.feature
+ * See: features/phase1/incentive.feature @PostService経由の統合
  * See: docs/architecture/components/posting.md §2 公開インターフェース
  *
  * テスト方針:
  *   - 依存するリポジトリ・サービスはすべてモック化する（Supabase に依存しない）
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
  *   - エッジケース（空本文・未認証・スレッド不存在等）を網羅する
+ *   - IncentiveService 統合テスト: evaluateOnPost の呼び出し・失敗時の巻き戻し禁止
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -54,6 +56,10 @@ vi.mock('@/lib/services/auth-service', () => ({
   reduceIp: vi.fn(),
 }))
 
+vi.mock('@/lib/services/incentive-service', () => ({
+  evaluateOnPost: vi.fn(),
+}))
+
 vi.mock('@/lib/domain/rules/daily-id', () => ({
   generateDailyId: vi.fn(),
 }))
@@ -74,6 +80,7 @@ import * as PostRepository from '@/lib/infrastructure/repositories/post-reposito
 import * as ThreadRepository from '@/lib/infrastructure/repositories/thread-repository'
 import * as UserRepository from '@/lib/infrastructure/repositories/user-repository'
 import * as AuthService from '@/lib/services/auth-service'
+import * as IncentiveService from '@/lib/services/incentive-service'
 import { generateDailyId } from '@/lib/domain/rules/daily-id'
 
 import type { Post } from '@/lib/domain/models/post'
@@ -141,6 +148,13 @@ describe('PostService', () => {
     vi.clearAllMocks()
     // generateDailyId のデフォルトモック
     vi.mocked(generateDailyId).mockReturnValue('abcd1234')
+    // IncentiveService のデフォルトモック（成功・何も付与しない）
+    vi.mocked(IncentiveService.evaluateOnPost).mockResolvedValue({
+      granted: [],
+      skipped: [],
+    })
+    // PostRepository.findByThreadId のデフォルトモック（アンカー解析用）
+    vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
   })
 
   // =========================================================================
@@ -517,6 +531,276 @@ describe('PostService', () => {
     })
 
     // -----------------------------------------------------------------------
+    // IncentiveService 統合テスト
+    // -----------------------------------------------------------------------
+
+    describe('IncentiveService 統合: 書き込み成功後に evaluateOnPost が呼ばれる', () => {
+      // See: features/phase1/incentive.feature @PostService経由の統合
+      // See: docs/architecture/components/incentive.md §5 設計上の判断
+
+      it('createPost 成功後に IncentiveService.evaluateOnPost が呼ばれる', async () => {
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1)
+        vi.mocked(PostRepository.create).mockResolvedValue(mockPost)
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
+
+        const result = await createPost({
+          threadId: 'thread-001',
+          body: 'こんにちは',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        // 書き込み成功かつ IncentiveService が呼ばれていること
+        expect(result).toMatchObject({ success: true })
+        expect(IncentiveService.evaluateOnPost).toHaveBeenCalledTimes(1)
+        expect(IncentiveService.evaluateOnPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            postId: 'post-001',
+            threadId: 'thread-001',
+            postNumber: 1,
+          })
+        )
+      })
+
+      it('IncentiveService が失敗しても書き込み結果は success:true を返す', async () => {
+        // See: docs/architecture/components/incentive.md §5 インセンティブ失敗は書き込みを巻き戻さない
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1)
+        vi.mocked(PostRepository.create).mockResolvedValue(mockPost)
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
+        // IncentiveService が例外をスローする
+        vi.mocked(IncentiveService.evaluateOnPost).mockRejectedValue(
+          new Error('IncentiveService error')
+        )
+
+        const result = await createPost({
+          threadId: 'thread-001',
+          body: 'こんにちは',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        // IncentiveService が失敗しても書き込みは成功扱い
+        expect(result).toMatchObject({
+          success: true,
+          postId: 'post-001',
+          postNumber: 1,
+          systemMessages: [],
+        })
+      })
+
+      it('アンカー（>>N）を含む本文では isReplyTo に対象レスIDが設定される', async () => {
+        // See: features/phase1/incentive.feature @返信ボーナス
+        const anchorTargetPost: Post = {
+          id: 'post-target-001',
+          threadId: 'thread-001',
+          postNumber: 1,
+          authorId: 'user-002',
+          displayName: '名無しさん',
+          dailyId: 'target1234',
+          body: '最初のレス',
+          isSystemMessage: false,
+          isDeleted: false,
+          createdAt: new Date('2026-03-09'),
+        }
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2)
+        vi.mocked(PostRepository.create).mockResolvedValue({ ...mockPost, postNumber: 2, id: 'post-002' })
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        // アンカー先レスを返す
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([anchorTargetPost])
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '>>1 返信します',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        // isReplyTo にアンカー先レスのID が設定されていること
+        expect(IncentiveService.evaluateOnPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isReplyTo: 'post-target-001',
+          })
+        )
+      })
+
+      it('アンカー先レスが存在しない場合は isReplyTo が undefined となる', async () => {
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2)
+        vi.mocked(PostRepository.create).mockResolvedValue({ ...mockPost, postNumber: 2 })
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        // アンカー先レスが存在しない
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '>>999 存在しないレスへのアンカー',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        expect(IncentiveService.evaluateOnPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isReplyTo: undefined,
+          })
+        )
+      })
+
+      it('アンカー先レスの authorId が null の場合は isReplyTo が undefined となる', async () => {
+        const anonymousPost: Post = {
+          id: 'post-anon-001',
+          threadId: 'thread-001',
+          postNumber: 1,
+          authorId: null, // authorId が null（匿名）
+          displayName: '名無しさん',
+          dailyId: 'anon1234',
+          body: '匿名のレス',
+          isSystemMessage: false,
+          isDeleted: false,
+          createdAt: new Date('2026-03-09'),
+        }
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2)
+        vi.mocked(PostRepository.create).mockResolvedValue({ ...mockPost, postNumber: 2 })
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([anonymousPost])
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '>>1 匿名レスへのアンカー',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        expect(IncentiveService.evaluateOnPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isReplyTo: undefined,
+          })
+        )
+      })
+
+      it('アンカーなしの本文では isReplyTo が undefined となる', async () => {
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1)
+        vi.mocked(PostRepository.create).mockResolvedValue(mockPost)
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
+
+        await createPost({
+          threadId: 'thread-001',
+          body: 'アンカーなしの通常の書き込み',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        expect(IncentiveService.evaluateOnPost).toHaveBeenCalledWith(
+          expect.not.objectContaining({
+            isReplyTo: expect.anything(),
+          })
+        )
+      })
+
+      it('複数アンカーがある場合は最初のアンカー先レスのIDが isReplyTo に設定される', async () => {
+        const post1: Post = {
+          id: 'post-first-001',
+          threadId: 'thread-001',
+          postNumber: 1,
+          authorId: 'user-002',
+          displayName: '名無しさん',
+          dailyId: 'first1234',
+          body: '最初のレス',
+          isSystemMessage: false,
+          isDeleted: false,
+          createdAt: new Date('2026-03-09'),
+        }
+        const post3: Post = {
+          id: 'post-third-003',
+          threadId: 'thread-001',
+          postNumber: 3,
+          authorId: 'user-003',
+          displayName: '名無しさん',
+          dailyId: 'third1234',
+          body: '3番目のレス',
+          isSystemMessage: false,
+          isDeleted: false,
+          createdAt: new Date('2026-03-09'),
+        }
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(5)
+        vi.mocked(PostRepository.create).mockResolvedValue({ ...mockPost, postNumber: 5, id: 'post-005' })
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([post1, post3])
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '>>1 >>3 複数アンカー',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        // 最初のアンカー（>>1）のレスID が設定される
+        expect(IncentiveService.evaluateOnPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isReplyTo: 'post-first-001',
+          })
+        )
+      })
+    })
+
+    // -----------------------------------------------------------------------
     // エッジケース: 特殊文字
     // -----------------------------------------------------------------------
 
@@ -750,6 +1034,82 @@ describe('PostService', () => {
         expect(result.success).toBe(false)
         expect(result.code).toBe('EMPTY_BODY')
         expect(ThreadRepository.create).not.toHaveBeenCalled()
+      })
+    })
+
+    // -----------------------------------------------------------------------
+    // IncentiveService 統合テスト（createThread）
+    // -----------------------------------------------------------------------
+
+    describe('IncentiveService 統合: createThread 成功後に isThreadCreation=true で evaluateOnPost が呼ばれる', () => {
+      // See: features/phase1/incentive.feature @スレッド作成時のボーナス
+      // See: docs/architecture/components/incentive.md §2.2 イベント種別 thread_creation
+
+      it('createThread 成功後に isThreadCreation:true で IncentiveService.evaluateOnPost が呼ばれる', async () => {
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1)
+        vi.mocked(PostRepository.create).mockResolvedValue(mockPost)
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
+
+        await createThread(
+          {
+            boardId: 'battleboard',
+            title: '今日の雑談',
+            firstPostBody: '自由に話しましょう',
+          },
+          'token-abc',
+          'seed-abc'
+        )
+
+        // createPost 内での呼び出し（isThreadCreation なし）と
+        // createThread 内での呼び出し（isThreadCreation:true）の2回呼ばれる
+        const calls = vi.mocked(IncentiveService.evaluateOnPost).mock.calls
+        const hasThreadCreationCall = calls.some(
+          call => call[1]?.isThreadCreation === true
+        )
+        expect(hasThreadCreationCall).toBe(true)
+      })
+
+      it('createThread の IncentiveService 失敗でもスレッド作成は成功として返される', async () => {
+        // See: docs/architecture/components/incentive.md §5 インセンティブ失敗は書き込みを巻き戻さない
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1)
+        vi.mocked(PostRepository.create).mockResolvedValue(mockPost)
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
+        // IncentiveService が例外をスローする
+        vi.mocked(IncentiveService.evaluateOnPost).mockRejectedValue(
+          new Error('IncentiveService error')
+        )
+
+        const result = await createThread(
+          {
+            boardId: 'battleboard',
+            title: '今日の雑談',
+            firstPostBody: '自由に話しましょう',
+          },
+          'token-abc',
+          'seed-abc'
+        )
+
+        expect(result.success).toBe(true)
+        expect(result.thread).toBeDefined()
+        expect(result.firstPost).toBeDefined()
       })
     })
 

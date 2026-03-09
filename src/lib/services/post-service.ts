@@ -3,17 +3,19 @@
  *
  * See: features/phase1/posting.feature
  * See: features/phase1/thread.feature
+ * See: features/phase1/incentive.feature @PostService経由の統合
  * See: docs/architecture/components/posting.md §2 公開インターフェース
  * See: docs/architecture/architecture.md §3.2 PostService
  * See: docs/architecture/architecture.md §7 投稿処理の原子性
  *
  * 責務:
- *   - 書き込み処理の統括（バリデーション → 認証検証 → 採番 → INSERT → スレッド更新）
+ *   - 書き込み処理の統括（バリデーション → 認証検証 → 採番 → INSERT → スレッド更新 → IncentiveService呼び出し）
  *   - スレッド作成（タイトルバリデーション → 認証 → スレッド生成 → 1レス目書き込み）
  *   - スレッド一覧・レス一覧の取得
  *
  * 設計上の判断:
- *   - CommandService / IncentiveService の呼び出しは Step 6 以降で統合（現在はプレースホルダー）
+ *   - CommandService の呼び出しは Phase 2 以降で統合
+ *   - IncentiveService は書き込み成功後に呼び出す（失敗しても書き込みを巻き戻さない）
  *   - 表示名デフォルトは「名無しさん」（ユビキタス言語辞書準拠）
  *   - isBotWrite=true の場合は edge-token 検証をスキップする
  *   - IP 不一致はソフトチェック（ip_mismatch でも書き込み続行）
@@ -23,10 +25,13 @@ import * as PostRepository from '../infrastructure/repositories/post-repository'
 import * as ThreadRepository from '../infrastructure/repositories/thread-repository'
 import * as UserRepository from '../infrastructure/repositories/user-repository'
 import * as AuthService from './auth-service'
+import * as IncentiveService from './incentive-service'
 import { generateDailyId } from '../domain/rules/daily-id'
+import { parseAnchors } from '../domain/rules/anchor-parser'
 import { validatePostBody, validateThreadTitle } from '../domain/rules/validation'
 import type { Post } from '../domain/models/post'
 import type { Thread, ThreadInput } from '../domain/models/thread'
+import type { PostContext } from '../domain/models/incentive'
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -268,13 +273,45 @@ export async function createPost(input: PostInput): Promise<PostResult> {
   await ThreadRepository.incrementPostCount(input.threadId)
   await ThreadRepository.updateLastPostAt(input.threadId, new Date())
 
-  // TODO: Step 6 で統合 — CommandService 呼び出し
+  // TODO: CommandService 呼び出しは Phase 2 以降で統合
   // コマンドパーサーで本文中のコマンドを検出し、CommandService に渡す
   // See: docs/architecture/architecture.md §7.1 Step 3-4
 
-  // TODO: Step 6 で統合 — IncentiveService 呼び出し
+  // Step 8: IncentiveService 呼び出し
   // 書き込み成功後にインセンティブ判定を行う（失敗しても書き込みを巻き戻さない）
-  // See: docs/architecture/architecture.md §7.1 Step 5
+  // See: docs/architecture/components/incentive.md §5 設計上の判断
+  // See: features/phase1/incentive.feature @PostService経由の統合
+  try {
+    // アンカー解析: 本文中の >>N を解析して最初のアンカー先レスを特定する
+    const anchors = parseAnchors(input.body)
+    let isReplyTo: string | undefined
+
+    if (anchors.length > 0) {
+      // アンカー先レスの著者IDを取得（最初のアンカーのみ対象）
+      const targetPosts = await PostRepository.findByThreadId(input.threadId)
+      const targetPost = targetPosts.find(p => p.postNumber === anchors[0])
+      if (targetPost?.authorId) {
+        // isReplyTo にはアンカー先レスのID（UUID）を設定する
+        // See: src/lib/domain/models/incentive.ts PostContext.isReplyTo
+        isReplyTo = targetPost.id
+      }
+    }
+
+    const postContext: PostContext = {
+      postId: createdPost.id,
+      threadId: input.threadId,
+      userId: resolvedAuthorId ?? '',
+      postNumber: createdPost.postNumber,
+      createdAt: createdPost.createdAt,
+      isReplyTo,
+    }
+
+    await IncentiveService.evaluateOnPost(postContext)
+  } catch (err) {
+    // インセンティブ失敗は書き込みを巻き戻さない
+    // See: docs/architecture/components/incentive.md §5 インセンティブ失敗は書き込みを巻き戻さない
+    console.error('[PostService] IncentiveService.evaluateOnPost failed:', err)
+  }
 
   return {
     success: true,
@@ -396,6 +433,7 @@ export async function createThread(
   // PostRepository に findById があるが、createPost の戻り値から postNumber を取得済み
   // firstPost を返すために postId から Post を復元する
   // 簡易実装: createPost が返した情報でミニマルな Post オブジェクトを構築する
+  const firstPostCreatedAt = new Date()
   const firstPost: Post = {
     id: postResult.postId,
     threadId: thread.id,
@@ -406,7 +444,26 @@ export async function createThread(
     body: input.firstPostBody,
     isSystemMessage: false,
     isDeleted: false,
-    createdAt: new Date(),
+    createdAt: firstPostCreatedAt,
+  }
+
+  // Step 6: スレッド作成ボーナス — IncentiveService 呼び出し（isThreadCreation=true）
+  // createPost 内でも evaluateOnPost が呼ばれるが、スレッド作成ボーナスは別途付与が必要
+  // IncentiveService 側の重複ガード（ON CONFLICT DO NOTHING）により二重付与は発生しない
+  // See: features/phase1/incentive.feature @スレッド作成時のボーナス
+  // See: docs/architecture/components/incentive.md §5 インセンティブ失敗は書き込みを巻き戻さない
+  try {
+    const threadCreationContext: PostContext = {
+      postId: postResult.postId,
+      threadId: thread.id,
+      userId: authResult.userId ?? '',
+      postNumber: postResult.postNumber,
+      createdAt: firstPostCreatedAt,
+    }
+    await IncentiveService.evaluateOnPost(threadCreationContext, { isThreadCreation: true })
+  } catch (err) {
+    // インセンティブ失敗は書き込みを巻き戻さない
+    console.error('[PostService] IncentiveService.evaluateOnPost (thread_creation) failed:', err)
   }
 
   return {
