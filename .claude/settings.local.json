@@ -8,7 +8,11 @@
       "Bash(npx vitest:*)",
       "Bash(npx cucumber-js:*)",
       "Bash(ls:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(for f in features/phase1/*.feature)",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//c/Users/user/Documents/PGM連携/battle_board/**)",
+      "Bash(done)"
     ]
   }
 }

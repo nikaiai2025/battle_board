@@ -30,9 +30,10 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 | Step 5 | 書き込み + スレッド管理 | **completed** | Sprint-5 |
 | Step 6 | インセンティブサービス | **completed** | Sprint-6 |
 | Step 7 | Web UI | **completed** | Sprint-7 |
-| Step 8 | 管理機能 | **次スプリント候補** | — |
-| Step 9 | 専ブラ互換 Adapter | **次スプリント候補** | — |
-| Step 10 | マイページ + 仕上げ | **次スプリント候補** | — |
+| Step 7.5 | BDD負債返済（Step 1〜7のステップ定義一括実装） | **次スプリント（最優先）** | — |
+| Step 8 | 管理機能 + BDDステップ定義 | 未着手（Step 7.5完了後） | — |
+| Step 9 | 専ブラ互換 Adapter + BDDステップ定義 | 未着手（Step 7.5完了後） | — |
+| Step 10 | マイページ + 仕上げ + BDDステップ定義 | 未着手（Step 7.5完了後） | — |
 
 ## テスト状況
 
@@ -40,12 +41,15 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 
 ## 次スプリント候補
 
-Step 7完了により、Step 8/9/10 がすべて着手可能。実装計画の依存関係:
-- **Step 8（管理機能）** — AdminService + 管理者UI
-- **Step 9（専ブラ互換 Adapter）** — DAT形式・bbs.cgi・subject.txt
-- **Step 10（マイページ + 仕上げ）** — マイページUI・日次リセットID残シナリオ
+**最優先: Step 7.5（BDD負債返済）**
+Step 1〜7で未実装だったBDDステップ定義を一括実装する。Step 8以降に進む前に完了させること。
 
-並行度を最大化する場合: Step 8 + Step 9 + Step 10 を同一スプリントで並行実行可能（locked_filesの重複なし）
+Step 7.5完了後:
+- **Step 8（管理機能）** — AdminService + 管理者UI + BDDステップ定義
+- **Step 9（専ブラ互換 Adapter）** — DAT形式・bbs.cgi・subject.txt + BDDステップ定義
+- **Step 10（マイページ + 仕上げ）** — マイページUI・日次リセットID残シナリオ + BDDステップ定義
+
+Step 8/9/10は並行実行可能（locked_filesの重複なし）。各Stepの完了条件に `npx cucumber-js` PASSを含む。
 
 ## 未解決エスカレーション
 
