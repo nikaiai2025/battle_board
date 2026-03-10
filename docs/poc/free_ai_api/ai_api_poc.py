@@ -104,8 +104,10 @@ def http_post_json(
     headers: Dict[str, str],
     timeout_seconds: float,
 ) -> Dict[str, Any]:
+    request_headers = {"User-Agent": "ai-api-poc/1.0"}
+    request_headers.update(headers)
     body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(url=url, data=body, headers=headers, method="POST")
+    request = urllib.request.Request(url=url, data=body, headers=request_headers, method="POST")
 
     try:
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
@@ -422,14 +424,10 @@ def run_provider_queue(config: Dict[str, Any], sleep_seconds: float) -> List[Dic
 def print_result(result: Dict[str, Any]) -> None:
     prefix = f"[{result['provider']}] model={result['model']}"
     if result["ok"]:
-        print(f"{prefix} ok=True output={result['output']}")
+        print(f"{prefix} ok=True")
         return
 
-    if result["output"]:
-        print(f"{prefix} ok=False output={result['output']}")
-        return
-
-    print(f"{prefix} ok=False error={result['error']}")
+    print(f"{prefix} ok=False")
 
 
 def print_summary(results: List[Dict[str, Any]]) -> None:
@@ -451,38 +449,67 @@ def build_log_text(results: List[Dict[str, Any]]) -> str:
     failed_count = total - success_count
 
     lines = [
-        "AI API PoC Result",
-        f"timestamp: {timestamp}",
-        f"prompt: {get_prompt()}",
-        f"total: {total}",
-        f"success: {success_count}",
-        f"failed: {failed_count}",
+        "# AI API PoC Result",
         "",
+        f"- **timestamp**: {timestamp}",
+        f"- **total**: {total}",
+        f"- **success**: {success_count}",
+        f"- **failed**: {failed_count}",
+        "",
+        "## Prompt",
+        "```text",
     ]
+    lines.extend(str(get_prompt()).splitlines())
+    lines.extend([
+        "```",
+        "",
+    ])
 
     current_provider = None
     for result in results:
         provider = result["provider"]
         if provider != current_provider:
-            if current_provider is not None:
-                lines.append("")
-            lines.append(f"[{provider}]")
+            lines.append(f"## Provider: {provider}")
+            lines.append("")
             current_provider = provider
 
         status = "OK" if result["ok"] else "FAILED"
-        lines.append(f"- model: {result['model']}")
-        lines.append(f"  status: {status}")
+        lines.append(f"### Model: {result['model']}")
+        lines.append(f"- **status**: {status}")
         for attempt in result.get("attempts", []):
             attempt_status = "OK" if attempt["ok"] else "FAILED"
-            lines.append(f"  attempt[{attempt['key_index']}]: {attempt_status}")
+            lines.append(f"- **attempt[{attempt['key_index']}]**: {attempt_status}")
             if attempt["output"]:
-                lines.append(f"    output: {attempt['output']}")
+                lines.append("  - **output**:")
+                lines.append("    ```text")
+                for line in str(attempt["output"]).splitlines():
+                    lines.append(f"    {line}")
+                lines.append("    ```")
             if attempt["error"]:
-                lines.append(f"    error: {attempt['error']}")
+                lines.append("  - **error**:")
+                lines.append("    ```text")
+                for line in str(attempt["error"]).splitlines():
+                    lines.append(f"    {line}")
+                lines.append("    ```")
         if result["output"]:
-            lines.append(f"  output: {result['output']}")
+            # Only print output if not already printed in the final attempt
+            final_attempt_output = result.get("attempts", [])[-1].get("output") if result.get("attempts") else None
+            if final_attempt_output != result["output"]:
+                lines.append("- **output**:")
+                lines.append("  ```text")
+                for line in str(result["output"]).splitlines():
+                    lines.append(f"  {line}")
+                lines.append("  ```")
         if result["error"]:
-            lines.append(f"  error: {result['error']}")
+            # Only print error if not already printed in the final attempt
+            final_attempt_error = result.get("attempts", [])[-1].get("error") if result.get("attempts") else None
+            if final_attempt_error != result["error"]:
+                lines.append("- **error**:")
+                lines.append("  ```text")
+                for line in str(result["error"]).splitlines():
+                    lines.append(f"  {line}")
+                lines.append("  ```")
+        lines.append("")
 
     return "\n".join(lines) + "\n"
 
@@ -492,7 +519,7 @@ def write_log_file(results: List[Dict[str, Any]]) -> str:
     log_dir = os.path.join(base_dir, "logs")
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    log_path = os.path.join(log_dir, f"ai_api_poc_{timestamp}.log")
+    log_path = os.path.join(log_dir, f"ai_api_poc_{timestamp}.md")
     log_text = build_log_text(results)
     with open(log_path, "w", encoding="utf-8") as handle:
         handle.write(log_text)
