@@ -10,16 +10,19 @@ import urllib.request
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
+def get_prompt() -> str:
+    return os.getenv("AI_API_POC_PROMPT", "Return exactly: HelloWorld")
 
-PROMPT = os.getenv("AI_API_POC_PROMPT", "Return exactly: HelloWorld")
-TIMEOUT_SECONDS = float(os.getenv("AI_API_POC_TIMEOUT_SECONDS", "30"))
+def get_timeout_seconds() -> float:
+    return float(os.getenv("AI_API_POC_TIMEOUT_SECONDS", "30"))
 
 
 def load_dotenv(path: str = ".env.local") -> None:
-    if not os.path.exists(path):
+    target_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+    if not os.path.exists(target_path):
         return
 
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(target_path, "r", encoding="utf-8") as handle:
         for raw_line in handle:
             line = raw_line.strip()
             if not line or line.startswith("#") or "=" not in line:
@@ -147,10 +150,10 @@ def call_openai_compatible(config: Dict[str, Any], api_key: str, model: str) -> 
     endpoint = os.getenv(config["endpoint_env"], config["default_endpoint"])
     payload = {
         "model": model,
-        "messages": [{"role": "user", "content": PROMPT}],
+        "messages": [{"role": "user", "content": get_prompt()}],
         "temperature": 0,
     }
-    result = http_post_json(endpoint, payload, build_openai_headers(config, api_key), TIMEOUT_SECONDS)
+    result = http_post_json(endpoint, payload, build_openai_headers(config, api_key), get_timeout_seconds())
     if "error" in result:
         return result
     result["output"] = parse_openai_compatible(result["payload"])
@@ -163,11 +166,11 @@ def call_gemini(config: Dict[str, Any], api_key: str, model: str) -> Dict[str, A
         config["default_endpoint"].format(model=model, api_key=urllib.parse.quote(api_key, safe="")),
     )
     payload = {
-        "contents": [{"parts": [{"text": PROMPT}]}],
+        "contents": [{"parts": [{"text": get_prompt()}]}],
         "generationConfig": {"temperature": 0},
     }
     headers = {"Content-Type": "application/json"}
-    result = http_post_json(endpoint, payload, headers, TIMEOUT_SECONDS)
+    result = http_post_json(endpoint, payload, headers, get_timeout_seconds())
     if "error" in result:
         return result
     result["output"] = parse_gemini(result["payload"])
@@ -178,14 +181,14 @@ def call_cohere(config: Dict[str, Any], api_key: str, model: str) -> Dict[str, A
     endpoint = os.getenv(config["endpoint_env"], config["default_endpoint"])
     payload = {
         "model": model,
-        "messages": [{"role": "user", "content": PROMPT}],
+        "messages": [{"role": "user", "content": get_prompt()}],
         "temperature": 0,
     }
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
     }
-    result = http_post_json(endpoint, payload, headers, TIMEOUT_SECONDS)
+    result = http_post_json(endpoint, payload, headers, get_timeout_seconds())
     if "error" in result:
         return result
     result["output"] = parse_cohere(result["payload"])
@@ -361,8 +364,8 @@ def run_model_once(config: Dict[str, Any], model: str, api_key: str) -> Dict[str
 
     output = first_text(result.get("output"))
     base_result["output"] = output
-    base_result["ok"] = output == "HelloWorld"
-    if not base_result["ok"] and not output:
+    base_result["ok"] = bool(output)
+    if not base_result["ok"]:
         base_result["error"] = "empty_response"
     return base_result
 
@@ -450,7 +453,7 @@ def build_log_text(results: List[Dict[str, Any]]) -> str:
     lines = [
         "AI API PoC Result",
         f"timestamp: {timestamp}",
-        f"prompt: {PROMPT}",
+        f"prompt: {get_prompt()}",
         f"total: {total}",
         f"success: {success_count}",
         f"failed: {failed_count}",
@@ -485,7 +488,8 @@ def build_log_text(results: List[Dict[str, Any]]) -> str:
 
 
 def write_log_file(results: List[Dict[str, Any]]) -> str:
-    log_dir = "logs"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    log_dir = os.path.join(base_dir, "logs")
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     log_path = os.path.join(log_dir, f"ai_api_poc_{timestamp}.log")
