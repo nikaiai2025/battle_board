@@ -56,7 +56,7 @@ export async function GET(
   // UTF-8 → Shift_JIS に変換
   const sjisBuffer = encoder.encode(settingText);
 
-  return new Response(sjisBuffer, {
+  return new Response(new Uint8Array(sjisBuffer), {
     status: 200,
     headers: {
       "Content-Type": "text/plain; charset=Shift_JIS",

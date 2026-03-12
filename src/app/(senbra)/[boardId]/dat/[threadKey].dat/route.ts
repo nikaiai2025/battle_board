@@ -121,7 +121,7 @@ async function handleFullRequest(
   // UTF-8 → Shift_JIS に変換
   const sjisBuffer = encoder.encode(datText);
 
-  return new Response(sjisBuffer, {
+  return new Response(new Uint8Array(sjisBuffer), {
     status: 200,
     headers: {
       "Content-Type": "text/plain; charset=Shift_JIS",
@@ -166,7 +166,7 @@ async function handleRangeRequest(
   if (rangeStart >= totalBytes) {
     // 更新なし: rangeStart 以降のデータが存在しない
     // 空の206を返す（専ブラは更新なしと判断する）
-    return new Response(Buffer.alloc(0), {
+    return new Response(new Uint8Array(0), {
       status: 206,
       headers: {
         "Content-Type": "text/plain; charset=Shift_JIS",
@@ -181,7 +181,7 @@ async function handleRangeRequest(
   const diffBuffer = fullSjisBuffer.slice(rangeStart);
   const diffEnd = totalBytes - 1;
 
-  return new Response(diffBuffer, {
+  return new Response(new Uint8Array(diffBuffer), {
     status: 206,
     headers: {
       "Content-Type": "text/plain; charset=Shift_JIS",

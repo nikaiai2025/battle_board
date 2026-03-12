@@ -71,7 +71,7 @@ export async function GET(
       ? threads[0].lastPostAt.toUTCString()
       : new Date(0).toUTCString();
 
-  return new Response(sjisBuffer, {
+  return new Response(new Uint8Array(sjisBuffer), {
     status: 200,
     headers: {
       "Content-Type": "text/plain; charset=Shift_JIS",

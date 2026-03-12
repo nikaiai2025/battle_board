@@ -65,7 +65,7 @@ function getIpHash(req: NextRequest): string {
  */
 function buildShiftJisHtmlResponse(html: string, status = 200): Response {
   const sjisBuffer = encoder.encode(html);
-  return new Response(sjisBuffer, {
+  return new Response(new Uint8Array(sjisBuffer), {
     status,
     headers: {
       "Content-Type": "text/html; charset=Shift_JIS",
@@ -218,7 +218,7 @@ async function handleCreatePost(
     isBotWrite: false,
   });
 
-  if ("authRequired" in result && result.authRequired) {
+  if ("authRequired" in result) {
     // 認証が必要な場合: 認証案内HTMLを返す
     const authHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken);
     const response = buildShiftJisHtmlResponse(authHtml, 200);

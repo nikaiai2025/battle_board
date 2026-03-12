@@ -42,7 +42,7 @@ export async function GET(_req: NextRequest): Promise<Response> {
   // UTF-8 → Shift_JIS に変換
   const sjisBuffer = encoder.encode(html);
 
-  return new Response(sjisBuffer, {
+  return new Response(new Uint8Array(sjisBuffer), {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=Shift_JIS",

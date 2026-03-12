@@ -54,7 +54,7 @@ async function getIpHash(req: NextRequest): Promise<string> {
   const headersList = await headers()
   const forwarded = headersList.get('x-forwarded-for')
   // x-forwarded-for は "client, proxy1, proxy2" の形式のため先頭を使用する
-  const ip = forwarded?.split(',')[0].trim() ?? req.ip ?? '127.0.0.1'
+  const ip = forwarded?.split(',')[0].trim() ?? '127.0.0.1'
   return hashIp(ip)
 }
 
