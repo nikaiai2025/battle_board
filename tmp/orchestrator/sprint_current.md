@@ -4,21 +4,34 @@
 
 ## 現在のフェーズ
 
-Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_plan.md`）
+**Phase 1: 掲示板の土台構築 — 完了**
 
-## 直近の完了スプリント
+全体計画: `tmp/phase1_implementation_plan.md`
+
+## Phase 1 完了サマリー
+
+Phase 1（Step 0〜10）の全実装 + フェーズ5検証サイクル + 差し戻し修正が完了。
+- 全87 BDDシナリオ PASS（除外3件: Phase 2依存）
+- 全468単体テスト PASS
+- Critical指摘2件（CR-001: Cookie名不一致, CR-002: authToken漏洩）を修正済み
+- ドキュメント整合性指摘1件（C-01: D-08クラスベース記述）を修正済み
+
+## Phase 2 着手前の課題
+
+`tmp/phase2_prerequisites.md` に整理済み:
+1. 専ブラ互換の実機テスト（Vercelデプロイ後）
+2. ブラウザ自動テスト（E2E）の導入検討
+3. Supabase Localセットアップ（TDR-ENV-001）
+4. 技術的負債（post-service.ts の Date, >>N ステップ汎用化）
+5. Phase 1除外シナリオ3件
+
+## スプリント履歴
 
 | Sprint | 対応Step | ステータス | 計画書 |
 |---|---|---|---|
-| Sprint-9 | Step 8 + Step 9: 管理機能 + 専ブラ互換 | completed | `tmp/orchestrator/sprint_9_plan.md` |
-| Sprint-8 | Step 7.5: BDD負債返済 | completed | `tmp/orchestrator/sprint_8_plan.md` |
-| Sprint-7 | Step 7: Web UI | completed | `tmp/orchestrator/sprint_7_plan.md` |
-| Sprint-6 | Step 6: インセンティブサービス | completed | `tmp/orchestrator/sprint_6_plan.md` |
-| Sprint-5 | Step 5: 書き込み + スレッド管理 | completed | `tmp/orchestrator/sprint_5_plan.md` |
-| Sprint-4 | Step 4 + RPC関数補完 | completed | `tmp/orchestrator/sprint_4_plan.md` |
-| Sprint-3 | Step 3: リポジトリ層 | completed | `tmp/orchestrator/sprint_3_plan.md` |
-| Sprint-2 | Step 1 + Step 2 (並行) | completed | `tmp/orchestrator/sprint_2_plan.md` |
-| Sprint-1 | Step 0: プロジェクト基盤整備 | completed | `tmp/orchestrator/sprint_1_plan.md` |
+| Sprint-10-fix | Phase 5差し戻し: CR-001/CR-002/C-01修正 | completed | `tmp/orchestrator/sprint_10_plan.md` |
+| Sprint-10 | Step 10: マイページ + 時刻リファクタ | completed | `tmp/orchestrator/sprint_10_plan.md` |
+| Sprint-1〜9 | Step 0〜9: 基盤〜専ブラ互換 | completed | アーカイブ参照 |
 
 ## Phase 1 進捗一覧
 
@@ -40,17 +53,13 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 ## テスト状況
 
 - vitest: 15ファイル / 468テスト / 全PASS
-- cucumber-js: 87シナリオ / 419ステップ / 全PASS（除外3件: Phase2コマンド1件 + インフラ制約2件）
+- cucumber-js: 87シナリオ / 419ステップ / 全PASS（除外3件: Phase 2依存）
 
-## 現在進行中: Sprint-10 (Step 10 マイページ + 時刻リファクタ)
+## フェーズ5検証結果
 
-計画書: `tmp/orchestrator/sprint_10_plan.md`
-
-| TASK_ID | 内容 | ステータス |
-|---|---|---|
-| TASK-025 | MypageService + マイページAPI + UI | **completed** |
-| TASK-026 | mypage + currency BDDステップ定義 | **completed** |
-| TASK-027 | 時刻制御リファクタ (incentive.steps.ts) | **completed** |
+- BDDゲート: 87シナリオ全PASS
+- コードレビュー: Critical 2件（修正済）, Warning 5件, Info 5件 → `tmp/reports/code_review_phase1.md`
+- ドキュメントレビュー: Critical 1件（修正済）, Warning 4件 → `tmp/reports/doc_review_phase1.md`
 
 ## 未解決エスカレーション
 
@@ -58,6 +67,10 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 
 ## アーカイブインデックス
 
-| ファイル | 対象Sprint |
+| ファイル | 内容 |
 |---|---|
-| （まだアーカイブなし） | — |
+| `tmp/orchestrator/archive/sprint_001_009.md` | Sprint 1〜9 計画書統合 |
+| `tmp/orchestrator/archive/sprint_8_bdd_guide.md` | Sprint-8 BDDガイド |
+| `tmp/tasks/archive/` | Phase 1 全タスク指示書 (TASK-002〜029) |
+| `tmp/escalations/archive/` | Phase 1 全エスカレーション (5件、全resolved/closed) |
+| `tmp/workers/archive/` | Phase 1 ワーカー作業空間 |

@@ -1,7 +1,9 @@
 ---
 escalation_id: ESC-TASK-018-2
 task_id: TASK-018
-status: open
+status: resolved
+resolved_at: 2026-03-13T06:00:00+09:00
+resolution: Sprint-10で修正済み。87シナリオ全PASS確認。
 created_at: 2026-03-12T22:30:00+09:00
 ---
 
