@@ -198,3 +198,24 @@ export async function updateUsername(userId: string, username: string | null): P
     throw new Error(`UserRepository.updateUsername failed: ${error.message}`)
   }
 }
+
+/**
+ * ユーザーの有料ステータス（isPremium）を更新する。
+ * 課金モック実装（MypageService.upgradeToPremium）から呼び出される。
+ *
+ * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > users > is_premium
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param isPremium - 新しい有料ステータス
+ */
+export async function updateIsPremium(userId: string, isPremium: boolean): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ is_premium: isPremium })
+    .eq('id', userId)
+
+  if (error) {
+    throw new Error(`UserRepository.updateIsPremium failed: ${error.message}`)
+  }
+}

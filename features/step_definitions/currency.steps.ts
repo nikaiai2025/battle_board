@@ -1,8 +1,8 @@
 /**
  * currency.feature ステップ定義
  *
- * 通貨システム（初期通貨、残高制約、二重消費防止）に関するシナリオを実装する。
- * マイページシナリオは cucumber.js 設定で除外済み。
+ * 通貨システム（初期通貨、残高確認、残高制約、二重消費防止）に関するシナリオを実装する。
+ * Sprint-10 で「マイページで通貨残高を確認する」シナリオを追加。
  *
  * サービス層は動的 require で取得する（モック差し替え後に呼ばれるため）。
  *
@@ -183,6 +183,35 @@ Then('1つの操作のみ成功する', function (this: BattleBoardWorld) {
     successCount,
     1,
     `1つの操作のみ成功することを期待しましたが、${successCount} 件成功しました`
+  )
+})
+
+// ---------------------------------------------------------------------------
+// Then: 通貨残高 "{string}" が表示される
+// See: features/phase1/currency.feature @マイページで通貨残高を確認する
+// ---------------------------------------------------------------------------
+
+/**
+ * マイページに表示される通貨残高が期待値（文字列表現）と一致することを確認する。
+ * mypageResult.balance を文字列化して比較する。
+ *
+ * "When マイページを表示する" は mypage.steps.ts で定義している。
+ *
+ * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ */
+Then('通貨残高 {string} が表示される', function (
+  this: BattleBoardWorld,
+  expectedBalanceStr: string
+) {
+  assert(
+    this.mypageResult !== null,
+    'マイページ情報が取得されていません。"When マイページを表示する" を先に実行してください'
+  )
+  const expectedBalance = Number(expectedBalanceStr)
+  assert.strictEqual(
+    this.mypageResult.balance,
+    expectedBalance,
+    `通貨残高が ${expectedBalance} であることを期待しましたが ${this.mypageResult.balance} でした`
   )
 })
 

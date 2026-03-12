@@ -590,6 +590,23 @@ Then('{string} と表示される', async function (
   this: BattleBoardWorld,
   message: string
 ) {
+  // マイページ書き込み履歴が0件の場合
+  // See: features/phase1/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
+  if (message === 'まだ書き込みがありません') {
+    assert(
+      this.postHistoryResult !== null,
+      '書き込み履歴の取得が実行されていません'
+    )
+    assert.strictEqual(
+      this.postHistoryResult.length,
+      0,
+      `書き込み履歴が 0 件であることを期待しましたが ${this.postHistoryResult.length} 件でした`
+    )
+    return
+  }
+
+  // スレッドが0件の場合
+  // See: features/phase1/thread.feature @スレッドが0件の場合はメッセージが表示される
   const PostService = getPostService()
   const threads = await PostService.getThreadList(TEST_BOARD_ID)
   assert.strictEqual(

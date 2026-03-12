@@ -10,6 +10,7 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 
 | Sprint | 対応Step | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-9 | Step 8 + Step 9: 管理機能 + 専ブラ互換 | completed | `tmp/orchestrator/sprint_9_plan.md` |
 | Sprint-8 | Step 7.5: BDD負債返済 | completed | `tmp/orchestrator/sprint_8_plan.md` |
 | Sprint-7 | Step 7: Web UI | completed | `tmp/orchestrator/sprint_7_plan.md` |
 | Sprint-6 | Step 6: インセンティブサービス | completed | `tmp/orchestrator/sprint_6_plan.md` |
@@ -32,26 +33,24 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 | Step 6 | インセンティブサービス | **completed** | Sprint-6 |
 | Step 7 | Web UI | **completed** | Sprint-7 |
 | Step 7.5 | BDD負債返済 | **completed** | Sprint-8 |
-| Step 8 | 管理機能 + BDDステップ定義 | **進行中** (Sprint-9) | Sprint-9 |
-| Step 9 | 専ブラ互換 Adapter + BDDステップ定義 | **進行中** (Sprint-9) | Sprint-9 |
-| Step 10 | マイページ + 仕上げ + BDDステップ定義 | 未着手 | — |
+| Step 8 | 管理機能 + BDDステップ定義 | **completed** | Sprint-9 |
+| Step 9 | 専ブラ互換 Adapter + BDDステップ定義 | **completed** | Sprint-9 |
+| Step 10 | マイページ + 仕上げ + BDDステップ定義 | **completed** | Sprint-10 |
 
 ## テスト状況
 
-- vitest: 14ファイル / 436テスト / 全PASS
-- cucumber-js: 78シナリオ / 389ステップ / 全PASS（除外3件: Phase2コマンド1件 + インフラ制約2件）
+- vitest: 15ファイル / 468テスト / 全PASS
+- cucumber-js: 87シナリオ / 419ステップ / 全PASS（除外3件: Phase2コマンド1件 + インフラ制約2件）
 
-## 現在進行中: Sprint-9 (Step 8 + Step 9 並行)
+## 現在進行中: Sprint-10 (Step 10 マイページ + 時刻リファクタ)
 
-計画書: `tmp/orchestrator/sprint_9_plan.md`
+計画書: `tmp/orchestrator/sprint_10_plan.md`
 
 | TASK_ID | 内容 | ステータス |
 |---|---|---|
-| TASK-020 | AdminService + 管理者認証実装 | **completed** |
-| TASK-021 | admin + authentication管理者 BDDステップ定義 | **completed** |
-| TASK-022 | 専ブラAdapterコア実装 | **completed** |
-| TASK-023 | 専ブラRoute Handler実装 | **completed** |
-| TASK-024 | specialist_browser_compat BDDステップ定義 | **completed** |
+| TASK-025 | MypageService + マイページAPI + UI | **completed** |
+| TASK-026 | mypage + currency BDDステップ定義 | **completed** |
+| TASK-027 | 時刻制御リファクタ (incentive.steps.ts) | **completed** |
 
 ## 未解決エスカレーション
 

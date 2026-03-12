@@ -12,6 +12,7 @@ import type { IWorldOptions } from '@cucumber/cucumber'
 import type { User } from '../../src/lib/domain/models/user'
 import type { Thread } from '../../src/lib/domain/models/thread'
 import type { Post } from '../../src/lib/domain/models/post'
+import type { MypageInfo, PostHistoryItem } from '../../src/lib/services/mypage-service'
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -140,6 +141,24 @@ export class BattleBoardWorld extends World {
   lastCreatedThread: Thread | null = null
 
   // -------------------------------------------------------------------------
+  // マイページコンテキスト
+  // See: features/phase1/mypage.feature
+  // See: features/phase1/currency.feature @マイページで通貨残高を確認する
+  // -------------------------------------------------------------------------
+
+  /**
+   * マイページ取得結果。
+   * getMypage の戻り値を保持し、Then ステップでのアサーションに使用する。
+   */
+  mypageResult: MypageInfo | null = null
+
+  /**
+   * 書き込み履歴取得結果。
+   * getPostHistory の戻り値を保持し、Then ステップでのアサーションに使用する。
+   */
+  postHistoryResult: PostHistoryItem[] | null = null
+
+  // -------------------------------------------------------------------------
   // 時刻制御
   // See: docs/architecture/bdd_test_strategy.md §5 時刻制御の方針
   // -------------------------------------------------------------------------
@@ -181,6 +200,8 @@ export class BattleBoardWorld extends World {
     this.lastResult = null
     this.lastCreatedPost = null
     this.lastCreatedThread = null
+    this.mypageResult = null
+    this.postHistoryResult = null
     this.currentTime = null
     // 管理者コンテキストのリセット
     // See: features/phase1/admin.feature

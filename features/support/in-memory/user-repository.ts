@@ -111,3 +111,15 @@ export async function updateUsername(userId: string, username: string | null): P
     store.set(userId, { ...user, username })
   }
 }
+
+/**
+ * ユーザーの有料ステータス（isPremium）を更新する。
+ * See: src/lib/infrastructure/repositories/user-repository.ts
+ * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ */
+export async function updateIsPremium(userId: string, isPremium: boolean): Promise<void> {
+  const user = store.get(userId)
+  if (user) {
+    store.set(userId, { ...user, isPremium })
+  }
+}

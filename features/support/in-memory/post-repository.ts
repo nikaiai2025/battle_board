@@ -80,6 +80,24 @@ export async function findByThreadId(
 }
 
 /**
+ * 著者 ID（author_id）に紐づくレス一覧を created_at DESC で取得する。
+ * マイページの書き込み履歴表示に使用する。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts
+ * See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
+ */
+export async function findByAuthorId(
+  authorId: string,
+  options: { limit?: number } = {}
+): Promise<Post[]> {
+  const limit = options.limit ?? 50
+  return Array.from(store.values())
+    .filter(p => p.authorId === authorId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit)
+}
+
+/**
  * 次のレス番号を取得する（アトミック採番）。
  *
  * 同一スレッドへの並行呼び出しでは Promise チェーンにより直列実行する。

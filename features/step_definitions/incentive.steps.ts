@@ -34,6 +34,15 @@ import type { Post } from '../../src/lib/domain/models/post'
 /** BDD テストで使用するデフォルトの板 ID */
 const TEST_BOARD_ID = 'battleboard'
 
+/**
+ * 時刻依存テストで使用する基準時刻 T（固定値）。
+ * 全ての時刻依存シナリオはこの時刻を起点として相対オフセットを計算する。
+ * 実行タイミングに依存せず、常に同一の結果を保証する（flakyテスト排除）。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §5.2 相対時刻の禁止
+ */
+const TEST_BASE_TIME = new Date('2026-03-12T10:00:00+09:00')
+
 /** 名前付きユーザーに対応する IP ハッシュ生成 */
 function getIpHashForUser(name: string): string {
   return `bdd-test-ip-hash-${name}-sha512-placeholder`
@@ -53,11 +62,15 @@ async function ensureNamedUser(world: BattleBoardWorld, name: string): Promise<U
 
 /**
  * 今日の JST 日付文字列を取得する。
- * new Date() を直接使用することで、PostRepository.create() の createdAt と同じ
- * 時刻基準になり、incentive-service.ts の contextDate との整合性を保つ。
+ * new Date() を直接使用することで、post-service.ts の new Date() による createdAt と
+ * 同じ時刻基準になり、incentive-service.ts の contextDate との整合性を保つ。
  *
- * Note: Date.now() スタブ（world.ts の setCurrentTime）は new Date() には反映されないため、
- * incentive-service.ts と同じ基準（new Date()）を使用する。
+ * Note: post-service.ts が new Date() を使用しているため、Date.now() スタブの恩恵を
+ * 受けられない。post-service.ts が new Date(Date.now()) 対応になり次第、
+ * こちらも new Date(Date.now()) に統一できる。
+ * 日付・ストリーク関連テストは日付変わり境界時刻以外では安定して動作する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §5.3 サービス層の時刻取得統一（注記）
  */
 function getTodayJst(): string {
   const now = new Date()
@@ -221,7 +234,9 @@ function ensureUserParticipated(
   if (newThreadJoinTestWorlds.get(world)) return
 
   // ユーザー自身のダミーレスを挿入して「参加済み」状態にする
-  // createdAt を 2 分前に設定して「今回の書き込みより前」であることを保証する
+  // createdAt は Date.now() - 2分 で計算する。
+  // 時計凍結中は凍結時刻から2分前、未凍結時は実時間から2分前となる。
+  // いずれの場合も「今回の書き込みより前」であることが保証される。
   InMemoryPostRepo._insert({
     id: crypto.randomUUID(),
     threadId,
@@ -418,6 +433,7 @@ Given('そのスレッドのユニークID数が {int} 以上である', async f
 ) {
   assert(this.currentThreadId, 'スレッドが設定されていません')
   // minUniqueIds 個の異なる dailyId を持つダミーレスを追加する
+  // createdAt は Date.now() - offset で計算する（時計凍結中は凍結値から計算される）
   for (let i = 0; i < minUniqueIds; i++) {
     InMemoryPostRepo._insert({
       id: crypto.randomUUID(),
@@ -446,6 +462,7 @@ Given('そのスレッドのユニークID数が {int} である', async functio
 ) {
   assert(this.currentThreadId, 'スレッドが設定されていません')
   // uniqueIds 個の異なる dailyId を持つダミーレスを追加する
+  // createdAt は Date.now() - offset で計算する（時計凍結中は凍結値から計算される）
   for (let i = 0; i < uniqueIds; i++) {
     InMemoryPostRepo._insert({
       id: crypto.randomUUID(),
@@ -593,11 +610,16 @@ Given('レス >>{int} の書き込みから60分以上経過している', async
   assert(userACtx, 'ユーザー "UserA" が登録されていません')
   assert(this.currentThreadId, 'スレッドが設定されていません')
 
-  // 既存のレスを 61 分前の時刻に更新
+  // D-10 §5.2 標準パターン:
+  // 時計を T に凍結し、対象レスの createdAt を T - 61分 に設定する。
+  // これにより当該レスが「61分前に書き込まれた」状態になり、ホットレス判定が不成立になる。
+  this.setCurrentTime(TEST_BASE_TIME)
+
+  // 既存のレスの createdAt を T - 61min に更新
   const allPosts = await InMemoryPostRepo.findByThreadId(this.currentThreadId)
   const targetPost = allPosts.find(p => p.postNumber === postNumber)
   if (targetPost) {
-    const oldTime = new Date(Date.now() - 61 * 60 * 1000)
+    const oldTime = new Date(TEST_BASE_TIME.getTime() - 61 * 60 * 1000)
     InMemoryPostRepo._insert({ ...targetPost, createdAt: oldTime })
   }
 })
@@ -656,6 +678,8 @@ Given('そのスレッドに過去書き込みをしたことがある', async f
     this.currentThreadId = thread.id
   }
   // 既存の書き込みを追加して「参加済み」にする
+  // 時計が凍結中であれば凍結時刻から10分前、未凍結であれば基準時刻から10分前を使用する
+  const participatedBaseTime = this.currentTime ?? TEST_BASE_TIME
   InMemoryPostRepo._insert({
     id: crypto.randomUUID(),
     threadId: this.currentThreadId,
@@ -666,7 +690,7 @@ Given('そのスレッドに過去書き込みをしたことがある', async f
     body: '以前の書き込み',
     isSystemMessage: false,
     isDeleted: false,
-    createdAt: new Date(Date.now() - 10 * 60 * 1000),
+    createdAt: new Date(participatedBaseTime.getTime() - 10 * 60 * 1000),
   })
 })
 
@@ -712,6 +736,13 @@ Given('今日すでに3つの新スレッドに初書き込みをしている', 
  */
 Given('スレッドの最終レスが24時間以上前である', async function (this: BattleBoardWorld) {
   assert(this.currentUserId, 'ユーザーがログイン済みである必要があります')
+
+  // D-10 §5.2 時刻依存シナリオの標準パターン:
+  // 1. 時計を基準時刻 T に凍結
+  // 2. 時計を過去（T - 25h）に設定し、低活性ダミーレスを作成
+  // 3. 時計を T に戻す（When ステップで操作実行）
+  this.setCurrentTime(TEST_BASE_TIME)
+
   // スレッドが未設定の場合はデフォルトスレッドを作成
   if (!this.currentThreadId) {
     const threadKey = Math.floor(Date.now() / 1000).toString()
@@ -723,8 +754,10 @@ Given('スレッドの最終レスが24時間以上前である', async function
     })
     this.currentThreadId = thread.id
   }
-  // 25時間前の時刻（低活性状態の基準点）
-  const inactiveTime = new Date(new Date().getTime() - 25 * 60 * 60 * 1000)
+
+  // 時計を T - 25h に設定してダミーレスを作成（低活性状態）
+  const inactiveTime = new Date(TEST_BASE_TIME.getTime() - 25 * 60 * 60 * 1000)
+  this.setCurrentTime(inactiveTime)
 
   // threadPosts の時系列から低活性期間を判定するため、25時間前のダミーレスを追加する。
   // Named User（UserA 等）が登録済みであればそのユーザーのダミーレスとして追加し、
@@ -744,10 +777,13 @@ Given('スレッドの最終レスが24時間以上前である', async function
     body: '低活性期間前のダミーレス（25時間前）',
     isSystemMessage: false,
     isDeleted: false,
-    createdAt: inactiveTime,
+    createdAt: new Date(Date.now()),
   })
 
-  // lastPostAt を 25 時間前に設定
+  // 時計を基準時刻 T に戻す（When ステップで正常な操作を実行するため）
+  this.setCurrentTime(TEST_BASE_TIME)
+
+  // lastPostAt を T - 25h に設定（低活性状態を保証）
   await InMemoryThreadRepo.updateLastPostAt(this.currentThreadId, inactiveTime)
   // スレッド復興ボーナス用に非活性時刻を保存する
   // （"UserA" がそのスレッドに書き込みを行う When ステップで post-service.ts が
@@ -770,6 +806,19 @@ Given('スレッドの最終レスが24時間以上前である', async function
  */
 Given('スレッドの最終レスが12時間前である', async function (this: BattleBoardWorld) {
   assert(this.currentUserId, 'ユーザーがログイン済みである必要があります')
+
+  // D-10 §5.2 時刻依存シナリオの標準パターン（flakyテスト排除の重点対象）:
+  // 1. 時計を基準時刻 T に凍結
+  // 2. 時計を T - 12h に設定し、直近ダミーレスを作成（24時間以内 = 低活性にならない）
+  // 3. 時計を T に戻す（When ステップで操作実行）
+  //
+  // 旧実装（Date.now() - 12h）は実行タイミングによりミリ秒単位のずれが生じ、
+  // 「最終レスが24時間以内のスレッドでは低活性判定にならない」シナリオがflakyになっていた。
+  // 凍結時計により完全に決定論的になる。
+  //
+  // See: docs/architecture/bdd_test_strategy.md §5.2 相対時刻の禁止
+  this.setCurrentTime(TEST_BASE_TIME)
+
   if (!this.currentThreadId) {
     const threadKey = Math.floor(Date.now() / 1000).toString()
     const thread = await InMemoryThreadRepo.create({
@@ -780,10 +829,12 @@ Given('スレッドの最終レスが12時間前である', async function (this
     })
     this.currentThreadId = thread.id
   }
-  // 12時間前の時刻（24時間以内なので低活性にならない）
-  const recentTime = new Date(Date.now() - 12 * 60 * 60 * 1000)
 
-  // threadPosts の時系列判定用に12時間前のダミーレスを追加する。
+  // 時計を T - 12h に設定してダミーレスを作成（24時間以内 = 低活性でない）
+  const recentTime = new Date(TEST_BASE_TIME.getTime() - 12 * 60 * 60 * 1000)
+  this.setCurrentTime(recentTime)
+
+  // threadPosts の時系列判定用に T-12h のダミーレスを追加する。
   // Named User（UserA 等）が登録済みであればそのユーザーのダミーレスとして追加し、
   // new_thread_join ボーナスの誤発火も同時に防止する。
   const namedUserARecent = this.getNamedUser('UserA')
@@ -797,14 +848,17 @@ Given('スレッドの最終レスが12時間前である', async function (this
     authorId: dummyAuthorIdRecent,
     displayName: '名無しさん',
     dailyId: `daily-recent-${dummyAuthorIdRecent}`,
-    body: '直近のダミーレス（12時間前）',
+    body: '直近のダミーレス（T-12h）',
     isSystemMessage: false,
     isDeleted: false,
-    createdAt: recentTime,
+    createdAt: new Date(Date.now()),
   })
 
-  // lastPostAt を 12 時間前に設定
+  // lastPostAt を T - 12h に設定（24時間以内なので低活性にならない）
   await InMemoryThreadRepo.updateLastPostAt(this.currentThreadId, recentTime)
+
+  // 時計を基準時刻 T に戻す（When ステップで正常な操作を実行するため）
+  this.setCurrentTime(TEST_BASE_TIME)
 })
 
 // ---------------------------------------------------------------------------
@@ -1277,7 +1331,7 @@ When('{string} がそのスレッドに書き込みを行う', async function (
     const inactiveTimeForDummy = threadRevivalInactiveTimes.get(this)
     const dummyCreatedAt = inactiveTimeForDummy
       ? new Date(inactiveTimeForDummy.getTime() - 60 * 1000)  // inactiveTime の 1分前
-      : new Date(Date.now() - 2 * 60 * 1000)                  // 通常の 2分前
+      : new Date(Date.now() - 2 * 60 * 1000)                  // 時計凍結中は凍結値から2分前
     InMemoryPostRepo._insert({
       id: crypto.randomUUID(),
       threadId: this.currentThreadId,
@@ -1321,7 +1375,10 @@ When('{string} がそのスレッドに書き込みを行う', async function (
       const data = this.lastResult?.data as { postId: string }
       const revivalPostObj = await InMemoryPostRepo.findById(data.postId)
       if (revivalPostObj) {
-        // revivalPost の createdAt を 1 秒前に設定して後続書き込みより確実に前にする
+        // revivalPost の createdAt を 1 秒前に設定して後続書き込みより確実に前にする。
+        // post-service.ts が new Date()（実時刻）で createdAt を設定するため、
+        // followupPost も実時刻で作成される。両者の差が 30分以内になるよう
+        // 実時刻から 1 秒前（new Date()）を使用する。
         const pastCreatedAt = new Date(new Date().getTime() - 1000)
         InMemoryPostRepo._insert({ ...revivalPostObj, createdAt: pastCreatedAt })
       }
@@ -1475,6 +1532,7 @@ When('スレッドのレス番号 {int} に書き込みを行う', async functio
   }
 
   // targetPostNumber - 1 件のダミーレスを挿入
+  // createdAt は Date.now() - offset で計算する（時計凍結中は凍結値から計算される）
   for (let i = 1; i < targetPostNumber; i++) {
     InMemoryPostRepo._insert({
       id: crypto.randomUUID(),
