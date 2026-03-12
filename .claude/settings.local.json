@@ -12,7 +12,11 @@
       "Bash(for f in features/phase1/*.feature)",
       "Bash(do echo \"=== $f ===\")",
       "Read(//c/Users/user/Documents/PGM連携/battle_board/**)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(wc:*)",
+      "Bash(node:*)",
+      "Bash(TS_NODE_PROJECT=tsconfig.cucumber.json npx cucumber-js:*)",
+      "Bash(grep:*)"
     ]
   }
 }

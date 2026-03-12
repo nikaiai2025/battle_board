@@ -244,33 +244,58 @@ export async function evaluateOnPost(
   // See: features/phase1/incentive.feature Rule: 過去に書き込んだことがないスレッドへの初書き込みで +3
   // -------------------------------------------------------------------------
   try {
-    // スレッドの既存レス（今回の書き込み前の状態）を取得
+    // スレッドのレス一覧を取得
+    // post-service.ts は PostRepository.create → evaluateOnPost の順に呼ぶため、
+    // この時点で existingPosts には今回の書き込み（ctx.postId）が含まれている。
+    // 今回の書き込みを除外して「以前に書き込んだことがあるか」を判定する。
+    // See: tmp/escalations/escalation_ESC-TASK-018-2.md (バグ1 の根本原因)
     const existingPosts = await PostRepository.findByThreadId(ctx.threadId)
-    const isFirstTimeInThread = !existingPosts.some(p => p.authorId === ctx.userId)
+    const existingPostsWithoutCurrent = existingPosts.filter(p => p.id !== ctx.postId)
+    const isFirstTimeInThread = !existingPostsWithoutCurrent.some(
+      p => p.authorId === ctx.userId
+    )
 
-    // 当日の新スレッド参加ログ数をカウント
-    const joinedThreadCountToday = todayLogs.filter(
-      log => log.eventType === 'new_thread_join'
-    ).length
+    // スレッド作成者が最初のレスを書く場合（createThread のフロー）は new_thread_join 対象外。
+    // post-service.ts の createThread は createPost を内部で呼び（isThreadCreation なし）、
+    // その後 evaluateOnPost を再度 isThreadCreation=true で呼ぶ。
+    // createPost 内の evaluateOnPost が呼ばれた時点でスレッドには今回のレスのみ存在するため、
+    // スレッド作成者かつ今回が初レスの場合はスレッド作成の書き込みと判断してスキップする。
+    // See: features/phase1/incentive.feature Rule: 1日の初回スレッド作成時に +10 が付与される
+    // See: tmp/escalations/escalation_ESC-TASK-019-1.md (副作用の詳細)
+    let isThreadCreatorFirstPost = false
+    if (existingPostsWithoutCurrent.length === 0) {
+      // 今回が初レス（スレッドに他のレスがない）の場合のみスレッド情報を確認
+      const threadInfo = await ThreadRepository.findById(ctx.threadId)
+      isThreadCreatorFirstPost = threadInfo?.createdBy === ctx.userId
+    }
 
-    if (shouldGrantNewThreadJoinBonus(isFirstTimeInThread, joinedThreadCountToday)) {
-      const log = await IncentiveLogRepository.create({
-        userId: ctx.userId,
-        eventType: 'new_thread_join',
-        amount: NEW_THREAD_JOIN_AMOUNT,
-        contextId: ctx.threadId,
-        contextDate,
-      })
-      if (log !== null) {
-        await CurrencyService.credit(ctx.userId, NEW_THREAD_JOIN_AMOUNT, 'incentive_new_thread_join')
-        granted.push({ eventType: 'new_thread_join', amount: NEW_THREAD_JOIN_AMOUNT })
-        // ログをリフレッシュして後続判定に反映
-        todayLogs = [...todayLogs, log]
+    if (isThreadCreatorFirstPost) {
+      skipped.push('new_thread_join')
+    } else {
+      // 当日の新スレッド参加ログ数をカウント
+      const joinedThreadCountToday = todayLogs.filter(
+        log => log.eventType === 'new_thread_join'
+      ).length
+
+      if (shouldGrantNewThreadJoinBonus(isFirstTimeInThread, joinedThreadCountToday)) {
+        const log = await IncentiveLogRepository.create({
+          userId: ctx.userId,
+          eventType: 'new_thread_join',
+          amount: NEW_THREAD_JOIN_AMOUNT,
+          contextId: ctx.threadId,
+          contextDate,
+        })
+        if (log !== null) {
+          await CurrencyService.credit(ctx.userId, NEW_THREAD_JOIN_AMOUNT, 'incentive_new_thread_join')
+          granted.push({ eventType: 'new_thread_join', amount: NEW_THREAD_JOIN_AMOUNT })
+          // ログをリフレッシュして後続判定に反映
+          todayLogs = [...todayLogs, log]
+        } else {
+          skipped.push('new_thread_join')
+        }
       } else {
         skipped.push('new_thread_join')
       }
-    } else {
-      skipped.push('new_thread_join')
     }
   } catch (err) {
     console.error('[IncentiveService] new_thread_join ボーナス付与中にエラー:', err)
@@ -480,8 +505,16 @@ async function evaluateHotPostBonus(
  * 低活性スレッド（最終レスから24時間以上経過）への書き込み後、
  * 30分以内に別ユーザーのレスが付いた場合に復興書き込みの作者に +10 を付与する。
  *
+ * 設計上の注意:
+ *   post-service.ts は PostRepository.create → ThreadRepository.updateLastPostAt → evaluateOnPost
+ *   の順で実行する。そのため evaluateOnPost が呼ばれた時点で thread.lastPostAt は既に現在時刻に
+ *   更新されており、isInactiveThread(thread.lastPostAt, ctx.createdAt) は常に false を返す。
+ *   このため thread.lastPostAt を使わず、threadPosts の時系列（隣接レス間の間隔）から
+ *   低活性期間と復興書き込みを判定する。
+ *
  * See: features/phase1/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み、30分以内に別ユーザーのレスが付くと +10
  * See: docs/architecture/components/incentive.md §2.2 thread_revival
+ * See: tmp/escalations/escalation_ESC-TASK-018-2.md (バグ2 の根本原因)
  */
 async function evaluateThreadRevivalBonus(
   ctx: PostContext,
@@ -491,16 +524,23 @@ async function evaluateThreadRevivalBonus(
   granted: { eventType: IncentiveEventType; amount: number }[],
   skipped: IncentiveEventType[]
 ): Promise<void> {
-  // スレッドが低活性かチェック
-  // lastPostAt は現在の書き込みで更新される前の値を使う
-  // threadPosts がある場合は、その中の最古（1件目）より前のlastPostAtを使う
-  if (!isInactiveThread(thread.lastPostAt, ctx.createdAt)) return
-
-  // 低活性スレッドへの最初の復興書き込みを探す
-  // threadPosts の中から、lastPostAt 以降の最初の書き込みが復興書き込み
-  const revivalPost = threadPosts.find(
-    p => p.createdAt > thread.lastPostAt
+  // threadPosts を createdAt 昇順でソートする（ソートは副作用なし）
+  const sortedPosts = [...threadPosts].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
   )
+
+  // 隣接レス間の間隔が24時間以上ある箇所を探し、その直後のレスを復興書き込みとする。
+  // post-service.ts が updateLastPostAt を先に呼ぶため thread.lastPostAt は使用しない。
+  // isInactiveThread（純粋関数）を活用して間隔判定を行う。
+  let revivalPost: Post | undefined
+  for (let i = 1; i < sortedPosts.length; i++) {
+    const prevPost = sortedPosts[i - 1]
+    const currPost = sortedPosts[i]
+    if (isInactiveThread(prevPost.createdAt, currPost.createdAt)) {
+      revivalPost = currPost
+      break
+    }
+  }
   if (!revivalPost || !revivalPost.authorId) return
 
   const revivalAuthorId = revivalPost.authorId

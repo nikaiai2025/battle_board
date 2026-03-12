@@ -367,8 +367,13 @@ describe('IncentiveService.evaluateOnPost', () => {
       it('スレッドへの初書き込みで +3 が付与される', async () => {
         // See: features/phase1/incentive.feature @未参加のスレッドに初めて書き込むと +3 ボーナスが付与される
         // スレッドのレス一覧に書き込みユーザーのレスが存在しない（初参加）
+        // incentive-service.ts はスレッド作成者の初レスを new_thread_join 対象外とするため、
+        // thread.createdBy を ctx.userId と異なるユーザーに設定して「他ユーザー作成スレッドへの初参加」を再現する
         vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
         vi.mocked(IncentiveLogRepository.findByUserIdAndDate).mockResolvedValue([])
+        vi.mocked(ThreadRepository.findById).mockResolvedValue(
+          makeThread({ createdBy: 'thread-owner' })  // user-a（ctx.userId）と異なる作成者
+        )
 
         const ctx = makeCtx()
         const result = await evaluateOnPost(ctx)
@@ -709,11 +714,19 @@ describe('IncentiveService.evaluateOnPost', () => {
     describe('正常系: 低活性スレッドへの書き込み後30分以内に別ユーザーが返信', () => {
       it('24時間以上低活性だったスレッドに書き込み後30分以内に他ユーザーが返信すると +10', async () => {
         // See: features/phase1/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと +10 ボーナスが付与される
+        // 修正後の evaluateThreadRevivalBonus は threadPosts の時系列から低活性期間を判定する。
+        // lastOldPost → revivalPost の間隔が 24時間以上であることを threadPosts で表現する必要がある。
+        const lastOldPost = makePost({
+          id: 'post-old',
+          postNumber: 1,
+          authorId: 'user-c',
+          createdAt: new Date('2026-03-08T00:00:00Z'),  // 33時間前（低活性期間）
+        })
         const revivalPost = makePost({
           id: 'post-revival',
           postNumber: 2,
           authorId: 'user-a',
-          createdAt: new Date('2026-03-09T09:00:00Z'),
+          createdAt: new Date('2026-03-09T09:00:00Z'),  // 復興書き込み
         })
         const followupPost = makePost({
           id: 'post-followup',
@@ -724,6 +737,7 @@ describe('IncentiveService.evaluateOnPost', () => {
         })
 
         vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
+          lastOldPost,
           revivalPost,
           followupPost,
         ])

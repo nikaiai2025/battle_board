@@ -1,0 +1,124 @@
+/**
+ * インメモリ CurrencyRepository
+ *
+ * BDD テスト用の Supabase 非依存実装。
+ * currency-repository.ts と同一シグネチャの関数を提供する。
+ *
+ * 楽観的ロック（deduct）: 単一の Promise チェーンで直列実行して
+ * balance >= amount の条件チェックと減算をアトミックに再現する。
+ *
+ * See: features/phase1/currency.feature
+ * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
+ */
+
+import type { Currency, DeductResult } from '../../../src/lib/domain/models/currency'
+
+// ---------------------------------------------------------------------------
+// インメモリストア
+// ---------------------------------------------------------------------------
+
+/** シナリオ間でリセットされる通貨ストア（key: userId） */
+const store = new Map<string, Currency>()
+
+/**
+ * 楽観的ロックを直列化するための Promise チェーン（ユーザーごと）。
+ *
+ * See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+ */
+const deductQueues = new Map<string, Promise<DeductResult>>()
+
+/**
+ * ストアを初期化する（Beforeフックから呼び出す）。
+ */
+export function reset(): void {
+  store.clear()
+  deductQueues.clear()
+}
+
+/**
+ * テスト用ヘルパー: 通貨レコードを直接ストアに設定する。
+ */
+export function _upsert(currency: Currency): void {
+  store.set(currency.userId, currency)
+}
+
+// ---------------------------------------------------------------------------
+// リポジトリ関数（本番実装と同一シグネチャ）
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー ID で通貨レコードを取得する。
+ * See: src/lib/infrastructure/repositories/currency-repository.ts
+ */
+export async function findByUserId(userId: string): Promise<Currency | null> {
+  return store.get(userId) ?? null
+}
+
+/**
+ * ユーザーの通貨レコードを新規作成する。
+ * See: src/lib/infrastructure/repositories/currency-repository.ts
+ */
+export async function create(userId: string, initialBalance: number = 0): Promise<Currency> {
+  const currency: Currency = {
+    userId,
+    balance: initialBalance,
+    updatedAt: new Date(),
+  }
+  store.set(userId, currency)
+  return currency
+}
+
+/**
+ * 通貨残高に指定額を加算する（credit）。
+ * See: src/lib/infrastructure/repositories/currency-repository.ts
+ */
+export async function credit(userId: string, amount: number): Promise<void> {
+  const currency = store.get(userId)
+  if (currency) {
+    store.set(userId, {
+      ...currency,
+      balance: currency.balance + amount,
+      updatedAt: new Date(),
+    })
+  }
+}
+
+/**
+ * 通貨残高から指定額を差し引く（deduct）。
+ *
+ * ユーザーごとの Promise チェーンで楽観的ロックを再現する。
+ * balance >= amount の条件を満たす場合のみ減算し、成功/失敗を返す。
+ *
+ * See: src/lib/infrastructure/repositories/currency-repository.ts
+ * See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+ */
+export async function deduct(userId: string, amount: number): Promise<DeductResult> {
+  // 前の deduct 処理が完了してから次を実行するよう直列化する
+  const prevQueue = deductQueues.get(userId) ?? Promise.resolve({ success: true, newBalance: 0 } as DeductResult)
+
+  const nextQueue = prevQueue.then(async (): Promise<DeductResult> => {
+    const currency = store.get(userId)
+    if (!currency || currency.balance < amount) {
+      return { success: false, reason: 'insufficient_balance' }
+    }
+
+    const newBalance = currency.balance - amount
+    store.set(userId, {
+      ...currency,
+      balance: newBalance,
+      updatedAt: new Date(),
+    })
+    return { success: true, newBalance }
+  })
+
+  deductQueues.set(userId, nextQueue)
+  return nextQueue
+}
+
+/**
+ * ユーザーの現在の通貨残高を取得する。
+ * See: src/lib/infrastructure/repositories/currency-repository.ts
+ */
+export async function getBalance(userId: string): Promise<number> {
+  return store.get(userId)?.balance ?? 0
+}

@@ -1,6 +1,6 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-09
+> 最終更新: 2026-03-12
 
 ## 現在のフェーズ
 
@@ -30,7 +30,7 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 | Step 5 | 書き込み + スレッド管理 | **completed** | Sprint-5 |
 | Step 6 | インセンティブサービス | **completed** | Sprint-6 |
 | Step 7 | Web UI | **completed** | Sprint-7 |
-| Step 7.5 | BDD負債返済（Step 1〜7のステップ定義一括実装） | **次スプリント（最優先）** | — |
+| Step 7.5 | BDD負債返済（Step 1〜7のステップ定義一括実装） | **進行中** (Sprint-8) | Sprint-8 |
 | Step 8 | 管理機能 + BDDステップ定義 | 未着手（Step 7.5完了後） | — |
 | Step 9 | 専ブラ互換 Adapter + BDDステップ定義 | 未着手（Step 7.5完了後） | — |
 | Step 10 | マイページ + 仕上げ + BDDステップ定義 | 未着手（Step 7.5完了後） | — |
@@ -38,11 +38,21 @@ Phase 1: 掲示板の土台構築（全体計画: `tmp/phase1_implementation_pla
 ## テスト状況
 
 - vitest: 8ファイル / 330テスト / 全PASS
+- cucumber-js: 56シナリオ / 303ステップ / 全PASS
+
+## 現在進行中: Sprint-8 (Step 7.5 BDD負債返済)
+
+計画書: `tmp/orchestrator/sprint_8_plan.md`
+
+| TASK_ID | 内容 | ステータス |
+|---|---|---|
+| TASK-015 | BDDテスト戦略・インフラ設計 | **completed** → `docs/architecture/bdd_test_strategy.md` (D-10) |
+| TASK-016 | BDDインフラ実装 + 共通ステップ定義 | **completed** |
+| TASK-017 | authentication + posting + thread + currency ステップ定義 | **completed** (26シナリオ全PASS) |
+| TASK-018 | incentive ステップ定義 | **completed** |
+| TASK-019 | incentive-service.ts バグ修正 | **completed** |
 
 ## 次スプリント候補
-
-**最優先: Step 7.5（BDD負債返済）**
-Step 1〜7で未実装だったBDDステップ定義を一括実装する。Step 8以降に進む前に完了させること。
 
 Step 7.5完了後:
 - **Step 8（管理機能）** — AdminService + 管理者UI + BDDステップ定義

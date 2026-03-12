@@ -100,7 +100,10 @@ const THREAD_LIST_MAX_LIMIT = 50
  * See: docs/architecture/architecture.md §5.2 日次リセットID生成
  */
 function getTodayJst(): string {
-  const now = new Date()
+  // Date.now() を使用することで時刻スタブ（BDDテスト）が正しく機能する
+  // new Date() のみでは Date.now のスタブが反映されない環境があるため
+  // See: features/support/world.ts @setCurrentTime
+  const now = new Date(Date.now())
   // JST = UTC+9
   const jstOffset = 9 * 60 * 60 * 1000
   const jstDate = new Date(now.getTime() + jstOffset)

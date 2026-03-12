@@ -35,6 +35,7 @@
 | 画面要素定義書 (D-06) | `docs/specs/screens/{screen_id}.yaml` | UI要素の静的カタログ（ID・種類・ラベル）。振る舞いはD-03で定義 |
 | アーキテクチャ設計書 (D-07) | `docs/architecture/architecture.md` | 技術的実現方針と技術的意思決定記録（TDR）を含む設計書 |
 | コンポーネント境界設計書 (D-08) | `docs/architecture/components/{component}.md` | コンポーネントの分割方針・責務の割り当て・依存関係等 |
+| BDDテスト戦略書 (D-10) | `docs/architecture/bdd_test_strategy.md` | BDDテストのテストレベル・モック戦略・World設計・ディレクトリ構成等の方針 |
 
 
 ## ソースコード
