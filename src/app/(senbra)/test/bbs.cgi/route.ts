@@ -29,6 +29,7 @@ import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 import * as PostService from "@/lib/services/post-service";
 import { hashIp, reduceIp } from "@/lib/services/auth-service";
 import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
+import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
 
 /** BbsCgiParserのシングルトンインスタンス */
 const bbsCgiParser = new BbsCgiParser();
@@ -245,7 +246,7 @@ function setEdgeTokenCookie(response: Response, edgeToken: string): Response {
   const headers = new Headers(response.headers);
   const isProduction = process.env.NODE_ENV === "production";
   const cookieOptions = [
-    `edge-token=${edgeToken}`,
+    `${EDGE_TOKEN_COOKIE}=${edgeToken}`,
     "HttpOnly",
     isProduction ? "Secure" : "",
     "SameSite=Lax",

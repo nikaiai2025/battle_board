@@ -936,7 +936,8 @@ When('bbs.cgiに所定のPOSTパラメータ（bbs, key, FROM, mail, MESSAGE, su
   params.set('MESSAGE', 'テスト書き込みメッセージ')
   params.set('submit', '書き込む')
 
-  const cookieHeader = `edge_token=${this.currentEdgeToken}`
+  // edge-token（ハイフン）に統一済み。See: src/lib/constants/cookie-names.ts
+  const cookieHeader = `edge-token=${this.currentEdgeToken}`
   const parsed = bbsCgiParser.parseRequest(params, cookieHeader)
 
   // PostServiceで書き込みを実行する
@@ -1019,7 +1020,8 @@ When('bbs.cgiにsubjectパラメータ付きでPOSTする', async function (this
   params.set('MESSAGE', 'スレッド最初のレスです')
   params.set('submit', '新規スレッド作成')
 
-  const cookieHeader = `edge_token=${this.currentEdgeToken}`
+  // edge-token（ハイフン）に統一済み。See: src/lib/constants/cookie-names.ts
+  const cookieHeader = `edge-token=${this.currentEdgeToken}`
   const parsed = bbsCgiParser.parseRequest(params, cookieHeader)
 
   // PostServiceでスレッドを作成する
@@ -1101,7 +1103,8 @@ When('本文が空の状態でbbs.cgiにPOSTする', async function (this: Battl
   params.set('MESSAGE', '')  // 空の本文
   params.set('submit', '書き込む')
 
-  const cookieHeader = `edge_token=${this.currentEdgeToken}`
+  // edge-token（ハイフン）に統一済み。See: src/lib/constants/cookie-names.ts
+  const cookieHeader = `edge-token=${this.currentEdgeToken}`
   const parsed = bbsCgiParser.parseRequest(params, cookieHeader)
 
   // PostServiceで書き込みを実行する（バリデーションエラーが発生するはず）

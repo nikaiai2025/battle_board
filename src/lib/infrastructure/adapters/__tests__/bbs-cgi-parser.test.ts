@@ -38,12 +38,13 @@ describe("BbsCgiParser", () => {
         MESSAGE: "テスト",
         submit: "書き込む",
       });
-      const cookieHeader = "edge_token=mytoken123; other=value";
+      // edge-token（ハイフン）に統一済み。See: src/lib/constants/cookie-names.ts
+      const cookieHeader = "edge-token=mytoken123; other=value";
       const result = parser.parseRequest(body, cookieHeader);
       expect(result.edgeToken).toBe("mytoken123");
     });
 
-    it("cookieにedge_tokenがない場合はnullを返す", () => {
+    it("cookieにedge-tokenがない場合はnullを返す", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
         bbs: "battleboard",
@@ -152,7 +153,7 @@ describe("BbsCgiParser", () => {
       expect(result).toHaveProperty("edgeToken");
     });
 
-    it("複数のcookieがある場合でも正しくedge_tokenを抽出する", () => {
+    it("複数のcookieがある場合でも正しくedge-tokenを抽出する", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
         bbs: "battleboard",
@@ -160,7 +161,8 @@ describe("BbsCgiParser", () => {
         MESSAGE: "テスト",
         submit: "書き込む",
       });
-      const cookieHeader = "session_id=abc; edge_token=token456; user=test";
+      // edge-token（ハイフン）に統一済み。See: src/lib/constants/cookie-names.ts
+      const cookieHeader = "session_id=abc; edge-token=token456; user=test";
       const result = parser.parseRequest(body, cookieHeader);
       expect(result.edgeToken).toBe("token456");
     });

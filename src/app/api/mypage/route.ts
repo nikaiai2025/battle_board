@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as MypageService from '@/lib/services/mypage-service'
 import * as UserRepository from '@/lib/infrastructure/repositories/user-repository'
+import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
 
 /**
  * GET /api/mypage — マイページ基本情報取得
@@ -31,7 +32,8 @@ import * as UserRepository from '@/lib/infrastructure/repositories/user-reposito
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   // --- Cookie から edge-token を読み取る ---
-  const edgeToken = req.cookies.get('edge-token')?.value ?? null
+  // See: src/lib/constants/cookie-names.ts
+  const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null
 
   if (!edgeToken) {
     return NextResponse.json(

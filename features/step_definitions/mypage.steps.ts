@@ -285,16 +285,20 @@ Then('通貨残高が表示される', function (this: BattleBoardWorld) {
 // ---------------------------------------------------------------------------
 
 /**
- * mypageResult に authToken と isPremium フィールドが存在することを確認する。
- * authToken がメールアドレスに代わるアカウント識別子として機能する。
+ * mypageResult に userId と isPremium フィールドが存在することを確認する。
+ *
+ * NOTE: CR-002修正により authToken はAPIレスポンスから除去済み。
+ *   authToken（edge-token）はセキュリティ上の理由でJSONレスポンスに含めない。
+ *   アカウント識別子としては userId を使用する。
+ *   See: tmp/reports/code_review_phase1.md CR-002
  */
 Then('アカウント情報（メールアドレス、有料\\/無料ステータス）が表示される', function (
   this: BattleBoardWorld
 ) {
   assert(this.mypageResult !== null, 'マイページ情報が取得されていません')
   assert(
-    typeof this.mypageResult.authToken === 'string' && this.mypageResult.authToken.length > 0,
-    'authToken（アカウント識別子）が取得できていません'
+    typeof this.mypageResult.userId === 'string' && this.mypageResult.userId.length > 0,
+    'userId（アカウント識別子）が取得できていません'
   )
   assert(
     typeof this.mypageResult.isPremium === 'boolean',

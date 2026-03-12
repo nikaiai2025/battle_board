@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import * as AdminUserRepository from '@/lib/infrastructure/repositories/admin-user-repository'
+import { ADMIN_SESSION_COOKIE } from '@/lib/constants/cookie-names'
 
 // ---------------------------------------------------------------------------
 // Route Handler
@@ -86,9 +87,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // --- 認証成功: admin_session Cookie を設定する ---
   // See: docs/architecture/components/authentication.md §2 Cookie命名
+  // See: src/lib/constants/cookie-names.ts
   const response = NextResponse.json({ message: 'ログインしました' }, { status: 200 })
 
-  response.cookies.set('admin_session', result.sessionToken, {
+  response.cookies.set(ADMIN_SESSION_COOKIE, result.sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',

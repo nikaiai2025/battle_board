@@ -18,6 +18,8 @@
  * See: docs/architecture/components/senbra-adapter.md §2 BbsCgiParser, §3 公開インターフェース
  */
 
+import { EDGE_TOKEN_COOKIE } from '../../constants/cookie-names'
+
 /**
  * BbsCgiParserのパース結果型。
  * フィールドはすべてデコード済みUTF-8文字列。
@@ -34,7 +36,7 @@ export interface BbsCgiParsedRequest {
   /** メールフィールド（mailパラメータ、sagageなど） */
   mail: string;
   /**
-   * 認証トークン（cookieのedge_tokenから取得）。
+   * 認証トークン（cookieのedge-tokenから取得）。
    * cookie未設定または該当cookieがない場合はnull。
    */
   edgeToken: string | null;
@@ -46,8 +48,11 @@ export interface BbsCgiParsedRequest {
  * 責務: URLSearchParams + cookieヘッダ → BbsCgiParsedRequest変換
  */
 export class BbsCgiParser {
-  /** edge_tokenを格納するcookie名 */
-  private static readonly EDGE_TOKEN_COOKIE = "edge_token";
+  /**
+   * edge-tokenを格納するcookie名。
+   * See: src/lib/constants/cookie-names.ts
+   */
+  private static readonly EDGE_TOKEN_COOKIE = EDGE_TOKEN_COOKIE;
 
   /**
    * bbs.cgi POSTリクエストをパースし、BbsCgiParsedRequestを返す。
@@ -74,15 +79,15 @@ export class BbsCgiParser {
    * CookieヘッダからedgeTokenを抽出する。
    *
    * 形式: "name1=value1; name2=value2; ..."
-   * edge_tokenが存在しない場合はnullを返す。
+   * edge-tokenが存在しない場合はnullを返す。
    *
    * @param cookieHeader - HTTPリクエストのCookieヘッダ文字列
-   * @returns edge_tokenの値またはnull
+   * @returns edge-tokenの値またはnull
    */
   private extractEdgeToken(cookieHeader: string): string | null {
     if (!cookieHeader) return null;
 
-    // セミコロン区切りでcookieを分割し、edge_token=valueを探す
+    // セミコロン区切りでcookieを分割し、edge-token=valueを探す
     const cookies = cookieHeader.split(";");
     for (const cookie of cookies) {
       const [name, ...valueParts] = cookie.trim().split("=");

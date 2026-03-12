@@ -12,7 +12,7 @@
  *   - Cookie から edge-token と IP を読み取る
  *   - AuthService.verifyAuthCode() への委譲
  *   - レスポンス整形
- *   - Cookie 操作（edge_token の更新は Route Handler で行う）
+ *   - Cookie 操作（edge-token の更新は Route Handler で行う）
  *
  * 設計上の判断:
  *   - AuthService は Cookie を直接操作しない（authentication.md §5）
@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies, headers } from 'next/headers'
 import { hashIp } from '@/lib/services/auth-service'
 import * as AuthService from '@/lib/services/auth-service'
+import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
 
 // ---------------------------------------------------------------------------
 // リクエスト・レスポンス型
@@ -69,7 +70,7 @@ async function getIpHash(req: NextRequest): Promise<string> {
  * リクエスト:
  *   Content-Type: application/json
  *   Body: { code: string; turnstileToken: string }
- *   Cookie: edge_token（認証コード発行時に発行済みのトークン）
+ *   Cookie: edge-token（認証コード発行時に発行済みのトークン）
  *
  * レスポンス:
  *   200: { success: true }（認証成功）
@@ -107,8 +108,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // --- Cookie から edge-token を読み取る ---
   // See: docs/architecture/components/authentication.md §5 > Cookie 命名規則
+  // See: src/lib/constants/cookie-names.ts
   const cookieStore = await cookies()
-  const edgeToken = cookieStore.get('edge_token')?.value
+  const edgeToken = cookieStore.get(EDGE_TOKEN_COOKIE)?.value
 
   if (!edgeToken) {
     return NextResponse.json(
@@ -132,13 +134,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // --- 認証成功: レスポンスを返す ---
-  // Cookie の edge_token は既に発行済みのものをそのまま使用する
+  // Cookie の edge-token は既に発行済みのものをそのまま使用する
   // （AuthService は Cookie を操作しない設計。token の有効化は AuthCodeRepository.markVerified で完了）
   const response = NextResponse.json({ success: true }, { status: 200 })
 
-  // edge_token Cookie を更新（HttpOnly, Secure, SameSite=Lax）
+  // edge-token Cookie を更新（HttpOnly, Secure, SameSite=Lax）
   // 認証成功時に明示的に Cookie を設定し直す（有効期限の更新等）
-  response.cookies.set('edge_token', edgeToken, {
+  // See: src/lib/constants/cookie-names.ts
+  response.cookies.set(EDGE_TOKEN_COOKIE, edgeToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

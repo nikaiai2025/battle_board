@@ -31,12 +31,14 @@ import type { Post } from '../domain/models/post'
  * マイページ基本情報レスポンス
  * See: features/phase1/mypage.feature @マイページに基本情報が表示される
  * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ *
+ * NOTE: authToken（edge-token）はセキュリティ上の理由からレスポンスに含めない。
+ *   クライアントはCookieを通じて自動送信されるため、JSONレスポンスでの返却は不要。
+ *   See: tmp/reports/code_review_phase1.md CR-002
  */
 export interface MypageInfo {
   /** ユーザーID */
   userId: string
-  /** メールアドレス（edge-token で認証済みのため、ここでは authToken を参照） */
-  authToken: string
   /** 通貨残高 */
   balance: number
   /** 有料ユーザーフラグ */
@@ -111,9 +113,10 @@ export async function getMypage(userId: string): Promise<MypageInfo | null> {
   // ユーザーが存在しない場合は null を返す（呼び出し元が 404 を判断する）
   if (!user) return null
 
+  // authToken は CR-002 修正によりレスポンスから除去済み
+  // Cookieで自動送信されるため、JSONレスポンスに含める必要はない
   return {
     userId: user.id,
-    authToken: user.authToken,
     balance,
     isPremium: user.isPremium,
     username: user.username,

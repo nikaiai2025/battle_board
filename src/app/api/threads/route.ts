@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as PostService from '@/lib/services/post-service'
 import { hashIp, reduceIp } from '@/lib/services/auth-service'
+import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
 
 // ---------------------------------------------------------------------------
 // ユーティリティ
@@ -113,7 +114,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // --- Cookie から edge-token を読み取る ---
-  const edgeToken = req.cookies.get('edge-token')?.value ?? null
+  // See: src/lib/constants/cookie-names.ts
+  const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null
 
   // --- IP ハッシュの取得 ---
   const ipHash = getIpHash(req)
@@ -142,7 +144,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     )
     // edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
     // See: docs/specs/openapi.yaml > /api/threads > post > 401 > Set-Cookie
-    response.cookies.set('edge-token', result.authRequired.edgeToken, {
+    // See: src/lib/constants/cookie-names.ts
+    response.cookies.set(EDGE_TOKEN_COOKIE, result.authRequired.edgeToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

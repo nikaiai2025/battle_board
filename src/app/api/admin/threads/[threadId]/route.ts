@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/services/auth-service'
 import { deleteThread } from '@/lib/services/admin-service'
+import { ADMIN_SESSION_COOKIE } from '@/lib/constants/cookie-names'
 
 // ---------------------------------------------------------------------------
 // Route Handler
@@ -48,7 +49,8 @@ export async function DELETE(
 
   // --- admin_session Cookie の検証 ---
   // See: docs/architecture/components/admin.md §5 > 認証と認可の分離
-  const sessionToken = req.cookies.get('admin_session')?.value ?? null
+  // See: src/lib/constants/cookie-names.ts
+  const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value ?? null
 
   if (!sessionToken) {
     return NextResponse.json(
