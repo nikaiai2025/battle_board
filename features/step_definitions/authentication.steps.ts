@@ -21,6 +21,7 @@ import {
   InMemoryTurnstileClient,
   InMemoryPostRepo,
   InMemoryThreadRepo,
+  InMemoryAdminRepo,
 } from '../support/mock-installer'
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,11 @@ function getAuthService() {
 /** PostService を動的 require で取得する（BeforeAll 後に呼ばれる） */
 function getPostService() {
   return require('../../src/lib/services/post-service') as typeof import('../../src/lib/services/post-service')
+}
+
+/** AdminUserRepository を動的 require で取得する（BeforeAll 後に呼ばれる） */
+function getAdminUserRepository() {
+  return require('../../src/lib/infrastructure/repositories/admin-user-repository') as typeof import('../../src/lib/infrastructure/repositories/admin-user-repository')
 }
 
 // ---------------------------------------------------------------------------
@@ -606,5 +612,157 @@ Then('日付変更前の書き込みのIDは変更されない', async function 
     firstPost.dailyId,
     beforeMidnightDailyId,
     `日付変更前のレスのIDが変更されていないことを期待しましたが "${firstPost.dailyId}" でした（期待値: "${beforeMidnightDailyId}"）`
+  )
+})
+
+// ---------------------------------------------------------------------------
+// 管理者ログイン（メール + パスワード）
+// See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+// See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+// ---------------------------------------------------------------------------
+
+/** テスト用管理者アカウントの固定値 */
+const TEST_ADMIN_ID = 'test-admin-user-id-auth-001'
+const TEST_ADMIN_EMAIL = 'admin@battleboard.test'
+const TEST_ADMIN_PASSWORD = 'admin-secret-password'
+const TEST_ADMIN_WRONG_PASSWORD = 'wrong-password'
+
+/**
+ * 管理者アカウントが存在する。
+ * インメモリストアに管理者ユーザーと認証情報を登録する。
+ *
+ * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/support/in-memory/admin-repository.ts > _insert, _insertCredential
+ */
+Given('管理者アカウントが存在する', function (this: BattleBoardWorld) {
+  // 管理者ユーザーをストアに登録する
+  InMemoryAdminRepo._insert({
+    id: TEST_ADMIN_ID,
+    role: 'admin',
+    createdAt: new Date(),
+  })
+  // 認証情報（メール + パスワード）を登録する
+  InMemoryAdminRepo._insertCredential(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD, TEST_ADMIN_ID)
+})
+
+/**
+ * 管理者が正しいメールアドレスとパスワードを入力してログインする。
+ * AdminUserRepository.loginWithPassword を呼び出す。
+ *
+ * See: src/lib/infrastructure/repositories/admin-user-repository.ts > loginWithPassword
+ * See: features/support/in-memory/admin-repository.ts > loginWithPassword
+ */
+When('管理者が正しいメールアドレスとパスワードを入力してログインする', async function (this: BattleBoardWorld) {
+  const AdminUserRepository = getAdminUserRepository()
+  const result = await AdminUserRepository.loginWithPassword(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+
+  if (result.success) {
+    this.currentAdminId = result.userId
+    this.adminSessionToken = result.sessionToken
+    this.isAdmin = true
+    this.lastResult = { type: 'success', data: result }
+  } else {
+    this.lastResult = {
+      type: 'error',
+      message: 'ログインに失敗しました',
+      code: result.reason,
+    }
+  }
+})
+
+/**
+ * 管理者が誤ったパスワードでログインを試みる。
+ * 誤ったパスワードで AdminUserRepository.loginWithPassword を呼び出す。
+ *
+ * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+ * See: features/support/in-memory/admin-repository.ts > loginWithPassword
+ */
+When('管理者が誤ったパスワードでログインを試みる', async function (this: BattleBoardWorld) {
+  const AdminUserRepository = getAdminUserRepository()
+  const result = await AdminUserRepository.loginWithPassword(TEST_ADMIN_EMAIL, TEST_ADMIN_WRONG_PASSWORD)
+
+  if (result.success) {
+    this.currentAdminId = result.userId
+    this.adminSessionToken = result.sessionToken
+    this.isAdmin = true
+    this.lastResult = { type: 'success', data: result }
+  } else {
+    this.lastResult = {
+      type: 'error',
+      message: 'ログインに失敗しました',
+      code: result.reason,
+    }
+  }
+})
+
+/**
+ * 管理者セッションが作成される。
+ * adminSessionToken が設定されており、isAdmin が true であることを確認する。
+ *
+ * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ */
+Then('管理者セッションが作成される', function (this: BattleBoardWorld) {
+  assert(this.lastResult, '操作結果が存在しません')
+  assert.strictEqual(
+    this.lastResult.type,
+    'success',
+    `管理者ログイン成功を期待しましたが "${this.lastResult.type}" でした`
+  )
+  assert(this.adminSessionToken, '管理者セッショントークンが設定されていません')
+  assert(this.adminSessionToken.length > 0, '管理者セッショントークンが空です')
+  assert.strictEqual(this.isAdmin, true, '管理者フラグが true であることを期待しました')
+})
+
+/**
+ * 管理画面にアクセスできる。
+ * 管理者セッションが存在することを確認する（実際のUIアクセスは不要）。
+ *
+ * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト（UIアクセスは検証外）
+ */
+Then('管理画面にアクセスできる', function (this: BattleBoardWorld) {
+  // サービス層テストのため、管理者セッションが存在することをもって
+  // 管理画面へのアクセス権があると判断する
+  assert(this.adminSessionToken, '管理者セッショントークンが存在することで管理画面アクセス権を確認します')
+  assert(this.currentAdminId, '管理者 ID が設定されていることを確認します')
+})
+
+/**
+ * ログインエラーメッセージが表示される。
+ * 最後の操作がエラーで終わったことを検証する。
+ *
+ * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+ */
+Then('ログインエラーメッセージが表示される', function (this: BattleBoardWorld) {
+  assert(this.lastResult, '操作結果が存在しません')
+  assert.strictEqual(
+    this.lastResult.type,
+    'error',
+    `ログインエラーを期待しましたが "${this.lastResult.type}" でした`
+  )
+  const errorResult = this.lastResult as { type: 'error'; message: string; code?: string }
+  assert(
+    errorResult.code === 'invalid_credentials' || errorResult.message.length > 0,
+    'ログインエラーメッセージが存在することを確認します'
+  )
+})
+
+/**
+ * 管理者セッションは作成されない。
+ * adminSessionToken が null であることを確認する。
+ *
+ * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+ */
+Then('管理者セッションは作成されない', function (this: BattleBoardWorld) {
+  assert(this.lastResult, '操作結果が存在しません')
+  assert.strictEqual(
+    this.lastResult.type,
+    'error',
+    `セッション未作成（error）を期待しましたが "${this.lastResult.type}" でした`
+  )
+  assert.strictEqual(
+    this.adminSessionToken,
+    null,
+    '管理者セッショントークンが null であることを期待しましたが設定されていました'
   )
 })

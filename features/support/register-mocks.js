@@ -73,6 +73,10 @@ const REPO_MOCKS = [
   ['src/lib/infrastructure/repositories/currency-repository.ts', './in-memory/currency-repository.ts'],
   ['src/lib/infrastructure/repositories/incentive-log-repository.ts', './in-memory/incentive-log-repository.ts'],
   ['src/lib/infrastructure/external/turnstile-client.ts', './in-memory/turnstile-client.ts'],
+  // 管理者リポジトリ（TASK-021 で追加）
+  // See: features/phase1/admin.feature
+  // See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+  ['src/lib/infrastructure/repositories/admin-user-repository.ts', './in-memory/admin-repository.ts'],
 ]
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

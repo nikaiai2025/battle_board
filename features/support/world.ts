@@ -99,6 +99,33 @@ export class BattleBoardWorld extends World {
   currentThreadTitle: string | null = null
 
   // -------------------------------------------------------------------------
+  // 管理者コンテキスト
+  // See: features/phase1/admin.feature
+  // See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+  // -------------------------------------------------------------------------
+
+  /** 現在の管理者ユーザーID（管理者ログイン済みの場合に設定） */
+  currentAdminId: string | null = null
+
+  /** 現在のユーザーが管理者かどうか */
+  isAdmin: boolean = false
+
+  /** 管理者セッショントークン（認証成功時に設定） */
+  adminSessionToken: string | null = null
+
+  /** 最後に削除されたレス ID（Then ステップでの検証用） */
+  lastDeletedPostId: string | null = null
+
+  /** 最後に削除されたレス番号（Then ステップでの検証用） */
+  lastDeletedPostNumber: number | null = null
+
+  /** 最後に削除されたスレッド ID（Then ステップでの検証用） */
+  lastDeletedThreadId: string | null = null
+
+  /** 最後に削除されたスレッドタイトル（Then ステップでの検証用） */
+  lastDeletedThreadTitle: string | null = null
+
+  // -------------------------------------------------------------------------
   // 最後の操作結果
   // See: docs/architecture/bdd_test_strategy.md §3 最後の操作結果
   // -------------------------------------------------------------------------
@@ -155,6 +182,15 @@ export class BattleBoardWorld extends World {
     this.lastCreatedPost = null
     this.lastCreatedThread = null
     this.currentTime = null
+    // 管理者コンテキストのリセット
+    // See: features/phase1/admin.feature
+    this.currentAdminId = null
+    this.isAdmin = false
+    this.adminSessionToken = null
+    this.lastDeletedPostId = null
+    this.lastDeletedPostNumber = null
+    this.lastDeletedThreadId = null
+    this.lastDeletedThreadTitle = null
   }
 
   // -------------------------------------------------------------------------

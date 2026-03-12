@@ -28,6 +28,10 @@ import * as InMemoryCurrencyRepo from './in-memory/currency-repository'
 import * as InMemoryIncentiveLogRepo from './in-memory/incentive-log-repository'
 import * as InMemoryTurnstileClient from './in-memory/turnstile-client'
 import * as InMemorySupabaseClient from './in-memory/supabase-client'
+// 管理者リポジトリ（TASK-021 で追加）
+// See: features/phase1/admin.feature
+// See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+import * as InMemoryAdminRepo from './in-memory/admin-repository'
 
 // ---------------------------------------------------------------------------
 // インストール関数
@@ -64,6 +68,9 @@ export function resetAllStores(): void {
   InMemoryCurrencyRepo.reset()
   InMemoryIncentiveLogRepo.reset()
   InMemoryTurnstileClient.reset()
+  // 管理者リポジトリのリセット（TASK-021 で追加）
+  // See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル
+  InMemoryAdminRepo.reset()
 }
 
 // ---------------------------------------------------------------------------
@@ -79,4 +86,6 @@ export {
   InMemoryIncentiveLogRepo,
   InMemoryTurnstileClient,
   InMemorySupabaseClient,
+  // 管理者リポジトリ（TASK-021 で追加）
+  InMemoryAdminRepo,
 }
