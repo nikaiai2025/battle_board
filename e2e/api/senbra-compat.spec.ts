@@ -414,11 +414,12 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
       "1レス目の本文"
     );
 
-    // DAT ファイルを取得
-    // Note: Next.js の [threadKey].dat ルートは .dat 付き URL で 404 になる動作があるため、
-    //       拡張子なし URL でアクセスする（専ブラ互換の観点では .dat なしでも機能する）
+    // DAT ファイルを取得（拡張子付き URL でアクセス）
+    // next.config.ts の rewrites により /{boardId}/dat/{threadKey}.dat →
+    // /{boardId}/dat/{threadKey} にリライトされてルートハンドラに到達する。
+    // See: next.config.ts @rewrites
     const response = await request.get(
-      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}`
+      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}.dat`
     );
 
     expect(response.status()).toBe(200);
@@ -478,9 +479,10 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 
     await createPost(request, edgeToken, thread.id, "2レス目の本文");
 
-    // DAT ファイルを取得（拡張子なしでアクセス）
+    // DAT ファイルを取得（拡張子付き URL でアクセス）
+    // See: next.config.ts @rewrites
     const response = await request.get(
-      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}`
+      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}.dat`
     );
     expect(response.status()).toBe(200);
 
@@ -505,9 +507,10 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
   test("GET /battleboard/dat/{threadKey}.dat — 存在しない threadKey で 404 を返す", async ({
     request,
   }) => {
-    // 存在しない threadKey（拡張子なし）で 404 を確認
+    // 存在しない threadKey（拡張子付き）で 404 を確認
+    // See: next.config.ts @rewrites
     const response = await request.get(
-      `${BASE_URL}/${BOARD_ID}/dat/9999999999`
+      `${BASE_URL}/${BOARD_ID}/dat/9999999999.dat`
     );
     expect(response.status()).toBe(404);
   });
@@ -525,8 +528,9 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
       "テスト本文"
     );
 
+    // See: next.config.ts @rewrites
     const response = await request.get(
-      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}`
+      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}.dat`
     );
     expect(response.status()).toBe(200);
 
@@ -709,9 +713,10 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
       "1レス目の本文"
     );
 
-    // まず全体取得して Content-Length を確認（拡張子なしでアクセス）
+    // まず全体取得して Content-Length を確認（拡張子付き URL でアクセス）
+    // See: next.config.ts @rewrites
     const fullResponse = await request.get(
-      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}`
+      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}.dat`
     );
     expect(fullResponse.status()).toBe(200);
     const fullBodyBytes = Buffer.from(await fullResponse.body());
@@ -720,7 +725,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 
     // 取得したバイト数をRangeヘッダとして送信（差分なし）
     const rangeResponse = await request.get(
-      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}`,
+      `${BASE_URL}/${BOARD_ID}/dat/${threadKey}.dat`,
       {
         headers: {
           Range: `bytes=${fullLength}-`,

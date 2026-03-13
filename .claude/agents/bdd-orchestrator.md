@@ -77,6 +77,7 @@ color: green
 1. 既存のタスク指示書 `tmp/tasks/task_{TASK_ID}.md` の作業ログ内に `escalation_resolution` セクションを追記する（解決内容・方針）
 2. タスクステータスを `assigned` に戻す
 3. 同一TASK_IDでワーカーを再起動する（ワーカーはタスク指示書の作業ログ内チェックポイントから中断地点を復帰する）
+4. 不要となったエスカレーションログをアーカイブに移動。`tmp/escalations/archive`
 
 #### 異常終了（aborted）時のリトライ
 - タスクステータスを `aborted` に更新し、locked_files を解放する
