@@ -42,6 +42,9 @@ color: green
 - タスク指示書 `tmp/tasks/task_{TASK_ID}.md` を作成する
 - **ファイル出力が必要な場合のみ**（仕様書ドラフト、テストエビデンス等）、成果物出力ディレクトリ `tmp/workers/{role}_{TASK_ID}/` を作成し、タスク指示書の `artifacts_dir` にパスを記載する
 - ファイル出力が不要な典型的なコーディングタスクでは `artifacts_dir` を省略し、workersディレクトリも作成しない
+- ワーカーの作業でローカル開発環境でのテストが必要な場合は以下コマンドを実行する。
+  - ドッカー起動: `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`
+  - Supabase起動: `npx supabase start` 
 
 ### ステップ5: ワーカー実行
 
