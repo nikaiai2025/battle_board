@@ -73,11 +73,33 @@ export default defineConfig({
     trace: "on-first-retry",
   },
 
-  /** Chromium のみで実行 */
+  /**
+   * テストプロジェクトの定義。
+   *
+   * - e2e: ブラウザ（Chromium）を使用したE2Eテスト（basic-flow.spec.ts等）
+   * - api: ブラウザ不要のHTTPレベルAPIテスト（e2e/api/ 配下）
+   *
+   * 実行方法:
+   *   全テスト:    npx playwright test
+   *   APIのみ:     npx playwright test --project=api
+   *   E2Eのみ:     npx playwright test --project=e2e
+   *
+   * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
+   */
   projects: [
     {
-      name: "chromium",
+      name: "e2e",
+      testDir: "./e2e",
+      testIgnore: "**/api/**",
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "api",
+      testDir: "./e2e/api",
+      use: {
+        // APIテストはブラウザ不要（baseURLのみ設定）
+        baseURL: "http://localhost:3000",
+      },
     },
   ],
 
