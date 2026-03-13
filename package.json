@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:bdd": "cucumber-js",
-    "test:bdd:dry": "cucumber-js --dry-run"
+    "test:bdd:dry": "cucumber-js --dry-run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
@@ -22,11 +24,13 @@
   "devDependencies": {
     "@cucumber/cucumber": "^12.7.0",
     "@cucumber/pretty-formatter": "^3.2.0",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.4",
+    "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

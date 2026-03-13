@@ -20,6 +20,7 @@
  */
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import AuthModal from "./AuthModal";
 
 interface ThreadCreateFormProps {
@@ -33,6 +34,7 @@ interface ThreadCreateFormProps {
  * See: docs/specs/screens/thread-list.yaml @SCR-001 > thread-create-form
  */
 export default function ThreadCreateForm({ onCreated }: ThreadCreateFormProps) {
+  const router = useRouter();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,6 +60,7 @@ export default function ThreadCreateForm({ onCreated }: ThreadCreateFormProps) {
       setTitle("");
       setBody("");
       onCreated?.();
+      router.refresh(); // Server Component の一覧を再フェッチ（PostForm.tsx と同パターン）
       return true;
     }
 
@@ -74,7 +77,7 @@ export default function ThreadCreateForm({ onCreated }: ThreadCreateFormProps) {
     const data = (await res.json()) as { message?: string; error?: string };
     setError(data.message ?? data.error ?? "エラーが発生しました");
     return false;
-  }, [title, body, onCreated]);
+  }, [title, body, onCreated, router]);
 
   /**
    * フォーム送信ハンドラ

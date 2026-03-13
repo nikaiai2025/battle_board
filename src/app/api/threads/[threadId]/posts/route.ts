@@ -118,6 +118,7 @@ export async function POST(
       {
         message: '認証コードを入力してください',
         authCodeUrl: '/auth/auth-code',
+        authCode: result.code,
       },
       { status: 401 }
     )

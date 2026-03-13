@@ -139,6 +139,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       {
         message: '認証コードを入力してください',
         authCodeUrl: '/auth/auth-code',
+        authCode: result.authRequired.code,
       },
       { status: 401 }
     )
