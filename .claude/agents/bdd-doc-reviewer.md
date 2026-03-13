@@ -35,7 +35,9 @@ model: opus
 
 - **単体テスト (Vitest)**: `src/lib/domain/rules/` 配下の全純粋関数に対応するテストが `src/__tests__/` に存在するか
 - **BDD (Cucumber.js)**: `features/` 配下の全シナリオに対応するステップ定義が `features/step_definitions/` に存在し、実行可能か（スコープ外として明示的に除外されているものを除く）
-- **E2E (Playwright)**: `e2e/` 配下のテストが存在し、D-10 §10.3の選定基準（認証→操作→確認の一連フロー、複数ユーザー操作等）に該当する重要フローをカバーしているか
+- **統合テスト (Cucumber.js --profile integration)**: Supabase Local実DBで実行される統合テストプロファイルが存在し、サービス層経由のシナリオがカバーされているか
+- **APIテスト (Playwright --project=api)**: `e2e/api/` 配下に、サービス層テストではカバーできないHTTPレベルの検証（Shift_JISエンコーディング、Cookie属性、Content-Type等）が存在するか
+- **E2E (Playwright --project=e2e)**: `e2e/` 配下のテストが存在し、D-10 §10.3の選定基準（認証→操作→確認の一連フロー、複数ユーザー操作等）に該当する重要フローをカバーしているか
 
 
 
