@@ -101,13 +101,28 @@ BattleBoard は「5chライクな匿名掲示板 + AIボット混在 + ゲーミ
 
 **BDDテスト・単体テスト**はインメモリモック（D-10方式）で実行するため、いずれの環境のDBにも接続しない。
 
-**環境変数の切り替え:**
-- ローカル: `.env.local` に Supabase Local の URL・キーを設定
-- 本番: Vercel の環境変数に Supabase 本番の URL・キーを設定
+**環境変数の管理:**
+- ローカル: `.env.local` に Supabase Local の URL・キーを設定（gitignore済み）
+- 本番: Vercel ダッシュボードの環境変数に Supabase 本番の URL・キーを設定
+- 本番用 `.env` ファイルはリポジトリに存在しない（Vercelがプロセスに直接注入するため不要。秘密鍵漏洩防止）
 
 **マイグレーション運用ルール:**
 - スキーマ変更は必ずローカルで `supabase db push` → 動作確認 → 本番に適用の順で行う
 - ローカルで検証せずに本番に直接適用することを禁止する
+
+**本番DBへのマイグレーション適用手順:**
+```bash
+# 1. Supabase CLIにログイン（初回のみ）
+npx supabase login
+
+# 2. 本番プロジェクトとリンク（初回のみ）
+npx supabase link --project-ref <Reference ID>
+# Reference IDはSupabaseダッシュボード Settings > General で確認
+# またはSUPABASE_URLの https://<Reference ID>.supabase.co から取得
+
+# 3. マイグレーションを本番に適用
+npx supabase db push
+```
 
 **ステージング不採用の理由:**
 - MVPフェーズではユーザー数が限定的であり、本番で問題が出ても即修正できる
