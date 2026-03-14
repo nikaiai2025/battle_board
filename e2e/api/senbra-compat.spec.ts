@@ -248,6 +248,85 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
   });
 
   // -------------------------------------------------------------------------
+  // GET /bbsmenu.json
+  // -------------------------------------------------------------------------
+
+  test("GET /bbsmenu.json — Content-Type が application/json で板一覧JSONを返す", async ({
+    request,
+  }) => {
+    // See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+    const response = await request.get(`${BASE_URL}/bbsmenu.json`);
+
+    // ステータス 200
+    expect(response.status()).toBe(200);
+
+    // Content-Type ヘッダが application/json を含む
+    const contentType = response.headers()["content-type"] ?? "";
+    expect(contentType).toContain("application/json");
+
+    // JSON として有効なレスポンスを返す
+    const body = await response.json();
+    expect(body).toBeTruthy();
+
+    // menu_list 配列が含まれる
+    expect(Array.isArray(body.menu_list)).toBe(true);
+    expect(body.menu_list.length).toBeGreaterThan(0);
+  });
+
+  test("GET /bbsmenu.json — 各板にurl, board_name, directory_nameが含まれる", async ({
+    request,
+  }) => {
+    // See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+    const response = await request.get(`${BASE_URL}/bbsmenu.json`);
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+
+    // 全カテゴリの全板を検証する
+    for (const category of body.menu_list) {
+      expect(typeof category.category_name).toBe("string");
+      expect(Array.isArray(category.category_content)).toBe(true);
+
+      for (const board of category.category_content) {
+        // url: 板のルートURL
+        expect(typeof board.url).toBe("string");
+        expect(board.url.length).toBeGreaterThan(0);
+
+        // board_name: 板の表示名
+        expect(typeof board.board_name).toBe("string");
+        expect(board.board_name.length).toBeGreaterThan(0);
+
+        // directory_name: 板ID（パスセグメント）
+        expect(typeof board.directory_name).toBe("string");
+        expect(board.directory_name.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test("GET /bbsmenu.json — battleboardの板情報が含まれる", async ({
+    request,
+  }) => {
+    // See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+    const response = await request.get(`${BASE_URL}/bbsmenu.json`);
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+
+    // battleboard の板情報が含まれることを確認する
+    const allBoards = body.menu_list.flatMap(
+      (cat: { category_content: { url: string; directory_name: string }[] }) =>
+        cat.category_content
+    );
+    const battleboardEntry = allBoards.find(
+      (b: { directory_name: string }) => b.directory_name === "battleboard"
+    );
+    expect(battleboardEntry).toBeTruthy();
+    expect(battleboardEntry.url).toContain("battleboard");
+  });
+
+  // -------------------------------------------------------------------------
   // GET /{boardId}/SETTING.TXT
   // -------------------------------------------------------------------------
 

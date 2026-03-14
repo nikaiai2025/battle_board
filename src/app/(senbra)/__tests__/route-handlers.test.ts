@@ -190,6 +190,109 @@ describe("bbsmenu.html Route Handler", () => {
 });
 
 // ---------------------------------------------------------------------------
+// bbsmenu.json Route Handler テスト
+// ---------------------------------------------------------------------------
+
+describe("bbsmenu.json Route Handler", () => {
+  let GET: (req: NextRequest) => Promise<Response>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    // 動的importで最新のモジュールを取得する
+    const mod = await import("../bbsmenu.json/route");
+    GET = mod.GET;
+  });
+
+  it("200 OK を返す", async () => {
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+  });
+
+  it("Content-TypeヘッダがapplicationJsonである", async () => {
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await GET(req);
+    expect(res.headers.get("content-type")).toContain("application/json");
+  });
+
+  it("JSONとしてパース可能なレスポンスが返される", async () => {
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await GET(req);
+    const text = await res.text();
+    expect(() => JSON.parse(text)).not.toThrow();
+  });
+
+  it("menu_list配列が含まれる", async () => {
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(Array.isArray(body.menu_list)).toBe(true);
+    expect(body.menu_list.length).toBeGreaterThan(0);
+  });
+
+  it("各カテゴリにcategory_nameとcategory_contentが含まれる", async () => {
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await GET(req);
+    const body = await res.json();
+    for (const category of body.menu_list) {
+      expect(typeof category.category_name).toBe("string");
+      expect(Array.isArray(category.category_content)).toBe(true);
+    }
+  });
+
+  it("各板にurl, board_name, directory_nameが含まれる", async () => {
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await GET(req);
+    const body = await res.json();
+    for (const category of body.menu_list) {
+      for (const board of category.category_content) {
+        expect(typeof board.url).toBe("string");
+        expect(board.url.length).toBeGreaterThan(0);
+        expect(typeof board.board_name).toBe("string");
+        expect(board.board_name.length).toBeGreaterThan(0);
+        expect(typeof board.directory_name).toBe("string");
+        expect(board.directory_name.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("urlにbattleboardが含まれる", async () => {
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await GET(req);
+    const body = await res.json();
+    const allBoards = body.menu_list.flatMap(
+      (cat: { category_content: { url: string }[] }) => cat.category_content
+    );
+    expect(allBoards.some((b: { url: string }) => b.url.includes("battleboard"))).toBe(true);
+  });
+
+  it("NEXT_PUBLIC_BASE_URLが設定されている場合にそのURLを使用する", async () => {
+    const originalBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    process.env.NEXT_PUBLIC_BASE_URL = "https://custom.example.com";
+
+    // モジュールキャッシュをクリアして再インポートする
+    vi.resetModules();
+    const mod = await import("../bbsmenu.json/route");
+    const customGET = mod.GET;
+
+    const req = new NextRequest("http://localhost/bbsmenu.json");
+    const res = await customGET(req);
+    const body = await res.json();
+    const allBoards = body.menu_list.flatMap(
+      (cat: { category_content: { url: string }[] }) => cat.category_content
+    );
+    expect(allBoards.some((b: { url: string }) => b.url.includes("custom.example.com"))).toBe(true);
+
+    // 環境変数を元に戻す
+    if (originalBaseUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_BASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_BASE_URL = originalBaseUrl;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // SETTING.TXT Route Handler テスト
 // ---------------------------------------------------------------------------
 

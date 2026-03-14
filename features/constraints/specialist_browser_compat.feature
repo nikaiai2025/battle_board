@@ -135,13 +135,20 @@ Feature: 5ch専用ブラウザ互換性
     And "BBS_NONAME_NAME=名無しさん" が含まれる
 
   # ===========================================
-  # 板一覧メニュー (bbsmenu.html)
+  # 板一覧メニュー (bbsmenu.html / bbsmenu.json)
   # ===========================================
 
   Scenario: bbsmenu.htmlが板一覧を返す
     When 専ブラが /bbsmenu.html にGETリクエストする
     Then 板へのリンクを含むHTMLが返される
     And リンク先が板のルートURLを指している
+
+  Scenario: bbsmenu.jsonがJSON形式で板一覧を返す
+    When 専ブラが /bbsmenu.json にGETリクエストする
+    Then JSON形式のレスポンスが返される
+    And menu_list配列に板情報が含まれる
+    And 各板にurl, board_name, directory_nameが含まれる
+    And Content-Typeが "application/json" である
 
   # ===========================================
   # インフラ制約

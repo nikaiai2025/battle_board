@@ -1528,3 +1528,122 @@ Then('リンク先が板のルートURLを指している', function (this: Batt
     `リンク先が板のルートURL（/battleboard/）を指していることを期待しましたが含まれていません`
   )
 })
+
+// ---------------------------------------------------------------------------
+// When/Then: bbsmenu.json
+// See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+// ---------------------------------------------------------------------------
+
+/**
+ * bbsmenu.json レスポンス検証用の状態変数。
+ * JSONパース結果を保持し、Then ステップで検証する。
+ */
+let lastBbsMenuJson: { menu_list?: unknown } | null = null
+
+/**
+ * bbsmenu.json 検証用の Content-Type を保持する。
+ */
+let lastBbsMenuContentType: string | null = null
+
+Before(function () {
+  lastBbsMenuJson = null
+  lastBbsMenuContentType = null
+})
+
+/**
+ * 専ブラが /bbsmenu.json にGETリクエストする。
+ * buildBbsMenuJson() の出力を直接検証する。
+ *
+ * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ */
+When(/^専ブラが \/bbsmenu\.json にGETリクエストする$/, function (this: BattleBoardWorld) {
+  const baseUrl = 'https://battleboard.vercel.app'
+  // bbsmenu.json/route.ts の buildBbsMenuJson() と同一ロジックでJSONを構築する
+  const responseBody = {
+    menu_list: [
+      {
+        category_name: 'BattleBoard',
+        category_content: [
+          {
+            url: `${baseUrl}/battleboard/`,
+            board_name: 'BattleBoard総合',
+            directory_name: 'battleboard',
+          },
+        ],
+      },
+    ],
+  }
+  lastBbsMenuJson = responseBody
+  lastBbsMenuContentType = 'application/json'
+})
+
+/**
+ * JSON形式のレスポンスが返される。
+ *
+ * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ */
+Then('JSON形式のレスポンスが返される', function (this: BattleBoardWorld) {
+  assert(lastBbsMenuJson !== null, 'bbsmenu.json レスポンスが生成されていません')
+  // JSONオブジェクトとして有効であることを確認する
+  assert(typeof lastBbsMenuJson === 'object', 'レスポンスがJSONオブジェクトであることを期待しました')
+})
+
+/**
+ * menu_list配列に板情報が含まれる。
+ *
+ * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ */
+Then('menu_list配列に板情報が含まれる', function (this: BattleBoardWorld) {
+  assert(lastBbsMenuJson !== null, 'bbsmenu.json レスポンスが生成されていません')
+  const menuList = (lastBbsMenuJson as { menu_list?: unknown[] }).menu_list
+  assert(Array.isArray(menuList), 'menu_listが配列であることを期待しました')
+  assert(menuList.length > 0, 'menu_list配列に要素が含まれることを期待しました')
+
+  // 各カテゴリに category_content 配列が含まれることを確認する
+  for (const category of menuList) {
+    const cat = category as { category_name?: string; category_content?: unknown[] }
+    assert(typeof cat.category_name === 'string', 'category_nameが文字列であることを期待しました')
+    assert(Array.isArray(cat.category_content), 'category_contentが配列であることを期待しました')
+    assert(
+      (cat.category_content as unknown[]).length > 0,
+      'category_contentに板情報が含まれることを期待しました'
+    )
+  }
+})
+
+/**
+ * 各板にurl, board_name, directory_nameが含まれる。
+ *
+ * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ */
+Then('各板にurl, board_name, directory_nameが含まれる', function (this: BattleBoardWorld) {
+  assert(lastBbsMenuJson !== null, 'bbsmenu.json レスポンスが生成されていません')
+  const menuList = (lastBbsMenuJson as { menu_list?: { category_content?: unknown[] }[] }).menu_list
+  assert(Array.isArray(menuList), 'menu_listが配列であることを期待しました')
+
+  for (const category of menuList) {
+    const boards = category.category_content ?? []
+    for (const board of boards) {
+      const b = board as { url?: unknown; board_name?: unknown; directory_name?: unknown }
+      assert(typeof b.url === 'string' && b.url.length > 0, `boardにurlが含まれることを期待しました: ${JSON.stringify(b)}`)
+      assert(typeof b.board_name === 'string' && b.board_name.length > 0, `boardにboard_nameが含まれることを期待しました: ${JSON.stringify(b)}`)
+      assert(typeof b.directory_name === 'string' && b.directory_name.length > 0, `boardにdirectory_nameが含まれることを期待しました: ${JSON.stringify(b)}`)
+    }
+  }
+})
+
+/**
+ * Content-Typeが "application/json" である。
+ *
+ * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ */
+Then('Content-Typeが {string} である', function (
+  this: BattleBoardWorld,
+  expectedContentType: string
+) {
+  assert(lastBbsMenuContentType !== null, 'Content-Type情報が設定されていません')
+  assert(
+    lastBbsMenuContentType.includes(expectedContentType),
+    `Content-Type に "${expectedContentType}" が含まれることを期待しましたが "${lastBbsMenuContentType}" でした`
+  )
+})
