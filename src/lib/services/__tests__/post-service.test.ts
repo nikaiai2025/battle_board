@@ -465,19 +465,20 @@ describe('PostService', () => {
     })
 
     // -----------------------------------------------------------------------
-    // IP不一致（ソフトチェック）
+    // IPアドレス変更時の認証（投稿時 IP チェック廃止）
     // -----------------------------------------------------------------------
 
-    describe('IP不一致はソフトチェックで続行する', () => {
-      // See: docs/architecture/architecture.md §5.2 IP整合チェック方針
+    describe('IPアドレスが変わっても認証済みなら書き込みが成功する', () => {
+      // See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+      // 投稿時の IP チェックは廃止。verifyEdgeToken は「存在 + is_verified」のみで判定する。
 
-      it('ip_mismatch でも書き込みが続行される', async () => {
+      it('IPが変わっても is_verified=true なら書き込みが成功する', async () => {
+        // verifyEdgeToken は IP チェックなしで valid: true を返す
         vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
-          valid: false,
-          reason: 'ip_mismatch',
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
         })
-        // ip_mismatch 時は UserRepository.findByAuthToken でユーザーを取得する
-        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(mockUser)
         vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
         vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1)
         vi.mocked(PostRepository.create).mockResolvedValue(mockPost)
@@ -488,12 +489,14 @@ describe('PostService', () => {
           threadId: 'thread-001',
           body: 'こんにちは',
           edgeToken: 'token-abc',
-          ipHash: 'different-ip-hash',
+          ipHash: 'different-ip-hash', // 登録時と異なるIPハッシュ
           isBotWrite: false,
         })
 
-        // ip_mismatch はソフトチェック: 書き込みは成功すること
+        // IP が変わっても書き込みが成功すること
         expect(result).toMatchObject({ success: true })
+        // resolveAuth が UserRepository.findByAuthToken を追加で呼び出さないこと（ip_mismatch 分岐廃止）
+        expect(UserRepository.findByAuthToken).not.toHaveBeenCalled()
       })
     })
 

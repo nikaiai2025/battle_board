@@ -72,12 +72,13 @@ export class ShiftJisEncoder {
    * そのまま専ブラに送ると「???」のように文字化けして表示される。
    * このメソッドでencode前にサニタイズすることでその問題を防ぐ。
    *
+   * 判定方式: ラウンドトリップ方式（encode → decode して元文字と一致するか確認）
+   * バイト値（0x3F）に依存しないため、Cloudflare Workers環境でのiconv-lite動作差異による
+   * 偽陽性（CP932でエンコード可能な文字が誤って全角？に置換される問題）を防ぐ。
+   *
    * 置換対象:
    * - サロゲートペア文字（U+10000以上）: 絵文字・CJK拡張漢字等。CP932では必ず非対応
-   * - BMP内でもCP932未マッピングな文字: iconv-liteが0x3Fを返す文字（❤等）
-   *
-   * 非置換対象:
-   * - 半角?（U+003F）: 0x3Fバイトとして正常にエンコードされるため、そのまま保持する
+   * - BMP内でもCP932未マッピングな文字: ラウンドトリップ不一致の文字（❤等）
    *
    * See: features/constraints/specialist_browser_compat.feature
    *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
@@ -93,32 +94,18 @@ export class ShiftJisEncoder {
       if (codePoint > 0xffff) {
         // サロゲートペア（U+10000以上）: 絵文字・CJK拡張等。CP932は必ず非対応
         result += CP932_FALLBACK_CHAR;
-      } else if (char !== "?" && this.isCp932Unmappable(char)) {
-        // BMP内でもCP932未マッピングな文字（❤ U+2764等）
-        // ただし半角?（U+003F）は除外（正常にエンコードされる）
-        result += CP932_FALLBACK_CHAR;
       } else {
-        result += char;
+        // ラウンドトリップ検証: encode → decode して元の文字と一致するか確認
+        // バイト値（0x3F）依存の旧方式と異なり、環境差異による偽陽性が発生しない
+        const encoded = iconv.encode(char, ShiftJisEncoder.ENCODING);
+        const decoded = iconv.decode(encoded, ShiftJisEncoder.ENCODING);
+        if (decoded === char) {
+          result += char; // 正常にラウンドトリップできる → そのまま使用
+        } else {
+          result += CP932_FALLBACK_CHAR; // ラウンドトリップ不一致 → 全角？に置換
+        }
       }
     }
     return result;
-  }
-
-  /**
-   * BMP内の文字がCP932でエンコードできないかどうかを判定する。
-   *
-   * iconv-liteでCP932エンコードした結果が1バイトの0x3F（半角?のASCIIコード）に
-   * なる場合、その文字はCP932未マッピングとみなす。
-   *
-   * NOTE: このメソッドは1文字を個別にエンコードするためオーバーヘッドがある。
-   * サロゲートペア文字は呼び出し元でチェック済みのため、ここではBMP文字のみを対象とする。
-   *
-   * @param char - 判定対象の1文字（BMP内、U+0000〜U+FFFF）
-   * @returns CP932でエンコードできない場合true
-   */
-  private isCp932Unmappable(char: string): boolean {
-    const encoded = iconv.encode(char, ShiftJisEncoder.ENCODING);
-    // 長さ1かつ値が0x3Fの場合は未マッピング（フォールバック文字になっている）
-    return encoded.length === 1 && encoded[0] === 0x3f;
   }
 }

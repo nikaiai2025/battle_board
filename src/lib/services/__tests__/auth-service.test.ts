@@ -286,11 +286,12 @@ describe('AuthService', () => {
         }
       })
 
-      it('not_verified は ip_mismatch より前にチェックされる（IPが一致していても未検証は拒否）', async () => {
-        const unverifiedUser = makeUser({ authorIdSeed: 'different-ip', isVerified: false })
+      it('未検証ユーザーは IP に関わらず not_verified を返す（IP チェックより優先）', async () => {
+        // IP チェックは廃止されたが、is_verified チェックは維持される
+        const unverifiedUser = makeUser({ authorIdSeed: 'any-ip', isVerified: false })
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(unverifiedUser)
 
-        const result = await verifyEdgeToken('valid-token', 'ip-hash')
+        const result = await verifyEdgeToken('valid-token', 'different-ip-hash')
 
         expect(result.valid).toBe(false)
         if (!result.valid) {
@@ -299,18 +300,33 @@ describe('AuthService', () => {
       })
     })
 
-    describe('異常系: IP 不一致（ソフトチェック）', () => {
+    describe('正常系: IPアドレスが変わっても認証済みなら成功する', () => {
       // See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
-      it('IP不一致時は ip_mismatch を返す（認証済みユーザーのみ到達）', async () => {
+      // 投稿時の IP 一致チェックは廃止。is_verified=true であれば IP が変わっても valid: true を返す。
+      it('IP不一致でも is_verified=true なら valid: true を返す', async () => {
+        // ユーザー作成時の IP ハッシュ（authorIdSeed）と異なる IP でアクセスする
         const user = makeUser({ authToken: 'valid-token', authorIdSeed: 'original-ip-hash', isVerified: true })
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
 
         const result = await verifyEdgeToken('valid-token', 'different-ip-hash')
 
-        expect(result.valid).toBe(false)
-        if (!result.valid) {
-          expect(result.reason).toBe('ip_mismatch')
+        // IP が変わっても認証成功すること
+        expect(result.valid).toBe(true)
+        if (result.valid) {
+          expect(result.userId).toBe('user-uuid-001')
+          expect(result.authorIdSeed).toBe('original-ip-hash')
         }
+      })
+
+      it('モバイル回線の IP 変動時も認証成功する', async () => {
+        // モバイル回線はセッション中にIPが変わることが日常的
+        const user = makeUser({ authToken: 'mobile-token', authorIdSeed: 'wifi-ip-hash', isVerified: true })
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
+
+        // 4G回線に切り替わったため IP が変わっている
+        const result = await verifyEdgeToken('mobile-token', '4g-mobile-ip-hash')
+
+        expect(result.valid).toBe(true)
       })
     })
 

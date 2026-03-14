@@ -13,7 +13,10 @@
  * 設計上の判断:
  *   - AuthService は Cookie を直接操作しない（Route Handler が担当）
  *   - edge-token は CSPRNG（crypto.randomUUID）で生成する
- *   - IP 整合チェックはソフトチェック（不一致でも通過、ログ記録のみ）
+ *   - 投稿時の IP 一致チェックは廃止。「edge-token の存在 + is_verified=true」のみで認証判定する
+ *     （eddist 参考実装に倣い。モバイル回線等の IP 変動時の再認証問題を解消）
+ *     See: docs/research/eddist_edge_token_ip_report_2026-03-14.md
+ *     See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 
 import { createHash, randomBytes } from 'crypto'
@@ -34,10 +37,13 @@ import { initializeBalance } from './currency-service'
  * not_verified: edge-token は存在するが認証コード未検証（is_verified=false）。
  * G1 是正対応。PostService の resolveAuth が認証案内を再表示する。
  * See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ *
+ * Note: ip_mismatch は廃止（投稿時の IP チェックを廃止したため）。
+ * See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 export type VerifyResult =
   | { valid: true; userId: string; authorIdSeed: string }
-  | { valid: false; reason: 'not_found' | 'ip_mismatch' | 'not_verified' }
+  | { valid: false; reason: 'not_found' | 'not_verified' }
 
 /**
  * 管理者セッション情報。
@@ -146,19 +152,22 @@ function generateAuthCode(): string {
 
 /**
  * edge-token を検証し、対応するユーザーを返す。
- * IP 整合チェックはソフトチェック（不一致でも valid: true を返し、警告ログのみ）。
+ * 投稿時の IP 一致チェックは廃止。「edge-token の存在 + is_verified=true」のみで認証判定する。
+ * eddist の参考実装（docs/research/eddist_edge_token_ip_report_2026-03-14.md）に倣い、
+ * モバイル回線等の IP 変動時に再認証が発生する問題を解消する。
  *
  * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  * See: docs/architecture/components/authentication.md §2.1 verifyEdgeToken
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
  *
  * @param token - Cookie から読み取った edge-token 文字列
- * @param ipHash - リクエスト元 IP の SHA-512 ハッシュ
+ * @param _ipHash - リクエスト元 IP の SHA-512 ハッシュ（後方互換のためシグネチャ維持、未使用）
  * @returns VerifyResult（valid: true のとき userId と authorIdSeed を含む）
  */
 export async function verifyEdgeToken(
   token: string,
-  ipHash: string
+  _ipHash: string
 ): Promise<VerifyResult> {
   // UserRepository で edge-token に対応するユーザーを検索する
   const user = await UserRepository.findByAuthToken(token)
@@ -167,24 +176,15 @@ export async function verifyEdgeToken(
     return { valid: false, reason: 'not_found' }
   }
 
-  // is_verified チェック（IPチェックより前に実施）
+  // is_verified チェック
   // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
   // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
   if (!user.isVerified) {
     return { valid: false, reason: 'not_verified' }
   }
 
-  // IP 整合チェック（ソフトチェック: 不一致でも処理続行）
-  // See: docs/architecture/architecture.md §5.2 > IP整合チェック方針
-  if (user.authorIdSeed !== ipHash) {
-    // モバイル回線等のIP変動を考慮し、ログ記録のみで通過させる
-    console.warn(
-      `[AuthService] IP 整合チェック: userId=${user.id} のIP不一致（モバイル回線等の変動の可能性）`
-    )
-    // ip_mismatch を返すが、呼び出し元（PostService）は続行可能
-    return { valid: false, reason: 'ip_mismatch' }
-  }
-
+  // IP チェックは廃止。edge-token の存在 + is_verified=true のみで認証成功とする。
+  // See: docs/research/eddist_edge_token_ip_report_2026-03-14.md §4 投稿時のトークン検証
   return {
     valid: true,
     userId: user.id,

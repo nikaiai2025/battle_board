@@ -204,5 +204,42 @@ describe("ShiftJisEncoder", () => {
       const encoder = new ShiftJisEncoder();
       expect(encoder.sanitizeForCp932("テスト🤖終わり")).toBe("テスト？終わり");
     });
+
+    // --- ラウンドトリップ方式への変更で偽陽性が解消されることを検証するテスト ---
+    // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+
+    it("丸数字（①②③④⑤）がCP932でエンコード可能なためそのまま保持される（偽陽性バグの回帰テスト）", () => {
+      // NEC特殊文字の丸数字はCP932マッピング有り。旧バイト値判定では偽陽性で全角？になる可能性があった
+      const encoder = new ShiftJisEncoder();
+      const text = "①②③④⑤⑥⑦⑧⑨⑩";
+      expect(encoder.sanitizeForCp932(text)).toBe(text);
+    });
+
+    it("ローマ数字（ⅠⅡⅢⅣⅤ）がCP932でエンコード可能なためそのまま保持される", () => {
+      // NEC特殊文字のローマ数字はCP932マッピング有り
+      const encoder = new ShiftJisEncoder();
+      const text = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ";
+      expect(encoder.sanitizeForCp932(text)).toBe(text);
+    });
+
+    it("単位記号（㎜㎝㎞㎡㎢㏄）がCP932でエンコード可能なためそのまま保持される", () => {
+      // NEC特殊文字の単位記号はCP932マッピング有り
+      const encoder = new ShiftJisEncoder();
+      const text = "㎜㎝㎞㎡㏄";
+      expect(encoder.sanitizeForCp932(text)).toBe(text);
+    });
+
+    it("全角チルダ・波ダッシュ（～〜）がCP932でエンコード可能なためそのまま保持される", () => {
+      const encoder = new ShiftJisEncoder();
+      // ～ (U+FF5E 全角チルダ) はCP932でエンコード可能
+      const text = "テスト～終わり";
+      expect(encoder.sanitizeForCp932(text)).toBe(text);
+    });
+
+    it("半角カタカナ（ｱｲｳｴｵ）がCP932でエンコード可能なためそのまま保持される", () => {
+      const encoder = new ShiftJisEncoder();
+      const text = "ｱｲｳｴｵｶｷｸｹｺ";
+      expect(encoder.sanitizeForCp932(text)).toBe(text);
+    });
   });
 });

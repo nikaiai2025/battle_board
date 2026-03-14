@@ -18,7 +18,8 @@
  *   - IncentiveService は書き込み成功後に呼び出す（失敗しても書き込みを巻き戻さない）
  *   - 表示名デフォルトは「名無しさん」（ユビキタス言語辞書準拠）
  *   - isBotWrite=true の場合は edge-token 検証をスキップする
- *   - IP 不一致はソフトチェック（ip_mismatch でも書き込み続行）
+ *   - 投稿時の IP 一致チェックは廃止（verifyEdgeToken が「存在 + is_verified」のみで判定する）
+ *     See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 
 import * as PostRepository from '../infrastructure/repositories/post-repository'
@@ -113,12 +114,12 @@ function getTodayJst(): string {
 /**
  * 認証フローを実行する。
  * edge-token が null または not_found の場合に新しい edge-token と認証コードを発行する。
- * ip_mismatch の場合はソフトチェックとして続行（userId をそのまま返す）。
  * not_verified の場合は既存 edge-token を維持したまま認証コードを再発行する（G1 是正）。
+ * IP チェックは廃止。verifyEdgeToken は「edge-token の存在 + is_verified=true」のみで判定する。
  *
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
- * See: docs/architecture/architecture.md §5.2 > IP整合チェック方針
  * See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
  *
  * @returns 認証成功時は userId と authorIdSeed、認証フロー起動時は authRequired 情報
@@ -144,7 +145,7 @@ async function resolveAuth(
     return { authenticated: false, authRequired: { code, edgeToken: newToken } }
   }
 
-  // edge-token を検証する
+  // edge-token を検証する（IP チェックなし: 存在 + is_verified のみ）
   const verifyResult = await AuthService.verifyEdgeToken(edgeToken, ipHash)
 
   if (!verifyResult.valid) {
@@ -155,29 +156,6 @@ async function resolveAuth(
       // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
       const { code } = await AuthService.issueAuthCode(ipHash, edgeToken)
       return { authenticated: false, authRequired: { code, edgeToken } }
-    }
-
-    if (verifyResult.reason === 'ip_mismatch') {
-      // IP 不一致: ソフトチェック（警告ログのみで続行）
-      // See: docs/architecture/architecture.md §5.2 IP整合チェック方針
-      // ※ AuthService.verifyEdgeToken 内で既にログ出力済み
-      // ip_mismatch の場合は UserRepository から userId を取得する
-      // verifyEdgeToken では not_found でないので user は存在するはず
-      // ただし verifyEdgeToken が valid:false を返す ip_mismatch 時は userId がない
-      // → 仕様上はそのまま続行するが userId が取れない場合は null
-      // NOTE: ip_mismatch 時は edge-token 自体は DB に存在するので findByAuthToken で取得可能
-      const user = await UserRepository.findByAuthToken(edgeToken)
-      if (user) {
-        return {
-          authenticated: true,
-          userId: user.id,
-          authorIdSeed: user.authorIdSeed,
-        }
-      }
-      // user が見つからない（予期しない状態）→ 認証フロー
-      const { token: newToken } = await AuthService.issueEdgeToken(ipHash)
-      const { code } = await AuthService.issueAuthCode(ipHash, newToken)
-      return { authenticated: false, authRequired: { code, edgeToken: newToken } }
     }
 
     // not_found: 新規ユーザーとして認証フロー起動
