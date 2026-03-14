@@ -19,6 +19,13 @@ import ThreadList from "./_components/ThreadList";
 import ThreadCreateForm from "./_components/ThreadCreateForm";
 import * as PostService from "@/lib/services/post-service";
 
+// リクエストごとにSSRを実行し、Vercelのページキャッシュを無効化する。
+// Cloudflare Workers環境でのself-fetch禁止（error code 1042）対応として
+// APIルート経由ではなくサービス層を直接importする方式に変更した結果、
+// Next.jsがページを静的と判断してキャッシュする問題を回避するために必要。
+// See: docs/architecture/architecture.md §13 TDR-006
+export const dynamic = 'force-dynamic';
+
 interface ThreadView {
   id: string;
   title: string;

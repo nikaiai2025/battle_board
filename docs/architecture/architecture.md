@@ -964,6 +964,16 @@ supabase/
   - 生SQL手動実行は禁止（CLI経由のみ）。適用済みSQLはファイルとして必ずリポジトリに残す
 - **理由**: マイグレーション履歴をコードとして追跡し、Supabase ダッシュボードでの直接手動実行による管理不能な状態を防ぐ
 
+### TDR-006: 認証不要のSSRページでサービス層を直接インポートする
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-14
+- **背景**: Cloudflare Workers環境ではWorker自身の外部URLへのfetchがerror code 1042（自己参照ループ禁止）でブロックされる。Server ComponentからAPIルート経由でデータを取得する従来方式が動作しない
+- **決定**: 認証不要のGET系Server Component（スレッド一覧・スレッド閲覧）では、PostServiceを直接importしてデータを取得する。`export const dynamic = 'force-dynamic'` を設定し、リクエストごとにSSRを実行する
+- **影響範囲**: `src/app/(web)/page.tsx`, `src/app/(web)/threads/[threadId]/page.tsx`
+- **除外**: POST系操作（書き込み・認証）はClient Componentから引き続きAPIルート経由で行う（Cloudflare制約の影響なし）
+- **理由**: Service Bindings による回避策も検討したが、Next.jsの標準`fetch()`からはService Bindingsにアクセスできず（Cloudflare固有の`env.BINDING.fetch()` APIが必要）、フレームワークの制約により採用不可
+
 ---
 
 ## 14. 今後の拡張ポイント
