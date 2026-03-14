@@ -32,7 +32,7 @@
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 
 // Turnstile グローバル型の拡張宣言
@@ -79,6 +79,14 @@ interface AuthCodeResponse {
  * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
  */
 export default function VerifyPage() {
+  return (
+    <Suspense fallback={<div className="max-w-lg mx-auto px-4 py-8 text-center text-gray-500">読み込み中...</div>}>
+      <VerifyPageContent />
+    </Suspense>
+  );
+}
+
+function VerifyPageContent() {
   const searchParams = useSearchParams();
 
   // クエリパラメータ `code` から認証コードをプリフィル
