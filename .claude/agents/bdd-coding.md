@@ -1,6 +1,6 @@
 ---
 name: bdd-coding
-description: "BDDシナリオ駆動でソースコードと単体テストを実装するコーディングAI。 スク指示書に基づき、対象領域のみに限定して実装する。 コード実装・テスト作成・バグ修正が必要な場面で使用する。\\n"
+description: BDD（振る舞い駆動開発）でソースコードと単体テストを実装するコーディングAI。タスク指示書に基づき、対象領域のみに限定して実装する。コード実装・テスト作成・バグ修正が必要な場面で使用する。
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 color: purple
