@@ -7,7 +7,7 @@
  * レスポンスHTML仕様:
  *   - 成功: titleタグに "書きこみました"
  *   - エラー: titleタグに "ＥＲＲＯＲ"（全角）
- *   - 認証必要: titleタグに "認証が必要です" + 認証コード + 認証ページURL + 手順説明
+ *   - 認証必要: titleタグに "ＥＲＲＯＲ"（全角）+ 認証コード + 認証ページURL + 手順説明
  *
  * See: features/constraints/specialist_browser_compat.feature
  *   @scenario 専ブラからの書き込みが正常に処理される
@@ -105,10 +105,11 @@ ${escapedMessage}
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">
-<title>認証が必要です</title>
+<title>ＥＲＲＯＲ</title>
 </head>
 <body>
-<b>認証が必要です</b><br>
+<b>ＥＲＲＯＲ</b><br>
+認証が必要です。<br>
 書き込みにはブラウザでの認証が必要です。<br>
 <br>
 【認証コード】${escapedCode}<br>

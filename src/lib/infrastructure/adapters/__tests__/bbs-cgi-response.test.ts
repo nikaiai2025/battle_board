@@ -94,9 +94,19 @@ describe("BbsCgiResponseBuilder", () => {
     const edgeToken = "test-edge-token-abc";
     const baseUrl = "https://example.com";
 
-    it("titleタグに '認証が必要です' を含む", () => {
+    it("titleタグに 'ＥＲＲＯＲ'（全角）を含む（eddist形式: ChMateがSet-Cookieを処理できる標準パターン）", () => {
       const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
-      expect(html).toContain("<title>認証が必要です</title>");
+      expect(html).toContain("<title>ＥＲＲＯＲ</title>");
+    });
+
+    it("bodyの冒頭に '<b>ＥＲＲＯＲ</b>' を含む（eddist形式）", () => {
+      const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+      expect(html).toContain("<b>ＥＲＲＯＲ</b><br>");
+    });
+
+    it("bodyに '認証が必要です。' の文言を含む", () => {
+      const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+      expect(html).toContain("認証が必要です。");
     });
 
     it("認証コードが本文に含まれる", () => {
