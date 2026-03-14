@@ -54,6 +54,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     )
   }
 
+  // --- 認証フロー完了チェック（is_verified） ---
+  // See: features/phase1/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
+  // See: features/phase1/authentication.feature @認証フロー是正
+  if (!user.isVerified) {
+    return NextResponse.json(
+      { error: 'UNAUTHORIZED', message: '認証が必要です' },
+      { status: 401 }
+    )
+  }
+
   // --- limit クエリパラメータの取得（デフォルト 50、最大 100）---
   const limitParam = req.nextUrl.searchParams.get('limit')
   const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 50), 100) : 50
