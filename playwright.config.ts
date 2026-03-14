@@ -83,14 +83,16 @@ export default defineConfig({
    *   全テスト:    npx playwright test
    *   APIのみ:     npx playwright test --project=api
    *   E2Eのみ:     npx playwright test --project=e2e
+   *   CF Smoke:    npx playwright test --project=cf-smoke
    *
    * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
+   * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
    */
   projects: [
     {
       name: "e2e",
       testDir: "./e2e",
-      testIgnore: "**/api/**",
+      testIgnore: ["**/api/**", "**/cf-smoke/**"],
       use: { ...devices["Desktop Chrome"] },
     },
     {
@@ -99,6 +101,19 @@ export default defineConfig({
       use: {
         // APIテストはブラウザ不要（baseURLのみ設定）
         baseURL: "http://localhost:3000",
+      },
+    },
+    {
+      /**
+       * CF Smokeテスト: wrangler dev (Cloudflare Workers ローカルランタイム) に対する
+       * Node.js API互換性のスモークテスト。wrangler dev は手動起動前提。
+       *
+       * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
+       */
+      name: "cf-smoke",
+      testDir: "./e2e/cf-smoke",
+      use: {
+        baseURL: "http://localhost:8788", // wrangler dev のデフォルトポート
       },
     },
   ],
