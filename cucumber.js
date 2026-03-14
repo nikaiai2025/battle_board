@@ -7,7 +7,8 @@
  *
  * Sprint-10 対象: 8 feature（mypage.feature 追加）
  * 除外対象（スコープ外）:
- *   - specialist_browser_compat.feature: Phase 2コマンドシナリオ 1 件 + インフラ制約 2 件
+ *   - specialist_browser_compat.feature: Phase 2コマンドシナリオ 1 件
+ *   ※ インフラ制約シナリオ（HTTP:80/WAF）は Sprint-21 TASK-060 でPendingステップとして追加済み
  *
  * Sprint-10 からの変更点（TASK-026）:
  *   - paths に mypage.feature を追加
@@ -74,10 +75,14 @@ module.exports = {
     // 注意: name フィルタの複数指定は OR として扱われるため、
     //       除外パターンを1つの正規表現にまとめる必要がある
     //   除外: コマンド文字列がゲームコマンドとして解釈される（Phase 2依存）
-    //   除外: bbs.cgiへのPOSTがHTTPSリダイレクトでペイロードを消失しない（インフラ制約）
-    //   除外: 専ブラ特有のUser-AgentがWAFにブロックされない（インフラ制約）
+    //
+    // インフラ制約シナリオ（HTTP:80/WAF）はPendingステップとして実行する（nameフィルタ除外しない）:
+    //   - 専ブラの5chプロトコル通信がHTTP:80で直接応答される
+    //   - bbs.cgiへのHTTP:80 POSTが直接処理される
+    //   - 専ブラ特有のUser-AgentがWAFにブロックされない
+    //   → ステップ定義で `return 'pending'` として実装済み（Sprint-21 TASK-060）
     name: [
-      '^(?!.*(コマンド文字列がゲームコマンドとして解釈される|bbs\\.cgiへのPOSTがHTTPSリダイレクトでペイロードを消失しない|専ブラ特有のUser-AgentがWAFにブロックされない)).*$',
+      '^(?!.*(コマンド文字列がゲームコマンドとして解釈される)).*$',
     ],
 
     format: ['@cucumber/pretty-formatter'],

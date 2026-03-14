@@ -4,6 +4,9 @@
  * See: features/constraints/specialist_browser_compat.feature
  *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
  *   @scenario 専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ *   @scenario Shift_JIS範囲外の文字がHTML数値参照として保持される
+ *   @scenario 異体字セレクタがDAT出力時に除去される
+ *   @scenario ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
  */
 
 import { describe, it, expect } from "vitest";
@@ -64,40 +67,53 @@ describe("ShiftJisEncoder", () => {
       expect(decoded).toBe(original);
     });
 
-    it("BOT絵文字(🤖)はShift_JIS非対応のため全角？に変換される（??? 問題の防止）", () => {
-      // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
-      // 🤖はShift_JISで表現できない。半角?に変換されず全角？になることを確認する
+    it("絵文字(😅 U+1F605)がHTML数値参照(&#128517;)に変換される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+      // 😅 = U+1F605 = 128517（十進数）
+      const encoder = new ShiftJisEncoder();
+      const result = encoder.encode("テスト😅");
+      const decoded = encoder.decode(result);
+      // 半角?（0x3F）が含まれないこと
+      expect(result.includes(0x3f)).toBe(false);
+      // HTML数値参照に変換されること（全角？ではない）
+      expect(decoded).toBe("テスト&#128517;");
+    });
+
+    it("BOT絵文字(🤖)がHTML数値参照(&#129302;)に変換される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+      // 🤖 = U+1F916 = 129302（十進数）
       const encoder = new ShiftJisEncoder();
       const result = encoder.encode("テスト🤖");
       const decoded = encoder.decode(result);
       // 半角?（0x3F）が含まれないこと
       expect(result.includes(0x3f)).toBe(false);
-      // 全角？に変換されること
-      expect(decoded).toBe("テスト？");
+      // HTML数値参照に変換されること（全角？ではない）
+      expect(decoded).toBe("テスト&#129302;");
     });
 
-    it("サロゲートペア絵文字（😀🦾🦿🧠）がすべて全角？に変換される", () => {
-      // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+    it("サロゲートペア絵文字（😀🦾🦿🧠）がすべてHTML数値参照に変換される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
       const encoder = new ShiftJisEncoder();
+      // 😀=U+1F600=128512, 🦾=U+1F9BE=129470, 🦿=U+1F9BF=129471, 🧠=U+1F9E0=129504
       const result = encoder.encode("😀🦾🦿🧠");
       const decoded = encoder.decode(result);
       // 半角?が出現しないこと
       expect(result.includes(0x3f)).toBe(false);
-      // 全角？4文字に変換されること
-      expect(decoded).toBe("？？？？");
+      // HTML数値参照に変換されること
+      expect(decoded).toBe("&#128512;&#129470;&#129471;&#129504;");
     });
 
-    it("CP932非対応のBMP文字（❤ U+2764）が全角？に変換される", () => {
-      // ❤（U+2764）はBMP内だがCP932の文字マッピング外
+    it("CP932非対応のBMP文字（❤ U+2764）がHTML数値参照(&#10084;)に変換される", () => {
+      // ❤（U+2764）はBMP内だがCP932の文字マッピング外。10084（十進数）
       const encoder = new ShiftJisEncoder();
       const result = encoder.encode("❤");
       const decoded = encoder.decode(result);
       expect(result.includes(0x3f)).toBe(false);
-      expect(decoded).toBe("？");
+      expect(decoded).toBe("&#10084;");
     });
 
     it("半角?（U+003F）はそのまま0x3Fバイトとして保持される（誤変換防止）", () => {
-      // 元から?が含まれる文字列を誤って全角？に変換しないこと
+      // 元から?が含まれる文字列を誤ってHTML数値参照に変換しないこと
       const encoder = new ShiftJisEncoder();
       const result = encoder.encode("test?question");
       // 元の?は0x3Fのまま保持
@@ -112,25 +128,40 @@ describe("ShiftJisEncoder", () => {
       expect(encoder.decode(result)).toBe("&lt;script&gt;");
     });
 
-    it("絵文字と通常文字が混在するテキストで絵文字のみ全角？に変換される", () => {
-      // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+    it("絵文字と通常文字が混在するテキストで絵文字のみHTML数値参照に変換される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
       const encoder = new ShiftJisEncoder();
+      // 😀=U+1F600=128512, 🌍=U+1F30D=127757
       const result = encoder.encode("こんにちは😀世界🌍テスト");
       const decoded = encoder.decode(result);
       // 半角?が出現しないこと
       expect(result.includes(0x3f)).toBe(false);
-      // 通常文字はそのまま、絵文字は全角？に
-      expect(decoded).toBe("こんにちは？世界？テスト");
+      // 通常文字はそのまま、絵文字はHTML数値参照に
+      expect(decoded).toBe("こんにちは&#128512;世界&#127757;テスト");
     });
 
-    it("CJK統合漢字拡張B（U+20000以上）が全角？に変換される", () => {
+    it("CJK統合漢字拡張B（U+20000以上）がHTML数値参照に変換される", () => {
       // サロゲートペアで表現されるCJK拡張漢字はCP932非対応
       const encoder = new ShiftJisEncoder();
-      const extChar = "\u{20000}"; // CJK Unified Ideographs Extension B
+      const extChar = "\u{20000}"; // CJK Unified Ideographs Extension B = 131072
       const result = encoder.encode(extChar);
       const decoded = encoder.decode(result);
       expect(result.includes(0x3f)).toBe(false);
-      expect(decoded).toBe("？");
+      expect(decoded).toBe("&#131072;");
+    });
+
+    it("HTML数値参照のASCII文字（&, #, ;, 数字）がShift_JISバイト列でも正しく保持される", () => {
+      // HTML数値参照はASCII文字のみで構成され、Shift_JISでも同一バイト値（0x26, 0x23, 0x3B等）
+      // encode後のバッファが専ブラに送信されてもHTML数値参照として正しく解釈されることを確認する
+      const encoder = new ShiftJisEncoder();
+      const text = "絵文字&#128517;テスト";
+      const result = encoder.encode(text);
+      const decoded = encoder.decode(result);
+      // HTML数値参照部分がそのまま保持されること
+      expect(decoded).toContain("&#128517;");
+      // &（0x26）, #（0x23）, 数字, ;（0x3B）はShift_JISでも同一バイト値
+      const ampIndex = decoded.indexOf("&#128517;");
+      expect(ampIndex).toBeGreaterThanOrEqual(0);
     });
 
     it("大量データ（1万文字以上）のエンコードが実用的な時間内に完了する", () => {
@@ -307,16 +338,20 @@ describe("ShiftJisEncoder", () => {
       expect(encoder.sanitizeForCp932(text)).toBe(text);
     });
 
-    it("サロゲートペア絵文字を全角？に置換する", () => {
+    it("サロゲートペア絵文字をHTML数値参照に変換する", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+      // 🤖=U+1F916=129302, 😀=U+1F600=128512
       const encoder = new ShiftJisEncoder();
-      expect(encoder.sanitizeForCp932("🤖")).toBe("？");
-      expect(encoder.sanitizeForCp932("😀")).toBe("？");
-      expect(encoder.sanitizeForCp932("🦾🦿🧠")).toBe("？？？");
+      expect(encoder.sanitizeForCp932("🤖")).toBe("&#129302;");
+      expect(encoder.sanitizeForCp932("😀")).toBe("&#128512;");
+      // 🦾=U+1F9BE=129470, 🦿=U+1F9BF=129471, 🧠=U+1F9E0=129504
+      expect(encoder.sanitizeForCp932("🦾🦿🧠")).toBe("&#129470;&#129471;&#129504;");
     });
 
-    it("CP932非対応BMP文字（❤）を全角？に置換する", () => {
+    it("CP932非対応BMP文字（❤ U+2764）をHTML数値参照(&#10084;)に変換する", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
       const encoder = new ShiftJisEncoder();
-      expect(encoder.sanitizeForCp932("❤")).toBe("？");
+      expect(encoder.sanitizeForCp932("❤")).toBe("&#10084;");
     });
 
     it("半角?（U+003F）はそのまま保持する", () => {
@@ -329,16 +364,116 @@ describe("ShiftJisEncoder", () => {
       expect(encoder.sanitizeForCp932("")).toBe("");
     });
 
-    it("混在テキストで非対応文字のみ置換する", () => {
+    it("混在テキストで非対応文字のみHTML数値参照に変換する", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+      // 🤖=U+1F916=129302
       const encoder = new ShiftJisEncoder();
-      expect(encoder.sanitizeForCp932("テスト🤖終わり")).toBe("テスト？終わり");
+      expect(encoder.sanitizeForCp932("テスト🤖終わり")).toBe("テスト&#129302;終わり");
+    });
+
+    it("全角？（U+FF1F）への置換は行われない", () => {
+      // See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+      const encoder = new ShiftJisEncoder();
+      // 😅=U+1F605=128517
+      const result = encoder.sanitizeForCp932("😅");
+      expect(result).not.toBe("？");
+      expect(result).toBe("&#128517;");
+    });
+
+    // --- 異体字セレクタ除去 ---
+    // See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+
+    it("U+FE0F（絵文字スタイル指示）が除去される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+      const encoder = new ShiftJisEncoder();
+      // "🕳️" = U+1F573 U+FE0F。基底文字だけが残り、U+FE0Fは除去される
+      const text = "\u{1F573}\u{FE0F}"; // 🕳️
+      const result = encoder.sanitizeForCp932(text);
+      // U+FE0Fが除去されること
+      expect(result).not.toContain("&#65039;"); // U+FE0F = 65039
+      // 基底文字（U+1F573 = 128371）のHTML数値参照は保持されること
+      expect(result).toBe("&#128371;");
+    });
+
+    it("U+FE0E（テキストスタイル指示）が除去される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+      const encoder = new ShiftJisEncoder();
+      const text = "\u{1F573}\u{FE0E}"; // 🕳 + テキストスタイル指示
+      const result = encoder.sanitizeForCp932(text);
+      // U+FE0Eが除去されること
+      expect(result).not.toContain("&#65038;"); // U+FE0E = 65038
+      // 基底文字のHTML数値参照は保持されること
+      expect(result).toBe("&#128371;");
+    });
+
+    it("異体字セレクタ付き絵文字（🕳️）の変換: 基底文字のHTML数値参照は保持, U+FE0Fは除去", () => {
+      // See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+      // "🕳️" = 基底文字 U+1F573（穴の絵文字）+ U+FE0F（絵文字スタイル指示）
+      // U+1F573 = 128371（十進数）
+      const encoder = new ShiftJisEncoder();
+      const textWithVariant = "🕳️"; // 🕳️ = U+1F573 U+FE0F
+      const result = encoder.sanitizeForCp932(textWithVariant);
+      // 基底文字のHTML数値参照（&#128371;）が含まれること
+      expect(result).toContain("&#128371;");
+      // 異体字セレクタ(U+FE0F = 65039)のHTML数値参照が含まれないこと
+      expect(result).not.toContain("&#65039;");
+    });
+
+    it("テキストに挟まれた異体字セレクタも除去される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+      const encoder = new ShiftJisEncoder();
+      // "テスト🕳️終わり"
+      const text = "テスト\u{1F573}\u{FE0F}終わり";
+      const result = encoder.sanitizeForCp932(text);
+      expect(result).toBe("テスト&#128371;終わり");
+    });
+
+    // --- ZWJ保持 ---
+    // See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+
+    it("ZWJ(U+200D)がHTML数値参照(&#8205;)として保持される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+      // ZWJ = U+200D = 8205（十進数）
+      const encoder = new ShiftJisEncoder();
+      const zwj = "\u{200D}"; // ZWJ
+      const result = encoder.sanitizeForCp932(zwj);
+      expect(result).toBe("&#8205;");
+    });
+
+    it("結合絵文字（👨‍👩‍👧）のZWJがHTML数値参照として保持される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+      // 👨‍👩‍👧 = U+1F468 ZWJ U+1F469 ZWJ U+1F467
+      // U+1F468=128104, U+1F469=128105, U+1F467=128103, ZWJ=8205
+      const encoder = new ShiftJisEncoder();
+      const family = "👨‍👩‍👧"; // 結合絵文字
+      const result = encoder.sanitizeForCp932(family);
+      // ZWJのHTML数値参照が含まれること
+      expect(result).toContain("&#8205;");
+      // 各構成文字のHTML数値参照も含まれること
+      expect(result).toContain("&#128104;"); // 👨
+      expect(result).toContain("&#128105;"); // 👩
+      expect(result).toContain("&#128103;"); // 👧
+      // 形式: 👨 ZWJ 👩 ZWJ 👧 → &#128104;&#8205;&#128105;&#8205;&#128103;
+      expect(result).toBe("&#128104;&#8205;&#128105;&#8205;&#128103;");
+    });
+
+    it("ZWJを除去すると絵文字が分解されるため除去しない（仕様確認）", () => {
+      // See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+      // ZWJは異体字セレクタとは異なり、除去すると絵文字が分解されるため除去しない
+      const encoder = new ShiftJisEncoder();
+      const zwj = "\u{200D}";
+      const result = encoder.sanitizeForCp932(zwj);
+      // 空文字列ではないこと（除去されていないこと）
+      expect(result).not.toBe("");
+      // HTML数値参照として保持されること
+      expect(result).toBe("&#8205;");
     });
 
     // --- ラウンドトリップ方式への変更で偽陽性が解消されることを検証するテスト ---
     // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
 
     it("丸数字（①②③④⑤）がCP932でエンコード可能なためそのまま保持される（偽陽性バグの回帰テスト）", () => {
-      // NEC特殊文字の丸数字はCP932マッピング有り。旧バイト値判定では偽陽性で全角？になる可能性があった
+      // NEC特殊文字の丸数字はCP932マッピング有り。旧バイト値判定では偽陽性で置換になる可能性があった
       const encoder = new ShiftJisEncoder();
       const text = "①②③④⑤⑥⑦⑧⑨⑩";
       expect(encoder.sanitizeForCp932(text)).toBe(text);
@@ -369,6 +504,21 @@ describe("ShiftJisEncoder", () => {
       const encoder = new ShiftJisEncoder();
       const text = "ｱｲｳｴｵｶｷｸｹｺ";
       expect(encoder.sanitizeForCp932(text)).toBe(text);
+    });
+
+    it("null相当の入力（空文字列）を安全に処理する（エッジケース）", () => {
+      const encoder = new ShiftJisEncoder();
+      expect(encoder.sanitizeForCp932("")).toBe("");
+    });
+
+    it("特殊文字（Unicode制御文字 U+0000）の処理", () => {
+      // NULL文字はCP932でエンコード可能（ASCII範囲）
+      const encoder = new ShiftJisEncoder();
+      const text = "\u0000";
+      // ラウンドトリップ検証でCP932対応として通過する
+      const result = encoder.sanitizeForCp932(text);
+      // NULL文字はCP932でエンコード可能のためそのまま（変換不要）
+      expect(result).toBe("\u0000");
     });
   });
 });

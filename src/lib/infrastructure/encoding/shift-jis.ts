@@ -39,12 +39,14 @@ function urlDecodeToBytes(str: string): Uint8Array {
 }
 
 /**
- * CP932未サポート文字を全角？に置換するためのフォールバック文字。
+ * 異体字セレクタのコードポイントセット。
+ * U+FE0F（絵文字スタイル指示）と U+FE0E（テキストスタイル指示）は
+ * Shift_JIS/DATの文脈では不要なため除去する。
+ * HTML数値参照に変換すると専ブラで文字化けマークとして表示されるため、除去が正しい処理。
  *
- * 半角?（0x3F）ではなく全角？（U+FF1F）を使用することで、
- * 専ブラで「???」のように文字化けして表示される問題を防ぐ。
+ * See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
  */
-const CP932_FALLBACK_CHAR = "？";
+const VARIATION_SELECTORS = new Set([0xfe0f, 0xfe0e]);
 
 /**
  * UTF-8文字列とShift_JIS(CP932)Bufferを相互変換するエンコーダー。
@@ -71,13 +73,15 @@ export class ShiftJisEncoder {
    * UTF-8文字列をShift_JIS(CP932)のBufferに変換する。
    *
    * encode前にsanitizeForCp932()を自動適用し、CP932未対応文字（絵文字・一部Unicode記号等）を
-   * 全角？（U+FF1F）に置換する。これにより専ブラで「???」が表示される問題を防ぐ。
+   * HTML数値参照（&#NNNNN;）に変換する。これにより専ブラでHTMLとして解釈し元の文字を表示できる。
+   * 異体字セレクタ（U+FE0F, U+FE0E）は除去する（専ブラで文字化けマークになるため）。
    *
    * NOTE: BOT絵文字（🤖等）はDAT出力時にDatFormatterで[BOT]に事前置換される。
-   * それ以外のCP932非対応文字（ユーザー入力の任意の絵文字等）はここで全角？に変換される。
+   * それ以外のCP932非対応文字（ユーザー入力の任意の絵文字等）はここでHTML数値参照に変換される。
    *
    * See: features/constraints/specialist_browser_compat.feature
    *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+   *   @scenario Shift_JIS範囲外の文字がHTML数値参照として保持される
    *
    * @param text - エンコード対象のUTF-8文字列
    * @returns Shift_JIS(CP932)エンコードされたBuffer
@@ -172,34 +176,47 @@ export class ShiftJisEncoder {
   }
 
   /**
-   * CP932でエンコードできない文字を全角？（U+FF1F）に置換してサニタイズする。
+   * CP932でエンコードできない文字をHTML数値参照（&#NNNNN;）に変換してサニタイズする。
    *
-   * iconv-liteはCP932未マッピング文字を0x3F（半角?）に変換するが、
-   * そのまま専ブラに送ると「???」のように文字化けして表示される。
-   * このメソッドでencode前にサニタイズすることでその問題を防ぐ。
+   * eddist参考実装（encoding_rs）に倣い、専ブラがHTMLとして解釈し元の文字を表示できるように
+   * CP932非対応文字をHTML数値参照に変換する。全角？への置換は行わない。
    *
    * 判定方式: ラウンドトリップ方式（encode → decode して元文字と一致するか確認）
    * バイト値（0x3F）に依存しないため、Cloudflare Workers環境でのiconv-lite動作差異による
-   * 偽陽性（CP932でエンコード可能な文字が誤って全角？に置換される問題）を防ぐ。
+   * 偽陽性（CP932でエンコード可能な文字が誤ってHTML数値参照に変換される問題）を防ぐ。
    *
-   * 置換対象:
-   * - サロゲートペア文字（U+10000以上）: 絵文字・CJK拡張漢字等。CP932では必ず非対応
-   * - BMP内でもCP932未マッピングな文字: ラウンドトリップ不一致の文字（❤等）
+   * HTML数値参照のASCII文字（&, #, ;, 数字）はShift_JISでも同一バイト値であるため、
+   * encode後のバイト列でも正しく解釈される。
+   *
+   * 変換ルール（入力コードポイントを順に処理）:
+   * 1. 異体字セレクタ (U+FE0F, U+FE0E) → 除去（出力しない）
+   * 2. CP932非対応文字 (U+10000以上のサロゲートペア、U+200D等) → HTML数値参照 (&#NNNNN;)
+   * 3. CP932対応文字 → そのまま出力
    *
    * See: features/constraints/specialist_browser_compat.feature
-   *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+   *   @scenario Shift_JIS範囲外の文字がHTML数値参照として保持される
+   *   @scenario 異体字セレクタがDAT出力時に除去される
+   *   @scenario ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
    *
    * @param text - サニタイズ対象のUTF-8文字列
-   * @returns CP932でエンコード可能な文字列（非対応文字は全角？に置換済み）
+   * @returns CP932でエンコード可能な文字列（非対応文字はHTML数値参照に変換済み、異体字セレクタは除去済み）
    */
   sanitizeForCp932(text: string): string {
     // for...of でサロゲートペアを含む全コードポイントを正しく反復する
     let result = "";
     for (const char of text) {
       const codePoint = char.codePointAt(0) ?? 0;
+
+      // ルール1: 異体字セレクタ (U+FE0F, U+FE0E) → 除去
+      // 専ブラではHTML数値参照として表示しても文字化けマークになるため除去が正しい
+      if (VARIATION_SELECTORS.has(codePoint)) {
+        continue;
+      }
+
       if (codePoint > 0xffff) {
-        // サロゲートペア（U+10000以上）: 絵文字・CJK拡張等。CP932は必ず非対応
-        result += CP932_FALLBACK_CHAR;
+        // ルール2a: サロゲートペア（U+10000以上）: 絵文字・CJK拡張等。CP932は必ず非対応
+        // HTML数値参照に変換して専ブラがHTMLとして解釈できるようにする
+        result += `&#${codePoint};`;
       } else {
         // ラウンドトリップ検証: encode → decode して元の文字と一致するか確認
         // バイト値（0x3F）依存の旧方式と異なり、環境差異による偽陽性が発生しない
@@ -208,7 +225,9 @@ export class ShiftJisEncoder {
         if (decoded === char) {
           result += char; // 正常にラウンドトリップできる → そのまま使用
         } else {
-          result += CP932_FALLBACK_CHAR; // ラウンドトリップ不一致 → 全角？に置換
+          // ルール2b: BMP内でもCP932未マッピングな文字（U+200D ZWJ、❤等）
+          // HTML数値参照に変換して情報を保持する
+          result += `&#${codePoint};`;
         }
       }
     }

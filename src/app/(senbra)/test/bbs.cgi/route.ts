@@ -185,17 +185,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   // Step 4: BbsCgiParserでBbsCgiParsedRequestに変換する
   const cookieHeader = req.headers.get("cookie") ?? "";
-
-  // [診断ログ] Cookie headerの受信状況をログ出力する
-  console.log(`[bbs.cgi] Cookie header: ${cookieHeader || "(absent)"}`);
-
   const parsed = bbsCgiParser.parseRequest(bodyParams, cookieHeader);
-
-  // [診断ログ] extractEdgeToken結果をログ出力する（セキュリティ配慮: 先頭8文字のみ）
-  const edgeTokenPrefix = parsed.edgeToken
-    ? `${parsed.edgeToken.slice(0, 8)}...`
-    : "null";
-  console.log(`[bbs.cgi] edgeToken from cookie: ${edgeTokenPrefix}`);
 
   // Step 5: IP ハッシュを取得する
   const ipHash = getIpHash(req);
@@ -208,17 +198,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
   const detectedWriteToken = extractWriteToken(parsed.mail);
 
-  // [診断ログ] write_token検出状況をログ出力する
-  console.log(`[bbs.cgi] write_token detected: ${detectedWriteToken !== null}`);
-
   if (detectedWriteToken !== null) {
     // write_token を検証する
     const writeTokenResult = await verifyWriteToken(detectedWriteToken);
-
-    // [診断ログ] write_token検証結果をログ出力する
-    console.log(
-      `[bbs.cgi] write_token verification: ${writeTokenResult.valid ? "valid" : "invalid"}`
-    );
 
     if (!writeTokenResult.valid) {
       // 無効な write_token: エラーレスポンスを返す
@@ -230,11 +212,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     // edge-token Cookie を verifyWriteToken が返した edgeToken 値で設定する
     const cleanedMail = removeWriteToken(parsed.mail);
     const verifiedEdgeToken = writeTokenResult.edgeToken!;
-
-    // [診断ログ] Set-Cookie設定時にトークンのプレフィックスをログ出力する（セキュリティ配慮: 先頭8文字のみ）
-    console.log(
-      `[bbs.cgi] Setting edge-token cookie: ${verifiedEdgeToken.slice(0, 8)}...`
-    );
 
     // edge-token が付与済みの parsed オブジェクトを生成する
     const parsedWithToken = {
@@ -295,10 +272,6 @@ async function handleCreateThread(
   );
 
   if (result.authRequired) {
-    // [診断ログ] resolveAuth結果: 認証要求（未認証またはトークン未検証）
-    console.log(
-      `[bbs.cgi] resolveAuth result: authenticated=false, reason=${result.authRequired.code}`
-    );
     // 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
     const authHtml = responseBuilder.buildAuthRequired(
       result.authRequired.code,
@@ -314,9 +287,6 @@ async function handleCreateThread(
     const errorHtml = responseBuilder.buildError(result.error ?? "スレッドの作成に失敗しました");
     return buildShiftJisHtmlResponse(errorHtml, 200);
   }
-
-  // [診断ログ] resolveAuth結果: 認証済みユーザーによる書き込み成功
-  console.log("[bbs.cgi] resolveAuth result: authenticated=true, reason=N/A");
 
   const threadKey = result.thread?.threadKey ?? "";
   const boardId = parsed.boardId || "battleboard";
@@ -370,10 +340,6 @@ async function handleCreatePost(
   });
 
   if ("authRequired" in result) {
-    // [診断ログ] resolveAuth結果: 認証要求（未認証またはトークン未検証）
-    console.log(
-      `[bbs.cgi] resolveAuth result: authenticated=false, reason=${result.code}`
-    );
     // 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
     const authHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken, getBaseUrl());
     const response = buildShiftJisHtmlResponse(authHtml, 200);
@@ -384,9 +350,6 @@ async function handleCreatePost(
     const errorHtml = responseBuilder.buildError(result.error ?? "書き込みに失敗しました");
     return buildShiftJisHtmlResponse(errorHtml, 200);
   }
-
-  // [診断ログ] resolveAuth結果: 認証済みユーザーによる書き込み成功
-  console.log("[bbs.cgi] resolveAuth result: authenticated=true, reason=N/A");
 
   const boardId = parsed.boardId || "battleboard";
   const successHtml = responseBuilder.buildSuccess(parsed.threadKey, boardId);
