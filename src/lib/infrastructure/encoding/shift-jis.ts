@@ -13,6 +13,32 @@
 import iconv from "iconv-lite";
 
 /**
+ * URLエンコードされた文字列をrawバイト列（Uint8Array）に変換するヘルパー。
+ *
+ * application/x-www-form-urlencoded 形式のデコードに使用する。
+ * - %XX: 16進数バイト値に変換
+ * - +: スペース（0x20）に変換（form encoding規約）
+ * - その他: charCode をそのままバイト値として使用
+ *
+ * @param str - URLエンコードされた文字列（ASCII範囲のみを想定）
+ * @returns rawバイト列
+ */
+function urlDecodeToBytes(str: string): Uint8Array {
+  const bytes: number[] = [];
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === "%" && i + 2 < str.length) {
+      bytes.push(parseInt(str.substring(i + 1, i + 3), 16));
+      i += 2;
+    } else if (str[i] === "+") {
+      bytes.push(0x20); // + はスペース（form encoding規約）
+    } else {
+      bytes.push(str.charCodeAt(i));
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+/**
  * CP932未サポート文字を全角？に置換するためのフォールバック文字。
  *
  * 半角?（0x3F）ではなく全角？（U+FF1F）を使用することで、
@@ -81,6 +107,68 @@ export class ShiftJisEncoder {
    */
   decode(buffer: Buffer | Uint8Array): string {
     return new TextDecoder(ShiftJisEncoder.TEXT_DECODER_ENCODING).decode(buffer);
+  }
+
+  /**
+   * URL-エンコード済みShift-JISフォームデータをパースしてUTF-8のURLSearchParamsに変換する。
+   *
+   * 専ブラはShift-JISバイトをURLエンコードして送信する（例: テスト → %83e%83X%83g）。
+   * 旧実装の誤り: encoder.decode(bodyBuffer) → new URLSearchParams() では、
+   * URLエンコードされたASCII文字列をShift-JISデコードしても何も変わらず、
+   * URLSearchParams がURL-デコード時に %83 をUTF-8バイトとして誤解釈する。
+   *
+   * 正しい処理順序:
+   * 1. bodyBufferをASCII文字列として読み取り（URLエンコード文字列はASCII範囲）
+   * 2. '&' で分割して各key=valueペアを取得
+   * 3. 各keyとvalueをURLデコードしてrawバイト列に戻す
+   * 4. rawバイト列をShift-JIS→UTF-8にデコード
+   * 5. UTF-8のURLSearchParamsを構築して返す
+   *
+   * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+   *
+   * @param bodyBuffer - application/x-www-form-urlencoded 形式のリクエストボディ（Shift-JIS URL-エンコード済み）
+   * @returns デコード済みUTF-8のURLSearchParams
+   */
+  decodeFormData(bodyBuffer: Buffer | Uint8Array): URLSearchParams {
+    // Step 1: bodyBufferをASCII文字列として読み取る
+    // URLエンコード文字列はASCII範囲のみで構成されるため、latin1（1:1バイトマッピング）で読む
+    const asciiBody = Buffer.isBuffer(bodyBuffer)
+      ? bodyBuffer.toString("latin1")
+      : Buffer.from(bodyBuffer).toString("latin1");
+
+    const params = new URLSearchParams();
+
+    // 空ボディは空のURLSearchParamsを返す
+    if (asciiBody.length === 0) {
+      return params;
+    }
+
+    // Step 2: '&' で分割してkey=valueペアを処理する
+    const pairs = asciiBody.split("&");
+    for (const pair of pairs) {
+      if (pair.length === 0) continue;
+
+      const eqIndex = pair.indexOf("=");
+      let rawKey: string;
+      let rawValue: string;
+
+      if (eqIndex === -1) {
+        // '=' がない場合はキーのみ（値は空文字列）
+        rawKey = pair;
+        rawValue = "";
+      } else {
+        rawKey = pair.substring(0, eqIndex);
+        rawValue = pair.substring(eqIndex + 1);
+      }
+
+      // Step 3-4: URLデコード（rawバイト列復元）→ Shift-JIS→UTF-8デコード
+      const keyDecoded = this.decode(urlDecodeToBytes(rawKey));
+      const valueDecoded = this.decode(urlDecodeToBytes(rawValue));
+
+      params.append(keyDecoded, valueDecoded);
+    }
+
+    return params;
   }
 
   /**

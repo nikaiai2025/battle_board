@@ -6,15 +6,15 @@
  *
  * 処理フロー:
  *   1. リクエストボディをBufferとして読み取る
- *   2. ShiftJisEncoderでShift_JIS → UTF-8 にデコードする
- *   3. URLSearchParamsとしてパースする
- *   4. BbsCgiParserでBbsCgiParsedRequestに変換する
- *   5. mail欄から write_token パターン (#<32文字hex>) を検出し除去する
- *   6. write_token が検出された場合: AuthService.verifyWriteToken() で検証し、
+ *   2. ShiftJisEncoder.decodeFormData()でURL-エンコード済みShift-JISを正しい順序でデコードする
+ *      （ASCIIとして読み取り → URLデコードでrawバイト取得 → Shift-JISデコード）
+ *   3. BbsCgiParserでBbsCgiParsedRequestに変換する
+ *   4. mail欄から write_token パターン (#<32文字hex>) を検出し除去する
+ *   5. write_token が検出された場合: AuthService.verifyWriteToken() で検証し、
  *      成功時は edge-token Cookie を設定してから書き込みを続行する
- *   7. subjectパラメータがある場合は新規スレッド作成、ない場合は書き込み
- *   8. BbsCgiResponseBuilderでHTMLレスポンスを生成する
- *   9. ShiftJisEncoderでUTF-8 → Shift_JIS にエンコードして返す
+ *   6. subjectパラメータがある場合は新規スレッド作成、ない場合は書き込み
+ *   7. BbsCgiResponseBuilderでHTMLレスポンスを生成する
+ *   8. ShiftJisEncoderでUTF-8 → Shift_JIS にエンコードして返す
  *
  * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
  * See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
@@ -166,17 +166,18 @@ export async function POST(req: NextRequest): Promise<Response> {
     return buildShiftJisHtmlResponse(errorHtml, 200);
   }
 
-  // Step 2: Shift_JIS → UTF-8 デコード
-  // 専ブラはPOSTボディをShift_JIS（CP932）でエンコードして送信する
-  // このデコードはRoute Handler層の責任。Application Layerに漏出させない。
+  // Step 2-3: URL-エンコード済みShift-JISフォームデータをパースしてUTF-8のURLSearchParamsに変換する
+  //
+  // 専ブラはShift-JISバイトをURLエンコードして送信する（例: テスト → %83e%83X%83g）。
+  // 正しいデコード順序: ASCIIとして読み取り → URLデコードでrawバイト取得 → Shift-JISデコード
+  // NG: encoder.decode(bodyBuffer) → new URLSearchParams() の順では、
+  //   URLSearchParams が %83 をUTF-8バイトとして誤解釈し文字化けが発生する。
+  //
+  // See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
   // See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界（Inbound）
-  const decodedBody = encoder.decode(bodyBuffer);
-
-  // Step 3: URLSearchParamsとしてパースする
-  // デコード済みUTF-8文字列からURLSearchParamsを構築する
   let bodyParams: URLSearchParams;
   try {
-    bodyParams = new URLSearchParams(decodedBody);
+    bodyParams = encoder.decodeFormData(bodyBuffer);
   } catch {
     const errorHtml = responseBuilder.buildError("POSTパラメータのパースに失敗しました");
     return buildShiftJisHtmlResponse(errorHtml, 200);

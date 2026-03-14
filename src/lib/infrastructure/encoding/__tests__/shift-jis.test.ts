@@ -202,6 +202,104 @@ describe("ShiftJisEncoder", () => {
     });
   });
 
+  describe("decodeFormData()", () => {
+    // See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+
+    it("URL-エンコード済みShift-JISのMESSAGEパラメータを正しくデコードする（テスト → テスト）", () => {
+      // 専ブラは "テスト" をShift-JISバイト(%83e%83X%83g)でURLエンコードして送信する
+      const encoder = new ShiftJisEncoder();
+      // Shift-JIS での "テスト" バイト列: 0x83 0x65 0x83 0x58 0x83 0x67
+      // それをURLエンコード: %83e%83X%83g
+      const body = Buffer.from("MESSAGE=%83e%83X%83g", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("MESSAGE")).toBe("テスト");
+    });
+
+    it("ASCII文字のみのパラメータ（bbs=battleboard）が正常にデコードされる", () => {
+      const encoder = new ShiftJisEncoder();
+      const body = Buffer.from("bbs=battleboard", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("bbs")).toBe("battleboard");
+    });
+
+    it("複数パラメータが正しくパースされる", () => {
+      const encoder = new ShiftJisEncoder();
+      // bbs=battleboard&MESSAGE=%83e%83X%83g
+      const body = Buffer.from("bbs=battleboard&MESSAGE=%83e%83X%83g", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("bbs")).toBe("battleboard");
+      expect(params.get("MESSAGE")).toBe("テスト");
+    });
+
+    it("+ がスペースに変換される（form encoding規約）", () => {
+      const encoder = new ShiftJisEncoder();
+      const body = Buffer.from("MESSAGE=hello+world", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("MESSAGE")).toBe("hello world");
+    });
+
+    it("空のパラメータ値が正常に処理される（エッジケース: 空値）", () => {
+      const encoder = new ShiftJisEncoder();
+      const body = Buffer.from("mail=&MESSAGE=test", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("mail")).toBe("");
+      expect(params.get("MESSAGE")).toBe("test");
+    });
+
+    it("空のボディが空のURLSearchParamsを返す（エッジケース: 空ボディ）", () => {
+      const encoder = new ShiftJisEncoder();
+      const body = Buffer.from("", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect([...params.entries()]).toHaveLength(0);
+    });
+
+    it("Uint8Array形式のボディも正しく処理される（Cloudflare Workers対応）", () => {
+      const encoder = new ShiftJisEncoder();
+      const body = new Uint8Array(Buffer.from("bbs=test&MESSAGE=%83e%83X%83g", "ascii"));
+      const params = encoder.decodeFormData(body);
+      expect(params.get("bbs")).toBe("test");
+      expect(params.get("MESSAGE")).toBe("テスト");
+    });
+
+    it("日本語のキー（Shift-JISエンコード）も正しくデコードされる", () => {
+      // キー側もShift-JISでエンコードされる場合への対応
+      const encoder = new ShiftJisEncoder();
+      // "名前" の Shift-JIS バイト: 0x96 0xBC 0x91 0x4F
+      // URLエンコード: %96%BC%91O
+      const body = Buffer.from("%96%BC%91O=%83e%83X%83g", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("名前")).toBe("テスト");
+    });
+
+    it("値にURLエンコードされていない文字が含まれる場合も正常に処理される", () => {
+      const encoder = new ShiftJisEncoder();
+      const body = Buffer.from("FROM=Alice&bbs=test", "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("FROM")).toBe("Alice");
+      expect(params.get("bbs")).toBe("test");
+    });
+
+    it("実際の専ブラPOSTボディ全体を正しくデコードする（統合シナリオ）", () => {
+      // bbs=battleboard&key=1234567890&FROM=%96%BC%96%B3%82%B5%82%B3%82%F1&mail=sage&MESSAGE=%83e%83X%83g%82P&submit=%8F%91%82%AB%8D%9E%82%DE
+      // FROM="名無しさん", MESSAGE="テスト１", submit="書き込む"
+      const encoder = new ShiftJisEncoder();
+      const bodyStr =
+        "bbs=battleboard&key=1234567890" +
+        "&FROM=%96%BC%96%B3%82%B5%82%B3%82%F1" +
+        "&mail=sage" +
+        "&MESSAGE=%83e%83X%83g%82P" +
+        "&submit=%8F%91%82%AB%8D%9E%82%DE";
+      const body = Buffer.from(bodyStr, "ascii");
+      const params = encoder.decodeFormData(body);
+      expect(params.get("bbs")).toBe("battleboard");
+      expect(params.get("key")).toBe("1234567890");
+      expect(params.get("FROM")).toBe("名無しさん");
+      expect(params.get("mail")).toBe("sage");
+      expect(params.get("MESSAGE")).toBe("テスト１");
+      expect(params.get("submit")).toBe("書き込む");
+    });
+  });
+
   describe("sanitizeForCp932()", () => {
     it("CP932互換文字はそのまま返す", () => {
       const encoder = new ShiftJisEncoder();

@@ -664,11 +664,51 @@ describe("bbs.cgi Route Handler", () => {
   });
 
   /**
-   * Shift_JISエンコードされたapplication/x-www-form-urlencoded形式のボディを生成する
+   * Shift_JISエンコードされたapplication/x-www-form-urlencoded形式のボディを生成する。
+   *
+   * 専ブラの実際の動作を再現する:
+   * 1. 各パラメータのキーと値をCP932バイト列に変換する
+   * 2. 各バイトをパーセントエンコードする（%XX形式）
+   * 3. key=value を & で連結する
+   *
+   * NOTE: 旧実装 (new URLSearchParams(params).toString() → iconv.encode) は
+   * UTF-8 URLエンコード文字列 (%E3%83... 形式) をCP932に変換するだけで、
+   * 本物の専ブラが送る %83e 形式（Shift-JISバイトのURLエンコード）とは異なっていた。
    */
   function makeShiftJisBody(params: Record<string, string>): Buffer {
-    const utf8Form = new URLSearchParams(params).toString();
-    return iconv.encode(utf8Form, "CP932");
+    const pairs: string[] = [];
+    for (const [key, value] of Object.entries(params)) {
+      const encodedKey = percentEncodeShiftJis(key);
+      const encodedValue = percentEncodeShiftJis(value);
+      pairs.push(`${encodedKey}=${encodedValue}`);
+    }
+    return Buffer.from(pairs.join("&"), "ascii");
+  }
+
+  /**
+   * 文字列をCP932バイト列に変換し、各バイトをパーセントエンコードする。
+   * ASCII英数字と一部の記号はエンコードしない（URLセーフな文字）。
+   */
+  function percentEncodeShiftJis(str: string): string {
+    const sjisBytes = iconv.encode(str, "CP932");
+    let result = "";
+    for (const byte of sjisBytes) {
+      // URLセーフな文字（英数字・記号の一部）はそのまま
+      if (
+        (byte >= 0x41 && byte <= 0x5a) || // A-Z
+        (byte >= 0x61 && byte <= 0x7a) || // a-z
+        (byte >= 0x30 && byte <= 0x39) || // 0-9
+        byte === 0x2d || // -
+        byte === 0x5f || // _
+        byte === 0x2e || // .
+        byte === 0x7e    // ~
+      ) {
+        result += String.fromCharCode(byte);
+      } else {
+        result += "%" + byte.toString(16).toUpperCase().padStart(2, "0");
+      }
+    }
+    return result;
   }
 
   it("書き込み成功時に titleタグに 書きこみました を含む HTML を返す", async () => {
