@@ -17,6 +17,7 @@
 
 import ThreadList from "./_components/ThreadList";
 import ThreadCreateForm from "./_components/ThreadCreateForm";
+import * as PostService from "@/lib/services/post-service";
 
 interface Thread {
   id: string;
@@ -25,44 +26,20 @@ interface Thread {
   lastPostAt: string;
 }
 
-interface ThreadListResponse {
-  threads: Thread[];
-}
-
 /**
- * スレッド一覧を API ルート経由で取得する。
+ * スレッド一覧をサービス層から直接取得する。
  *
- * SSR: Next.js の Server Component から fetch を使用。
- * サービス層を直接 import しないことで、認証ロジックを APIルートに集約する。
+ * SSR: Next.js の Server Component からサービス層を直接呼び出す。
+ * Cloudflare Workers 環境では自分自身への fetch が error code 1042
+ * （自己参照ループ禁止）でブロックされるため、API ルート経由ではなく
+ * サービス層を直接 import して呼び出す。
  *
- * See: docs/architecture/components/web-ui.md §2 > Server ComponentからAPIルートを呼び出す理由
  * See: docs/specs/openapi.yaml > /api/threads > get
  */
 async function fetchThreads(): Promise<Thread[]> {
   try {
-    // Next.js の Server Component では内部 API を絶対URLで呼び出す
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ??
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-
-    console.log(`[fetchThreads] baseUrl=${baseUrl}, NEXT_PUBLIC_BASE_URL=${process.env.NEXT_PUBLIC_BASE_URL}, VERCEL_URL=${process.env.VERCEL_URL}`);
-
-    const res = await fetch(`${baseUrl}/api/threads`, {
-      // SSR: キャッシュなし（常に最新データを取得）
-      cache: "no-store",
-    });
-
-    console.log(`[fetchThreads] response status=${res.status}, ok=${res.ok}`);
-
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`GET /api/threads failed: ${res.status}, body=${body.slice(0, 500)}`);
-      return [];
-    }
-
-    const data = (await res.json()) as ThreadListResponse;
-    console.log(`[fetchThreads] threads count=${data.threads?.length ?? 0}`);
-    return data.threads ?? [];
+    const threads = await PostService.getThreadList("battleboard", 50);
+    return threads as Thread[];
   } catch (err) {
     console.error("[fetchThreads] Exception:", err);
     return [];

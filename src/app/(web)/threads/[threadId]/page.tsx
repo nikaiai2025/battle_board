@@ -20,6 +20,7 @@ import PostList from "../../_components/PostList";
 import PostListLiveWrapper from "../../_components/PostListLiveWrapper";
 import PostForm from "../../_components/PostForm";
 import { type Post } from "../../_components/PostItem";
+import * as PostService from "@/lib/services/post-service";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -44,12 +45,13 @@ interface ThreadDetailResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * スレッド詳細（スレッド情報＋レス一覧）を API ルート経由で取得する。
+ * スレッド詳細（スレッド情報＋レス一覧）をサービス層から直接取得する。
  *
- * SSR: Next.js の Server Component から fetch を使用。
- * サービス層を直接 import しないことで、認証ロジックを APIルートに集約する。
+ * SSR: Next.js の Server Component からサービス層を直接呼び出す。
+ * Cloudflare Workers 環境では自分自身への fetch が error code 1042
+ * （自己参照ループ禁止）でブロックされるため、API ルート経由ではなく
+ * サービス層を直接 import して呼び出す。
  *
- * See: docs/architecture/components/web-ui.md §2 > Server ComponentからAPIルートを呼び出す理由
  * See: docs/specs/openapi.yaml > /api/threads/{threadId} > get
  *
  * @param threadId - スレッドID
@@ -59,29 +61,18 @@ async function fetchThreadDetail(
   threadId: string
 ): Promise<ThreadDetailResponse | null> {
   try {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ??
-      (process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000");
+    const [thread, posts] = await Promise.all([
+      PostService.getThread(threadId),
+      PostService.getPostList(threadId),
+    ]);
 
-    const res = await fetch(`${baseUrl}/api/threads/${threadId}`, {
-      // SSR: キャッシュなし（常に最新データを取得）
-      cache: "no-store",
-    });
-
-    if (res.status === 404) {
+    if (!thread) {
       return null;
     }
 
-    if (!res.ok) {
-      console.error(`GET /api/threads/${threadId} failed: ${res.status}`);
-      return null;
-    }
-
-    return (await res.json()) as ThreadDetailResponse;
+    return { thread: thread as Thread, posts: posts as Post[] };
   } catch (err) {
-    console.error("Failed to fetch thread detail:", err);
+    console.error("[fetchThreadDetail] Exception:", err);
     return null;
   }
 }
