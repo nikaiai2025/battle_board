@@ -46,12 +46,14 @@ vi.mock('@/lib/infrastructure/repositories/user-repository', () => ({
   updateAuthToken: vi.fn(),
   updateStreak: vi.fn(),
   updateUsername: vi.fn(),
+  updateIsVerified: vi.fn(),
 }))
 
 vi.mock('@/lib/services/auth-service', () => ({
   verifyEdgeToken: vi.fn(),
   issueEdgeToken: vi.fn(),
   issueAuthCode: vi.fn(),
+  verifyWriteToken: vi.fn(),
   hashIp: vi.fn(),
   reduceIp: vi.fn(),
 }))
@@ -96,6 +98,7 @@ const mockUser: User = {
   authToken: 'token-abc',
   authorIdSeed: 'seed-abc',
   isPremium: false,
+  isVerified: true,
   username: null,
   streakDays: 0,
   lastPostDate: null,
@@ -107,6 +110,7 @@ const mockPremiumUser: User = {
   authToken: 'token-xyz',
   authorIdSeed: 'seed-xyz',
   isPremium: true,
+  isVerified: true,
   username: 'バトラー太郎',
   streakDays: 5,
   lastPostDate: '2026-03-08',
@@ -426,6 +430,37 @@ describe('PostService', () => {
         })
 
         expect(result).toMatchObject({ authRequired: true })
+      })
+
+      it('edge-token が not_verified の場合は既存 edge-token を維持して認証コードを再発行する（G1 是正）', async () => {
+        // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: false,
+          reason: 'not_verified',
+        })
+        vi.mocked(AuthService.issueAuthCode).mockResolvedValue({
+          code: '999888',
+          expiresAt: new Date(),
+        })
+
+        const result = await createPost({
+          threadId: 'thread-001',
+          body: 'こんにちは',
+          edgeToken: 'existing-unverified-token',
+          ipHash: 'ip-hash-xyz',
+          isBotWrite: false,
+        })
+
+        // 認証フローが起動され、既存の edge-token が維持されること
+        expect(result).toMatchObject({
+          authRequired: true,
+          edgeToken: 'existing-unverified-token',
+          code: '999888',
+        })
+        // 新規 edge-token は発行されない（既存を維持）
+        expect(AuthService.issueEdgeToken).not.toHaveBeenCalled()
+        // 既存 edge-token に紐づく認証コードを再発行
+        expect(AuthService.issueAuthCode).toHaveBeenCalledWith('ip-hash-xyz', 'existing-unverified-token')
       })
     })
 

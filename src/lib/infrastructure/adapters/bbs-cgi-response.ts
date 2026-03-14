@@ -7,12 +7,14 @@
  * レスポンスHTML仕様:
  *   - 成功: titleタグに "書きこみました"
  *   - エラー: titleタグに "ＥＲＲＯＲ"（全角）
- *   - 認証必要: titleタグに "認証" + 認証URL
+ *   - 認証必要: titleタグに "認証が必要です" + 認証コード + 認証ページURL + 手順説明
  *
  * See: features/constraints/specialist_browser_compat.feature
  *   @scenario 専ブラからの書き込みが正常に処理される
  *   @scenario 書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
+ *   @scenario 専ブラからの初回書き込みで認証案内が返される
  * See: docs/architecture/components/senbra-adapter.md §2 BbsCgiResponseBuilder, §3 公開インターフェース
+ * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 
 /**
@@ -72,15 +74,29 @@ ${escapedMessage}
   /**
    * 認証が必要な場合の案内HTMLを生成する。
    *
-   * 専ブラにはOTP認証URLを提示する。
+   * 専ブラ向けに認証コード・認証ページURL・手順説明を明示する。
+   * 専ブラは WebView を持たないため、ユーザーはブラウザで認証を完了後、
+   * write_token をメール欄に貼り付けて再書き込みする（G4対応）。
    *
-   * @param code - 認証コード（OTP等）
-   * @param edgeToken - Edgeトークン
+   * 認証ページURL形式: /auth/verify?code={code}&token={edgeToken}
+   *
+   * 手順:
+   *   1. 以下のURLにアクセスして認証を完了する
+   *   2. 表示された認証コードを入力する
+   *   3. 発行された write_token をメール欄に "#write_token" 形式で貼り付けて再書き込みする
+   *
+   * See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+   * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
+   * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
+   *
+   * @param code - 認証コード（6桁数字）
+   * @param edgeToken - 発行済み edge-token
    * @returns 認証案内HTMLレスポンス文字列（UTF-8）
    */
   buildAuthRequired(code: string, edgeToken: string): string {
     const escapedCode = this.escapeHtml(code);
     const escapedToken = this.escapeHtml(edgeToken);
+    const authUrl = `/auth/verify?code=${escapedCode}&token=${escapedToken}`;
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -89,8 +105,17 @@ ${escapedMessage}
 </head>
 <body>
 <b>認証が必要です</b><br>
-以下のURLにアクセスして認証を完了してください。<br>
-<a href="/auth/verify?code=${escapedCode}&token=${escapedToken}">認証ページへ</a>
+書き込みにはブラウザでの認証が必要です。<br>
+<br>
+【認証コード】${escapedCode}<br>
+<br>
+【手順】<br>
+1. 以下のURLにブラウザでアクセスしてください<br>
+2. 認証コード ${escapedCode} を入力して認証を完了してください<br>
+3. 発行された write_token をメール欄に "#write_token値" 形式で貼り付けて再度書き込んでください<br>
+<br>
+【認証URL】<br>
+<a href="${authUrl}">${authUrl}</a>
 </body>
 </html>`;
   }

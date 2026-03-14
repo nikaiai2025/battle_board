@@ -26,6 +26,7 @@ import { InMemoryUserRepo, InMemoryCurrencyRepo, InMemoryThreadRepo } from '../s
 import * as AuthService from '../../src/lib/services/auth-service'
 import * as PostService from '../../src/lib/services/post-service'
 import * as CurrencyService from '../../src/lib/services/currency-service'
+import { InMemoryUserRepo } from '../support/mock-installer'
 
 // ---------------------------------------------------------------------------
 // テスト用定数
@@ -62,6 +63,10 @@ Given('ユーザーがログイン済みである', async function (this: Battle
   this.currentEdgeToken = token
   this.currentUserId = userId
   this.currentIpHash = DEFAULT_IP_HASH
+  // isVerified=true に設定して「認証済み」状態にする。
+  // TASK-041 で verifyEdgeToken に not_verified チェックが追加されたため必要。
+  // See: features/phase1/authentication.feature @認証フロー是正
+  await InMemoryUserRepo.updateIsVerified(userId, true)
 })
 
 Given('ユーザーが書き込み可能状態である', async function (this: BattleBoardWorld) {
@@ -69,6 +74,9 @@ Given('ユーザーが書き込み可能状態である', async function (this: 
   this.currentEdgeToken = token
   this.currentUserId = userId
   this.currentIpHash = DEFAULT_IP_HASH
+  // isVerified=true に設定して「認証済み（書き込み可能）」状態にする。
+  // See: features/phase1/authentication.feature @認証フロー是正
+  await InMemoryUserRepo.updateIsVerified(userId, true)
 })
 
 // ---------------------------------------------------------------------------

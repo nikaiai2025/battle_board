@@ -15,6 +15,19 @@ import type { Post } from '../../src/lib/domain/models/post'
 import type { MypageInfo, PostHistoryItem } from '../../src/lib/services/mypage-service'
 
 // ---------------------------------------------------------------------------
+// モジュールロード時に実際の Date.now を保存する
+// setCurrentTime によるスタブ化で _originalDateNow が汚染されることを防ぐ。
+// See: docs/architecture/bdd_test_strategy.md §5 時刻制御の方針
+// ---------------------------------------------------------------------------
+
+/**
+ * モジュールロード時点での真の Date.now 関数。
+ * setCurrentTime によるグローバルスタブ化の影響を受けない。
+ * restoreDateNow() はこの値を使って Date.now を復元する。
+ */
+const _trueOriginalDateNow: () => number = Date.now.bind(Date)
+
+// ---------------------------------------------------------------------------
 // 型定義
 // ---------------------------------------------------------------------------
 
@@ -235,9 +248,11 @@ export class BattleBoardWorld extends World {
   /**
    * Date.now を元の実装に復元する。
    * AfterフックおよびresetCurrentTime から呼び出す。
+   * _trueOriginalDateNow（モジュールロード時の真の Date.now）を使って復元するため、
+   * 前のシナリオのスタブ化の影響を受けない。
    */
   restoreDateNow(): void {
-    Date.now = this._originalDateNow
+    Date.now = _trueOriginalDateNow
     this.currentTime = null
   }
 

@@ -24,6 +24,11 @@ interface UserRow {
   auth_token: string
   author_id_seed: string
   is_premium: boolean
+  /**
+   * edge-token の認証完了状態。
+   * See: supabase/migrations/00005_auth_verification.sql
+   */
+  is_verified: boolean
   username: string | null
   streak_days: number
   last_post_date: string | null
@@ -45,6 +50,7 @@ function rowToUser(row: UserRow): User {
     authToken: row.auth_token,
     authorIdSeed: row.author_id_seed,
     isPremium: row.is_premium,
+    isVerified: row.is_verified,
     username: row.username,
     streakDays: row.streak_days,
     lastPostDate: row.last_post_date,
@@ -104,12 +110,15 @@ export async function findByAuthToken(authToken: string): Promise<User | null> {
 /**
  * 新しいユーザーを作成する。
  * id / createdAt / streakDays / lastPostDate は DB のデフォルト値を使用する。
+ * isVerified は省略時 false（DBデフォルト値と一致）。
+ *
+ * See: features/phase1/authentication.feature @認証フロー是正
  *
  * @param user - 作成するユーザーのデータ（自動設定フィールドを除く）
  * @returns 作成された User（DB デフォルト値を含む）
  */
 export async function create(
-  user: Omit<User, 'id' | 'createdAt' | 'streakDays' | 'lastPostDate'>
+  user: Omit<User, 'id' | 'createdAt' | 'streakDays' | 'lastPostDate' | 'isVerified'> & { isVerified?: boolean }
 ): Promise<User> {
   const { data, error } = await supabaseAdmin
     .from('users')
@@ -117,6 +126,8 @@ export async function create(
       auth_token: user.authToken,
       author_id_seed: user.authorIdSeed,
       is_premium: user.isPremium,
+      // isVerified が省略された場合は DB デフォルト（false）を使用する
+      ...(user.isVerified !== undefined ? { is_verified: user.isVerified } : {}),
       username: user.username,
     })
     .select()
@@ -217,5 +228,27 @@ export async function updateIsPremium(userId: string, isPremium: boolean): Promi
 
   if (error) {
     throw new Error(`UserRepository.updateIsPremium failed: ${error.message}`)
+  }
+}
+
+/**
+ * ユーザーの認証完了状態（isVerified）を更新する。
+ * AuthService.verifyAuthCode が認証コードとTurnstileの検証に成功した後に呼び出される。
+ * is_verified = true への更新により、書き込み時の認証チェック（G1 是正）が機能する。
+ *
+ * See: features/phase1/authentication.feature @認証フロー是正
+ * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param isVerified - 新しい認証完了状態（通常は true を渡す）
+ */
+export async function updateIsVerified(userId: string, isVerified: boolean): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ is_verified: isVerified })
+    .eq('id', userId)
+
+  if (error) {
+    throw new Error(`UserRepository.updateIsVerified failed: ${error.message}`)
   }
 }

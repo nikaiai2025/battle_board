@@ -15,6 +15,13 @@ export interface User {
   /** 有料ユーザーフラグ */
   isPremium: boolean;
   /**
+   * edge-token の認証完了状態。
+   * 認証コード検証（/auth/verify）が成功した後に true に更新される。
+   * See: features/phase1/authentication.feature @認証フロー是正
+   * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
+   */
+  isVerified: boolean;
+  /**
    * ユーザーネーム（有料ユーザーのみ設定可、最大20文字）
    * See: docs/requirements/ubiquitous_language.yaml #ユーザーネーム
    */

@@ -66,6 +66,9 @@ Given('有料ユーザーがマイページを表示している', async functio
 
   // isPremium を true に設定する
   await InMemoryUserRepo.updateIsPremium(userId, true)
+  // isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
+  // See: features/phase1/authentication.feature @認証フロー是正
+  await InMemoryUserRepo.updateIsVerified(userId, true)
   this.currentIsPremium = true
 
   // マイページを取得して World に保持する
@@ -116,6 +119,9 @@ Given('ユーザーが過去に3件の書き込みを行っている', async fun
   this.currentEdgeToken = token
   this.currentUserId = userId
   this.currentIpHash = DEFAULT_IP_HASH
+  // isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
+  // See: features/phase1/authentication.feature @認証フロー是正
+  await InMemoryUserRepo.updateIsVerified(userId, true)
 
   // スレッドを作成する
   const threadResult = await PostService.createThread(

@@ -73,7 +73,7 @@ async function getIpHash(req: NextRequest): Promise<string> {
  *   Cookie: edge-token（認証コード発行時に発行済みのトークン）
  *
  * レスポンス:
- *   200: { success: true }（認証成功）
+ *   200: { success: true; writeToken?: string }（認証成功。writeToken は専ブラ向け認証橋渡しトークン）
  *   400: { success: false; error: string }（リクエスト不正）
  *   401: { success: false; error: string }（認証失敗）
  */
@@ -124,9 +124,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // --- AuthService への委譲 ---
   // ビジネスロジックは AuthService が担う
-  const verified = await AuthService.verifyAuthCode(code, turnstileToken, ipHash)
+  // TASK-041 より verifyAuthCode は { success: boolean, writeToken?: string } を返す
+  // See: src/lib/services/auth-service.ts > verifyAuthCode
+  const result = await AuthService.verifyAuthCode(code, turnstileToken, ipHash)
 
-  if (!verified) {
+  if (!result.success) {
     return NextResponse.json(
       { success: false, error: '認証コードが無効または期限切れです' },
       { status: 401 }
@@ -136,7 +138,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // --- 認証成功: レスポンスを返す ---
   // Cookie の edge-token は既に発行済みのものをそのまま使用する
   // （AuthService は Cookie を操作しない設計。token の有効化は AuthCodeRepository.markVerified で完了）
-  const response = NextResponse.json({ success: true }, { status: 200 })
+  // write_token は専ブラ向け認証橋渡しトークン。オプショナルフィールドとしてレスポンスに含める
+  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
+  // See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+  const responseBody: { success: boolean; writeToken?: string } = { success: true }
+  if (result.writeToken) {
+    responseBody.writeToken = result.writeToken
+  }
+  const response = NextResponse.json(responseBody, { status: 200 })
 
   // edge-token Cookie を更新（HttpOnly, Secure, SameSite=Lax）
   // 認証成功時に明示的に Cookie を設定し直す（有効期限の更新等）

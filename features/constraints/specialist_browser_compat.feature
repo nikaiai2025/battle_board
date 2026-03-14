@@ -1,5 +1,5 @@
 # features/constraints/specialist_browser_compat.feature
-# ステータス: ドラフト v2
+# ステータス: ドラフト v3
 #
 # NOTE: このファイルはユーザーストーリーではなく「プロトコル準拠の制約条件」を
 # Gherkin形式で記述したもの。5ch専用ブラウザ（ChMate, Siki等）との互換性を
@@ -78,6 +78,39 @@ Feature: 5ch専用ブラウザ互換性
     When 当該ユーザーの書き込みを含むDATファイルを取得する
     Then 日付フィールドに "ID:AbCd1234" が含まれる
     And 日付フォーマットは "YYYY/MM/DD(曜日) HH:MM:SS.ff ID:xxxxxxxx" 形式である
+
+  # ===========================================
+  # 専ブラ認証フロー（G4対応）
+  # ===========================================
+  # 専ブラはTurnstileウィジェットを表示できないため、Webブラウザで認証を完了し
+  # write_tokenをメール欄に貼り付ける方式で認証を橋渡しする。
+  # Cookie共有可能な専ブラではメール欄トークン不要。
+
+  Scenario: 専ブラからの初回書き込みで認証案内が返される
+    Given ユーザーが専ブラで未認証である
+    When bbs.cgiに書き込みをPOSTする
+    Then レスポンスに認証コードと認証ページURLが含まれる
+    And edge-token Cookieが発行される
+
+  Scenario: 認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+    Given ユーザーが認証ページで認証を完了しwrite_tokenを取得している
+    When bbs.cgiのメール欄に "#<write_token>" を含めてPOSTする
+    Then write_tokenが検証される
+    And edge-token Cookieが有効化される
+    And 書き込みがスレッドに追加される
+    And レスポンスのtitleタグに "書きこみました" が含まれる
+    And メール欄のwrite_tokenは書き込みデータに含まれない
+
+  Scenario: Cookie共有の専ブラでは認証後そのまま書き込みできる
+    Given ユーザーがWebブラウザで認証を完了している
+    And 専ブラがWebブラウザとCookieを共有している
+    When bbs.cgiに書き込みをPOSTする
+    Then 書き込みがスレッドに追加される
+
+  Scenario: 無効なwrite_tokenでは書き込みが拒否される
+    Given ユーザーが専ブラで未認証である
+    When bbs.cgiのメール欄に無効なwrite_tokenを含めてPOSTする
+    Then レスポンスのtitleタグに "ＥＲＲＯＲ" が含まれる
 
   # ===========================================
   # 書き込みAPI (bbs.cgi)

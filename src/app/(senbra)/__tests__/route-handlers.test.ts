@@ -47,6 +47,7 @@ vi.mock("@/lib/services/auth-service", () => ({
   verifyEdgeToken: vi.fn(),
   issueEdgeToken: vi.fn(),
   issueAuthCode: vi.fn(),
+  verifyWriteToken: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,7 @@ vi.mock("@/lib/services/auth-service", () => ({
 import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
 import * as PostRepository from "@/lib/infrastructure/repositories/post-repository";
 import * as PostService from "@/lib/services/post-service";
+import * as AuthService from "@/lib/services/auth-service";
 
 // ---------------------------------------------------------------------------
 // ヘルパー
@@ -874,5 +876,229 @@ describe("bbs.cgi Route Handler", () => {
     const buffer = await res.arrayBuffer();
     const decoded = decodeSjis(buffer);
     expect(decoded).toContain("ＥＲＲＯＲ");
+  });
+
+  // ---------------------------------------------------------------------------
+  // write_token 関連テスト
+  // See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+  // See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
+  // ---------------------------------------------------------------------------
+
+  it("有効な write_token をメール欄に含む場合: 書き込みが成功し edge-token Cookie が設定される", async () => {
+    const validWriteToken = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"; // 32文字hex
+    vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({
+      valid: true,
+      edgeToken: "verified-edge-token",
+    });
+    vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
+    vi.mocked(PostService.createPost).mockResolvedValue({
+      success: true,
+      postId: "post-uuid-001",
+      postNumber: 2,
+      systemMessages: [],
+    });
+
+    const body = makeShiftJisBody({
+      bbs: "battleboard",
+      key: "1234567890",
+      FROM: "名無しさん",
+      mail: `#${validWriteToken}`,
+      MESSAGE: "テスト書き込み",
+      submit: "書き込む",
+    });
+
+    const req = new NextRequest("http://localhost/test/bbs.cgi", {
+      method: "POST",
+      body,
+      headers: { "content-type": "application/x-www-form-urlencoded; charset=Shift_JIS" },
+    });
+
+    const res = await POST(req);
+    const buffer = await res.arrayBuffer();
+    const decoded = decodeSjis(buffer);
+    // 書き込み成功
+    expect(decoded).toContain("書きこみました");
+    // edge-token Cookie が設定されている
+    expect(res.headers.get("set-cookie")).toContain("edge-token=verified-edge-token");
+    // verifyWriteToken が呼ばれたこと
+    expect(AuthService.verifyWriteToken).toHaveBeenCalledWith(validWriteToken);
+  });
+
+  it("write_token を含む mail 欄: PostService に渡す際に write_token が除去されている（DAT漏洩防止）", async () => {
+    const validWriteToken = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4";
+    vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({
+      valid: true,
+      edgeToken: "verified-edge-token",
+    });
+    vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
+
+    let capturedEmail: string | undefined;
+    vi.mocked(PostService.createPost).mockImplementation(async (input) => {
+      capturedEmail = input.email;
+      return {
+        success: true,
+        postId: "post-uuid-001",
+        postNumber: 2,
+        systemMessages: [],
+      };
+    });
+
+    const body = makeShiftJisBody({
+      bbs: "battleboard",
+      key: "1234567890",
+      mail: `sage#${validWriteToken}`,
+      MESSAGE: "テスト",
+    });
+
+    const req = new NextRequest("http://localhost/test/bbs.cgi", {
+      method: "POST",
+      body,
+    });
+
+    await POST(req);
+    // PostService に渡された email には write_token が含まれていない
+    expect(capturedEmail).toBe("sage");
+    expect(capturedEmail).not.toContain(validWriteToken);
+    expect(capturedEmail).not.toContain("#");
+  });
+
+  it("mail欄が '#<write_token>' のみの場合: 除去後に空文字列として渡される", async () => {
+    const validWriteToken = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4";
+    vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({
+      valid: true,
+      edgeToken: "verified-edge-token",
+    });
+    vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
+
+    let capturedEmail: string | undefined;
+    vi.mocked(PostService.createPost).mockImplementation(async (input) => {
+      capturedEmail = input.email;
+      return {
+        success: true,
+        postId: "post-uuid-001",
+        postNumber: 2,
+        systemMessages: [],
+      };
+    });
+
+    const body = makeShiftJisBody({
+      bbs: "battleboard",
+      key: "1234567890",
+      mail: `#${validWriteToken}`,
+      MESSAGE: "テスト",
+    });
+
+    const req = new NextRequest("http://localhost/test/bbs.cgi", {
+      method: "POST",
+      body,
+    });
+
+    await POST(req);
+    // write_token のみの場合、除去後は空文字列 → PostService の email に undefined が渡される
+    expect(capturedEmail).toBeUndefined();
+  });
+
+  it("無効な write_token の場合: ＥＲＲＯＲ を含む HTML を返す", async () => {
+    const invalidWriteToken = "ffffffffffffffffffffffffffffffff"; // 無効なトークン
+    vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({ valid: false });
+
+    const body = makeShiftJisBody({
+      bbs: "battleboard",
+      key: "1234567890",
+      mail: `#${invalidWriteToken}`,
+      MESSAGE: "テスト",
+    });
+
+    const req = new NextRequest("http://localhost/test/bbs.cgi", {
+      method: "POST",
+      body,
+    });
+
+    const res = await POST(req);
+    const buffer = await res.arrayBuffer();
+    const decoded = decodeSjis(buffer);
+    // ＥＲＲＯＲ レスポンスが返される
+    expect(decoded).toContain("ＥＲＲＯＲ");
+    // 書き込みは実行されない
+    expect(PostService.createPost).not.toHaveBeenCalled();
+  });
+
+  it("無効な write_token の場合: Set-Cookie ヘッダは設定されない", async () => {
+    const invalidWriteToken = "ffffffffffffffffffffffffffffffff";
+    vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({ valid: false });
+
+    const body = makeShiftJisBody({
+      bbs: "battleboard",
+      key: "1234567890",
+      mail: `#${invalidWriteToken}`,
+      MESSAGE: "テスト",
+    });
+
+    const req = new NextRequest("http://localhost/test/bbs.cgi", {
+      method: "POST",
+      body,
+    });
+
+    const res = await POST(req);
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("write_token を含まない通常の mail 欄では verifyWriteToken が呼ばれない", async () => {
+    vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
+    vi.mocked(PostService.createPost).mockResolvedValue({
+      success: true,
+      postId: "post-uuid-001",
+      postNumber: 2,
+      systemMessages: [],
+    });
+
+    const body = makeShiftJisBody({
+      bbs: "battleboard",
+      key: "1234567890",
+      mail: "sage",
+      MESSAGE: "テスト",
+    });
+
+    const req = new NextRequest("http://localhost/test/bbs.cgi", {
+      method: "POST",
+      body,
+    });
+
+    await POST(req);
+    expect(AuthService.verifyWriteToken).not.toHaveBeenCalled();
+  });
+
+  it("write_token が大文字小文字混在でも正しく検出・小文字化される", async () => {
+    // 大文字のhexトークン（実際には正規表現でケースインセンシティブマッチ）
+    const upperWriteToken = "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4";
+    const lowerWriteToken = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4";
+    vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({
+      valid: true,
+      edgeToken: "verified-edge-token",
+    });
+    vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
+    vi.mocked(PostService.createPost).mockResolvedValue({
+      success: true,
+      postId: "post-uuid-001",
+      postNumber: 2,
+      systemMessages: [],
+    });
+
+    const body = makeShiftJisBody({
+      bbs: "battleboard",
+      key: "1234567890",
+      mail: `#${upperWriteToken}`,
+      MESSAGE: "テスト",
+    });
+
+    const req = new NextRequest("http://localhost/test/bbs.cgi", {
+      method: "POST",
+      body,
+    });
+
+    await POST(req);
+    // 小文字化されて verifyWriteToken に渡される
+    expect(AuthService.verifyWriteToken).toHaveBeenCalledWith(lowerWriteToken);
   });
 });

@@ -54,6 +54,9 @@ async function ensureNamedUser(world: BattleBoardWorld, name: string): Promise<U
   if (!ctx) {
     const ipHash = getIpHashForUser(name)
     const { token, userId } = await AuthService.issueEdgeToken(ipHash)
+    // isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
+    // See: features/phase1/authentication.feature @認証フロー是正
+    await InMemoryUserRepo.updateIsVerified(userId, true)
     ctx = { userId, edgeToken: token, ipHash, isPremium: false, username: null }
     world.setNamedUser(name, ctx)
   }

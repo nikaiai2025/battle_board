@@ -14,9 +14,14 @@ import { Given, When, Then } from '@cucumber/cucumber'
 import assert from 'assert'
 import type { BattleBoardWorld } from '../support/world'
 import {
+  InMemoryUserRepo,
   InMemoryThreadRepo,
   InMemoryPostRepo,
 } from '../support/mock-installer'
+
+// See: features/phase1/authentication.feature @認証フロー是正 (TASK-041)
+// issueEdgeToken は isVerified=false でユーザーを作成するため、
+// 書き込みを行うステップでは必ず updateIsVerified(userId, true) を呼ぶ必要がある。
 import { THREAD_TITLE_MAX_LENGTH } from '../../src/lib/domain/rules/validation'
 
 // ---------------------------------------------------------------------------
@@ -336,6 +341,9 @@ Given('スレッド {string} は最終書き込み時刻が最も古く一覧に
     this.currentEdgeToken = token
     this.currentUserId = userId
     this.currentIpHash = DEFAULT_IP_HASH
+    // isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
+    // See: features/phase1/authentication.feature @認証フロー是正
+    await InMemoryUserRepo.updateIsVerified(userId, true)
   }
 
   // 51個+1のスレッドのうち最も古い時刻で「低活性スレッド」を作成する
@@ -639,6 +647,9 @@ Given('スレッド {string} に3件のレスが書き込まれている', async
     this.currentEdgeToken = token
     this.currentUserId = userId
     this.currentIpHash = DEFAULT_IP_HASH
+    // isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
+    // See: features/phase1/authentication.feature @認証フロー是正
+    await InMemoryUserRepo.updateIsVerified(userId, true)
   }
 
   const thread = await InMemoryThreadRepo.create({
@@ -716,6 +727,9 @@ Given('スレッド {string} にレス >>1 が存在する', async function (
     this.currentEdgeToken = token
     this.currentUserId = userId
     this.currentIpHash = DEFAULT_IP_HASH
+    // isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
+    // See: features/phase1/authentication.feature @認証フロー是正
+    await InMemoryUserRepo.updateIsVerified(userId, true)
   }
 
   const thread = await InMemoryThreadRepo.create({

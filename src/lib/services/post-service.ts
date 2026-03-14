@@ -114,9 +114,12 @@ function getTodayJst(): string {
  * 認証フローを実行する。
  * edge-token が null または not_found の場合に新しい edge-token と認証コードを発行する。
  * ip_mismatch の場合はソフトチェックとして続行（userId をそのまま返す）。
+ * not_verified の場合は既存 edge-token を維持したまま認証コードを再発行する（G1 是正）。
  *
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
  * See: docs/architecture/architecture.md §5.2 > IP整合チェック方針
+ * See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
  *
  * @returns 認証成功時は userId と authorIdSeed、認証フロー起動時は authRequired 情報
  */
@@ -145,6 +148,15 @@ async function resolveAuth(
   const verifyResult = await AuthService.verifyEdgeToken(edgeToken, ipHash)
 
   if (!verifyResult.valid) {
+    if (verifyResult.reason === 'not_verified') {
+      // 未検証（G1 是正）: 認証コード未入力で再書き込みされた場合。
+      // 新規 edge-token の発行は不要。既存の edge-token に紐づく認証コードを再発行する。
+      // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+      // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
+      const { code } = await AuthService.issueAuthCode(ipHash, edgeToken)
+      return { authenticated: false, authRequired: { code, edgeToken } }
+    }
+
     if (verifyResult.reason === 'ip_mismatch') {
       // IP 不一致: ソフトチェック（警告ログのみで続行）
       // See: docs/architecture/architecture.md §5.2 IP整合チェック方針

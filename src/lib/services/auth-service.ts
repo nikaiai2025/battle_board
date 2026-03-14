@@ -16,7 +16,7 @@
  *   - IP 整合チェックはソフトチェック（不一致でも通過、ログ記録のみ）
  */
 
-import { createHash } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 import { supabaseAdmin } from '../infrastructure/supabase/client'
 import * as UserRepository from '../infrastructure/repositories/user-repository'
 import * as AuthCodeRepository from '../infrastructure/repositories/auth-code-repository'
@@ -30,10 +30,14 @@ import { initializeBalance } from './currency-service'
 /**
  * edge-token 検証結果。
  * See: docs/architecture/components/authentication.md §2.1
+ *
+ * not_verified: edge-token は存在するが認証コード未検証（is_verified=false）。
+ * G1 是正対応。PostService の resolveAuth が認証案内を再表示する。
+ * See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
  */
 export type VerifyResult =
   | { valid: true; userId: string; authorIdSeed: string }
-  | { valid: false; reason: 'not_found' | 'ip_mismatch' }
+  | { valid: false; reason: 'not_found' | 'ip_mismatch' | 'not_verified' }
 
 /**
  * 管理者セッション情報。
@@ -163,6 +167,13 @@ export async function verifyEdgeToken(
     return { valid: false, reason: 'not_found' }
   }
 
+  // is_verified チェック（IPチェックより前に実施）
+  // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+  // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
+  if (!user.isVerified) {
+    return { valid: false, reason: 'not_verified' }
+  }
+
   // IP 整合チェック（ソフトチェック: 不一致でも処理続行）
   // See: docs/architecture/architecture.md §5.2 > IP整合チェック方針
   if (user.authorIdSeed !== ipHash) {
@@ -240,6 +251,9 @@ export async function issueAuthCode(
     ipHash,
     verified: false,
     expiresAt,
+    // 初回作成時は write_token は null（認証完了後に updateWriteToken で設定する）
+    writeToken: null,
+    writeTokenExpiresAt: null,
   })
 
   return { code, expiresAt }
@@ -251,33 +265,37 @@ export async function issueAuthCode(
  *   1. コードが存在するか
  *   2. 有効期限内か
  *   3. Turnstile トークンが有効か
- *   4. 認証済み状態に更新する
+ *   4. 認証済み状態に更新（auth_codes.verified = true）
+ *   5. ユーザーを検証済みに更新（users.is_verified = true）
+ *   6. write_token を生成して auth_codes に保存
  * IP 整合チェックはソフトチェック（不一致でも成功扱い、ログのみ）。
  *
  * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
  * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
  * See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+ * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  * See: docs/architecture/components/authentication.md §2.1 verifyAuthCode
  *
  * @param code - ユーザーが入力した6桁認証コード
  * @param turnstileToken - Turnstile チャレンジレスポンストークン
  * @param ipHash - 検証時のクライアント IP ハッシュ
- * @returns 検証成功時 true、失敗時 false
+ * @returns 検証成功時 { success: true, writeToken: string }、失敗時 { success: false }
  */
 export async function verifyAuthCode(
   code: string,
   turnstileToken: string,
   ipHash: string
-): Promise<boolean> {
+): Promise<{ success: boolean; writeToken?: string }> {
   // Step 1: コードの存在確認
   const authCode = await AuthCodeRepository.findByCode(code)
   if (!authCode) {
-    return false
+    return { success: false }
   }
 
   // Step 2: 有効期限チェック
   if (authCode.expiresAt < new Date()) {
-    return false
+    return { success: false }
   }
 
   // Step 3: IP 整合チェック（ソフトチェック）
@@ -292,13 +310,79 @@ export async function verifyAuthCode(
   // See: docs/architecture/architecture.md §2.2 > Cloudflare Turnstile
   const turnstileValid = await verifyTurnstileToken(turnstileToken)
   if (!turnstileValid) {
-    return false
+    return { success: false }
   }
 
-  // Step 5: 認証済み状態に更新
+  // Step 5: 認証済み状態に更新（auth_codes.verified = true）
   await AuthCodeRepository.markVerified(authCode.id)
 
-  return true
+  // Step 6: ユーザーを検証済みに更新（users.is_verified = true）
+  // tokenId は edge-token 文字列。findByAuthToken でユーザーを取得して ID を解決する
+  // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
+  const user = await UserRepository.findByAuthToken(authCode.tokenId)
+  if (user) {
+    await UserRepository.updateIsVerified(user.id, true)
+  }
+
+  // Step 7: write_token を生成して auth_codes に保存（専ブラ向け認証橋渡しトークン）
+  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
+  // See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+  const writeToken = randomBytes(16).toString('hex') // 32文字 hex
+  const writeTokenExpiresAt = new Date(Date.now() + 600 * 1000) // 10分後
+  await AuthCodeRepository.updateWriteToken(authCode.id, writeToken, writeTokenExpiresAt)
+
+  return { success: true, writeToken }
+}
+
+/**
+ * write_token を検証し、対応するユーザーの edge-token を認証済みに更新する。
+ * ワンタイム: 検証成功時に write_token を null に更新して再利用を防ぐ。
+ *
+ * 処理ステップ:
+ *   1. write_token で auth_codes レコードを検索する
+ *   2. 有効期限チェック
+ *   3. ワンタイム消費（write_token を null に更新）
+ *   4. 対応ユーザーの is_verified = true に更新
+ *
+ * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+ * See: features/constraints/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
+ * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
+ *
+ * @param writeToken - 専ブラの mail 欄から受け取った write_token（32文字 hex）
+ * @returns 検証成功時 { valid: true, edgeToken: string }、失敗時 { valid: false }
+ */
+export async function verifyWriteToken(
+  writeToken: string
+): Promise<{ valid: boolean; edgeToken?: string }> {
+  // Step 1: write_token で auth_codes レコードを検索する（リポジトリ経由）
+  // See: src/lib/infrastructure/repositories/auth-code-repository.ts > findByWriteToken
+  // See: tmp/escalations/escalation_ESC-TASK-041-1.md — リポジトリ化で解決
+  const authCode = await AuthCodeRepository.findByWriteToken(writeToken)
+
+  if (!authCode) {
+    return { valid: false }
+  }
+
+  // Step 2: write_token の有効期限チェック
+  if (!authCode.writeTokenExpiresAt) {
+    return { valid: false }
+  }
+  if (authCode.writeTokenExpiresAt < new Date()) {
+    return { valid: false }
+  }
+
+  // Step 3: ワンタイム消費（write_token を null に更新して再利用を防ぐ）
+  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式 > ワンタイム
+  await AuthCodeRepository.clearWriteToken(authCode.id)
+
+  // Step 4: 対応ユーザーの is_verified = true に更新
+  // tokenId は edge-token 文字列。findByAuthToken でユーザーを取得して ID を解決する
+  const user = await UserRepository.findByAuthToken(authCode.tokenId)
+  if (user) {
+    await UserRepository.updateIsVerified(user.id, true)
+  }
+
+  return { valid: true, edgeToken: authCode.tokenId }
 }
 
 // ---------------------------------------------------------------------------

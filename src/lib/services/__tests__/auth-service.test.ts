@@ -2,6 +2,7 @@
  * 単体テスト: auth-service.ts（AuthService）
  *
  * See: features/phase1/authentication.feature
+ * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
  * See: docs/architecture/components/authentication.md §2 公開インターフェース
  *
  * テスト方針:
@@ -30,12 +31,18 @@ vi.mock('@/lib/infrastructure/supabase/client', () => ({
 vi.mock('@/lib/infrastructure/repositories/user-repository', () => ({
   findByAuthToken: vi.fn(),
   create: vi.fn(),
+  updateIsVerified: vi.fn(),
 }))
 
 vi.mock('@/lib/infrastructure/repositories/auth-code-repository', () => ({
   findByCode: vi.fn(),
   create: vi.fn(),
   markVerified: vi.fn(),
+  updateWriteToken: vi.fn(),
+  // write_token 検証用（verifyWriteToken が使用）
+  // See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+  findByWriteToken: vi.fn(),
+  clearWriteToken: vi.fn(),
 }))
 
 vi.mock('@/lib/infrastructure/external/turnstile-client', () => ({
@@ -57,6 +64,7 @@ import {
   issueEdgeToken,
   issueAuthCode,
   verifyAuthCode,
+  verifyWriteToken,
   verifyAdminSession,
   hashIp,
   reduceIp,
@@ -78,6 +86,7 @@ function makeUser(overrides: Partial<{
   authToken: string
   authorIdSeed: string
   isPremium: boolean
+  isVerified: boolean
   username: string | null
   streakDays: number
   lastPostDate: string | null
@@ -88,6 +97,7 @@ function makeUser(overrides: Partial<{
     authToken: 'valid-edge-token',
     authorIdSeed: 'ip-hash-abc123',
     isPremium: false,
+    isVerified: true, // デフォルトは認証済み
     username: null,
     streakDays: 0,
     lastPostDate: null,
@@ -104,6 +114,8 @@ function makeAuthCode(overrides: Partial<{
   ipHash: string
   verified: boolean
   expiresAt: Date
+  writeToken: string | null
+  writeTokenExpiresAt: Date | null
   createdAt: Date
 }> = {}) {
   return {
@@ -113,6 +125,8 @@ function makeAuthCode(overrides: Partial<{
     ipHash: 'ip-hash-abc123',
     verified: false,
     expiresAt: new Date(Date.now() + 600_000), // 10分後
+    writeToken: null,
+    writeTokenExpiresAt: null,
     createdAt: new Date('2026-03-08T00:00:00Z'),
     ...overrides,
   }
@@ -229,9 +243,10 @@ describe('AuthService', () => {
   // =========================================================================
 
   describe('verifyEdgeToken', () => {
-    describe('正常系: トークンが有効でIP一致', () => {
+    describe('正常系: トークンが有効でIP一致・認証済み', () => {
+      // See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
       it('有効なトークンと一致するIPで valid: true を返す', async () => {
-        const user = makeUser({ authToken: 'valid-token', authorIdSeed: 'ip-hash' })
+        const user = makeUser({ authToken: 'valid-token', authorIdSeed: 'ip-hash', isVerified: true })
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
 
         const result = await verifyEdgeToken('valid-token', 'ip-hash')
@@ -257,9 +272,37 @@ describe('AuthService', () => {
       })
     })
 
+    describe('異常系: 未検証ユーザー（G1 是正）', () => {
+      // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+      it('is_verified=false のユーザーで not_verified を返す', async () => {
+        const unverifiedUser = makeUser({ authToken: 'valid-token', authorIdSeed: 'ip-hash', isVerified: false })
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(unverifiedUser)
+
+        const result = await verifyEdgeToken('valid-token', 'ip-hash')
+
+        expect(result.valid).toBe(false)
+        if (!result.valid) {
+          expect(result.reason).toBe('not_verified')
+        }
+      })
+
+      it('not_verified は ip_mismatch より前にチェックされる（IPが一致していても未検証は拒否）', async () => {
+        const unverifiedUser = makeUser({ authorIdSeed: 'different-ip', isVerified: false })
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(unverifiedUser)
+
+        const result = await verifyEdgeToken('valid-token', 'ip-hash')
+
+        expect(result.valid).toBe(false)
+        if (!result.valid) {
+          expect(result.reason).toBe('not_verified')
+        }
+      })
+    })
+
     describe('異常系: IP 不一致（ソフトチェック）', () => {
-      it('IP不一致時は ip_mismatch を返す', async () => {
-        const user = makeUser({ authToken: 'valid-token', authorIdSeed: 'original-ip-hash' })
+      // See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+      it('IP不一致時は ip_mismatch を返す（認証済みユーザーのみ到達）', async () => {
+        const user = makeUser({ authToken: 'valid-token', authorIdSeed: 'original-ip-hash', isVerified: true })
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
 
         const result = await verifyEdgeToken('valid-token', 'different-ip-hash')
@@ -411,6 +454,8 @@ describe('AuthService', () => {
             ipHash: 'test-ip-hash',
             tokenId: 'test-edge-token',
             verified: false,
+            writeToken: null,
+            writeTokenExpiresAt: null,
           })
         )
       })
@@ -455,14 +500,20 @@ describe('AuthService', () => {
 
   describe('verifyAuthCode', () => {
     describe('正常系: 認証成功', () => {
-      it('有効なコードとTurnstile成功で true を返す', async () => {
+      // See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+      it('有効なコードとTurnstile成功で { success: true, writeToken } を返す', async () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(makeAuthCode())
         vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
         vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
 
         const result = await verifyAuthCode('123456', 'turnstile-token', 'ip-hash-abc123')
 
-        expect(result).toBe(true)
+        expect(result.success).toBe(true)
+        // write_token は 32文字 hex
+        expect(result.writeToken).toMatch(/^[0-9a-f]{32}$/)
       })
 
       it('認証成功後に markVerified を呼び出す', async () => {
@@ -470,10 +521,49 @@ describe('AuthService', () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode)
         vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
         vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
 
         await verifyAuthCode('123456', 'turnstile-token', 'ip-hash-abc123')
 
         expect(AuthCodeRepository.markVerified).toHaveBeenCalledWith('code-id-001')
+      })
+
+      it('認証成功後に UserRepository.updateIsVerified(userId, true) を呼び出す', async () => {
+        // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+        const authCode = makeAuthCode({ tokenId: 'test-edge-token' })
+        const user = makeUser({ id: 'test-user-id' })
+        vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode)
+        vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
+        vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
+
+        await verifyAuthCode('123456', 'turnstile-token', 'ip-hash-abc123')
+
+        expect(UserRepository.findByAuthToken).toHaveBeenCalledWith('test-edge-token')
+        expect(UserRepository.updateIsVerified).toHaveBeenCalledWith('test-user-id', true)
+      })
+
+      it('認証成功後に AuthCodeRepository.updateWriteToken を呼び出す', async () => {
+        // See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+        const authCode = makeAuthCode({ id: 'code-id-001' })
+        vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode)
+        vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
+        vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
+
+        await verifyAuthCode('123456', 'turnstile-token', 'ip-hash-abc123')
+
+        expect(AuthCodeRepository.updateWriteToken).toHaveBeenCalledWith(
+          'code-id-001',
+          expect.stringMatching(/^[0-9a-f]{32}$/),
+          expect.any(Date)
+        )
       })
 
       it('IP 不一致でも認証は成功する（ソフトチェック）', async () => {
@@ -481,27 +571,48 @@ describe('AuthService', () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode)
         vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
         vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
 
         // IP が異なる場合でも認証は成功する
         const result = await verifyAuthCode('123456', 'turnstile-token', 'different-ip')
 
-        expect(result).toBe(true)
+        expect(result.success).toBe(true)
+      })
+
+      it('対応ユーザーが見つからない場合も write_token 発行は行われる', async () => {
+        // tokenId に対応するユーザーが見つからない稀なケース（データ不整合）
+        vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(makeAuthCode())
+        vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
+        vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(null)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
+
+        const result = await verifyAuthCode('123456', 'turnstile-token', 'ip-hash')
+
+        expect(result.success).toBe(true)
+        expect(result.writeToken).toMatch(/^[0-9a-f]{32}$/)
+        // ユーザーが見つからない場合は updateIsVerified は呼ばれない
+        expect(UserRepository.updateIsVerified).not.toHaveBeenCalled()
       })
     })
 
     describe('異常系: コードが存在しない', () => {
-      it('存在しないコードで false を返す', async () => {
+      it('存在しないコードで { success: false } を返す', async () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(null)
 
         const result = await verifyAuthCode('999999', 'turnstile-token', 'ip-hash')
 
-        expect(result).toBe(false)
+        expect(result.success).toBe(false)
+        expect(result.writeToken).toBeUndefined()
         expect(AuthCodeRepository.markVerified).not.toHaveBeenCalled()
       })
     })
 
     describe('異常系: 有効期限切れ', () => {
-      it('期限切れコードで false を返す', async () => {
+      // See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+      it('期限切れコードで { success: false } を返す', async () => {
         const expiredCode = makeAuthCode({
           expiresAt: new Date(Date.now() - 1000), // 1秒前に期限切れ
         })
@@ -509,20 +620,21 @@ describe('AuthService', () => {
 
         const result = await verifyAuthCode('123456', 'turnstile-token', 'ip-hash')
 
-        expect(result).toBe(false)
+        expect(result.success).toBe(false)
         expect(TurnstileClient.verifyTurnstileToken).not.toHaveBeenCalled()
         expect(AuthCodeRepository.markVerified).not.toHaveBeenCalled()
       })
     })
 
     describe('異常系: Turnstile 検証失敗', () => {
-      it('Turnstile 検証失敗で false を返す', async () => {
+      // See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+      it('Turnstile 検証失敗で { success: false } を返す', async () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(makeAuthCode())
         vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(false)
 
         const result = await verifyAuthCode('123456', 'invalid-turnstile', 'ip-hash-abc123')
 
-        expect(result).toBe(false)
+        expect(result.success).toBe(false)
         expect(AuthCodeRepository.markVerified).not.toHaveBeenCalled()
       })
     })
@@ -535,10 +647,13 @@ describe('AuthService', () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(code)
         vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
         vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
 
         const result = await verifyAuthCode('123456', 'turnstile', 'ip-hash-abc123')
 
-        expect(result).toBe(true)
+        expect(result.success).toBe(true)
       })
     })
 
@@ -548,7 +663,7 @@ describe('AuthService', () => {
 
         const result = await verifyAuthCode('', 'turnstile', 'ip-hash')
 
-        expect(result).toBe(false)
+        expect(result.success).toBe(false)
         expect(AuthCodeRepository.findByCode).toHaveBeenCalledWith('')
       })
 
@@ -560,6 +675,130 @@ describe('AuthService', () => {
         await expect(
           verifyAuthCode('123456', 'turnstile', 'ip-hash')
         ).rejects.toThrow('DB接続エラー')
+      })
+    })
+  })
+
+  // =========================================================================
+  // verifyWriteToken: write_token 検証（専ブラ向け）
+  // =========================================================================
+
+  describe('verifyWriteToken', () => {
+    // See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+    // verifyWriteToken は AuthCodeRepository.findByWriteToken / clearWriteToken を使う（リポジトリ経由）
+
+    describe('正常系: 有効な write_token', () => {
+      // See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+      it('有効な write_token で { valid: true, edgeToken } を返す', async () => {
+        vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(
+          makeAuthCode({
+            id: 'auth-code-id-001',
+            tokenId: 'valid-edge-token',
+            writeToken: 'abcdef1234567890abcdef1234567890',
+            writeTokenExpiresAt: new Date(Date.now() + 300_000), // 5分後
+          })
+        )
+        vi.mocked(AuthCodeRepository.clearWriteToken).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+
+        const result = await verifyWriteToken('abcdef1234567890abcdef1234567890')
+
+        expect(result.valid).toBe(true)
+        expect(result.edgeToken).toBe('valid-edge-token')
+      })
+
+      it('ワンタイム消費: clearWriteToken が呼ばれる', async () => {
+        vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(
+          makeAuthCode({
+            id: 'auth-code-id-001',
+            tokenId: 'valid-edge-token',
+            writeToken: 'testtoken123456789012345678901234',
+            writeTokenExpiresAt: new Date(Date.now() + 300_000),
+          })
+        )
+        vi.mocked(AuthCodeRepository.clearWriteToken).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+
+        await verifyWriteToken('testtoken123456789012345678901234')
+
+        // clearWriteToken が auth-code の id で呼ばれたことを確認する
+        expect(AuthCodeRepository.clearWriteToken).toHaveBeenCalledWith('auth-code-id-001')
+      })
+
+      it('対応ユーザーの is_verified を true に更新する', async () => {
+        vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(
+          makeAuthCode({
+            id: 'auth-code-id-001',
+            tokenId: 'target-edge-token',
+            writeToken: 'abcdef1234567890abcdef1234567890',
+            writeTokenExpiresAt: new Date(Date.now() + 300_000),
+          })
+        )
+        vi.mocked(AuthCodeRepository.clearWriteToken).mockResolvedValue(undefined)
+        const user = makeUser({ id: 'target-user-id' })
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+
+        await verifyWriteToken('abcdef1234567890abcdef1234567890')
+
+        expect(UserRepository.findByAuthToken).toHaveBeenCalledWith('target-edge-token')
+        expect(UserRepository.updateIsVerified).toHaveBeenCalledWith('target-user-id', true)
+      })
+    })
+
+    describe('異常系: write_token が存在しない', () => {
+      // See: features/constraints/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
+      it('存在しない write_token で { valid: false } を返す', async () => {
+        vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(null)
+
+        const result = await verifyWriteToken('nonexistent-token')
+
+        expect(result.valid).toBe(false)
+        expect(result.edgeToken).toBeUndefined()
+      })
+    })
+
+    describe('異常系: 有効期限切れ', () => {
+      it('期限切れ write_token で { valid: false } を返す', async () => {
+        vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(
+          makeAuthCode({
+            id: 'auth-code-id-001',
+            tokenId: 'valid-edge-token',
+            writeToken: 'expiredtoken12345678901234567890',
+            writeTokenExpiresAt: new Date(Date.now() - 1000), // 1秒前に期限切れ
+          })
+        )
+
+        const result = await verifyWriteToken('expiredtoken12345678901234567890')
+
+        expect(result.valid).toBe(false)
+        // 期限切れの場合は消費・is_verified 更新を行わない
+        expect(UserRepository.updateIsVerified).not.toHaveBeenCalled()
+      })
+
+      it('writeTokenExpiresAt が null の場合も { valid: false } を返す', async () => {
+        vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(
+          makeAuthCode({
+            id: 'auth-code-id-001',
+            tokenId: 'valid-edge-token',
+            writeToken: 'sometoken1234567890123456789012',
+            writeTokenExpiresAt: null,
+          })
+        )
+
+        const result = await verifyWriteToken('sometoken1234567890123456789012')
+
+        expect(result.valid).toBe(false)
+      })
+    })
+
+    describe('異常系: リポジトリエラー', () => {
+      it('findByWriteToken が例外をスローした場合は例外が伝播する', async () => {
+        vi.mocked(AuthCodeRepository.findByWriteToken).mockRejectedValue(new Error('DB接続エラー'))
+
+        await expect(verifyWriteToken('sometoken')).rejects.toThrow('DB接続エラー')
       })
     })
   })
