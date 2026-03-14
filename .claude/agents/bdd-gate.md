@@ -2,6 +2,8 @@
 name: bdd-gate
 description: 実環境テスト実行・合否判定ゲート
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+model: sonnet
+color: purple
 ---
 
 # bdd-gate — 実環境テストゲート

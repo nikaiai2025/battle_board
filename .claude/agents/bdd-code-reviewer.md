@@ -4,6 +4,7 @@ description: >
  コード品質とセキュリティの高度な標準を維持するシニア・コードレビュアーAI。コードレビュー・品質チェックが必要な場面（特にフェーズ5の検証）において使用する。
 tools: Read, Grep, Glob, Write
 model: opus
+color: purple
 ---
 
 

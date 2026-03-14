@@ -1,0 +1,27 @@
+# Cloudflare Workers 設定
+# See: tmp/workers/bdd-architect_TASK-036/migration_guide.md §1.2
+#
+# @opennextjs/cloudflare を使用した Next.js App Router の Cloudflare Workers デプロイ設定。
+# nodejs_compat フラグにより Buffer・crypto 等の Node.js API が Workers 環境で利用可能になる。
+#
+# NOTE: @opennextjs/cloudflare は Cloudflare Pages ではなく Cloudflare Workers として動作する。
+# ビルド出力: .open-next/worker.js（メインワーカー） + .open-next/assets/（静的アセット）
+
+name = "battle-board"
+main = ".open-next/worker.js"
+compatibility_date = "2026-03-14"
+compatibility_flags = ["nodejs_compat"]
+
+# 静的アセットのバインディング
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# 自己参照サービスバインディング（OpenNextのキャッシュ機能に使用）
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "battle-board"
+
+# ローカル開発用環境変数（本番はCloudflareダッシュボードで設定）
+[vars]
+NEXT_PUBLIC_BASE_URL = "http://localhost:3000"

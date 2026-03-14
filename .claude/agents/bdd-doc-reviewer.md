@@ -4,6 +4,7 @@ description: >
  プロジェクト関連ドキュメント・テストコードの整備状況をレビューするAI。プロジェクト運営が健全であることを確認する必要があるとき（特にフェーズ5の検証時）において使用する。
 tools: Read, Grep, Glob, Write
 model: opus
+color: purple
 ---
 
 
