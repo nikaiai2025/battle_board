@@ -408,7 +408,7 @@ function setEdgeTokenCookie(response: Response, edgeToken: string): Response {
   const cookieOptions = [
     `${EDGE_TOKEN_COOKIE}=${edgeToken}`,
     "HttpOnly",
-    "Max-Age=2592000", // 30日
+    "Max-Age=31536000", // 365日（eddist準拠）
     "Path=/",
   ].join("; ");
   headers.append("Set-Cookie", cookieOptions);

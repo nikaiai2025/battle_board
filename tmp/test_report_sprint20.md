@@ -96,3 +96,132 @@ Cloudflareダッシュボード:
 1. https://dash.cloudflare.com/ にログイン
 2. Workers & Pages > battle-board > Logs > Real-time Logs
 3. ChMateから書き込みを実行し、ログストリームを確認
+
+CLI（リアルタイムのみ。過去ログは永続保存されない）:
+```
+npx wrangler tail battle-board --format pretty --search "[bbs.cgi]"
+```
+
+---
+
+## 検証結果
+
+### 第1回検証（SameSite=Lax — 修正前）
+
+`wrangler tail` で取得したリアルタイムログ:
+
+```
+# 手順1: 初回書き込み → 認証要求（期待通り）
+POST /test/bbs.cgi?guid=ON @ 2026/3/15 4:27:09
+  [bbs.cgi] Cookie header: (absent)
+  [bbs.cgi] edgeToken from cookie: null
+  [bbs.cgi] write_token detected: false
+  [bbs.cgi] resolveAuth result: authenticated=false, reason=313523
+
+# 手順2: write_tokenで書き込み → 成功、Set-Cookie発行（期待通り）
+POST /test/bbs.cgi?guid=ON @ 2026/3/15 4:27:42
+  [bbs.cgi] Cookie header: (absent)
+  [bbs.cgi] edgeToken from cookie: null
+  [bbs.cgi] write_token detected: true
+  [bbs.cgi] write_token verification: valid
+  [bbs.cgi] Setting edge-token cookie: 0e6f10f0...
+  [bbs.cgi] resolveAuth result: authenticated=true, reason=N/A
+
+# 手順3: write_tokenなしで再書き込み → Cookieが送信されず再認証（★問題再現）
+POST /test/bbs.cgi?guid=ON @ 2026/3/15 4:28:01
+  [bbs.cgi] Cookie header: (absent)     ← ★ Set-Cookieしたはずのedge-tokenが送信されていない
+  [bbs.cgi] edgeToken from cookie: null
+  [bbs.cgi] write_token detected: false
+  [bbs.cgi] resolveAuth result: authenticated=false, reason=727354
+```
+
+**判定: H1確定** — ChMateがSet-CookieレスポンスからCookieを保存していない。
+
+### 仮説の絞り込み
+
+Set-Cookieヘッダに `SameSite=Lax` を設定していたため、POSTリクエストにCookieが付与されないのではと仮説を立て `SameSite=None; Secure` に変更してデプロイ。
+
+### 第2回検証（SameSite=None; Secure）
+
+```
+# 手順1〜3を再実施。結果は第1回と同一。
+POST /test/bbs.cgi?guid=ON @ 2026/3/15 4:46:32
+  [bbs.cgi] Cookie header: (absent)
+POST /test/bbs.cgi?guid=ON @ 2026/3/15 4:46:54
+  [bbs.cgi] Cookie header: (absent)
+  [bbs.cgi] write_token detected: true / verification: valid
+  [bbs.cgi] Setting edge-token cookie: 9a9a73ad...
+POST /test/bbs.cgi?guid=ON @ 2026/3/15 4:47:07
+  [bbs.cgi] Cookie header: (absent)     ← ★ まだCookieが送信されない
+```
+
+**判定:** SameSiteの問題ではない。`Secure`属性自体がChMateのCookie保存を阻害している可能性。
+
+### eddist参考実装の調査
+
+eddist（`github.com/edginer/eddist`）の `eddist-server/src/shiftjis.rs` > `add_set_cookie` を調査:
+
+```rust
+pub fn add_set_cookie(self, key: String, value: String, max_age: time::Duration) -> Self {
+    let mut cookie = Cookie::new(key, value);
+    cookie.set_http_only(true);
+    cookie.set_max_age(max_age);
+    cookie.set_path("/");
+    // Secure, SameSite, Domain は意図的に未設定
+}
+```
+
+| 属性 | eddist | BattleBoard（修正前） |
+|---|---|---|
+| HttpOnly | あり | あり |
+| Secure | **なし** | あり |
+| SameSite | **なし** | Lax → None |
+| Path | `/` | `/` |
+| Max-Age | 365日 | 30日 |
+
+eddistは `Secure` と `SameSite` を**意図的に設定していない**。
+専ブラ（ChMate等）はHTTPレスポンスのSet-Cookieヘッダを処理する際、`Secure`属性が付いたCookieを保存しない挙動を示す。
+
+### 第3回検証（Secure, SameSite 両方削除 — eddist準拠）
+
+Set-Cookieの属性を `HttpOnly; Max-Age=2592000; Path=/` のみに変更してデプロイ。
+
+**結果: ChMateでCookieが正常に保存・送信され、write_token不要で連続書き込みが成功した。**
+
+## 根本原因
+
+**Set-Cookieヘッダの `Secure` 属性。**
+
+ChMate等の5ch専用ブラウザは、内部のHTTPクライアント実装において `Secure` 属性付きCookieを保存しない（または送信しない）。ブラウザ標準の挙動（HTTPS接続時は `Secure` Cookieを送信する）とは異なる。
+
+eddistはこの専ブラの挙動を前提として、Set-Cookieに `Secure` / `SameSite` を設定していない。
+
+## 修正内容（最終）
+
+`src/app/(senbra)/test/bbs.cgi/route.ts` > `setEdgeTokenCookie`:
+
+```typescript
+// 修正前
+const cookieOptions = [
+    `${EDGE_TOKEN_COOKIE}=${edgeToken}`,
+    "HttpOnly",
+    isProduction ? "Secure" : "",
+    "SameSite=Lax",
+    "Max-Age=2592000",
+    "Path=/",
+]
+
+// 修正後（eddist準拠）
+const cookieOptions = [
+    `${EDGE_TOKEN_COOKIE}=${edgeToken}`,
+    "HttpOnly",
+    "Max-Age=2592000",
+    "Path=/",
+]
+```
+
+## 教訓
+
+1. **専ブラ向けSet-Cookieには `Secure` / `SameSite` を設定してはならない。** 一般的なWebセキュリティのベストプラクティス（Secure + SameSite=Strict/Lax）は専ブラ互換性と両立しない。
+2. **eddistの実装は専ブラ互換性の知識の宝庫** であり、Cookie属性のような「設定しないことが正解」のパターンが存在する。新たなHTTP応答を追加する際はeddistを参照すべき。
+3. **診断ログは有効だった。** `Cookie header: (absent)` という1行で、サーバー側ロジック（IF分岐）の問題ではなくクライアント側のCookie送信問題であることを即座に切り分けられた。
