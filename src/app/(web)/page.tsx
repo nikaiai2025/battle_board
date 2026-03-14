@@ -45,20 +45,26 @@ async function fetchThreads(): Promise<Thread[]> {
       process.env.NEXT_PUBLIC_BASE_URL ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
+    console.log(`[fetchThreads] baseUrl=${baseUrl}, NEXT_PUBLIC_BASE_URL=${process.env.NEXT_PUBLIC_BASE_URL}, VERCEL_URL=${process.env.VERCEL_URL}`);
+
     const res = await fetch(`${baseUrl}/api/threads`, {
       // SSR: キャッシュなし（常に最新データを取得）
       cache: "no-store",
     });
 
+    console.log(`[fetchThreads] response status=${res.status}, ok=${res.ok}`);
+
     if (!res.ok) {
-      console.error(`GET /api/threads failed: ${res.status}`);
+      const body = await res.text();
+      console.error(`GET /api/threads failed: ${res.status}, body=${body.slice(0, 500)}`);
       return [];
     }
 
     const data = (await res.json()) as ThreadListResponse;
+    console.log(`[fetchThreads] threads count=${data.threads?.length ?? 0}`);
     return data.threads ?? [];
   } catch (err) {
-    console.error("Failed to fetch threads:", err);
+    console.error("[fetchThreads] Exception:", err);
     return [];
   }
 }
