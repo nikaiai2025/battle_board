@@ -1,8 +1,9 @@
 /**
  * ShiftJisEncoder 単体テスト
+ *
  * See: features/constraints/specialist_browser_compat.feature
- * @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
- * @scenario 専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+ *   @scenario 専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  */
 
 import { describe, it, expect } from "vitest";
@@ -19,11 +20,33 @@ describe("ShiftJisEncoder", () => {
       expect(result[1]).toBe(0x65); // 'e'
     });
 
-    it("日本語文字列をShift_JISのBufferに変換する", () => {
+    it("日本語（ひらがな・カタカナ・漢字）をShift_JISに正しく変換する", () => {
       const encoder = new ShiftJisEncoder();
-      const result = encoder.encode("テスト");
-      expect(result).toBeInstanceOf(Buffer);
-      expect(result.length).toBeGreaterThan(0);
+      // ひらがな
+      const hira = encoder.encode("あいうえお");
+      expect(hira).toBeInstanceOf(Buffer);
+      expect(hira.length).toBeGreaterThan(0);
+      expect(encoder.decode(hira)).toBe("あいうえお");
+      // カタカナ
+      const kata = encoder.encode("アイウエオ");
+      expect(encoder.decode(kata)).toBe("アイウエオ");
+      // 漢字
+      const kanji = encoder.encode("日本語テスト");
+      expect(encoder.decode(kanji)).toBe("日本語テスト");
+    });
+
+    it("全角記号【】「」（）をShift_JISに正しく変換する", () => {
+      const encoder = new ShiftJisEncoder();
+      const text = "【】「」（）";
+      const result = encoder.encode(text);
+      expect(encoder.decode(result)).toBe(text);
+    });
+
+    it("全角英数字ＡＢＣＤや０１２３をShift_JISに正しく変換する", () => {
+      const encoder = new ShiftJisEncoder();
+      const text = "ＡＢＣＤ０１２３";
+      const result = encoder.encode(text);
+      expect(encoder.decode(result)).toBe(text);
     });
 
     it("空文字列を空Bufferに変換する（エッジケース: 空文字列）", () => {
@@ -41,20 +64,86 @@ describe("ShiftJisEncoder", () => {
       expect(decoded).toBe(original);
     });
 
-    it("BOT絵文字(🤖)はShift_JISに変換不可なためエンコード時にフォールバック文字になる（変換可能な文字は正常変換）", () => {
-      // 🤖はShift_JISで表現できないため、iconv-liteはフォールバック文字に変換する
-      // DAT出力時はDatFormatterで事前に[BOT]置換するため、ここでは変換が完了することのみ確認
+    it("BOT絵文字(🤖)はShift_JIS非対応のため全角？に変換される（??? 問題の防止）", () => {
+      // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+      // 🤖はShift_JISで表現できない。半角?に変換されず全角？になることを確認する
       const encoder = new ShiftJisEncoder();
       const result = encoder.encode("テスト🤖");
-      expect(result).toBeInstanceOf(Buffer);
-      expect(result.length).toBeGreaterThan(0);
+      const decoded = encoder.decode(result);
+      // 半角?（0x3F）が含まれないこと
+      expect(result.includes(0x3f)).toBe(false);
+      // 全角？に変換されること
+      expect(decoded).toBe("テスト？");
+    });
+
+    it("サロゲートペア絵文字（😀🦾🦿🧠）がすべて全角？に変換される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+      const encoder = new ShiftJisEncoder();
+      const result = encoder.encode("😀🦾🦿🧠");
+      const decoded = encoder.decode(result);
+      // 半角?が出現しないこと
+      expect(result.includes(0x3f)).toBe(false);
+      // 全角？4文字に変換されること
+      expect(decoded).toBe("？？？？");
+    });
+
+    it("CP932非対応のBMP文字（❤ U+2764）が全角？に変換される", () => {
+      // ❤（U+2764）はBMP内だがCP932の文字マッピング外
+      const encoder = new ShiftJisEncoder();
+      const result = encoder.encode("❤");
+      const decoded = encoder.decode(result);
+      expect(result.includes(0x3f)).toBe(false);
+      expect(decoded).toBe("？");
+    });
+
+    it("半角?（U+003F）はそのまま0x3Fバイトとして保持される（誤変換防止）", () => {
+      // 元から?が含まれる文字列を誤って全角？に変換しないこと
+      const encoder = new ShiftJisEncoder();
+      const result = encoder.encode("test?question");
+      // 元の?は0x3Fのまま保持
+      expect(result.includes(0x3f)).toBe(true);
+      expect(encoder.decode(result)).toBe("test?question");
     });
 
     it("特殊文字（HTML記号）をShift_JISに変換する", () => {
       const encoder = new ShiftJisEncoder();
       const result = encoder.encode("&lt;script&gt;");
       expect(result).toBeInstanceOf(Buffer);
-      expect(result.length).toBeGreaterThan(0);
+      expect(encoder.decode(result)).toBe("&lt;script&gt;");
+    });
+
+    it("絵文字と通常文字が混在するテキストで絵文字のみ全角？に変換される", () => {
+      // See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+      const encoder = new ShiftJisEncoder();
+      const result = encoder.encode("こんにちは😀世界🌍テスト");
+      const decoded = encoder.decode(result);
+      // 半角?が出現しないこと
+      expect(result.includes(0x3f)).toBe(false);
+      // 通常文字はそのまま、絵文字は全角？に
+      expect(decoded).toBe("こんにちは？世界？テスト");
+    });
+
+    it("CJK統合漢字拡張B（U+20000以上）が全角？に変換される", () => {
+      // サロゲートペアで表現されるCJK拡張漢字はCP932非対応
+      const encoder = new ShiftJisEncoder();
+      const extChar = "\u{20000}"; // CJK Unified Ideographs Extension B
+      const result = encoder.encode(extChar);
+      const decoded = encoder.decode(result);
+      expect(result.includes(0x3f)).toBe(false);
+      expect(decoded).toBe("？");
+    });
+
+    it("大量データ（1万文字以上）のエンコードが実用的な時間内に完了する", () => {
+      const encoder = new ShiftJisEncoder();
+      // 1万文字の日本語テキスト（絵文字含む）
+      const longText = ("あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほ🤖😀").repeat(300);
+      const start = Date.now();
+      const result = encoder.encode(longText);
+      const elapsed = Date.now() - start;
+      expect(result).toBeInstanceOf(Buffer);
+      expect(result.includes(0x3f)).toBe(false);
+      // 10秒以内（実際は数十ms程度が想定）
+      expect(elapsed).toBeLessThan(10000);
     });
   });
 
@@ -79,6 +168,41 @@ describe("ShiftJisEncoder", () => {
       const buffer = Buffer.from([0x68, 0x65, 0x6c, 0x6c, 0x6f]); // 'hello'
       const result = encoder.decode(buffer);
       expect(result).toBe("hello");
+    });
+  });
+
+  describe("sanitizeForCp932()", () => {
+    it("CP932互換文字はそのまま返す", () => {
+      const encoder = new ShiftJisEncoder();
+      const text = "普通の日本語テキスト【】「」（）ＡＢＣＤ";
+      expect(encoder.sanitizeForCp932(text)).toBe(text);
+    });
+
+    it("サロゲートペア絵文字を全角？に置換する", () => {
+      const encoder = new ShiftJisEncoder();
+      expect(encoder.sanitizeForCp932("🤖")).toBe("？");
+      expect(encoder.sanitizeForCp932("😀")).toBe("？");
+      expect(encoder.sanitizeForCp932("🦾🦿🧠")).toBe("？？？");
+    });
+
+    it("CP932非対応BMP文字（❤）を全角？に置換する", () => {
+      const encoder = new ShiftJisEncoder();
+      expect(encoder.sanitizeForCp932("❤")).toBe("？");
+    });
+
+    it("半角?（U+003F）はそのまま保持する", () => {
+      const encoder = new ShiftJisEncoder();
+      expect(encoder.sanitizeForCp932("test?")).toBe("test?");
+    });
+
+    it("空文字列は空文字列を返す（エッジケース）", () => {
+      const encoder = new ShiftJisEncoder();
+      expect(encoder.sanitizeForCp932("")).toBe("");
+    });
+
+    it("混在テキストで非対応文字のみ置換する", () => {
+      const encoder = new ShiftJisEncoder();
+      expect(encoder.sanitizeForCp932("テスト🤖終わり")).toBe("テスト？終わり");
     });
   });
 });

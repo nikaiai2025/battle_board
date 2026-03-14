@@ -75,6 +75,9 @@ const TEST_BOARD_ID = 'battleboard'
 /** BDD テストで使用するデフォルト IP ハッシュ */
 const DEFAULT_IP_HASH = 'bdd-test-ip-hash-default-sha512-placeholder'
 
+/** BDD テストで使用するベースURL（buildAuthRequired の絶対URL生成に使用） */
+const TEST_BASE_URL = 'https://battleboard.example.com'
+
 // ---------------------------------------------------------------------------
 // ステップ間で共有するシナリオ固有の状態（Worldに収まらない一時的なデータ）
 // ---------------------------------------------------------------------------
@@ -970,7 +973,7 @@ When('bbs.cgiに所定のPOSTパラメータ（bbs, key, FROM, mail, MESSAGE, su
     lastBbsCgiHtml = responseBuilder.buildSuccess(thread.threadKey, TEST_BOARD_ID)
     this.lastResult = { type: 'success', data: result }
   } else if ('authRequired' in result) {
-    lastBbsCgiHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken)
+    lastBbsCgiHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken, TEST_BASE_URL)
     this.lastResult = { type: 'authRequired', code: result.code, edgeToken: result.edgeToken }
   } else {
     const errMsg = (result as { error?: string }).error ?? '書き込みに失敗しました'
@@ -1135,7 +1138,7 @@ When('本文が空の状態でbbs.cgiにPOSTする', async function (this: Battl
     lastBbsCgiHtml = responseBuilder.buildSuccess(thread.threadKey, TEST_BOARD_ID)
     this.lastResult = { type: 'success', data: result }
   } else if ('authRequired' in result) {
-    lastBbsCgiHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken)
+    lastBbsCgiHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken, TEST_BASE_URL)
     this.lastResult = { type: 'authRequired', code: result.code, edgeToken: result.edgeToken }
   } else {
     const errMsg = (result as { error?: string }).error ?? '書き込みに失敗しました'
@@ -1909,7 +1912,7 @@ When('bbs.cgiのメール欄に {string} を含めてPOSTする', async function
     lastBbsCgiHtml = responseBuilder.buildSuccess('g4-thread-key', TEST_BOARD_ID)
   } else if ('authRequired' in postResult) {
     this.lastResult = { type: 'authRequired', code: postResult.code, edgeToken: postResult.edgeToken }
-    lastBbsCgiHtml = responseBuilder.buildAuthRequired(postResult.code, postResult.edgeToken)
+    lastBbsCgiHtml = responseBuilder.buildAuthRequired(postResult.code, postResult.edgeToken, TEST_BASE_URL)
   } else {
     const errMsg = (postResult as any).error ?? '書き込みに失敗しました'
     this.lastResult = {

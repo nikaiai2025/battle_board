@@ -78,7 +78,8 @@ ${escapedMessage}
    * 専ブラは WebView を持たないため、ユーザーはブラウザで認証を完了後、
    * write_token をメール欄に貼り付けて再書き込みする（G4対応）。
    *
-   * 認証ページURL形式: /auth/verify?code={code}&token={edgeToken}
+   * 認証ページURL形式（絶対URL）: {baseUrl}/auth/verify?code={code}&token={edgeToken}
+   * 専ブラのWebViewでは相対パスがリンクとして認識されないため絶対URLを使用する。
    *
    * 手順:
    *   1. 以下のURLにアクセスして認証を完了する
@@ -91,12 +92,15 @@ ${escapedMessage}
    *
    * @param code - 認証コード（6桁数字）
    * @param edgeToken - 発行済み edge-token
+   * @param baseUrl - サービスのベースURL（例: "https://example.com"）。末尾スラッシュは除去される
    * @returns 認証案内HTMLレスポンス文字列（UTF-8）
    */
-  buildAuthRequired(code: string, edgeToken: string): string {
+  buildAuthRequired(code: string, edgeToken: string, baseUrl: string): string {
     const escapedCode = this.escapeHtml(code);
     const escapedToken = this.escapeHtml(edgeToken);
-    const authUrl = `/auth/verify?code=${escapedCode}&token=${escapedToken}`;
+    // 末尾スラッシュを除去して二重スラッシュを防ぐ
+    const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+    const authUrl = `${normalizedBaseUrl}/auth/verify?code=${escapedCode}&token=${escapedToken}`;
     return `<!DOCTYPE html>
 <html>
 <head>

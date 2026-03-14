@@ -46,6 +46,21 @@ import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
  */
 const WRITE_TOKEN_PATTERN = /#([0-9a-f]{32})/i;
 
+/**
+ * BattleBoardのホストURLを環境変数から取得する。
+ * 未設定の場合はデフォルトフォールバック値を使用する。
+ *
+ * NEXT_PUBLIC_BASE_URL を優先し、未設定時は "https://battleboard.vercel.app" を使用する。
+ * 本番環境は Cloudflare Workers のため、ダッシュボードで正しい値を設定すること。
+ *
+ * See: src/app/(senbra)/bbsmenu.html/route.ts — 同パターンの参考実装
+ *
+ * @returns ベースURL文字列（末尾スラッシュなし）
+ */
+function getBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_BASE_URL ?? "https://battleboard.vercel.app";
+}
+
 /** BbsCgiParserのシングルトンインスタンス */
 const bbsCgiParser = new BbsCgiParser();
 
@@ -255,10 +270,11 @@ async function handleCreateThread(
   );
 
   if (result.authRequired) {
-    // 認証が必要な場合: 認証案内HTMLを返す
+    // 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
     const authHtml = responseBuilder.buildAuthRequired(
       result.authRequired.code,
-      result.authRequired.edgeToken
+      result.authRequired.edgeToken,
+      getBaseUrl()
     );
     const response = buildShiftJisHtmlResponse(authHtml, 200);
     // edge-token Cookie を設定する
@@ -319,8 +335,8 @@ async function handleCreatePost(
   });
 
   if ("authRequired" in result) {
-    // 認証が必要な場合: 認証案内HTMLを返す
-    const authHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken);
+    // 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
+    const authHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken, getBaseUrl());
     const response = buildShiftJisHtmlResponse(authHtml, 200);
     return setEdgeTokenCookie(response, result.edgeToken);
   }
