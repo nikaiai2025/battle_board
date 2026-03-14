@@ -408,13 +408,9 @@ function setEdgeTokenCookie(response: Response, edgeToken: string): Response {
   const cookieOptions = [
     `${EDGE_TOKEN_COOKIE}=${edgeToken}`,
     "HttpOnly",
-    "Secure",
-    "SameSite=None",
     "Max-Age=2592000", // 30日
     "Path=/",
-  ]
-    .filter(Boolean)
-    .join("; ");
+  ].join("; ");
   headers.append("Set-Cookie", cookieOptions);
 
   return new Response(response.body, {
