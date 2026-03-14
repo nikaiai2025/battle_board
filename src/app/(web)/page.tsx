@@ -1,7 +1,7 @@
 /**
  * スレッド一覧ページ — BattleBoard トップページ（Server Component）
  *
- * - GET /api/threads でスレッド一覧を取得（サービス層を直接importしない）
+ * - PostService.getThreadList() でスレッド一覧を直接取得（SSR）
  * - スレッド一覧を ThreadList でレンダリング
  * - スレッド作成フォーム（ThreadCreateForm: Client Component）を表示
  * - 未認証ユーザーへの認証案内を表示
@@ -19,7 +19,7 @@ import ThreadList from "./_components/ThreadList";
 import ThreadCreateForm from "./_components/ThreadCreateForm";
 import * as PostService from "@/lib/services/post-service";
 
-interface Thread {
+interface ThreadView {
   id: string;
   title: string;
   postCount: number;
@@ -36,10 +36,17 @@ interface Thread {
  *
  * See: docs/specs/openapi.yaml > /api/threads > get
  */
-async function fetchThreads(): Promise<Thread[]> {
+async function fetchThreads(): Promise<ThreadView[]> {
   try {
     const threads = await PostService.getThreadList("battleboard", 50);
-    return threads as Thread[];
+    // PostService は Date 型で返すが、UI表示用に string へ変換する
+    // （APIルート経由の場合は JSON シリアライズで自動変換されていた）
+    return threads.map((t) => ({
+      id: t.id,
+      title: t.title,
+      postCount: t.postCount,
+      lastPostAt: t.lastPostAt instanceof Date ? t.lastPostAt.toISOString() : String(t.lastPostAt),
+    }));
   } catch (err) {
     console.error("[fetchThreads] Exception:", err);
     return [];

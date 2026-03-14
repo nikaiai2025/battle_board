@@ -1,7 +1,7 @@
 /**
  * スレッド閲覧ページ — /threads/{threadId}（Server Component, SSR）
  *
- * - GET /api/threads/{threadId} でスレッド情報・レス一覧を取得（APIルート経由）
+ * - PostService でスレッド情報・レス一覧を直接取得（SSR）
  * - スレッドが存在しない場合は 404 を返す
  * - 初期レスは PostList（Server Component）で SSR レンダリング
  * - 新着レスは PostListLiveWrapper（Client Component）がポーリングで取得
@@ -70,7 +70,29 @@ async function fetchThreadDetail(
       return null;
     }
 
-    return { thread: thread as Thread, posts: posts as Post[] };
+    // PostService は Date 型で返すが、UI表示用に string へ変換する
+    // （APIルート経由の場合は JSON シリアライズで自動変換されていた）
+    return {
+      thread: {
+        id: thread.id,
+        threadKey: thread.threadKey,
+        title: thread.title,
+        postCount: thread.postCount,
+        lastPostAt: thread.lastPostAt instanceof Date ? thread.lastPostAt.toISOString() : String(thread.lastPostAt),
+        createdAt: thread.createdAt instanceof Date ? thread.createdAt.toISOString() : String(thread.createdAt),
+      },
+      posts: posts.map((p) => ({
+        id: p.id,
+        threadId: p.threadId,
+        postNumber: p.postNumber,
+        displayName: p.displayName,
+        dailyId: p.dailyId,
+        body: p.body,
+        isSystemMessage: p.isSystemMessage,
+        isDeleted: p.isDeleted,
+        createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
+      })),
+    };
   } catch (err) {
     console.error("[fetchThreadDetail] Exception:", err);
     return null;
