@@ -169,6 +169,37 @@ describe("ShiftJisEncoder", () => {
       const result = encoder.decode(buffer);
       expect(result).toBe("hello");
     });
+
+    // --- Cloudflare Workers対応: Uint8Array受け付け ---
+    // See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+
+    it("Uint8Array形式のShift_JISデータをUTF-8文字列に変換する（Cloudflare Workers対応）", () => {
+      // Cloudflare WorkersではBufferではなくUint8Arrayが使われる場合がある
+      const encoder = new ShiftJisEncoder();
+      const original = "テストスレッド";
+      const buffer = encoder.encode(original);
+      // BufferをUint8Arrayとして渡す（CloudflareではUint8Arrayが渡される）
+      const uint8 = new Uint8Array(buffer);
+      const result = encoder.decode(uint8);
+      expect(result).toBe(original);
+    });
+
+    it("空のUint8Arrayを空文字列に変換する（エッジケース）", () => {
+      const encoder = new ShiftJisEncoder();
+      const result = encoder.decode(new Uint8Array(0));
+      expect(result).toBe("");
+    });
+
+    it("Uint8Array形式の日本語Shift_JISデータを正しくデコードする", () => {
+      // See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+      // 専ブラからのPOSTデータ（本番環境でUint8Arrayとして渡される）が文字化けしないことを検証
+      const encoder = new ShiftJisEncoder();
+      const original = "書き込みテスト";
+      const buffer = encoder.encode(original);
+      const uint8 = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      const result = encoder.decode(uint8);
+      expect(result).toBe(original);
+    });
   });
 
   describe("sanitizeForCp932()", () => {

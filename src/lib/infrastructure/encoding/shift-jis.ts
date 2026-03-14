@@ -30,8 +30,16 @@ const CP932_FALLBACK_CHAR = "？";
  * 半角?（0x3F）に化けて「???」と表示される問題を防ぐ。
  */
 export class ShiftJisEncoder {
-  /** iconv-liteのエンコーディング名 (CP932 = Microsoft拡張Shift_JIS) */
+  /** iconv-liteのエンコーディング名 (CP932 = Microsoft拡張Shift_JIS) — encode用 */
   private static readonly ENCODING = "CP932";
+
+  /**
+   * Web API TextDecoderのエンコーディング名。
+   * Node.js (ICU full) および Cloudflare Workers の両方でネイティブサポートされている。
+   * iconv-liteはCloudflare Workers (nodejs_compat) 環境でdecodeが正常動作しないため、
+   * decode方向はTextDecoderを使用する。
+   */
+  private static readonly TEXT_DECODER_ENCODING = "shift_jis";
 
   /**
    * UTF-8文字列をShift_JIS(CP932)のBufferに変換する。
@@ -54,15 +62,25 @@ export class ShiftJisEncoder {
   }
 
   /**
-   * Shift_JIS(CP932)のBufferをUTF-8文字列に変換する。
+   * Shift_JIS(CP932)のBuffer/Uint8ArrayをUTF-8文字列に変換する。
    *
    * 専ブラからのPOSTリクエストボディのデコードに使用する。
    *
-   * @param buffer - デコード対象のShift_JIS(CP932) Buffer
+   * iconv-liteはCloudflare Workers (nodejs_compat) 環境でdecodeが正常動作しないため、
+   * Web API標準のTextDecoderを使用する。TextDecoderはNode.js (ICU full) および
+   * Cloudflare Workersの両方でネイティブサポートされている。
+   *
+   * Cloudflare WorkersではPOSTボディがUint8Arrayとして渡される場合があるため、
+   * BufferとUint8Arrayの両方を受け付ける。
+   *
+   * See: features/constraints/specialist_browser_compat.feature
+   *   @scenario 専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+   *
+   * @param buffer - デコード対象のShift_JIS(CP932) Buffer または Uint8Array
    * @returns デコードされたUTF-8文字列
    */
-  decode(buffer: Buffer): string {
-    return iconv.decode(buffer, ShiftJisEncoder.ENCODING);
+  decode(buffer: Buffer | Uint8Array): string {
+    return new TextDecoder(ShiftJisEncoder.TEXT_DECODER_ENCODING).decode(buffer);
   }
 
   /**
