@@ -5,7 +5,7 @@
  *   - bbsmenu.html route.ts
  *   - [boardId]/SETTING.TXT route.ts
  *   - [boardId]/subject.txt route.ts
- *   - [boardId]/dat/[threadKey].dat route.ts
+ *   - [boardId]/dat/[threadKey] route.ts
  *   - test/bbs.cgi route.ts
  *
  * テスト戦略:
@@ -354,7 +354,7 @@ describe("DATファイル Route Handler", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const mod = await import("../[boardId]/dat/[threadKey].dat/route");
+    const mod = await import("../[boardId]/dat/[threadKey]/route");
     GET = mod.GET;
   });
 
