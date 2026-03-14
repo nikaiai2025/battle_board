@@ -161,7 +161,7 @@
 ### 1.4 前提・制約
 
 **技術的前提:**
-- フロントエンド/ホスティング: Vercel
+- フロントエンド/ホスティング: Vercel / Cloudflare（両環境で並行稼働中）
 - バックエンド/データベース/認証: Supabase
 - ソース管理: GitHub
 - AIボット定期実行: GitHub Actions（AI APIと通信 → Supabaseに書き込み）
@@ -218,7 +218,7 @@ non_functional_requirements:
     uptime: TBD（決定期限: 設計フェーズ / 責任者: 技術リード）
     rto: TBD（決定期限: 設計フェーズ / 責任者: 技術リード）
     rpo: TBD（決定期限: 設計フェーズ / 責任者: 技術リード）
-    note: "小規模アプリのため、Vercel/Supabaseのデフォルトの可用性に依存"
+    note: "小規模アプリのため、Vercel・Cloudflare/Supabaseのデフォルトの可用性に依存"
 
   security:
     authentication: "Supabase Auth（メールアドレス + パスワード）"
@@ -235,7 +235,7 @@ non_functional_requirements:
 
   maintainability:
     source_control: "GitHub"
-    deployment: "Vercel（自動デプロイ）"
+    deployment: "Vercel / Cloudflare（自動デプロイ、両環境並行稼働）"
     ai_bot_execution: "GitHub Actions（cron実行）"
 ```
 

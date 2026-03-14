@@ -64,7 +64,7 @@ app/(web)/threads/[threadId]/page.tsx  [Server Component]  // 初期レス群を
         └── AuthModal [Client Component]  // 認証コード入力（未認証時）
 ```
 
-**ポーリング方式**: 定期的な `GET /api/threads/{threadId}/posts?since={lastPostId}` で新着レスを取得。WebSocketは使用しない（Vercel Serverless制約・初期フェーズでは不要）。
+**ポーリング方式**: 定期的な `GET /api/threads/{threadId}/posts?since={lastPostId}` で新着レスを取得。WebSocketは使用しない（Serverless環境の制約・初期フェーズでは不要）。
 
 ### 3.3 マイページ
 

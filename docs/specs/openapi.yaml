@@ -16,7 +16,7 @@ info:
 
 servers:
   - url: https://{domain}
-    description: 本番環境（Vercel）
+    description: 本番環境（Vercel / Cloudflare、両環境並行稼働）
     variables:
       domain:
         default: battleboard.vercel.app
