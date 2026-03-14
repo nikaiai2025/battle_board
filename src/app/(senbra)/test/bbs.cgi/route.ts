@@ -405,12 +405,11 @@ async function handleCreatePost(
  */
 function setEdgeTokenCookie(response: Response, edgeToken: string): Response {
   const headers = new Headers(response.headers);
-  const isProduction = process.env.NODE_ENV === "production";
   const cookieOptions = [
     `${EDGE_TOKEN_COOKIE}=${edgeToken}`,
     "HttpOnly",
-    isProduction ? "Secure" : "",
-    "SameSite=Lax",
+    "Secure",
+    "SameSite=None",
     "Max-Age=2592000", // 30日
     "Path=/",
   ]
