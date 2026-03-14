@@ -101,6 +101,8 @@ function VerifyPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [writeToken, setWriteToken] = useState<string | null>(null);
+  // コピー完了フィードバック用フラグ（2秒後に自動リセット）
+  const [copied, setCopied] = useState(false);
 
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
@@ -176,6 +178,28 @@ function VerifyPageContent() {
 
     return () => clearInterval(interval);
   }, [renderTurnstile]);
+
+  // ---------------------------------------------------------------------------
+  // コピーボタン
+  // ---------------------------------------------------------------------------
+
+  /**
+   * write_token をクリップボードにコピーするハンドラ
+   * `#<write_token>` 形式でコピーし、2秒間「コピーしました」フィードバックを表示する。
+   * clipboard API が使えない環境（非 HTTPS 等）では処理を無視する。
+   *
+   * See: tmp/tasks/task_TASK-053.md
+   */
+  const handleCopy = async () => {
+    if (!writeToken) return;
+    try {
+      await navigator.clipboard.writeText(`#${writeToken}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // フォールバック: clipboard API 非対応環境では何もしない
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // フォーム送信
@@ -277,8 +301,17 @@ function VerifyPageContent() {
               <p className="text-sm font-bold text-yellow-800 mb-2">
                 専用ブラウザをご利用の方へ
               </p>
+              {/* 案内文: 有効期限30日・永続利用を案内 */}
+              <p className="text-xs text-yellow-700 mb-1">
+                メール欄に以下のコードを入力してください（有効期限: 30日間）。
+              </p>
+              {/* sage 併用例の案内 */}
               <p className="text-xs text-yellow-700 mb-3">
-                次の書き込み時に、メール欄に以下のコードを入力してください（有効期限: 10分）。
+                sageと併用する場合は{" "}
+                <code className="font-mono bg-yellow-100 px-1 rounded">
+                  sage#{writeToken}
+                </code>{" "}
+                と入力してください。
               </p>
               <p className="text-xs text-gray-500 mb-1">メール欄に入力するコード:</p>
               {/* write-token-display: write_token の表示 */}
@@ -288,8 +321,17 @@ function VerifyPageContent() {
               >
                 #{writeToken}
               </code>
+              {/* copy-token-btn: ワンタッチコピーボタン */}
+              <button
+                id="copy-token-btn"
+                type="button"
+                onClick={handleCopy}
+                className="mt-2 px-3 py-1 text-xs bg-yellow-200 hover:bg-yellow-300 text-yellow-900 border border-yellow-400 rounded transition-colors"
+              >
+                {copied ? "コピーしました" : "コピー"}
+              </button>
               <p className="text-xs text-gray-500 mt-2">
-                ※ このコードは一度だけ使用できます
+                ※ このコードはメール欄に入れたままご利用ください
               </p>
             </div>
           )}

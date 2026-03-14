@@ -582,6 +582,30 @@ describe('AuthService', () => {
         )
       })
 
+      it('write_token の有効期限が30日後に設定される', async () => {
+        // See: tmp/workers/bdd-architect_TASK-052/analysis.md §5 案G
+        // ChMateユーザーが長期間 write_token を使用できるよう30日に設定する
+        const authCode = makeAuthCode({ id: 'code-id-001' })
+        vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode)
+        vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
+        vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+        vi.mocked(AuthCodeRepository.updateWriteToken).mockResolvedValue(undefined)
+
+        const before = Date.now()
+        await verifyAuthCode('123456', 'turnstile-token', 'ip-hash-abc123')
+        const after = Date.now()
+
+        // updateWriteToken の第3引数（有効期限Date）が30日後であることを確認する
+        const callArgs = vi.mocked(AuthCodeRepository.updateWriteToken).mock.calls[0]
+        const expiresAt = callArgs[2] as Date
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+        // ±5秒の誤差を許容
+        expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + thirtyDaysMs - 5000)
+        expect(expiresAt.getTime()).toBeLessThanOrEqual(after + thirtyDaysMs + 5000)
+      })
+
       it('IP 不一致でも認証は成功する（ソフトチェック）', async () => {
         const authCode = makeAuthCode({ ipHash: 'original-ip' })
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode)
@@ -701,7 +725,9 @@ describe('AuthService', () => {
 
   describe('verifyWriteToken', () => {
     // See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
-    // verifyWriteToken は AuthCodeRepository.findByWriteToken / clearWriteToken を使う（リポジトリ経由）
+    // verifyWriteToken は AuthCodeRepository.findByWriteToken を使う（リポジトリ経由）
+    // clearWriteToken は呼ばない（ワンタイム消費廃止。write_tokenは30日間有効で繰り返し利用可能）
+    // See: tmp/workers/bdd-architect_TASK-052/analysis.md §5 案G
 
     describe('正常系: 有効な write_token', () => {
       // See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
@@ -714,7 +740,6 @@ describe('AuthService', () => {
             writeTokenExpiresAt: new Date(Date.now() + 300_000), // 5分後
           })
         )
-        vi.mocked(AuthCodeRepository.clearWriteToken).mockResolvedValue(undefined)
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
         vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
 
@@ -724,7 +749,9 @@ describe('AuthService', () => {
         expect(result.edgeToken).toBe('valid-edge-token')
       })
 
-      it('ワンタイム消費: clearWriteToken が呼ばれる', async () => {
+      it('永続化: clearWriteToken は呼ばれない（ワンタイム消費廃止）', async () => {
+        // See: tmp/workers/bdd-architect_TASK-052/analysis.md §5 案G
+        // write_token は有効期限内であれば何度でも使用可能
         vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(
           makeAuthCode({
             id: 'auth-code-id-001',
@@ -733,14 +760,37 @@ describe('AuthService', () => {
             writeTokenExpiresAt: new Date(Date.now() + 300_000),
           })
         )
-        vi.mocked(AuthCodeRepository.clearWriteToken).mockResolvedValue(undefined)
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
         vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
 
         await verifyWriteToken('testtoken123456789012345678901234')
 
-        // clearWriteToken が auth-code の id で呼ばれたことを確認する
-        expect(AuthCodeRepository.clearWriteToken).toHaveBeenCalledWith('auth-code-id-001')
+        // clearWriteToken が呼ばれないことを確認する（ワンタイム消費廃止）
+        expect(AuthCodeRepository.clearWriteToken).not.toHaveBeenCalled()
+      })
+
+      it('同じ write_token を2回使用しても両方 { valid: true } を返す（永続化）', async () => {
+        // See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+        // ChMateユーザーがmail欄に sage#<write_token> を入れ続ける限り認証が有効
+        const authCodeData = makeAuthCode({
+          id: 'auth-code-id-001',
+          tokenId: 'valid-edge-token',
+          writeToken: 'persistenttoken123456789012345678',
+          writeTokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
+        })
+        vi.mocked(AuthCodeRepository.findByWriteToken)
+          .mockResolvedValueOnce(authCodeData)
+          .mockResolvedValueOnce(authCodeData)
+        vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(makeUser())
+        vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)
+
+        const result1 = await verifyWriteToken('persistenttoken123456789012345678')
+        const result2 = await verifyWriteToken('persistenttoken123456789012345678')
+
+        expect(result1.valid).toBe(true)
+        expect(result2.valid).toBe(true)
+        // clearWriteToken は一度も呼ばれない
+        expect(AuthCodeRepository.clearWriteToken).not.toHaveBeenCalled()
       })
 
       it('対応ユーザーの is_verified を true に更新する', async () => {
@@ -752,7 +802,6 @@ describe('AuthService', () => {
             writeTokenExpiresAt: new Date(Date.now() + 300_000),
           })
         )
-        vi.mocked(AuthCodeRepository.clearWriteToken).mockResolvedValue(undefined)
         const user = makeUser({ id: 'target-user-id' })
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
         vi.mocked(UserRepository.updateIsVerified).mockResolvedValue(undefined)

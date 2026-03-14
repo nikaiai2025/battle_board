@@ -126,6 +126,14 @@ describe("BbsCgiResponseBuilder", () => {
       expect(html).toContain("write_token");
     });
 
+    it("write_tokenを30日間有効のままメール欄に入れ続けるよう案内する", () => {
+      // See: tmp/workers/bdd-architect_TASK-052/analysis.md §5 案G
+      // ChMateユーザーに write_token の永続利用を案内する
+      const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+      expect(html).toContain("30日間有効");
+      expect(html).toContain("メール欄に入れたままにしてください");
+    });
+
     it("Shift_JIS Content-Type meta タグを含む", () => {
       const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
       expect(html).toContain("charset=Shift_JIS");

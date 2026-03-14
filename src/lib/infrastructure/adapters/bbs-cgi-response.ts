@@ -117,6 +117,8 @@ ${escapedMessage}
 1. 以下のURLにブラウザでアクセスしてください<br>
 2. 認証コード ${escapedCode} を入力して認証を完了してください<br>
 3. 発行された write_token をメール欄に "#write_token値" 形式で貼り付けて再度書き込んでください<br>
+※ このコードはメール欄に入れたままにしてください（30日間有効）<br>
+例: sage#write_token値<br>
 <br>
 【認証URL】<br>
 <a href="${authUrl}">${authUrl}</a>
