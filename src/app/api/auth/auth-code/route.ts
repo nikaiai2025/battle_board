@@ -37,6 +37,8 @@ interface AuthCodeRequest {
   code: string
   /** Turnstile チャレンジレスポンストークン */
   turnstileToken: string
+  /** edge-token（専ブラWebView等、Cookieが共有されない環境向けフォールバック） */
+  edgeToken?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -106,11 +108,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     )
   }
 
-  // --- Cookie から edge-token を読み取る ---
+  // --- edge-token の取得 ---
+  // 優先順位: Cookie > リクエストボディ（専ブラWebView等のCookie非共有環境向けフォールバック）
   // See: docs/architecture/components/authentication.md §5 > Cookie 命名規則
   // See: src/lib/constants/cookie-names.ts
   const cookieStore = await cookies()
-  const edgeToken = cookieStore.get(EDGE_TOKEN_COOKIE)?.value
+  const edgeToken = cookieStore.get(EDGE_TOKEN_COOKIE)?.value ?? body.edgeToken
 
   if (!edgeToken) {
     return NextResponse.json(

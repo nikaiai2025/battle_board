@@ -93,6 +93,9 @@ function VerifyPageContent() {
   // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > 認証案内（専ブラ: HTML に認証 URL 表示）
   const codeParam = searchParams.get("code") ?? "";
 
+  // クエリパラメータ `token` から edge-token を取得（専ブラWebView等のCookie非共有環境向け）
+  const edgeTokenParam = searchParams.get("token") ?? "";
+
   const [inputCode, setInputCode] = useState(codeParam);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -207,7 +210,11 @@ function VerifyPageContent() {
       const res = await fetch("/api/auth/auth-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: inputCode, turnstileToken }),
+        body: JSON.stringify({
+          code: inputCode,
+          turnstileToken,
+          ...(edgeTokenParam ? { edgeToken: edgeTokenParam } : {}),
+        }),
       });
 
       const data = (await res.json()) as AuthCodeResponse;
