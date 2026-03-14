@@ -325,12 +325,10 @@ export async function verifyAuthCode(
   }
 
   // Step 7: write_token を生成して auth_codes に保存（専ブラ向け認証橋渡しトークン）
-  // 有効期限は30日。ChMateユーザーがmail欄に sage#<write_token> を入れ続ける限り認証が有効になる。
   // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
   // See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
-  // See: tmp/workers/bdd-architect_TASK-052/analysis.md §5 案G
   const writeToken = randomBytes(16).toString('hex') // 32文字 hex
-  const writeTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30日後
+  const writeTokenExpiresAt = new Date(Date.now() + 600 * 1000) // 10分後
   await AuthCodeRepository.updateWriteToken(authCode.id, writeToken, writeTokenExpiresAt)
 
   return { success: true, writeToken }
@@ -338,18 +336,17 @@ export async function verifyAuthCode(
 
 /**
  * write_token を検証し、対応するユーザーの edge-token を認証済みに更新する。
- * 永続化: write_token は有効期限（30日）内であれば何度でも使用可能。ワンタイム消費は廃止。
- * ChMateユーザーがmail欄に sage#<write_token> を入れ続ける限り認証が有効になる。
+ * ワンタイム: 検証成功時に write_token を null に更新して再利用を防ぐ。
  *
  * 処理ステップ:
  *   1. write_token で auth_codes レコードを検索する
  *   2. 有効期限チェック
- *   3. 対応ユーザーの is_verified = true に更新
+ *   3. ワンタイム消費（write_token を null に更新）
+ *   4. 対応ユーザーの is_verified = true に更新
  *
  * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
  * See: features/constraints/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
- * See: tmp/workers/bdd-architect_TASK-052/analysis.md §5 案G
  *
  * @param writeToken - 専ブラの mail 欄から受け取った write_token（32文字 hex）
  * @returns 検証成功時 { valid: true, edgeToken: string }、失敗時 { valid: false }
@@ -374,10 +371,12 @@ export async function verifyWriteToken(
     return { valid: false }
   }
 
-  // Step 3: 対応ユーザーの is_verified = true に更新
+  // Step 3: ワンタイム消費（write_token を null に更新して再利用を防ぐ）
+  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式 > ワンタイム
+  await AuthCodeRepository.clearWriteToken(authCode.id)
+
+  // Step 4: 対応ユーザーの is_verified = true に更新
   // tokenId は edge-token 文字列。findByAuthToken でユーザーを取得して ID を解決する
-  // Note: ワンタイム消費（clearWriteToken）は廃止。有効期限内であれば繰り返し利用可能。
-  // See: tmp/workers/bdd-architect_TASK-052/analysis.md §5 案G
   const user = await UserRepository.findByAuthToken(authCode.tokenId)
   if (user) {
     await UserRepository.updateIsVerified(user.id, true)

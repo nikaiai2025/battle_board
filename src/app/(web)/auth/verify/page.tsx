@@ -301,17 +301,8 @@ function VerifyPageContent() {
               <p className="text-sm font-bold text-yellow-800 mb-2">
                 専用ブラウザをご利用の方へ
               </p>
-              {/* 案内文: 有効期限30日・永続利用を案内 */}
-              <p className="text-xs text-yellow-700 mb-1">
-                メール欄に以下のコードを入力してください（有効期限: 30日間）。
-              </p>
-              {/* sage 併用例の案内 */}
               <p className="text-xs text-yellow-700 mb-3">
-                sageと併用する場合は{" "}
-                <code className="font-mono bg-yellow-100 px-1 rounded">
-                  sage#{writeToken}
-                </code>{" "}
-                と入力してください。
+                次の書き込み時に、メール欄に以下のコードを入力してください（有効期限: 10分）。
               </p>
               <p className="text-xs text-gray-500 mb-1">メール欄に入力するコード:</p>
               {/* write-token-display: write_token の表示 */}
@@ -331,7 +322,7 @@ function VerifyPageContent() {
                 {copied ? "コピーしました" : "コピー"}
               </button>
               <p className="text-xs text-gray-500 mt-2">
-                ※ このコードはメール欄に入れたままご利用ください
+                ※ このコードは一度だけ使用できます
               </p>
             </div>
           )}
