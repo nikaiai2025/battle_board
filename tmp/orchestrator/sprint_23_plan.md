@@ -13,6 +13,7 @@ Phase 2 実装着手前のドキュメント・スキーマ不整合（GAP-1〜7
 | TASK-063 | bdd-architect | GAP-1〜7 解消方針の検討・提案 | なし | completed |
 | TASK-064 | bdd-architect | D-08更新（GAP-6確定・GAP-7パース仕様追記） | TASK-063 | completed |
 | TASK-065 | bdd-architect | スキーマ・仕様書更新（GAP-1,2,3,4,5） | TASK-063 | completed |
+| TASK-066 | bdd-coding | Post型追加に伴うTSビルドエラー修正（56件） | TASK-065 | completed |
 
 ## 結果
 

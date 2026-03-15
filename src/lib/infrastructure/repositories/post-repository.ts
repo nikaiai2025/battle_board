@@ -27,6 +27,7 @@ interface PostRow {
   display_name: string
   daily_id: string
   body: string
+  inline_system_info: string | null
   is_system_message: boolean
   is_deleted: boolean
   created_at: string
@@ -49,6 +50,7 @@ function rowToPost(row: PostRow): Post {
     displayName: row.display_name,
     dailyId: row.daily_id,
     body: row.body,
+    inlineSystemInfo: row.inline_system_info ?? null,
     isSystemMessage: row.is_system_message,
     isDeleted: row.is_deleted,
     createdAt: new Date(row.created_at),

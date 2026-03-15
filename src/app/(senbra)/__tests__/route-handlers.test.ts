@@ -111,6 +111,7 @@ function makePost(overrides: Partial<{
   displayName: string;
   dailyId: string;
   body: string;
+  inlineSystemInfo: string | null;
   isSystemMessage: boolean;
   isDeleted: boolean;
   createdAt: Date;
@@ -123,6 +124,7 @@ function makePost(overrides: Partial<{
     displayName: "名無しさん",
     dailyId: "AbCd1234",
     body: "テスト本文",
+    inlineSystemInfo: null,
     isSystemMessage: false,
     isDeleted: false,
     createdAt: new Date("2025-01-01T12:00:00Z"),
@@ -675,14 +677,14 @@ describe("bbs.cgi Route Handler", () => {
    * UTF-8 URLエンコード文字列 (%E3%83... 形式) をCP932に変換するだけで、
    * 本物の専ブラが送る %83e 形式（Shift-JISバイトのURLエンコード）とは異なっていた。
    */
-  function makeShiftJisBody(params: Record<string, string>): Buffer {
+  function makeShiftJisBody(params: Record<string, string>): string {
     const pairs: string[] = [];
     for (const [key, value] of Object.entries(params)) {
       const encodedKey = percentEncodeShiftJis(key);
       const encodedValue = percentEncodeShiftJis(value);
       pairs.push(`${encodedKey}=${encodedValue}`);
     }
-    return Buffer.from(pairs.join("&"), "ascii");
+    return pairs.join("&");
   }
 
   /**

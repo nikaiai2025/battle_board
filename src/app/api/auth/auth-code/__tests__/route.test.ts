@@ -70,7 +70,7 @@ function mockCookies(edgeToken: string | undefined) {
       return undefined
     }),
   }
-  vi.mocked(cookies).mockResolvedValue(cookieStoreMock as ReturnType<typeof cookies> extends Promise<infer T> ? T : never)
+  vi.mocked(cookies).mockResolvedValue(cookieStoreMock as unknown as ReturnType<typeof cookies> extends Promise<infer T> ? T : never)
 }
 
 /**
@@ -83,7 +83,7 @@ function mockHeaders(ip: string = '127.0.0.1') {
       return null
     }),
   }
-  vi.mocked(headers).mockResolvedValue(headersMock as ReturnType<typeof headers> extends Promise<infer T> ? T : never)
+  vi.mocked(headers).mockResolvedValue(headersMock as unknown as ReturnType<typeof headers> extends Promise<infer T> ? T : never)
 }
 
 // ---------------------------------------------------------------------------

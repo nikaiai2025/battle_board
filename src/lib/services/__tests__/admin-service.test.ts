@@ -52,6 +52,7 @@ function makePost(overrides: Partial<Post> = {}): Post {
     displayName: '名無しさん',
     dailyId: 'Ax8kP2Lm',
     body: 'テスト本文',
+    inlineSystemInfo: null,
     isSystemMessage: false,
     isDeleted: false,
     createdAt: new Date('2026-03-13T00:00:00Z'),

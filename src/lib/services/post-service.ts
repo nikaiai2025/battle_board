@@ -258,6 +258,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
     displayName: resolvedDisplayName,
     dailyId,
     body: input.body,
+    inlineSystemInfo: null,
     isSystemMessage: false,
   })
 
@@ -435,6 +436,7 @@ export async function createThread(
     displayName: DEFAULT_DISPLAY_NAME,
     dailyId: 'unknown', // テスト・UI では使わない（スレッド作成成功の確認に使用）
     body: input.firstPostBody,
+    inlineSystemInfo: null,
     isSystemMessage: false,
     isDeleted: false,
     createdAt: firstPostCreatedAt,

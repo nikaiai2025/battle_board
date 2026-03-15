@@ -66,7 +66,6 @@ describe("validateThreadTitle", () => {
   });
 
   it("null は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateThreadTitle(null);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -75,7 +74,6 @@ describe("validateThreadTitle", () => {
   });
 
   it("undefined は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateThreadTitle(undefined);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -84,7 +82,6 @@ describe("validateThreadTitle", () => {
   });
 
   it("数値は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateThreadTitle(42);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -93,7 +90,6 @@ describe("validateThreadTitle", () => {
   });
 
   it("配列は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateThreadTitle(["タイトル"]);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -173,7 +169,6 @@ describe("validatePostBody", () => {
   });
 
   it("null は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validatePostBody(null);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -182,7 +177,6 @@ describe("validatePostBody", () => {
   });
 
   it("undefined は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validatePostBody(undefined);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -253,7 +247,6 @@ describe("validateUsername", () => {
   });
 
   it("null は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateUsername(null);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -319,7 +312,6 @@ describe("validateAuthCode", () => {
   });
 
   it("null は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateAuthCode(null);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -328,7 +320,6 @@ describe("validateAuthCode", () => {
   });
 
   it("数値型は無効（型チェック）", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateAuthCode(123456);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -399,7 +390,6 @@ describe("validateBoardId", () => {
   });
 
   it("null は無効", () => {
-    // @ts-expect-error: テスト用に不正な型を渡す
     const result = validateBoardId(null);
     expect(result.valid).toBe(false);
     if (!result.valid) {
