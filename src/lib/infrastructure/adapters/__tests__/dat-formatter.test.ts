@@ -161,6 +161,77 @@ describe("DatFormatter", () => {
       const bodyField = result.split("\n")[0].split("<>")[3];
       expect(bodyField).toBe("このレスは削除されました");
     });
+
+    // -----------------------------------------------------------------------
+    // inlineSystemInfo 連結出力
+    // See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+    // See: docs/architecture/components/posting.md §5 方式A: レス内マージ
+    // -----------------------------------------------------------------------
+
+    it("inlineSystemInfoがある場合、本文末尾に区切り線付きで連結される", () => {
+      const formatter = new DatFormatter();
+      const post = makePost({
+        body: "これAIだろ !tell >>5",
+        inlineSystemInfo: "!tell >>5 を実行しました",
+      });
+      const result = formatter.buildDat([post], "スレ");
+      const bodyField = result.split("\n")[0].split("<>")[3];
+      // 区切り線は全角ダッシュ10個
+      expect(bodyField).toContain("<br>──────────<br>");
+      expect(bodyField).toContain("!tell &gt;&gt;5 を実行しました");
+    });
+
+    it("inlineSystemInfoがnullの場合、区切り線は付与されない", () => {
+      const formatter = new DatFormatter();
+      const post = makePost({ body: "通常の書き込み", inlineSystemInfo: null });
+      const result = formatter.buildDat([post], "スレ");
+      const bodyField = result.split("\n")[0].split("<>")[3];
+      expect(bodyField).not.toContain("──────────");
+      expect(bodyField).toBe("通常の書き込み");
+    });
+
+    it("inlineSystemInfoが空文字列の場合、区切り線は付与されない", () => {
+      const formatter = new DatFormatter();
+      const post = makePost({ body: "通常の書き込み", inlineSystemInfo: "" });
+      const result = formatter.buildDat([post], "スレ");
+      const bodyField = result.split("\n")[0].split("<>")[3];
+      expect(bodyField).not.toContain("──────────");
+    });
+
+    it("isDeleted=trueの場合はinlineSystemInfoがあっても区切り線は付与されない", () => {
+      const formatter = new DatFormatter();
+      const post = makePost({
+        body: "削除対象",
+        inlineSystemInfo: "コマンド結果",
+        isDeleted: true,
+      });
+      const result = formatter.buildDat([post], "スレ");
+      const bodyField = result.split("\n")[0].split("<>")[3];
+      expect(bodyField).toBe("このレスは削除されました");
+    });
+
+    it("inlineSystemInfoにHTML特殊文字が含まれる場合もエスケープされる", () => {
+      const formatter = new DatFormatter();
+      const post = makePost({
+        body: "テスト",
+        inlineSystemInfo: '<script>alert("xss")</script>',
+      });
+      const result = formatter.buildDat([post], "スレ");
+      const bodyField = result.split("\n")[0].split("<>")[3];
+      expect(bodyField).toContain("&lt;script&gt;");
+      expect(bodyField).not.toContain("<script>");
+    });
+
+    it("inlineSystemInfoに改行が含まれる場合、<br>に変換される", () => {
+      const formatter = new DatFormatter();
+      const post = makePost({
+        body: "テスト",
+        inlineSystemInfo: "行1\n行2",
+      });
+      const result = formatter.buildDat([post], "スレ");
+      const bodyField = result.split("\n")[0].split("<>")[3];
+      expect(bodyField).toContain("行1<br>行2");
+    });
   });
 
   describe("calcShiftJisLineBytes()", () => {

@@ -17,7 +17,7 @@ Phase 1完了。Phase 2のBDDシナリオ精緻化・ドキュメント不整合
 
 ## テスト状況
 
-- vitest: 18ファイル / 601テスト / 全PASS
+- vitest: 20ファイル / 672テスト / 全PASS
 - cucumber-js: 106シナリオ (103 passed, 3 pending) / 0 failed
   - pending 3件: インフラ制約（HTTP:80直接応答2件 + WAF非ブロック1件）— 意図的Pending
 - playwright E2E: 1テスト / 全PASS（基本機能確認フロー）
@@ -43,6 +43,7 @@ Phase 1完了。Phase 2のBDDシナリオ精緻化・ドキュメント不整合
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-24 | Phase 2 Step 1: コマンド基盤実装（parser+Service+PostService統合） | completed | `tmp/orchestrator/sprint_24_plan.md` |
 | Sprint-23 | Phase 2準備: GAP-1〜7解消（仕様確定・ドキュメント更新） | completed | `tmp/orchestrator/sprint_23_plan.md` |
 | Sprint-22 | Web UI機能整備（マイページ導線 + 認証整合） | completed | アーカイブ参照 |
 | Sprint-20〜21 | ChMate Cookie根本原因解決 + 新規BDDシナリオ実装 + ログ除去 | completed | アーカイブ参照 |

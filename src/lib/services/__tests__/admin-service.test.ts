@@ -27,6 +27,12 @@ vi.mock('@/lib/infrastructure/repositories/thread-repository', () => ({
   softDelete: vi.fn(),
 }))
 
+// PostService をモック化する（AdminService が createPost を使ってシステムレスを挿入するため）
+// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+vi.mock('@/lib/services/post-service', () => ({
+  createPost: vi.fn(),
+}))
+
 // ---------------------------------------------------------------------------
 // インポート（モック宣言後）
 // ---------------------------------------------------------------------------
@@ -35,6 +41,7 @@ import { deletePost, deleteThread } from '../admin-service'
 import type { DeletePostResult, DeleteThreadResult } from '../admin-service'
 import * as PostRepository from '@/lib/infrastructure/repositories/post-repository'
 import * as ThreadRepository from '@/lib/infrastructure/repositories/thread-repository'
+import * as PostService from '@/lib/services/post-service'
 import type { Post } from '@/lib/domain/models/post'
 import type { Thread } from '@/lib/domain/models/thread'
 
@@ -84,6 +91,14 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
 describe('AdminService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // PostService.createPost のデフォルトモック（システムレス挿入用）
+    // See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+    vi.mocked(PostService.createPost).mockResolvedValue({
+      success: true,
+      postId: 'system-post-uuid-001',
+      postNumber: 99,
+      systemMessages: [],
+    })
   })
 
   // =========================================================================
@@ -214,6 +229,75 @@ describe('AdminService', () => {
 
         const result = await deletePost('post-uuid-001', 'admin-uuid-001')
 
+        expect(result.success).toBe(true)
+      })
+    })
+
+    // -----------------------------------------------------------------------
+    // システムレス挿入（方式B: 独立システムレス）
+    // See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+    // See: docs/architecture/components/posting.md §5 方式B
+    // -----------------------------------------------------------------------
+
+    describe('システムレス挿入: 削除時に「★システム」名義のレスが追加される', () => {
+      it('削除時にcreatePostで★システム名義のシステムレスが挿入される', async () => {
+        // See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+        const post = makePost({ id: 'post-uuid-001', threadId: 'thread-uuid-001' })
+        vi.mocked(PostRepository.findById).mockResolvedValue(post)
+        vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined)
+
+        await deletePost('post-uuid-001', 'admin-uuid-001')
+
+        expect(PostService.createPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            threadId: 'thread-uuid-001',
+            displayName: '★システム',
+            isBotWrite: true,
+            isSystemMessage: true,
+          })
+        )
+      })
+
+      it('commentが指定された場合、コメント内容がシステムレス本文に設定される', async () => {
+        // See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+        const post = makePost({ id: 'post-uuid-001' })
+        vi.mocked(PostRepository.findById).mockResolvedValue(post)
+        vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined)
+
+        await deletePost('post-uuid-001', 'admin-uuid-001', undefined, 'スパム投稿のため削除')
+
+        expect(PostService.createPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: 'スパム投稿のため削除',
+          })
+        )
+      })
+
+      it('commentが未指定の場合、フォールバックメッセージがシステムレス本文に設定される', async () => {
+        // See: features/phase2/command_system.feature @管理者がコメントなしでレス削除した場合はフォールバックメッセージで通知される
+        const post = makePost({ id: 'post-uuid-001' })
+        vi.mocked(PostRepository.findById).mockResolvedValue(post)
+        vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined)
+
+        await deletePost('post-uuid-001', 'admin-uuid-001')
+
+        expect(PostService.createPost).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: '管理者によりレスが削除されました',
+          })
+        )
+      })
+
+      it('システムレス挿入が失敗しても削除結果は success: true を返す', async () => {
+        // See: docs/architecture/components/posting.md §5 方式B
+        const post = makePost({ id: 'post-uuid-001' })
+        vi.mocked(PostRepository.findById).mockResolvedValue(post)
+        vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined)
+        vi.mocked(PostService.createPost).mockRejectedValue(new Error('システムレス挿入失敗'))
+
+        const result = await deletePost('post-uuid-001', 'admin-uuid-001')
+
+        // 削除自体は成功
         expect(result.success).toBe(true)
       })
     })

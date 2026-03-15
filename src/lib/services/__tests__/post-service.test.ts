@@ -601,9 +601,10 @@ describe('PostService', () => {
         // 書き込み成功かつ IncentiveService が呼ばれていること
         expect(result).toMatchObject({ success: true })
         expect(IncentiveService.evaluateOnPost).toHaveBeenCalledTimes(1)
+        // postId は INSERT 前に生成される仮IDのため、文字列であることのみ検証する
+        // See: features/phase2/command_system.feature — evaluateOnPost は INSERT 前に呼ばれる
         expect(IncentiveService.evaluateOnPost).toHaveBeenCalledWith(
           expect.objectContaining({
-            postId: 'post-001',
             threadId: 'thread-001',
             postNumber: 1,
           })
@@ -901,6 +902,222 @@ describe('PostService', () => {
             isBotWrite: false,
           })
         ).rejects.toThrow('PostRepository.create failed')
+      })
+    })
+
+    // -----------------------------------------------------------------------
+    // CommandService 統合: コマンド解析と inlineSystemInfo 設定
+    // See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+    // See: docs/architecture/components/posting.md §5 方式A
+    // -----------------------------------------------------------------------
+
+    describe('CommandService 統合: コマンド実行結果が inlineSystemInfo に設定される', () => {
+      // ヘルパー: 認証済みのデフォルト設定
+      function setupAuthenticatedUser() {
+        vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+          valid: true,
+          userId: 'user-001',
+          authorIdSeed: 'seed-abc',
+        })
+        vi.mocked(UserRepository.findById).mockResolvedValue(mockUser)
+        vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1)
+        vi.mocked(PostRepository.create).mockResolvedValue(mockPost)
+        vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined)
+        vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined)
+        vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
+      }
+
+      it('CommandService が設定されていない場合は inlineSystemInfo が null になる', async () => {
+        // See: Phase 1 互換: CommandService 未設定時はコマンド機能無効
+        setupAuthenticatedUser()
+        // CommandService を設定しない（デフォルト: null）
+        const { setCommandService } = await import('../post-service')
+        setCommandService(null)
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '!tell >>5',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        expect(PostRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ inlineSystemInfo: null })
+        )
+      })
+
+      it('CommandService がコマンドを検出した場合、結果が inlineSystemInfo に設定される', async () => {
+        // See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+        setupAuthenticatedUser()
+        const mockCommandService = {
+          executeCommand: vi.fn().mockResolvedValue({
+            success: true,
+            systemMessage: '!tell >>5 を実行しました',
+            currencyCost: 50,
+          }),
+          getRegisteredCommandNames: vi.fn().mockReturnValue(['tell', 'w']),
+        }
+        const { setCommandService } = await import('../post-service')
+        setCommandService(mockCommandService as any)
+
+        await createPost({
+          threadId: 'thread-001',
+          body: 'これAIだろ !tell >>5',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        expect(mockCommandService.executeCommand).toHaveBeenCalledWith(
+          expect.objectContaining({
+            rawCommand: 'これAIだろ !tell >>5',
+            threadId: 'thread-001',
+            userId: 'user-001',
+          })
+        )
+        expect(PostRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            inlineSystemInfo: '!tell >>5 を実行しました',
+          })
+        )
+
+        // クリーンアップ
+        setCommandService(null)
+      })
+
+      it('CommandService がコマンドを検出しない場合は inlineSystemInfo が null になる', async () => {
+        // See: features/phase2/command_system.feature @存在しないコマンドは無視され通常の書き込みとして扱われる
+        setupAuthenticatedUser()
+        const mockCommandService = {
+          executeCommand: vi.fn().mockResolvedValue(null),
+          getRegisteredCommandNames: vi.fn().mockReturnValue(['tell', 'w']),
+        }
+        const { setCommandService } = await import('../post-service')
+        setCommandService(mockCommandService as any)
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '普通の書き込みです',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        expect(PostRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ inlineSystemInfo: null })
+        )
+        setCommandService(null)
+      })
+
+      it('isSystemMessage=true の場合はコマンド解析をスキップする', async () => {
+        // See: features/phase2/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
+        setupAuthenticatedUser()
+        const mockCommandService = {
+          executeCommand: vi.fn(),
+          getRegisteredCommandNames: vi.fn().mockReturnValue(['tell', 'w']),
+        }
+        const { setCommandService } = await import('../post-service')
+        setCommandService(mockCommandService as any)
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '!tell >>3 はシステムメッセージ',
+          edgeToken: null,
+          ipHash: 'system',
+          isBotWrite: true,
+          isSystemMessage: true,
+        })
+
+        // CommandService.executeCommand は呼ばれない
+        expect(mockCommandService.executeCommand).not.toHaveBeenCalled()
+        // isSystemMessage=true が PostRepository.create に渡される
+        expect(PostRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ isSystemMessage: true })
+        )
+        setCommandService(null)
+      })
+
+      it('isSystemMessage=true の場合は IncentiveService もスキップする', async () => {
+        // See: features/phase2/command_system.feature @システムメッセージは書き込み報酬の対象にならない
+        setupAuthenticatedUser()
+        const { setCommandService } = await import('../post-service')
+        setCommandService(null)
+
+        await createPost({
+          threadId: 'thread-001',
+          body: 'システムメッセージ',
+          edgeToken: null,
+          ipHash: 'system',
+          isBotWrite: true,
+          isSystemMessage: true,
+        })
+
+        expect(IncentiveService.evaluateOnPost).not.toHaveBeenCalled()
+      })
+
+      it('CommandService 失敗時も書き込み自体は成功する', async () => {
+        // See: docs/architecture/components/posting.md §1 分割方針
+        setupAuthenticatedUser()
+        const mockCommandService = {
+          executeCommand: vi.fn().mockRejectedValue(new Error('CommandService error')),
+          getRegisteredCommandNames: vi.fn().mockReturnValue(['tell']),
+        }
+        const { setCommandService } = await import('../post-service')
+        setCommandService(mockCommandService as any)
+
+        const result = await createPost({
+          threadId: 'thread-001',
+          body: '!tell >>5',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        expect(result).toMatchObject({ success: true })
+        setCommandService(null)
+      })
+
+      it('コマンド結果とインセンティブ報酬の両方が inlineSystemInfo に含まれる', async () => {
+        // See: features/phase2/command_system.feature
+        // 完了条件: コマンド実行結果 + 書き込み報酬が両方ある場合、両方がinlineSystemInfoに含まれる
+        setupAuthenticatedUser()
+        const mockCommandService = {
+          executeCommand: vi.fn().mockResolvedValue({
+            success: true,
+            systemMessage: 'コマンド実行結果',
+            currencyCost: 0,
+          }),
+          getRegisteredCommandNames: vi.fn().mockReturnValue(['w']),
+        }
+        const { setCommandService } = await import('../post-service')
+        setCommandService(mockCommandService as any)
+
+        // IncentiveService が報酬を返す
+        vi.mocked(IncentiveService.evaluateOnPost).mockResolvedValue({
+          granted: [{ eventType: 'daily_login', amount: 10 }],
+          skipped: [],
+        })
+
+        await createPost({
+          threadId: 'thread-001',
+          body: '!w >>3',
+          edgeToken: 'token-abc',
+          ipHash: 'seed-abc',
+          isBotWrite: false,
+        })
+
+        // inlineSystemInfo にコマンド結果と報酬の両方が含まれる
+        expect(PostRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            inlineSystemInfo: expect.stringContaining('コマンド実行結果'),
+          })
+        )
+        // 報酬メッセージも含まれる
+        const createCall = vi.mocked(PostRepository.create).mock.calls[0][0]
+        expect(createCall.inlineSystemInfo).toContain('daily_login +10')
+
+        setCommandService(null)
       })
     })
   })

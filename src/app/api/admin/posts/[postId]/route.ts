@@ -31,11 +31,13 @@ import { ADMIN_SESSION_COOKIE } from '@/lib/constants/cookie-names'
  * DELETE /api/admin/posts/{postId} — レス削除（管理者）
  *
  * See: features/phase1/admin.feature @管理者が指定したレスを削除する
+ * See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
  * See: docs/specs/openapi.yaml > /api/admin/posts/{postId}
  *
  * リクエスト:
  *   Cookie: admin_session（管理者セッション）
  *   Path: postId（削除対象レスの UUID）
+ *   Query: comment（任意。削除コメント。「★システム」名義のシステムレスに表示する）
  *
  * レスポンス:
  *   200: 削除成功
@@ -69,8 +71,13 @@ export async function DELETE(
     )
   }
 
+  // --- comment クエリパラメータを取得 ---
+  // See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+  // See: docs/specs/openapi.yaml > adminDeletePost > parameters > comment
+  const comment = req.nextUrl.searchParams.get('comment') ?? undefined
+
   // --- AdminService へ委譲 ---
-  const result = await deletePost(postId, adminSession.userId)
+  const result = await deletePost(postId, adminSession.userId, undefined, comment)
 
   // --- レスポンス整形 ---
   if (!result.success) {
