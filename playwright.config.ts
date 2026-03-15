@@ -58,8 +58,11 @@ export default defineConfig({
   /** テストの並列実行を無効化（DBの状態変更が競合しないよう直列実行） */
   workers: 1,
 
+  /** テスト成果物（トレース・スクリーンショット等）の出力先 — git管理不要のためゴミ箱配下 */
+  outputDir: "ゴミ箱/test-results",
+
   /** テスト結果レポーター */
-  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
+  reporter: [["list"], ["html", { open: "never", outputFolder: "ゴミ箱/playwright-report" }]],
 
   /** 全テストに共通の設定 */
   use: {

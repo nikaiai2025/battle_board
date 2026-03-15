@@ -1,0 +1,24 @@
+# config/commands.yaml
+# コマンド設定（D-08 command.md §2.2 準拠）
+# Phase 2 スコープ: !tell, !w のみ
+#
+# フィールド定義:
+#   description  - ユーザー向け説明文（ヘルプページ表示用）
+#   cost         - 通貨コスト（0 = 無料）
+#   targetFormat - 必要な引数の形式（null = 引数なし）
+#   enabled      - false にするとコマンド無効化
+#   stealth      - true の場合、コマンド文字列が本文から除去される
+
+commands:
+  tell:
+    description: "指定レスをAIだと告発する"
+    cost: 50
+    targetFormat: ">>postNumber"
+    enabled: true
+    stealth: false
+  w:
+    description: "指定レスに草を生やす"
+    cost: 0
+    targetFormat: ">>postNumber"
+    enabled: true
+    stealth: false

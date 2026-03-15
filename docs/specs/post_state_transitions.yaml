@@ -24,13 +24,23 @@ post_types:
 
   - name: system_message
     label: システムメッセージ
-    description: コマンド実行結果やイベント通知
+    description: >
+      方式B（独立システムレス）。管理者操作の通知・非同期イベント通知など、
+      特定の投稿に紐づかないイベントで使用する。
+      D-08 posting.md §5 参照。
     fields:
       author_id: "NULL"
       bot_id: "NULL"
-      display_name: "[システム]"
+      display_name: "★システム"
       daily_id: "SYSTEM"
       is_system_message: true
+
+  notes:
+    - >
+      方式A（レス内マージ）では post_type は user_post のまま。
+      コマンド結果・書き込み報酬は inline_system_info カラムに格納され、
+      表示時に本文末尾に区切り線付きで付加される。
+      system_message タイプにはならない。
 
 # =============================================
 # レスの状態

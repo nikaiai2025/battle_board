@@ -49,7 +49,7 @@ elements:
             type: text
             source: post.displayName
             style:
-              system_message: "[システム] プレフィックス付き、背景色変更"
+              system_message: "「★システム」名義、背景色変更"
               bot_marked: "🤖 マーク付き"
           - id: post-daily-id
             type: text
@@ -71,6 +71,28 @@ elements:
             style: system-message-bg
         features:
           - anchor-link: ">>N 形式をクリック可能なリンクに変換"
+
+      - id: post-inline-system-info
+        type: component
+        condition: post.inlineSystemInfo != null
+        description: >
+          レス内マージ型システム情報（方式A）。
+          コマンド実行結果・書き込み報酬など即時確定情報を
+          本文の下に区切り線付きで表示する。
+          D-08 posting.md「システムメッセージの表示方式」参照。
+        children:
+          - id: inline-separator
+            type: divider
+            style: "solid line, muted color (──────────)"
+            description: 本文とシステム情報を視覚的に分離する区切り線
+          - id: inline-system-content
+            type: text
+            source: post.inlineSystemInfo
+            style: muted, smaller-font
+            description: >
+              例: "🤖 >>5 はAIでした！ 通貨 +30"
+              例: "📝 書き込み報酬 +10"
+              例: "⚠️ 通貨が不足しています"
 
       - id: post-bot-info
         type: component

@@ -98,6 +98,10 @@ components:
           type: boolean
         isDeleted:
           type: boolean
+        inlineSystemInfo:
+          type: string
+          nullable: true
+          description: レス内マージ型システム情報（コマンド結果・書き込み報酬等）。方式A表示用。
         botMark:
           type: object
           nullable: true
@@ -254,7 +258,9 @@ components:
 
     CommandResult:
       type: object
-      description: コマンド実行結果（システムメッセージとしてスレッドにも表示される）
+      description: >
+        コマンド実行結果のメタ情報（プログラム的判定用）。
+        表示用文字列は post.inlineSystemInfo を参照すること。
       properties:
         commandName:
           type: string
@@ -263,7 +269,9 @@ components:
           type: boolean
         systemMessage:
           type: string
-          description: スレッドに追加されたシステムメッセージの本文
+          description: >
+            コマンド実行結果の要約テキスト。
+            表示にはこのフィールドではなく post.inlineSystemInfo を使用する。
       required: [commandName, success]
 
 # =============================================
@@ -445,7 +453,9 @@ paths:
                   commandResult:
                     $ref: "#/components/schemas/CommandResult"
                     nullable: true
-                    description: コマンドが含まれていた場合のみ
+                    description: >
+                      コマンドが含まれていた場合のメタ情報（プログラム的判定用）。
+                      表示用文字列は post.inlineSystemInfo を参照。
                   bonuses:
                     type: array
                     items:
@@ -682,6 +692,15 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: comment
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+          description: >
+            削除時のコメント（「★システム」名義の独立レスに表示される）。
+            未指定時はデフォルトメッセージを使用する。
       responses:
         "200":
           description: 削除成功

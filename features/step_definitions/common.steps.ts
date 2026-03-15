@@ -26,7 +26,6 @@ import { InMemoryUserRepo, InMemoryCurrencyRepo, InMemoryThreadRepo } from '../s
 import * as AuthService from '../../src/lib/services/auth-service'
 import * as PostService from '../../src/lib/services/post-service'
 import * as CurrencyService from '../../src/lib/services/currency-service'
-import { InMemoryUserRepo } from '../support/mock-installer'
 
 // ---------------------------------------------------------------------------
 // テスト用定数

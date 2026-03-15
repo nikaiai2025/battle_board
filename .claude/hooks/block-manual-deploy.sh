@@ -12,7 +12,7 @@ COMMAND=$(jq -r '.tool_input.command')
 FIRST_LINE=$(echo "$COMMAND" | head -1)
 
 # wrangler deploy（手動デプロイ）
-if echo "$FIRST_LINE" | grep -qE '(npx\s+)?wrangler\s+deploy'; then
+if echo "$FIRST_LINE" | grep -qE '(npx\s+)?wrangler\s+deploy(\s|$)'; then
   jq -n '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
