@@ -22,7 +22,11 @@ import path from "path";
 import { parse as parseYaml } from "yaml";
 import type { DeductReason } from "../domain/models/currency";
 import { parseCommand } from "../domain/rules/command-parser";
-import type { AccusationService } from "./accusation-service";
+import {
+	type AccusationBonusConfig,
+	type AccusationService,
+	createAccusationService,
+} from "./accusation-service";
 import type * as CurrencyServiceType from "./currency-service";
 import { GrassHandler } from "./handlers/grass-handler";
 import { TellHandler } from "./handlers/tell-handler";
@@ -111,6 +115,10 @@ interface CommandConfig {
 	targetFormat: string | null;
 	enabled: boolean;
 	stealth: boolean;
+	/** 告発成功時のボーナス額（tell コマンド専用） */
+	hitBonus?: number;
+	/** 冤罪ボーナス額（tell コマンド専用） */
+	falseAccusationBonus?: number;
 }
 
 /** config/commands.yaml のルート型 */
@@ -168,12 +176,12 @@ export class CommandService {
 
 	/**
 	 * @param currencyService - 通貨操作サービス（DI。テスト時はモックを注入する）
-	 * @param accusationService - AI告発サービス（DI。TellHandler に注入する）
+	 * @param accusationService - AI告発サービス（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
 	 * @param commandsYamlPath - commands.yaml のファイルパス（省略時はデフォルトパス）
 	 */
 	constructor(
 		private readonly currencyService: ICurrencyService,
-		private readonly accusationService: AccusationService,
+		accusationService?: AccusationService | null,
 		commandsYamlPath?: string,
 	) {
 		// config/commands.yaml を読み込み、Registry を構築する
@@ -186,12 +194,28 @@ export class CommandService {
 		this.configs = new Map();
 		this.registry = new Map();
 
+		// YAML から tell コマンドの経済パラメータを抽出する
+		// AccusationService が未提供の場合、YAML設定値で内部生成する
+		// See: config/commands.yaml > tell.hitBonus, tell.falseAccusationBonus, tell.cost
+		const tellConfig = parsed.commands.tell;
+		let resolvedAccusationService: AccusationService;
+		if (accusationService) {
+			resolvedAccusationService = accusationService;
+		} else {
+			const bonusConfig: AccusationBonusConfig = {
+				hitBonus: tellConfig?.hitBonus ?? 20,
+				falseAccusationBonus: tellConfig?.falseAccusationBonus ?? 10,
+				cost: tellConfig?.cost ?? 10,
+			};
+			resolvedAccusationService = createAccusationService(bonusConfig);
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
 		const handlers: CommandHandler[] = [
 			new GrassHandler(),
-			new TellHandler(this.accusationService),
+			new TellHandler(resolvedAccusationService),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();

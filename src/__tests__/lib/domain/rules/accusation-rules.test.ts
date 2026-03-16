@@ -7,24 +7,33 @@
  * テスト方針:
  *   - 純粋関数のため外部依存なし。モック不要。
  *   - 全判定パスとエッジケースを網羅する。
+ *   - ボーナス額は引数で渡される（ハードコード定数は削除済み）。
  *
  * カバレッジ対象:
  *   - checkAccusationAllowed: 自分自身の書き込みチェック / システムメッセージチェック
- *   - calculateBonus: hit時/miss時のボーナス額計算
+ *   - calculateBonus: hit時/miss時のボーナス額計算（引数ベース）
  *   - buildHitSystemMessage: hit時のシステムメッセージ生成
  *   - buildMissSystemMessage: miss時のシステムメッセージ生成
  */
 
 import { describe, expect, it } from "vitest";
 import {
-	ACCUSATION_HIT_BONUS,
 	type AccusationCheckInput,
 	buildHitSystemMessage,
 	buildMissSystemMessage,
 	calculateBonus,
 	checkAccusationAllowed,
-	FALSE_ACCUSATION_BONUS,
 } from "../../../../lib/domain/rules/accusation-rules";
+
+// ---------------------------------------------------------------------------
+// テスト用定数（config/commands.yaml の値と一致）
+// ---------------------------------------------------------------------------
+
+/** 告発成功ボーナス（config/commands.yaml tell.hitBonus） */
+const HIT_BONUS = 20;
+
+/** 冤罪ボーナス（config/commands.yaml tell.falseAccusationBonus） */
+const FALSE_ACCUSATION_BONUS = 10;
 
 // ===========================================================================
 // checkAccusationAllowed
@@ -158,32 +167,47 @@ describe("checkAccusationAllowed", () => {
 // ===========================================================================
 
 describe("calculateBonus", () => {
-	it("hit（AIボット）の場合、告発者にACCUSATION_HIT_BONUSが付与される", () => {
-		// See: features/phase2/ai_accusation.feature @告発成功ボーナスが告発者に付与される
-		const result = calculateBonus(true);
+	it("hit（AIボット）の場合、告発者にhitBonusが付与される", () => {
+		// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+		const result = calculateBonus(true, HIT_BONUS, FALSE_ACCUSATION_BONUS);
 
-		expect(result.accuserBonus).toBe(ACCUSATION_HIT_BONUS);
+		expect(result.accuserBonus).toBe(HIT_BONUS);
 		expect(result.targetBonus).toBe(0);
 	});
 
-	it("miss（人間）の場合、被告発者にFALSE_ACCUSATION_BONUSが付与される", () => {
-		// See: features/phase2/ai_accusation.feature @被告発者に冤罪ボーナスが付与される
-		const result = calculateBonus(false);
+	it("miss（人間）の場合、被告発者にfalseAccusationBonusが付与される", () => {
+		// See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+		const result = calculateBonus(false, HIT_BONUS, FALSE_ACCUSATION_BONUS);
 
 		expect(result.accuserBonus).toBe(0);
 		expect(result.targetBonus).toBe(FALSE_ACCUSATION_BONUS);
 	});
 
-	it("hit時のボーナス額が告発コストの2倍（100）である", () => {
-		const result = calculateBonus(true);
+	it("hit時のボーナス額が引数で渡した値（20）である", () => {
+		const result = calculateBonus(true, 20, 10);
 
-		expect(result.accuserBonus).toBe(100);
+		expect(result.accuserBonus).toBe(20);
 	});
 
-	it("miss時の冤罪ボーナス額が告発コストと同額（50）である", () => {
-		const result = calculateBonus(false);
+	it("miss時の冤罪ボーナス額が引数で渡した値（10）である", () => {
+		const result = calculateBonus(false, 20, 10);
 
-		expect(result.targetBonus).toBe(50);
+		expect(result.targetBonus).toBe(10);
+	});
+
+	it("異なるボーナス値を渡した場合もそのまま使用される", () => {
+		const result = calculateBonus(true, 999, 500);
+
+		expect(result.accuserBonus).toBe(999);
+		expect(result.targetBonus).toBe(0);
+	});
+
+	it("ボーナス値0を渡した場合もそのまま使用される（境界値）", () => {
+		const resultHit = calculateBonus(true, 0, 0);
+		expect(resultHit.accuserBonus).toBe(0);
+
+		const resultMiss = calculateBonus(false, 0, 0);
+		expect(resultMiss.targetBonus).toBe(0);
 	});
 });
 
@@ -194,37 +218,37 @@ describe("calculateBonus", () => {
 describe("buildHitSystemMessage", () => {
 	it("告発成功のシステムメッセージに告発者のdailyIdが含まれる", () => {
 		// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
-		const message = buildHitSystemMessage("AbCd1234", 5, 100);
+		const message = buildHitSystemMessage("AbCd1234", 5, 20);
 
 		expect(message).toContain("AbCd1234");
 	});
 
 	it("告発成功のシステムメッセージに対象レス番号が含まれる", () => {
-		const message = buildHitSystemMessage("AbCd1234", 5, 100);
+		const message = buildHitSystemMessage("AbCd1234", 5, 20);
 
 		expect(message).toContain(">>5");
 	});
 
 	it("告発成功のシステムメッセージにボーナス額が含まれる", () => {
-		const message = buildHitSystemMessage("AbCd1234", 5, 100);
+		const message = buildHitSystemMessage("AbCd1234", 5, 20);
 
-		expect(message).toContain("+100");
+		expect(message).toContain("+20");
 	});
 
 	it("告発成功のシステムメッセージに[システム]ヘッダが含まれる", () => {
-		const message = buildHitSystemMessage("AbCd1234", 5, 100);
+		const message = buildHitSystemMessage("AbCd1234", 5, 20);
 
 		expect(message).toContain("[システム]");
 	});
 
 	it("告発成功のシステムメッセージにAI判定結果が含まれる", () => {
-		const message = buildHitSystemMessage("AbCd1234", 5, 100);
+		const message = buildHitSystemMessage("AbCd1234", 5, 20);
 
 		expect(message).toContain("AIでした");
 	});
 
 	it("レス番号1の場合も正しくフォーマットされる（境界値）", () => {
-		const message = buildHitSystemMessage("Test0001", 1, 100);
+		const message = buildHitSystemMessage("Test0001", 1, 20);
 
 		expect(message).toContain(">>1");
 	});
@@ -243,70 +267,50 @@ describe("buildHitSystemMessage", () => {
 describe("buildMissSystemMessage", () => {
 	it("冤罪のシステムメッセージに告発者のdailyIdが含まれる", () => {
 		// See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
 		expect(message).toContain("AbCd1234");
 	});
 
 	it("冤罪のシステムメッセージに被告発者のdailyIdが含まれる", () => {
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
 		expect(message).toContain("XyZw5678");
 	});
 
 	it("冤罪のシステムメッセージに対象レス番号が含まれる", () => {
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
 		expect(message).toContain(">>5");
 	});
 
 	it("冤罪のシステムメッセージに告発コスト額が含まれる", () => {
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
-		expect(message).toContain("-50");
+		expect(message).toContain("-10");
 	});
 
 	it("冤罪のシステムメッセージに冤罪ボーナス額が含まれる", () => {
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
-		expect(message).toContain("+50");
+		expect(message).toContain("+10");
 	});
 
 	it("冤罪のシステムメッセージに人間判定結果が含まれる", () => {
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
 		expect(message).toContain("人間でした");
 	});
 
 	it("冤罪のシステムメッセージに[システム]ヘッダが含まれる", () => {
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
 		expect(message).toContain("[システム]");
 	});
 
 	it("冤罪のシステムメッセージに冤罪ボーナスの獲得メッセージが含まれる", () => {
-		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 50, 50);
+		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
 		expect(message).toContain("冤罪ボーナス");
-	});
-});
-
-// ===========================================================================
-// 定数値の検証
-// ===========================================================================
-
-describe("ボーナス定数", () => {
-	it("ACCUSATION_HIT_BONUS は正の整数である", () => {
-		expect(ACCUSATION_HIT_BONUS).toBeGreaterThan(0);
-		expect(Number.isInteger(ACCUSATION_HIT_BONUS)).toBe(true);
-	});
-
-	it("FALSE_ACCUSATION_BONUS は正の整数である", () => {
-		expect(FALSE_ACCUSATION_BONUS).toBeGreaterThan(0);
-		expect(Number.isInteger(FALSE_ACCUSATION_BONUS)).toBe(true);
-	});
-
-	it("ACCUSATION_HIT_BONUS は FALSE_ACCUSATION_BONUS より大きい（告発成功のインセンティブが冤罪ボーナスを上回る）", () => {
-		expect(ACCUSATION_HIT_BONUS).toBeGreaterThan(FALSE_ACCUSATION_BONUS);
 	});
 });

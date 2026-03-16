@@ -38,7 +38,7 @@ BeforeAll(() => {
  *
  * See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル > Before
  */
-Before(function (this: BattleBoardWorld, scenario: any) {
+Before(async function (this: BattleBoardWorld, scenario: any) {
 	// インメモリストアを全てクリアする
 	resetAllStores();
 
@@ -58,6 +58,30 @@ Before(function (this: BattleBoardWorld, scenario: any) {
 
 	// World 状態をリセットする
 	this.reset();
+
+	// AI告発シナリオの場合、デフォルトユーザーをセットアップする。
+	// common.steps.ts の「ユーザーの通貨残高が N である」ステップが
+	// this.currentUserId を前提とするため、ここで事前にユーザーを生成する。
+	// デフォルト残高を200に設定（通貨残高指定のないシナリオでも告発可能にする）。
+	// See: features/phase2/ai_accusation.feature
+	if (isAccusationScenario) {
+		const { InMemoryCurrencyRepo, InMemoryUserRepo } =
+			require("./mock-installer");
+		const AuthService =
+			require("../../src/lib/services/auth-service") as typeof import("../../src/lib/services/auth-service");
+		const ipHash = "bdd-test-ip-hash-accusation";
+		const { token, userId } = await AuthService.issueEdgeToken(ipHash);
+		this.currentEdgeToken = token;
+		this.currentUserId = userId;
+		this.currentIpHash = ipHash;
+		(this as any)._accuserDailyId = userId.slice(0, 8);
+		await InMemoryUserRepo.updateIsVerified(userId, true);
+		InMemoryCurrencyRepo._upsert({
+			userId,
+			balance: 200,
+			updatedAt: new Date(),
+		});
+	}
 });
 
 // ---------------------------------------------------------------------------

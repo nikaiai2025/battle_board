@@ -2,30 +2,12 @@
  * accusation-rules — AI告発の判定純粋関数
  *
  * 外部依存なしの純粋関数。テストが容易でドメインロジックのみを担う。
+ * ボーナス額は config/commands.yaml で定義し、呼び出し元から引数で受け取る。
  *
  * See: features/phase2/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
  * See: docs/architecture/architecture.md §3.2 > domain/rules: 純粋関数
  */
-
-// ---------------------------------------------------------------------------
-// ボーナス額定数（config/commands.yaml の cost: 50 に対応した合理的デフォルト値）
-// ---------------------------------------------------------------------------
-
-/**
- * 告発成功（hit）時に告発者に付与するボーナス額。
- * 告発コスト（50）の2倍。成功リターンを高くすることで告発意欲を促進する。
- * See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
- */
-export const ACCUSATION_HIT_BONUS = 100;
-
-/**
- * 告発失敗（miss）時に被告発者（人間）に付与する冤罪ボーナス額。
- * 告発コスト（50）と同額。冤罪を受けた補償として、かつAIのフリ戦略の創発を促す。
- * See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
- * See: features/phase2/ai_accusation.feature @人間がAIっぽく振る舞い告発を誘って冤罪ボーナスを稼ぐ
- */
-export const FALSE_ACCUSATION_BONUS = 50;
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -110,27 +92,35 @@ export function checkAccusationAllowed(
 /**
  * 告発結果に応じたボーナス額を計算する。
  *
- * - hit（AIボット）: 告発者に ACCUSATION_HIT_BONUS を付与。被告発者へのボーナスなし。
- * - miss（人間）: 告発者へのボーナスなし。被告発者に FALSE_ACCUSATION_BONUS を付与。
+ * - hit（AIボット）: 告発者に hitBonus を付与。被告発者へのボーナスなし。
+ * - miss（人間）: 告発者へのボーナスなし。被告発者に falseAccusationBonus を付与。
  *
- * See: features/phase2/ai_accusation.feature @告発成功ボーナスが告発者に付与される
- * See: features/phase2/ai_accusation.feature @被告発者に冤罪ボーナスが付与される
+ * ボーナス額は config/commands.yaml から読み込まれ、引数として渡される。
+ *
+ * See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+ * See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
  *
  * @param isBot - 対象レスがAIボットの書き込みかどうか
+ * @param hitBonus - 告発成功時に告発者に付与するボーナス額
+ * @param falseAccusationBonus - 告発失敗時に被告発者に付与する冤罪ボーナス額
  * @returns ボーナス計算結果
  */
-export function calculateBonus(isBot: boolean): BonusCalculationResult {
+export function calculateBonus(
+	isBot: boolean,
+	hitBonus: number,
+	falseAccusationBonus: number,
+): BonusCalculationResult {
 	if (isBot) {
 		// hit: 告発者に成功ボーナスを付与
 		return {
-			accuserBonus: ACCUSATION_HIT_BONUS,
+			accuserBonus: hitBonus,
 			targetBonus: 0,
 		};
 	} else {
 		// miss: 被告発者に冤罪ボーナスを付与
 		return {
 			accuserBonus: 0,
-			targetBonus: FALSE_ACCUSATION_BONUS,
+			targetBonus: falseAccusationBonus,
 		};
 	}
 }

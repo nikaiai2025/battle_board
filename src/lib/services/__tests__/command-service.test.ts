@@ -56,10 +56,12 @@ const COMMANDS_YAML_FULL = `
 commands:
   tell:
     description: "指定レスをAIだと告発する"
-    cost: 50
+    cost: 10
     targetFormat: ">>postNumber"
     enabled: true
     stealth: false
+    hitBonus: 20
+    falseAccusationBonus: 10
   w:
     description: "指定レスに草を生やす"
     cost: 0
@@ -73,10 +75,12 @@ const COMMANDS_YAML_WITH_DISABLED = `
 commands:
   tell:
     description: "指定レスをAIだと告発する"
-    cost: 50
+    cost: 10
     targetFormat: ">>postNumber"
     enabled: false
     stealth: false
+    hitBonus: 20
+    falseAccusationBonus: 10
   w:
     description: "指定レスに草を生やす"
     cost: 0
@@ -123,7 +127,7 @@ function createMockAccusationService(): AccusationService {
 	return {
 		accuse: vi.fn().mockResolvedValue({
 			result: "hit",
-			bonusAmount: 100,
+			bonusAmount: 20,
 			systemMessage: "[システム] AI告発成功！",
 			alreadyAccused: false,
 		}),
@@ -270,20 +274,20 @@ commands:
 			const result = await service.executeCommand(createInput("!tell >>5"));
 
 			expect(result).not.toBeNull();
-			// currencyCost が消費額（50）を返す
+			// currencyCost が消費額（10）を返す
 			// D-08 command.md §5: 「コマンド失敗時に通貨を戻す補償処理は行わない」
-			expect(result!.currencyCost).toBe(50);
+			expect(result!.currencyCost).toBe(10);
 			// deduct が呼ばれた
 			expect(currencyService.deduct).toHaveBeenCalledWith(
 				"user-uuid-001",
-				50,
+				10,
 				"command_tell",
 			);
 		});
 
 		it(// See: features/phase2/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
 		"通貨不足の場合はコマンドが実行されずエラーメッセージが返される", async () => {
-			const currencyService = createMockCurrencyService(10); // 残高10、コスト50
+			const currencyService = createMockCurrencyService(5); // 残高5、コスト10
 			const service = new CommandService(currencyService, accusationService);
 
 			const result = await service.executeCommand(createInput("!tell >>5"));
@@ -295,7 +299,7 @@ commands:
 		});
 
 		it("通貨不足の場合は deduct が呼ばれない", async () => {
-			const currencyService = createMockCurrencyService(10);
+			const currencyService = createMockCurrencyService(5);
 			const service = new CommandService(currencyService, accusationService);
 
 			await service.executeCommand(createInput("!tell >>5"));
@@ -407,7 +411,7 @@ commands:
 			// !tell が実行され、deduct が呼ばれる（コスト50）
 			expect(currencyService.deduct).toHaveBeenCalledWith(
 				"user-uuid-001",
-				50,
+				10,
 				"command_tell",
 			);
 		});
@@ -424,7 +428,7 @@ commands:
 		});
 
 		it("残高がちょうどコストと同額の場合はコマンドが実行される", async () => {
-			const currencyService = createMockCurrencyService(50); // 残高50、コスト50
+			const currencyService = createMockCurrencyService(10); // 残高10、コスト10
 			const service = new CommandService(currencyService, accusationService);
 
 			const result = await service.executeCommand(createInput("!tell >>5"));

@@ -37,6 +37,7 @@ Phase 2 Step 1（コマンド基盤）・Step 2（!tell告発）実装完了。c
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-28 | ai_accusation.feature改訂 + 告発経済パラメータ集約 | completed | `tmp/orchestrator/sprint_28_plan.md` |
 | Sprint-27 | Phase 2 Step 2: !tell ハンドラ + AccusationService実装 | completed | `tmp/orchestrator/sprint_27_plan.md` |
 | Sprint-26 | 専ブラ絵文字バグ修正（HTML数値参照→UTF-8逆変換） | completed | `tmp/orchestrator/sprint_26_plan.md` |
 | Sprint-25 | BDD失敗10件修正（incentive二段階評価 + mypage★置換 + admin削除コメント） | completed | `tmp/orchestrator/sprint_25_plan.md` |

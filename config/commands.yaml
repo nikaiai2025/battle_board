@@ -12,10 +12,12 @@
 commands:
   tell:
     description: "指定レスをAIだと告発する"
-    cost: 50
+    cost: 10
     targetFormat: ">>postNumber"
     enabled: true
     stealth: false
+    hitBonus: 20
+    falseAccusationBonus: 10
   w:
     description: "指定レスに草を生やす"
     cost: 0
