@@ -24,31 +24,42 @@ import iconv from "iconv-lite";
  * 2. 異体字セレクタ (U+FE0F=65039, U+FE0E=65038) は除去（空文字に変換）する
  * 3. 有効なUnicodeコードポイントは String.fromCodePoint(N) でUTF-8文字に変換する
  * 4. 無効なコードポイント（RangeError）はそのまま残す
+ * 5. U+FFFD (Replacement Character) を除去する
+ *    - ChMateがVariation Selector等をHTML数値参照ではなくUTF-8生バイトで送信した場合、
+ *      TextDecoder("shift_jis")が未知バイトをU+FFFDに変換する。
+ *    - U+FFFDはShift_JISデコード時の不正バイト残骸であり、ユーザーが意図的に入力する文字ではないため除去する。
  *
  * NOTE: &#x形式（16進数）はChMateが使用しないため対象外とする。
  *
  * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  *
  * @param text - デコード対象のUTF-8文字列（HTML数値参照を含む可能性がある）
- * @returns HTML数値参照をUTF-8文字に逆変換した文字列
+ * @returns HTML数値参照をUTF-8文字に逆変換し、U+FFFDを除去した文字列
  */
 export function decodeHtmlNumericReferences(text: string): string {
-	return text.replace(/&#(\d+);/g, (_match, numStr: string) => {
-		const codePoint = parseInt(numStr, 10);
-		// 異体字セレクタ（U+FE0F, U+FE0E）は除去する
-		// 専ブラ閲覧時に sanitizeForCp932 でも除去されるが、書き込み時点で除去することで
-		// DBデータをクリーンに保つ
-		if (codePoint === 0xfe0f || codePoint === 0xfe0e) {
-			return "";
-		}
-		// 有効なUnicodeコードポイントならUTF-8文字に変換する
-		try {
-			return String.fromCodePoint(codePoint);
-		} catch {
-			// 無効なコードポイント（RangeError）はそのまま残す
-			return _match;
-		}
-	});
+	return (
+		text
+			.replace(/&#(\d+);/g, (_match, numStr: string) => {
+				const codePoint = parseInt(numStr, 10);
+				// 異体字セレクタ（U+FE0F, U+FE0E）は除去する
+				// 専ブラ閲覧時に sanitizeForCp932 でも除去されるが、書き込み時点で除去することで
+				// DBデータをクリーンに保つ
+				if (codePoint === 0xfe0f || codePoint === 0xfe0e) {
+					return "";
+				}
+				// 有効なUnicodeコードポイントならUTF-8文字に変換する
+				try {
+					return String.fromCodePoint(codePoint);
+				} catch {
+					// 無効なコードポイント（RangeError）はそのまま残す
+					return _match;
+				}
+			})
+			// U+FFFD (Replacement Character) を除去する。
+			// Shift_JISデコード時に未知バイトへ挿入される文字であり、
+			// 専ブラ書き込み経路でこの文字が残っている場合は不正バイト列の残骸のため除去が正しい。
+			.replace(/\uFFFD/g, "")
+	);
 }
 
 /**

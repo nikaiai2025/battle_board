@@ -41,8 +41,22 @@
 | TASK_ID | 担当 | 内容 | 依存 | ステータス |
 |---|---|---|---|---|
 | TASK-075 | bdd-architect | 絵文字エンコーディング全経路分析 + 16パターン挙動推定 + 修正方針 | なし | completed |
-| TASK-076 | bdd-coding | bbs.cgi受信時HTML数値参照→UTF-8逆変換 + 単体テスト | TASK-075 | assigned |
+| TASK-076 | bdd-coding | bbs.cgi受信時HTML数値参照→UTF-8逆変換 + 単体テスト | TASK-075 | completed |
 
 ## 結果
 
-（実行後に記載）
+全タスク completed。
+
+### テスト結果
+- vitest: 20ファイル / 689テスト / 全PASS（Sprint-25の672 → +17）
+- tsc: エラー0件
+- cucumber-js: 108シナリオ (105 passed, 3 pending, 0 failed)
+
+### 実装サマリー
+- `decodeHtmlNumericReferences()`: `&#(\d+);` → UTF-8逆変換、VS(U+FE0F/U+FE0E)除去
+- bbs.cgi route: MESSAGE/name/subject に逆変換適用
+- 単体テスト18件追加
+
+### 次のステップ
+- 実機での16パターン再検証（デプロイ後に実施）
+- BOT_EMOJI_REPLACEMENTSは現行で適切（変更不要）

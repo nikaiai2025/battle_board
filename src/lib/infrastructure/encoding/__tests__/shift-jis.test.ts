@@ -662,4 +662,44 @@ describe("decodeHtmlNumericReferences()", () => {
 		expect(decodeHtmlNumericReferences("& # ;")).toBe("& # ;");
 		expect(decodeHtmlNumericReferences("&#;")).toBe("&#;");
 	});
+
+	// --- U+FFFD (Replacement Character) 除去 ---
+	// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+
+	it("U+FFFD (Replacement Character) が除去される", () => {
+		// ChMateがVariation Selector (U+FE0F等) をHTML数値参照ではなくUTF-8生バイトで送信した場合、
+		// TextDecoder("shift_jis") が未知バイトをU+FFFDに変換する。
+		// U+FFFDはShift_JISデコード時の不正バイト残骸であり、ユーザーが意図的に入力する文字ではないため除去する。
+		expect(decodeHtmlNumericReferences("\uFFFD")).toBe("");
+	});
+
+	it("絵文字の後に続くU+FFFDが除去される（🕳\\uFFFD → 🕳）", () => {
+		// 🕳 + U+FFFD（生バイト経由のVariation Selectorが化けた場合）
+		expect(decodeHtmlNumericReferences("🕳\uFFFD")).toBe("🕳");
+	});
+
+	it("テキスト中のU+FFFDが除去される（テスト\\uFFFDです → テストです）", () => {
+		// 日本語テキスト中に混入したReplacement Characterを除去する
+		expect(decodeHtmlNumericReferences("テスト\uFFFDです")).toBe("テストです");
+	});
+
+	it("U+FFFDが複数ある場合、全て除去される", () => {
+		// 複数のU+FFFDがあっても全て除去されること
+		expect(decodeHtmlNumericReferences("\uFFFDテスト\uFFFD文字\uFFFD")).toBe(
+			"テスト文字",
+		);
+	});
+
+	it("U+FFFDが含まれない文字列は変化しない", () => {
+		// 副作用がないことを確認
+		expect(decodeHtmlNumericReferences("普通のテキスト")).toBe(
+			"普通のテキスト",
+		);
+	});
+
+	it("HTML数値参照変換後にU+FFFDが残る場合も除去される（複合ケース）", () => {
+		// HTML数値参照の変換とU+FFFD除去の両方が正しく動作すること
+		// 😀(&#128512;) + U+FFFD
+		expect(decodeHtmlNumericReferences("&#128512;\uFFFD")).toBe("😀");
+	});
 });
