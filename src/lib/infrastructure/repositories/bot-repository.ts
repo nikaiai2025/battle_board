@@ -6,10 +6,11 @@
  *
  * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > bots
  * See: docs/architecture/architecture.md §10.1.1 RLSポリシー設計
+ * See: docs/architecture/components/bot.md §5.1 bots テーブル変更 (v5)
  */
 
-import { supabaseAdmin } from '../supabase/client';
-import type { Bot } from '../../domain/models/bot';
+import type { Bot } from "../../domain/models/bot";
+import { supabaseAdmin } from "../supabase/client";
 
 // ---------------------------------------------------------------------------
 // DB レコード型（snake_case）
@@ -17,22 +18,26 @@ import type { Bot } from '../../domain/models/bot';
 
 /** bots テーブルの生レコード型 */
 interface BotRow {
-  id: string;
-  name: string;
-  persona: string;
-  hp: number;
-  max_hp: number;
-  daily_id: string;
-  daily_id_date: string;
-  is_active: boolean;
-  is_revealed: boolean;
-  revealed_at: string | null;
-  survival_days: number;
-  total_posts: number;
-  accused_count: number;
-  eliminated_at: string | null;
-  eliminated_by: string | null;
-  created_at: string;
+	id: string;
+	name: string;
+	persona: string;
+	hp: number;
+	max_hp: number;
+	daily_id: string;
+	daily_id_date: string;
+	is_active: boolean;
+	is_revealed: boolean;
+	revealed_at: string | null;
+	survival_days: number;
+	total_posts: number;
+	accused_count: number;
+	/** v5追加: 被攻撃回数。撃破報酬計算に使用する */
+	times_attacked: number;
+	/** v5追加: config/bot_profiles.yaml のプロファイルキー */
+	bot_profile_key: string | null;
+	eliminated_at: string | null;
+	eliminated_by: string | null;
+	created_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -43,24 +48,26 @@ interface BotRow {
  * DB レコード（snake_case）をドメインモデル（camelCase）に変換する。
  */
 function rowToBot(row: BotRow): Bot {
-  return {
-    id: row.id,
-    name: row.name,
-    persona: row.persona,
-    hp: row.hp,
-    maxHp: row.max_hp,
-    dailyId: row.daily_id,
-    dailyIdDate: row.daily_id_date,
-    isActive: row.is_active,
-    isRevealed: row.is_revealed,
-    revealedAt: row.revealed_at ? new Date(row.revealed_at) : null,
-    survivalDays: row.survival_days,
-    totalPosts: row.total_posts,
-    accusedCount: row.accused_count,
-    eliminatedAt: row.eliminated_at ? new Date(row.eliminated_at) : null,
-    eliminatedBy: row.eliminated_by,
-    createdAt: new Date(row.created_at),
-  };
+	return {
+		id: row.id,
+		name: row.name,
+		persona: row.persona,
+		hp: row.hp,
+		maxHp: row.max_hp,
+		dailyId: row.daily_id,
+		dailyIdDate: row.daily_id_date,
+		isActive: row.is_active,
+		isRevealed: row.is_revealed,
+		revealedAt: row.revealed_at ? new Date(row.revealed_at) : null,
+		survivalDays: row.survival_days,
+		totalPosts: row.total_posts,
+		accusedCount: row.accused_count,
+		timesAttacked: row.times_attacked,
+		botProfileKey: row.bot_profile_key,
+		eliminatedAt: row.eliminated_at ? new Date(row.eliminated_at) : null,
+		eliminatedBy: row.eliminated_by,
+		createdAt: new Date(row.created_at),
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -75,29 +82,33 @@ function rowToBot(row: BotRow): Bot {
  * @param column インクリメント対象のカラム名
  */
 async function incrementColumn(
-  botId: string,
-  column: 'total_posts' | 'accused_count' | 'survival_days'
+	botId: string,
+	column: "total_posts" | "accused_count" | "survival_days" | "times_attacked",
 ): Promise<void> {
-  const { data: row, error: fetchError } = await supabaseAdmin
-    .from('bots')
-    .select(column)
-    .eq('id', botId)
-    .single();
+	const { data: row, error: fetchError } = await supabaseAdmin
+		.from("bots")
+		.select(column)
+		.eq("id", botId)
+		.single();
 
-  if (fetchError) {
-    throw new Error(`BotRepository.increment(${column}) fetch failed: ${fetchError.message}`);
-  }
+	if (fetchError) {
+		throw new Error(
+			`BotRepository.increment(${column}) fetch failed: ${fetchError.message}`,
+		);
+	}
 
-  const current = (row as Record<string, number>)[column];
+	const current = (row as Record<string, number>)[column];
 
-  const { error: updateError } = await supabaseAdmin
-    .from('bots')
-    .update({ [column]: current + 1 })
-    .eq('id', botId);
+	const { error: updateError } = await supabaseAdmin
+		.from("bots")
+		.update({ [column]: current + 1 })
+		.eq("id", botId);
 
-  if (updateError) {
-    throw new Error(`BotRepository.increment(${column}) update failed: ${updateError.message}`);
-  }
+	if (updateError) {
+		throw new Error(
+			`BotRepository.increment(${column}) update failed: ${updateError.message}`,
+		);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -110,21 +121,21 @@ async function incrementColumn(
  * @returns 該当ボット、または存在しない場合は null
  */
 export async function findById(id: string): Promise<Bot | null> {
-  const { data, error } = await supabaseAdmin
-    .from('bots')
-    .select('*')
-    .eq('id', id)
-    .single();
+	const { data, error } = await supabaseAdmin
+		.from("bots")
+		.select("*")
+		.eq("id", id)
+		.single();
 
-  if (error) {
-    // PGRST116: 行が見つからない
-    if (error.code === 'PGRST116') {
-      return null;
-    }
-    throw new Error(`BotRepository.findById failed: ${error.message}`);
-  }
+	if (error) {
+		// PGRST116: 行が見つからない
+		if (error.code === "PGRST116") {
+			return null;
+		}
+		throw new Error(`BotRepository.findById failed: ${error.message}`);
+	}
 
-  return data ? rowToBot(data as BotRow) : null;
+	return data ? rowToBot(data as BotRow) : null;
 }
 
 /**
@@ -132,50 +143,78 @@ export async function findById(id: string): Promise<Bot | null> {
  * @returns 活動中ボットの配列
  */
 export async function findActive(): Promise<Bot[]> {
-  const { data, error } = await supabaseAdmin
-    .from('bots')
-    .select('*')
-    .eq('is_active', true);
+	const { data, error } = await supabaseAdmin
+		.from("bots")
+		.select("*")
+		.eq("is_active", true);
 
-  if (error) {
-    throw new Error(`BotRepository.findActive failed: ${error.message}`);
-  }
+	if (error) {
+		throw new Error(`BotRepository.findActive failed: ${error.message}`);
+	}
 
-  return (data as BotRow[]).map(rowToBot);
+	return (data as BotRow[]).map(rowToBot);
+}
+
+/**
+ * 全ボットを取得する（is_active フラグ問わず）。
+ * 日次リセット処理で全ボットを対象にする場合に使用する。
+ * See: docs/architecture/components/bot.md §2.10 日次リセット処理
+ *
+ * @returns 全ボットの配列
+ */
+export async function findAll(): Promise<Bot[]> {
+	const { data, error } = await supabaseAdmin.from("bots").select("*");
+
+	if (error) {
+		throw new Error(`BotRepository.findAll failed: ${error.message}`);
+	}
+
+	return (data as BotRow[]).map(rowToBot);
 }
 
 /**
  * 新規ボットを作成する。
- * id, createdAt, survivalDays, totalPosts, accusedCount, eliminatedAt, eliminatedBy は
- * DB デフォルト値で生成されるため、入力から除外する。
+ * id, createdAt, survivalDays, totalPosts, accusedCount, timesAttacked,
+ * eliminatedAt, eliminatedBy は DB デフォルト値で生成されるため、入力から除外する。
  *
  * @param bot 作成するボットのデータ
  * @returns 作成されたボット（DB 生成フィールドを含む）
  */
 export async function create(
-  bot: Omit<Bot, 'id' | 'createdAt' | 'survivalDays' | 'totalPosts' | 'accusedCount' | 'eliminatedAt' | 'eliminatedBy'>
+	bot: Omit<
+		Bot,
+		| "id"
+		| "createdAt"
+		| "survivalDays"
+		| "totalPosts"
+		| "accusedCount"
+		| "timesAttacked"
+		| "eliminatedAt"
+		| "eliminatedBy"
+	>,
 ): Promise<Bot> {
-  const { data, error } = await supabaseAdmin
-    .from('bots')
-    .insert({
-      name: bot.name,
-      persona: bot.persona,
-      hp: bot.hp,
-      max_hp: bot.maxHp,
-      daily_id: bot.dailyId,
-      daily_id_date: bot.dailyIdDate,
-      is_active: bot.isActive,
-      is_revealed: bot.isRevealed,
-      revealed_at: bot.revealedAt?.toISOString() ?? null,
-    })
-    .select()
-    .single();
+	const { data, error } = await supabaseAdmin
+		.from("bots")
+		.insert({
+			name: bot.name,
+			persona: bot.persona,
+			hp: bot.hp,
+			max_hp: bot.maxHp,
+			daily_id: bot.dailyId,
+			daily_id_date: bot.dailyIdDate,
+			is_active: bot.isActive,
+			is_revealed: bot.isRevealed,
+			revealed_at: bot.revealedAt?.toISOString() ?? null,
+			bot_profile_key: bot.botProfileKey ?? null,
+		})
+		.select()
+		.single();
 
-  if (error) {
-    throw new Error(`BotRepository.create failed: ${error.message}`);
-  }
+	if (error) {
+		throw new Error(`BotRepository.create failed: ${error.message}`);
+	}
 
-  return rowToBot(data as BotRow);
+	return rowToBot(data as BotRow);
 }
 
 /**
@@ -184,14 +223,14 @@ export async function create(
  * @param hp 新しい HP 値
  */
 export async function updateHp(botId: string, hp: number): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('bots')
-    .update({ hp })
-    .eq('id', botId);
+	const { error } = await supabaseAdmin
+		.from("bots")
+		.update({ hp })
+		.eq("id", botId);
 
-  if (error) {
-    throw new Error(`BotRepository.updateHp failed: ${error.message}`);
-  }
+	if (error) {
+		throw new Error(`BotRepository.updateHp failed: ${error.message}`);
+	}
 }
 
 /**
@@ -203,36 +242,37 @@ export async function updateHp(botId: string, hp: number): Promise<void> {
  * @param dailyIdDate 偽装ID の発行日（YYYY-MM-DD）
  */
 export async function updateDailyId(
-  botId: string,
-  dailyId: string,
-  dailyIdDate: string
+	botId: string,
+	dailyId: string,
+	dailyIdDate: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('bots')
-    .update({ daily_id: dailyId, daily_id_date: dailyIdDate })
-    .eq('id', botId);
+	const { error } = await supabaseAdmin
+		.from("bots")
+		.update({ daily_id: dailyId, daily_id_date: dailyIdDate })
+		.eq("id", botId);
 
-  if (error) {
-    throw new Error(`BotRepository.updateDailyId failed: ${error.message}`);
-  }
+	if (error) {
+		throw new Error(`BotRepository.updateDailyId failed: ${error.message}`);
+	}
 }
 
 /**
  * ボットに BOTマークを付与する（is_revealed = true, revealed_at = 現在時刻）。
- * AI告発（!tell）成功時に呼ばれる。
+ * AI告発（!tell）成功時、または !attack による不意打ち成功時に呼ばれる。
  * See: docs/architecture/architecture.md §4.2 > bots.is_revealed
+ * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
  *
  * @param botId ボットの UUID
  */
 export async function reveal(botId: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('bots')
-    .update({ is_revealed: true, revealed_at: new Date().toISOString() })
-    .eq('id', botId);
+	const { error } = await supabaseAdmin
+		.from("bots")
+		.update({ is_revealed: true, revealed_at: new Date().toISOString() })
+		.eq("id", botId);
 
-  if (error) {
-    throw new Error(`BotRepository.reveal failed: ${error.message}`);
-  }
+	if (error) {
+		throw new Error(`BotRepository.reveal failed: ${error.message}`);
+	}
 }
 
 /**
@@ -242,34 +282,39 @@ export async function reveal(botId: string): Promise<void> {
  * @param botId ボットの UUID
  */
 export async function unreveal(botId: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('bots')
-    .update({ is_revealed: false, revealed_at: null })
-    .eq('id', botId);
+	const { error } = await supabaseAdmin
+		.from("bots")
+		.update({ is_revealed: false, revealed_at: null })
+		.eq("id", botId);
 
-  if (error) {
-    throw new Error(`BotRepository.unreveal failed: ${error.message}`);
-  }
+	if (error) {
+		throw new Error(`BotRepository.unreveal failed: ${error.message}`);
+	}
 }
 
 /**
  * ボットを撃破状態にする（is_active = false, eliminated_at = 現在時刻, eliminated_by = 撃破者ID）。
+ * See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+ *
  * @param botId ボットの UUID
  * @param eliminatedBy 撃破した人間ユーザーの user_id
  */
-export async function eliminate(botId: string, eliminatedBy: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('bots')
-    .update({
-      is_active: false,
-      eliminated_at: new Date().toISOString(),
-      eliminated_by: eliminatedBy,
-    })
-    .eq('id', botId);
+export async function eliminate(
+	botId: string,
+	eliminatedBy: string,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("bots")
+		.update({
+			is_active: false,
+			eliminated_at: new Date().toISOString(),
+			eliminated_by: eliminatedBy,
+		})
+		.eq("id", botId);
 
-  if (error) {
-    throw new Error(`BotRepository.eliminate failed: ${error.message}`);
-  }
+	if (error) {
+		throw new Error(`BotRepository.eliminate failed: ${error.message}`);
+	}
 }
 
 /**
@@ -277,7 +322,7 @@ export async function eliminate(botId: string, eliminatedBy: string): Promise<vo
  * @param botId ボットの UUID
  */
 export async function incrementTotalPosts(botId: string): Promise<void> {
-  await incrementColumn(botId, 'total_posts');
+	await incrementColumn(botId, "total_posts");
 }
 
 /**
@@ -285,7 +330,7 @@ export async function incrementTotalPosts(botId: string): Promise<void> {
  * @param botId ボットの UUID
  */
 export async function incrementAccusedCount(botId: string): Promise<void> {
-  await incrementColumn(botId, 'accused_count');
+	await incrementColumn(botId, "accused_count");
 }
 
 /**
@@ -295,5 +340,92 @@ export async function incrementAccusedCount(botId: string): Promise<void> {
  * @param botId ボットの UUID
  */
 export async function incrementSurvivalDays(botId: string): Promise<void> {
-  await incrementColumn(botId, 'survival_days');
+	await incrementColumn(botId, "survival_days");
+}
+
+/**
+ * ボットの被攻撃回数（times_attacked）を 1 インクリメントする。
+ * !attack コマンドによるダメージ処理時に呼ばれる。
+ * See: docs/architecture/components/bot.md §2.2 HP更新・ダメージ処理
+ * See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+ *
+ * @param botId ボットの UUID
+ */
+export async function incrementTimesAttacked(botId: string): Promise<void> {
+	await incrementColumn(botId, "times_attacked");
+}
+
+/**
+ * is_revealed = true の全ボットの BOTマークを一括解除する（revealed -> lurking）。
+ * 日次リセット処理で使用する。
+ * See: docs/specs/bot_state_transitions.yaml #daily_reset > revealed -> lurking
+ * See: features/未実装/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+ *
+ * @returns BOTマーク解除したボット数
+ */
+export async function bulkResetRevealed(): Promise<number> {
+	const { data, error } = await supabaseAdmin
+		.from("bots")
+		.update({ is_revealed: false, revealed_at: null })
+		.eq("is_revealed", true)
+		.select("id");
+
+	if (error) {
+		throw new Error(`BotRepository.bulkResetRevealed failed: ${error.message}`);
+	}
+
+	return ((data ?? []) as { id: string }[]).length;
+}
+
+/**
+ * eliminated 状態の全ボットを lurking に復活させる。
+ * HP を max_hp に戻し、survival_days・times_attacked を 0 にリセットする。
+ * 日次リセット処理で使用する。
+ * See: docs/specs/bot_state_transitions.yaml #daily_reset > eliminated -> lurking
+ * See: features/未実装/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
+ *
+ * @returns 復活させたボット数
+ */
+export async function bulkReviveEliminated(): Promise<number> {
+	// eliminated 状態 = is_active = false のボットを取得して max_hp を参照する必要がある。
+	// Supabase は UPDATE ... SET hp = max_hp のような自己参照 UPDATE をサポートしないため、
+	// 一度全件取得してから個別に更新する。
+	const { data: eliminated, error: fetchError } = await supabaseAdmin
+		.from("bots")
+		.select("id, max_hp")
+		.eq("is_active", false);
+
+	if (fetchError) {
+		throw new Error(
+			`BotRepository.bulkReviveEliminated fetch failed: ${fetchError.message}`,
+		);
+	}
+
+	const rows = eliminated as { id: string; max_hp: number }[];
+	if (rows.length === 0) return 0;
+
+	// 各ボットを復活させる（max_hp は bot ごとに異なりうるため個別 UPDATE）
+	for (const row of rows) {
+		const { error: updateError } = await supabaseAdmin
+			.from("bots")
+			.update({
+				is_active: true,
+				is_revealed: false,
+				hp: row.max_hp,
+				revealed_at: null,
+				eliminated_at: null,
+				eliminated_by: null,
+				survival_days: 0,
+				times_attacked: 0,
+			})
+			.eq("id", row.id);
+
+		if (updateError) {
+			throw new Error(
+				`BotRepository.bulkReviveEliminated update failed for bot ${row.id}: ${updateError.message}`,
+			);
+		}
+	}
+
+	return rows.length;
 }

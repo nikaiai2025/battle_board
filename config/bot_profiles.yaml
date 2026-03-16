@@ -1,0 +1,41 @@
+# config/bot_profiles.yaml
+# ボットプロファイル定義
+# See: docs/architecture/components/bot.md §4 隠蔽する実装詳細
+# See: docs/specs/bot_state_transitions.yaml #phase2_bots
+# See: docs/specs/bot_state_transitions.yaml #elimination_reward
+#
+# フィールド定義:
+#   hp              - 初期HP
+#   max_hp          - 最大HP
+#   reward          - 撃破報酬パラメータ
+#     base_reward   - 基本報酬
+#     daily_bonus   - 生存日数ボーナス（survival_days に乗算）
+#     attack_bonus  - 被攻撃ボーナス（times_attacked に乗算）
+#   fixed_messages  - 固定文リスト（書き込みランダム選択元）
+#
+# 撃破報酬計算式: base_reward + (survival_days * daily_bonus) + (times_attacked * attack_bonus)
+# See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+
+荒らし役:
+  hp: 10
+  max_hp: 10
+  reward:
+    base_reward: 10
+    daily_bonus: 50
+    attack_bonus: 5
+  fixed_messages:
+    - "なんJほんま覇権やな"
+    - "効いてて草"
+    - "貧乳なのにめちゃくちゃエロい"
+    - "【朗報】ワイ、参上"
+    - "ンゴンゴ"
+    - "草不可避"
+    - "せやな"
+    - "はえ〜すっごい"
+    - "それな"
+    - "ぐう畜"
+    - "まあ正直そうだよな"
+    - "どういうことだよ（困惑）"
+    - "ファ！？"
+    - "ンゴ..."
+    - "うーんこの"

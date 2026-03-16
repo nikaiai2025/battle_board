@@ -432,6 +432,9 @@ Given(
 		});
 
 		accusationState.postNumberToId.set(postNumber, postId);
+		// bot_system シナリオでも使用されるため world.botPostNumberToId にも登録する
+		// See: features/bot_system.feature @自分の書き込みに対して攻撃を試みると拒否される
+		this.botPostNumberToId.set(postNumber, postId);
 	},
 );
 
@@ -515,15 +518,28 @@ Then(
 		const expectedCost = parseInt(costStr, 10);
 		const expectedBalanceAfterCost = parseInt(expectedBalanceAfterCostStr, 10);
 
-		// コスト消費の論理検証: 変更前残高 - コスト = 期待残高
-		// 実際の残高はボーナス付与後の値になるため、変更前残高から計算で検証する
-		const actualCost =
-			accusationState.balanceBeforeAccusation - expectedBalanceAfterCost;
-		assert.strictEqual(
-			actualCost,
-			expectedCost,
-			`通貨消費の検証: 変更前残高=${accusationState.balanceBeforeAccusation}, 期待コスト=${expectedCost}, 実際コスト=${actualCost}`,
-		);
+		if (accusationState.balanceBeforeAccusation > 0) {
+			// AI告発シナリオ: コスト消費の論理検証
+			// 変更前残高 - コスト = 期待残高
+			// 実際の残高はボーナス付与後の値になるため、変更前残高から計算で検証する
+			const actualCost =
+				accusationState.balanceBeforeAccusation - expectedBalanceAfterCost;
+			assert.strictEqual(
+				actualCost,
+				expectedCost,
+				`通貨消費の検証: 変更前残高=${accusationState.balanceBeforeAccusation}, 期待コスト=${expectedCost}, 実際コスト=${actualCost}`,
+			);
+		} else {
+			// 非告発シナリオ（bot_system 等）: 現在残高を直接確認する
+			// See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+			const CurrencyService = getCurrencyService();
+			const balance = await CurrencyService.getBalance(this.currentUserId);
+			assert.strictEqual(
+				balance,
+				expectedBalanceAfterCost,
+				`通貨残高が ${expectedBalanceAfterCost} であることを期待しましたが ${balance} でした`,
+			);
+		}
 	},
 );
 

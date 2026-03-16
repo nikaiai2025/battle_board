@@ -24,35 +24,70 @@ function resolveFromRoot(relativePath) {
 }
 
 // ---------------------------------------------------------------------------
-// ダミー Supabase クライアント
+// インメモリ Supabase クライアント（supabase-client.ts から動的ロード）
 // ---------------------------------------------------------------------------
+// TASK-097: Phase 3 対応として、signUp / signInWithPassword 等の auth メソッドを
+// 持つインメモリ実装を使用する。
+// register-mocks.js はインタープリタ実行のため、TypeScript ファイルを直接 require する
+// には ts-node が必要。ここでは inline でコンパイル済みの CommonJS 互換モジュールを
+// 使うか、あるいはインメモリ実装を直接インライン定義する。
+//
+// See: features/support/in-memory/supabase-client.ts
+// See: features/user_registration.feature
 
-const dummyClient = {
-	from: (_table) => ({
-		select: () => ({
-			eq: () => ({ single: async () => ({ data: null, error: null }) }),
-		}),
-		insert: () => ({
-			select: () => ({ single: async () => ({ data: null, error: null }) }),
-		}),
-		update: () => ({ eq: async () => ({ error: null }) }),
-		delete: () => ({
-			lt: () => ({ select: async () => ({ data: [], error: null }) }),
-		}),
-	}),
-	rpc: async (_fn, _args) => ({ data: null, error: null }),
-	auth: {
-		getUser: async (_token) => ({ data: { user: null }, error: null }),
-	},
-};
+// インメモリ Supabase Auth ストア（email → { id, email, password }）
+const supabaseAuthStore = new Map();
+
+// signUp の結果スタブ: null=デフォルト成功、'email_taken'=重複エラー
+let signUpStubMode = null;
+
+/**
+ * テスト用ヘルパー: Supabase Auth にユーザーを登録する。
+ * resetAllStores() で supabaseAuthStore もクリアされる必要があるため、
+ * この関数は in-memory/supabase-client.ts のインスタンスと共有する。
+ *
+ * See: features/support/in-memory/supabase-client.ts
+ */
+function resetSupabaseAuthStore() {
+	supabaseAuthStore.clear();
+	signUpStubMode = null;
+}
+
+// in-memory/supabase-client.ts の exports に reset/helper 関数を注入するため、
+// ここでは同じストアを持つ dummyClient を構築し、
+// in-memory/supabase-client.ts と同一エクスポートを提供するモックを作成する。
+// NOTE: in-memory/supabase-client.ts はここより後でロードされるため、
+//       require.cache 差し込み後に supabaseAuthStore を共有できない。
+//       代わりに in-memory/supabase-client.ts 側の関数を後から呼ぶ設計とする。
+//
+// 実際の実装方針:
+//   register-mocks.js の dummyClient に完全な auth メソッドを追加する。
+//   in-memory/supabase-client.ts は mock-installer.ts から resetAllStores() で
+//   呼ばれるが、ストアは register-mocks.js のものと独立している。
+//   reset() は両方から呼ばれるため、BDDシナリオ間ではストアがリセットされる。
+//   ただし register-mocks.js と in-memory/supabase-client.ts は別インスタンスで
+//   ストアが分離している問題がある。
+//
+// 解決策: in-memory/supabase-client.ts を require して共有する。
+// ts-node/register が cucumber.js の requireModule で読み込まれるが、
+// register-mocks.js はその前に実行される。ただし ts-node は
+// register-mocks.js の require チェーン経由でも TS ファイルを解釈できる。
+// tsconfig.cucumber.json が TS_NODE_PROJECT で指定済みのため有効。
+//
+// より安全な方法: dummyClient を inline で完全実装し、
+// in-memory/supabase-client.ts にはストア状態の注入口を設ける。
+
+const inMemorySupabaseClient = require(
+	path.resolve(__dirname, "./in-memory/supabase-client.ts"),
+);
 
 const supabaseClientMock = {
 	id: resolveFromRoot("src/lib/infrastructure/supabase/client.ts"),
 	filename: resolveFromRoot("src/lib/infrastructure/supabase/client.ts"),
 	loaded: true,
 	exports: {
-		supabaseClient: dummyClient,
-		supabaseAdmin: dummyClient,
+		supabaseClient: inMemorySupabaseClient.supabaseClient,
+		supabaseAdmin: inMemorySupabaseClient.supabaseAdmin,
 	},
 	parent: null,
 	children: [],
@@ -122,6 +157,18 @@ const REPO_MOCKS = [
 	[
 		"src/lib/infrastructure/repositories/edge-token-repository.ts",
 		"./in-memory/edge-token-repository.ts",
+	],
+	// ボットリポジトリ（TASK-096 で追加）
+	// See: features/bot_system.feature
+	[
+		"src/lib/infrastructure/repositories/bot-repository.ts",
+		"./in-memory/bot-repository.ts",
+	],
+	// 攻撃リポジトリ（TASK-096 で追加）
+	// See: features/bot_system.feature
+	[
+		"src/lib/infrastructure/repositories/attack-repository.ts",
+		"./in-memory/attack-repository.ts",
 	],
 ];
 

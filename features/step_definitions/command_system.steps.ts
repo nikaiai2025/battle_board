@@ -603,6 +603,9 @@ Given(
 		// AI告発シナリオでも使用されるため accusationState にも登録する（TASK-079）
 		// See: features/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
 		accusationState.postNumberToId.set(10, postId);
+		// bot_system シナリオでも使用されるため world.botPostNumberToId にも登録する
+		// See: features/bot_system.feature @システムメッセージに対して攻撃を試みると拒否される
+		this.botPostNumberToId.set(10, postId);
 	},
 );
 

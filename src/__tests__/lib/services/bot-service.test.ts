@@ -1,0 +1,644 @@
+/**
+ * 単体テスト: BotService（AIボットシステムサービス）
+ *
+ * See: features/未実装/bot_system.feature
+ * See: docs/architecture/components/bot.md §2 公開インターフェース
+ * See: docs/specs/bot_state_transitions.yaml
+ *
+ * テスト方針:
+ *   - BotRepository, BotPostRepository, AttackRepository はすべてモック化する
+ *   - 各メソッドの振る舞い（Behavior）を検証し、実装詳細に依存しない
+ *   - エッジケース（撃破済み・既攻撃・存在しない等）を網羅する
+ */
+
+import { describe, expect, it, vi } from "vitest";
+import type { Bot } from "../../../lib/domain/models/bot";
+import type { Attack } from "../../../lib/infrastructure/repositories/attack-repository";
+import {
+	BotService,
+	type IAttackRepository,
+	type IBotPostRepository,
+	type IBotRepository,
+} from "../../../lib/services/bot-service";
+
+// ---------------------------------------------------------------------------
+// テスト用ヘルパー
+// ---------------------------------------------------------------------------
+
+/** テスト用 Bot（lurking状態）を生成する */
+function createLurkingBot(overrides: Partial<Bot> = {}): Bot {
+	return {
+		id: "bot-001",
+		name: "荒らし役",
+		persona: "荒らし",
+		hp: 10,
+		maxHp: 10,
+		dailyId: "FkBot01",
+		dailyIdDate: "2026-03-16",
+		isActive: true,
+		isRevealed: false,
+		revealedAt: null,
+		survivalDays: 0,
+		totalPosts: 0,
+		accusedCount: 0,
+		timesAttacked: 0,
+		botProfileKey: "荒らし役",
+		eliminatedAt: null,
+		eliminatedBy: null,
+		createdAt: new Date("2026-03-16T00:00:00Z"),
+		...overrides,
+	};
+}
+
+/** テスト用 Bot（revealed状態）を生成する */
+function createRevealedBot(overrides: Partial<Bot> = {}): Bot {
+	return createLurkingBot({
+		isRevealed: true,
+		revealedAt: new Date("2026-03-16T10:00:00Z"),
+		...overrides,
+	});
+}
+
+/** テスト用 Bot（eliminated状態）を生成する */
+function createEliminatedBot(overrides: Partial<Bot> = {}): Bot {
+	return createLurkingBot({
+		isActive: false,
+		hp: 0,
+		eliminatedAt: new Date("2026-03-16T12:00:00Z"),
+		eliminatedBy: "attacker-001",
+		...overrides,
+	});
+}
+
+/** モック BotRepository を生成する */
+function createMockBotRepository(
+	bot: Bot | null = createLurkingBot(),
+): IBotRepository {
+	return {
+		findById: vi.fn().mockResolvedValue(bot),
+		findAll: vi.fn().mockResolvedValue([]),
+		updateHp: vi.fn().mockResolvedValue(undefined),
+		eliminate: vi.fn().mockResolvedValue(undefined),
+		reveal: vi.fn().mockResolvedValue(undefined),
+		incrementTimesAttacked: vi.fn().mockResolvedValue(undefined),
+		bulkResetRevealed: vi.fn().mockResolvedValue(0),
+		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
+		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
+		updateDailyId: vi.fn().mockResolvedValue(undefined),
+	};
+}
+
+/** モック BotPostRepository を生成する */
+function createMockBotPostRepository(
+	record: { postId: string; botId: string } | null = null,
+): IBotPostRepository {
+	return {
+		findByPostId: vi.fn().mockResolvedValue(record),
+	};
+}
+
+/** モック AttackRepository を生成する */
+function createMockAttackRepository(
+	existingAttack: Attack | null = null,
+): IAttackRepository {
+	return {
+		findByAttackerAndBotAndDate: vi.fn().mockResolvedValue(existingAttack),
+		create: vi.fn().mockResolvedValue({
+			id: "attack-001",
+			attackerId: "attacker-001",
+			botId: "bot-001",
+			attackDate: "2026-03-16",
+			postId: "post-001",
+			damage: 10,
+			createdAt: new Date(),
+		} as Attack),
+		deleteByDateBefore: vi.fn().mockResolvedValue(0),
+	};
+}
+
+/** テスト用 BotService を生成するヘルパー */
+function createService(
+	options: {
+		bot?: Bot | null;
+		botPostRecord?: { postId: string; botId: string } | null;
+		existingAttack?: Attack | null;
+		allBots?: Bot[];
+	} = {},
+): BotService {
+	const botRepo = createMockBotRepository(
+		"bot" in options ? (options.bot ?? null) : createLurkingBot(),
+	);
+	if (options.allBots !== undefined) {
+		(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(
+			options.allBots,
+		);
+	}
+	const botPostRepo = createMockBotPostRepository(
+		options.botPostRecord ?? null,
+	);
+	const attackRepo = createMockAttackRepository(options.existingAttack ?? null);
+	return new BotService(botRepo, botPostRepo, attackRepo);
+}
+
+// ---------------------------------------------------------------------------
+// テストスイート
+// ---------------------------------------------------------------------------
+
+describe("BotService", () => {
+	// =========================================================================
+	// isBot
+	// =========================================================================
+
+	describe("isBot()", () => {
+		it("bot_posts にレコードが存在する場合、true を返す", async () => {
+			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+			const service = createService({
+				botPostRecord: { postId: "post-001", botId: "bot-001" },
+			});
+			const result = await service.isBot("post-001");
+			expect(result).toBe(true);
+		});
+
+		it("bot_posts にレコードが存在しない場合、false を返す", async () => {
+			const service = createService({ botPostRecord: null });
+			const result = await service.isBot("post-001");
+			expect(result).toBe(false);
+		});
+	});
+
+	// =========================================================================
+	// getBotByPostId
+	// =========================================================================
+
+	describe("getBotByPostId()", () => {
+		it("bot_posts レコードが存在しない場合、null を返す", async () => {
+			const service = createService({ botPostRecord: null });
+			const result = await service.getBotByPostId("post-001");
+			expect(result).toBeNull();
+		});
+
+		it("bot_posts レコードが存在し Bot が見つかった場合、BotInfo を返す", async () => {
+			// See: docs/architecture/components/bot.md §2.4 ボットID逆引き
+			const bot = createLurkingBot({ id: "bot-001", name: "荒らし役", hp: 10 });
+			const botRepo = createMockBotRepository(bot);
+			const botPostRepo = createMockBotPostRepository({
+				postId: "post-001",
+				botId: "bot-001",
+			});
+			const attackRepo = createMockAttackRepository();
+			const service = new BotService(botRepo, botPostRepo, attackRepo);
+
+			const result = await service.getBotByPostId("post-001");
+
+			expect(result).not.toBeNull();
+			expect(result?.botId).toBe("bot-001");
+			expect(result?.name).toBe("荒らし役");
+			expect(result?.hp).toBe(10);
+			expect(result?.isActive).toBe(true);
+			expect(result?.isRevealed).toBe(false);
+		});
+
+		it("bot_posts レコードは存在するが Bot が見つからない場合、null を返す", async () => {
+			const botRepo = createMockBotRepository(null);
+			const botPostRepo = createMockBotPostRepository({
+				postId: "post-001",
+				botId: "bot-999",
+			});
+			const attackRepo = createMockAttackRepository();
+			const service = new BotService(botRepo, botPostRepo, attackRepo);
+
+			const result = await service.getBotByPostId("post-001");
+			expect(result).toBeNull();
+		});
+	});
+
+	// =========================================================================
+	// revealBot
+	// =========================================================================
+
+	describe("revealBot()", () => {
+		it("lurking 状態のボットに BOTマークを付与する", async () => {
+			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+			const bot = createLurkingBot({ id: "bot-001" });
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.revealBot("bot-001");
+
+			expect(botRepo.reveal).toHaveBeenCalledWith("bot-001");
+		});
+
+		it("already revealed の場合は reveal を呼び出さない（冪等）", async () => {
+			// See: docs/architecture/components/bot.md §2.6 BOTマーク付与 > 冪等
+			const bot = createRevealedBot({ id: "bot-001" });
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.revealBot("bot-001");
+
+			expect(botRepo.reveal).not.toHaveBeenCalled();
+		});
+
+		it("ボットが見つからない場合はエラーをスローする", async () => {
+			const botRepo = createMockBotRepository(null);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await expect(service.revealBot("bot-999")).rejects.toThrow();
+		});
+	});
+
+	// =========================================================================
+	// canAttackToday
+	// =========================================================================
+
+	describe("canAttackToday()", () => {
+		it("本日まだ攻撃していない場合、true を返す", async () => {
+			// See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+			const service = createService({ existingAttack: null });
+			const result = await service.canAttackToday("attacker-001", "bot-001");
+			expect(result).toBe(true);
+		});
+
+		it("本日既に攻撃済みの場合、false を返す", async () => {
+			const existingAttack: Attack = {
+				id: "attack-001",
+				attackerId: "attacker-001",
+				botId: "bot-001",
+				attackDate: "2026-03-16",
+				postId: "post-001",
+				damage: 10,
+				createdAt: new Date(),
+			};
+			const service = createService({ existingAttack });
+			const result = await service.canAttackToday("attacker-001", "bot-001");
+			expect(result).toBe(false);
+		});
+	});
+
+	// =========================================================================
+	// recordAttack
+	// =========================================================================
+
+	describe("recordAttack()", () => {
+		it("攻撃記録を AttackRepository に保存する", async () => {
+			// See: docs/architecture/components/bot.md §2.9 攻撃記録
+			const attackRepo = createMockAttackRepository();
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				attackRepo,
+			);
+
+			await service.recordAttack("attacker-001", "bot-001", "post-001", 10);
+
+			expect(attackRepo.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					attackerId: "attacker-001",
+					botId: "bot-001",
+					postId: "post-001",
+					damage: 10,
+				}),
+			);
+		});
+
+		it("attackDate が YYYY-MM-DD 形式で記録される", async () => {
+			// See: docs/architecture/components/bot.md §5.2 attacks テーブル
+			const attackRepo = createMockAttackRepository();
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				attackRepo,
+			);
+
+			await service.recordAttack("attacker-001", "bot-001", "post-001", 10);
+
+			const callArg = (attackRepo.create as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			// YYYY-MM-DD 形式かどうかを確認
+			expect(callArg.attackDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+		});
+	});
+
+	// =========================================================================
+	// applyDamage
+	// =========================================================================
+
+	describe("applyDamage()", () => {
+		it("HPが十分な場合、HP を damage 分減少させ eliminated=false を返す", async () => {
+			// See: docs/architecture/components/bot.md §2.2 HP更新・ダメージ処理
+			const bot = createRevealedBot({
+				id: "bot-001",
+				hp: 20,
+				maxHp: 20,
+				timesAttacked: 0,
+			});
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const result = await service.applyDamage("bot-001", 10, "attacker-001");
+
+			expect(result.previousHp).toBe(20);
+			expect(result.remainingHp).toBe(10);
+			expect(result.eliminated).toBe(false);
+			expect(result.eliminatedBy).toBeNull();
+			expect(result.reward).toBeNull();
+		});
+
+		it("ダメージ後 HP が 0 になった場合、eliminated=true を返す", async () => {
+			// See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			const bot = createRevealedBot({
+				id: "bot-001",
+				hp: 10,
+				maxHp: 10,
+				survivalDays: 5,
+				timesAttacked: 0,
+				botProfileKey: "荒らし役",
+			});
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const result = await service.applyDamage("bot-001", 10, "attacker-001");
+
+			expect(result.previousHp).toBe(10);
+			expect(result.remainingHp).toBe(0);
+			expect(result.eliminated).toBe(true);
+			expect(result.eliminatedBy).toBe("attacker-001");
+			expect(result.reward).not.toBeNull();
+		});
+
+		it("撃破時に報酬が正しく計算される（5日生存・被攻撃1回 -> 265）", async () => {
+			// See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// 計算: 10 + (5 * 50) + (1 * 5) = 265 (注: timesAttacked は incrementTimesAttacked 後の値)
+			const bot = createRevealedBot({
+				id: "bot-001",
+				hp: 10,
+				maxHp: 10,
+				survivalDays: 5,
+				timesAttacked: 0, // increment 後に 1 になる
+				botProfileKey: "荒らし役",
+			});
+			const botRepo = createMockBotRepository(bot);
+			// incrementTimesAttacked はモックのため実際には更新されないが、
+			// applyDamage 内で timesAttacked + 1 を計算に使う
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const result = await service.applyDamage("bot-001", 10, "attacker-001");
+
+			// timesAttacked: 0 -> +1 = 1 として計算
+			// reward: 10 + (5 * 50) + (1 * 5) = 265
+			expect(result.reward).toBe(265);
+		});
+
+		it("撃破時に eliminate が呼ばれる", async () => {
+			const bot = createRevealedBot({ id: "bot-001", hp: 10 });
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.applyDamage("bot-001", 10, "attacker-001");
+
+			expect(botRepo.eliminate).toHaveBeenCalledWith("bot-001", "attacker-001");
+		});
+
+		it("times_attacked が incrementTimesAttacked により +1 される", async () => {
+			const bot = createRevealedBot({
+				id: "bot-001",
+				hp: 20,
+				timesAttacked: 3,
+			});
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.applyDamage("bot-001", 10, "attacker-001");
+
+			expect(botRepo.incrementTimesAttacked).toHaveBeenCalledWith("bot-001");
+		});
+
+		it("ボットが存在しない場合はエラーをスローする", async () => {
+			const botRepo = createMockBotRepository(null);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await expect(
+				service.applyDamage("bot-999", 10, "attacker-001"),
+			).rejects.toThrow();
+		});
+
+		it("HP が 0 ちょうどで撃破になる（境界値）", async () => {
+			const bot = createRevealedBot({ id: "bot-001", hp: 10 });
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const result = await service.applyDamage("bot-001", 10, "attacker-001");
+
+			expect(result.remainingHp).toBe(0);
+			expect(result.eliminated).toBe(true);
+		});
+
+		it("ダメージが HP を超えても eliminated になる（オーバーキル）", async () => {
+			const bot = createRevealedBot({ id: "bot-001", hp: 5 });
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const result = await service.applyDamage("bot-001", 10, "attacker-001");
+
+			expect(result.remainingHp).toBeLessThanOrEqual(0);
+			expect(result.eliminated).toBe(true);
+		});
+	});
+
+	// =========================================================================
+	// calculateEliminationReward（公開メソッド版）
+	// =========================================================================
+
+	describe("calculateEliminationReward()", () => {
+		it("bot_profiles.yaml のパラメータを使用して報酬を計算する", async () => {
+			// See: docs/architecture/components/bot.md §2.7 撃破報酬計算
+			// 荒らし役: base=10, daily=50, attack=5
+			// 0日生存・1回攻撃: 10 + (0*50) + (1*5) = 15
+			const bot = createLurkingBot({
+				id: "bot-001",
+				survivalDays: 0,
+				timesAttacked: 1,
+				botProfileKey: "荒らし役",
+			});
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const reward = await service.calculateEliminationReward("bot-001");
+
+			expect(reward).toBe(15);
+		});
+
+		it("botProfileKey が null の場合でもデフォルトパラメータで計算される", async () => {
+			const bot = createLurkingBot({
+				id: "bot-001",
+				survivalDays: 0,
+				timesAttacked: 0,
+				botProfileKey: null,
+			});
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const reward = await service.calculateEliminationReward("bot-001");
+
+			// デフォルト: base=10, daily=50, attack=5 → 10 + 0 + 0 = 10
+			expect(reward).toBe(10);
+		});
+	});
+
+	// =========================================================================
+	// performDailyReset
+	// =========================================================================
+
+	describe("performDailyReset()", () => {
+		it("日次リセット結果（revealed解除数・復活数・ID再生成数）を返す", async () => {
+			// See: features/未実装/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+			// See: docs/architecture/components/bot.md §2.10 日次リセット処理
+			const allBots = [
+				createLurkingBot({ id: "bot-001" }),
+				createRevealedBot({ id: "bot-002" }),
+				createEliminatedBot({ id: "bot-003" }),
+			];
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(allBots);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				1,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue(1);
+			const attackRepo = createMockAttackRepository();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				attackRepo,
+			);
+
+			const result = await service.performDailyReset();
+
+			expect(result.botsRevealed).toBe(1);
+			expect(result.botsRevived).toBe(1);
+			expect(typeof result.idsRegenerated).toBe("number");
+		});
+
+		it("日次リセット後に attacks テーブルのクリーンアップが実行される", async () => {
+			// See: docs/architecture/components/bot.md §2.10 step 5
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue(0);
+			const attackRepo = createMockAttackRepository();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				attackRepo,
+			);
+
+			await service.performDailyReset();
+
+			expect(attackRepo.deleteByDateBefore).toHaveBeenCalled();
+		});
+
+		it("lurking/revealed 状態のボットの survival_days が +1 される", async () => {
+			// See: docs/specs/bot_state_transitions.yaml #daily_reset
+			const bots = [
+				createLurkingBot({ id: "bot-001" }),
+				createRevealedBot({ id: "bot-002" }),
+			];
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(bots);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				1,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue(0);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.performDailyReset();
+
+			expect(botRepo.incrementSurvivalDays).toHaveBeenCalledWith("bot-001");
+			expect(botRepo.incrementSurvivalDays).toHaveBeenCalledWith("bot-002");
+		});
+
+		it("eliminated 状態のボットの survival_days は +1 されない", async () => {
+			const bots = [createEliminatedBot({ id: "bot-003" })];
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(bots);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue(1);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.performDailyReset();
+
+			expect(botRepo.incrementSurvivalDays).not.toHaveBeenCalledWith("bot-003");
+		});
+	});
+});

@@ -44,6 +44,7 @@ module.exports = {
 		// TASK-026: mypage.feature を追加
 		// TASK-079: phase2 feature を追加
 		// TASK-083: phase1/phase2サブディレクトリ廃止によりパス更新
+		// TASK-096: bot_system.feature を追加（重複ステップを解消済み）
 		paths: [
 			"features/authentication.feature",
 			"features/posting.feature",
@@ -55,16 +56,46 @@ module.exports = {
 			"features/mypage.feature",
 			"features/command_system.feature",
 			"features/ai_accusation.feature",
+			// TASK-097: 本登録・PAT 機能の BDD シナリオ追加
+			// See: features/user_registration.feature
+			"features/user_registration.feature",
+			// TASK-096: ボットシステム BDD シナリオ追加
+			// See: features/bot_system.feature
+			"features/bot_system.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
 		// register-mocks.js を先頭に配置して全モジュールのキャッシュを差し込む
+		//
+		// TASK-096: bot_system.steps.ts を追加
+		//   重複ステップは以下の対応により解消済み:
+		//     - `通貨残高は {int} のまま変化しない`: bot_system.steps.ts から削除（common.steps.ts を使用）
+		//     - `ユーザーの通貨残高が {int} である`: bot_system.steps.ts から削除（common.steps.ts を使用、currentUserId 未設定時の自動作成を追加）
+		//     - `通貨が N 消費され残高が M になる`: bot_system.steps.ts から削除（ai_accusation.steps.ts を使用、フォールバック追加）
+		//     - `コマンドレジストリに以下のコマンドが登録されている:`: bot_system.steps.ts から削除（command_system.steps.ts を使用）
+		//     - `レス >>(\d+) は自分自身の書き込みである`: bot_system.steps.ts から削除（ai_accusation.steps.ts を使用、world.botPostNumberToId への登録追加）
+		//     - `レス >>10 はシステムメッセージである`: bot_system.steps.ts から削除（command_system.steps.ts を使用、world.botPostNumberToId への登録追加）
+		//     - `通貨は消費されない`: bot_system.steps.ts から削除（command_system.steps.ts を使用）
+		//     - `レス末尾にエラー {string} がマージ表示される`: bot_system.steps.ts から削除（command_system.steps.ts を使用、executeAttackCommand でDBレスを作成）
+		//   See: TASK-096
 		require: [
 			"features/support/register-mocks.js",
 			"features/support/world.ts",
 			"features/support/mock-installer.ts",
 			"features/support/hooks.ts",
-			"features/step_definitions/**/*.ts",
+			"features/step_definitions/admin.steps.ts",
+			"features/step_definitions/ai_accusation.steps.ts",
+			"features/step_definitions/authentication.steps.ts",
+			"features/step_definitions/bot_system.steps.ts",
+			"features/step_definitions/command_system.steps.ts",
+			"features/step_definitions/common.steps.ts",
+			"features/step_definitions/currency.steps.ts",
+			"features/step_definitions/incentive.steps.ts",
+			"features/step_definitions/mypage.steps.ts",
+			"features/step_definitions/posting.steps.ts",
+			"features/step_definitions/specialist_browser_compat.steps.ts",
+			"features/step_definitions/thread.steps.ts",
+			"features/step_definitions/user_registration.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

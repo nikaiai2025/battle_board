@@ -28,6 +28,7 @@ import {
 	createAccusationService,
 } from "./accusation-service";
 import type * as CurrencyServiceType from "./currency-service";
+import { AttackHandler } from "./handlers/attack-handler";
 import { GrassHandler } from "./handlers/grass-handler";
 import { TellHandler } from "./handlers/tell-handler";
 
@@ -115,6 +116,10 @@ interface CommandConfig {
 	targetFormat: string | null;
 	enabled: boolean;
 	stealth: boolean;
+	/** !attack 専用: ダメージ量 */
+	damage?: number;
+	/** !attack 専用: 賠償金倍率 */
+	compensation_multiplier?: number;
 }
 
 /** config/commands.yaml のルート型 */
@@ -147,6 +152,8 @@ function resolveDeductReason(commandName: string): DeductReason {
 	switch (commandName) {
 		case "tell":
 			return "command_tell";
+		case "attack":
+			return "command_attack";
 		default:
 			return "command_other";
 	}
@@ -171,14 +178,31 @@ export class CommandService {
 	private readonly registeredCommandNames: string[];
 
 	/**
+	 * コマンド名から「CommandService の共通 debit をスキップするか」を判断する。
+	 *
+	 * D-08 attack.md §3.1 の設計に基づき、!attack はハンドラ内で debit を行うため
+	 * CommandService の共通 debit をスキップする。
+	 *
+	 * See: docs/architecture/components/attack.md §3.1 共通前処理
+	 * See: task_TASK-095.md §補足・制約 > D-08 attack.md §3.1
+	 */
+	private readonly skipDebitCommands: Set<string>;
+
+	/**
 	 * @param currencyService - 通貨操作サービス（DI。テスト時はモックを注入する）
 	 * @param accusationService - AI告発サービス（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
 	 * @param commandsYamlPath - commands.yaml のファイルパス（省略時はデフォルトパス）
+	 * @param attackHandler - AttackHandler（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
+	 *
+	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
+	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
+	 *   attack コマンドをテスト用 YAML で有効化しない場合は省略可能。
 	 */
 	constructor(
 		private readonly currencyService: ICurrencyService,
 		accusationService?: AccusationService | null,
 		commandsYamlPath?: string,
+		attackHandler?: AttackHandler | null,
 	) {
 		// config/commands.yaml を読み込み、Registry を構築する
 		// See: docs/architecture/components/command.md §2.2 設定層
@@ -189,6 +213,10 @@ export class CommandService {
 
 		this.configs = new Map();
 		this.registry = new Map();
+
+		// !attack は通貨消費をハンドラ内で行うため、CommandService の共通 debit をスキップする
+		// See: docs/architecture/components/attack.md §3.1
+		this.skipDebitCommands = new Set(["attack"]);
 
 		// YAML から tell コマンドの経済パラメータを抽出する
 		// AccusationService が未提供の場合、YAML設定値で内部生成する
@@ -205,12 +233,39 @@ export class CommandService {
 			resolvedAccusationService = createAccusationService(bonusConfig);
 		}
 
+		// AttackHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に attack コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// （テスト用 YAML で attack を含まない場合は生成しない）
+		// See: docs/architecture/components/attack.md §2.2 コマンド設定
+		let resolvedAttackHandler: AttackHandler | null = null;
+		if (attackHandler !== undefined) {
+			// 明示的に DI された場合（null を含む）
+			resolvedAttackHandler = attackHandler ?? null;
+		} else if (parsed.commands.attack?.enabled) {
+			// YAML で attack が有効化されており、DI がない場合のみ本番用生成
+			const attackConfig = parsed.commands.attack;
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const botService = require("./bot-service").createBotService();
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const postRepository = require("../infrastructure/repositories/post-repository");
+			resolvedAttackHandler = new AttackHandler(
+				botService,
+				this.currencyService,
+				postRepository,
+				attackConfig?.cost ?? 5,
+				attackConfig?.damage ?? 10,
+				attackConfig?.compensation_multiplier ?? 3,
+			);
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
 		const handlers: CommandHandler[] = [
 			new GrassHandler(),
 			new TellHandler(resolvedAccusationService),
+			...(resolvedAttackHandler ? [resolvedAttackHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();
@@ -288,6 +343,11 @@ export class CommandService {
 
 		const cost = config.cost;
 
+		// skipDebit フラグ: !attack はハンドラ内でdebitを行うため、CommandService の共通debitをスキップする
+		// See: docs/architecture/components/attack.md §3.1 共通前処理
+		// See: task_TASK-095.md §補足・制約 > D-08 attack.md §3.1
+		const shouldSkipDebit = this.skipDebitCommands.has(parsed.name);
+
 		// Step 3: 通貨残高チェック（cost > 0 のコマンドのみ）
 		// See: features/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
 		if (cost > 0) {
@@ -300,21 +360,24 @@ export class CommandService {
 				};
 			}
 
-			// Step 4: 通貨消費（引き落とし → 実行の順。D-08 command.md §5）
-			// See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
-			const deductResult = await this.currencyService.deduct(
-				input.userId,
-				cost,
-				resolveDeductReason(parsed.name),
-			);
+			if (!shouldSkipDebit) {
+				// Step 4: 通貨消費（引き落とし → 実行の順。D-08 command.md §5）
+				// !attack 以外の通常コマンドはここで debit する
+				// See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
+				const deductResult = await this.currencyService.deduct(
+					input.userId,
+					cost,
+					resolveDeductReason(parsed.name),
+				);
 
-			if (!deductResult.success) {
-				// 楽観的ロックにより残高不足が発生した場合
-				return {
-					success: false,
-					systemMessage: "通貨が不足しています",
-					currencyCost: 0,
-				};
+				if (!deductResult.success) {
+					// 楽観的ロックにより残高不足が発生した場合
+					return {
+						success: false,
+						systemMessage: "通貨が不足しています",
+						currencyCost: 0,
+					};
+				}
 			}
 		}
 
@@ -329,12 +392,13 @@ export class CommandService {
 		const result = await handler.execute(ctx);
 
 		// 通貨引き落とし済みの場合は、ハンドラの成否にかかわらず currencyCost に実際の消費額を返す。
+		// skipDebit コマンドはハンドラ内で消費が決まるため、成功時のみ cost を返す。
 		// See: docs/architecture/components/command.md §5 通貨引き落としの順序
 		// 「コマンド失敗時に通貨を戻す補償処理は行わない」
 		return {
 			success: result.success,
 			systemMessage: result.systemMessage,
-			currencyCost: cost,
+			currencyCost: shouldSkipDebit ? (result.success ? cost : 0) : cost,
 		};
 	}
 }

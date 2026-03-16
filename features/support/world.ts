@@ -9,6 +9,7 @@
 
 import type { IWorldOptions } from "@cucumber/cucumber";
 import { setWorldConstructor, World } from "@cucumber/cucumber";
+import type { Bot } from "../../src/lib/domain/models/bot";
 import type { Post } from "../../src/lib/domain/models/post";
 import type { Thread } from "../../src/lib/domain/models/thread";
 import type { User } from "../../src/lib/domain/models/user";
@@ -175,6 +176,41 @@ export class BattleBoardWorld extends World {
 	postHistoryResult: PostHistoryItem[] | null = null;
 
 	// -------------------------------------------------------------------------
+	// ボットシステムコンテキスト
+	// See: features/bot_system.feature
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 現在操作対象のボット。
+	 * ボットシナリオで「ボット "荒らし役"」などのステップで設定される。
+	 */
+	currentBot: Bot | null = null;
+
+	/**
+	 * ボット名 -> Bot のマップ（複数ボットシナリオで使用）。
+	 * See: features/bot_system.feature @荒らし役ボットは10体が並行して活動する
+	 */
+	botMap: Map<string, Bot> = new Map();
+
+	/**
+	 * postNumber -> postId のマッピング（ボット攻撃対象解決用）。
+	 * See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+	 */
+	botPostNumberToId: Map<number, string> = new Map();
+
+	/**
+	 * !attack コマンドの実行結果（最後の操作）。
+	 * Then ステップでのアサーション対象。
+	 */
+	lastAttackResult: { success: boolean; systemMessage: string } | null = null;
+
+	/**
+	 * 攻撃者（複数ユーザーシナリオ用）。
+	 * See: features/bot_system.feature @複数ユーザーがそれぞれ同一ボットを攻撃できる
+	 */
+	attackerUserIds: Map<string, string> = new Map();
+
+	// -------------------------------------------------------------------------
 	// 時刻制御
 	// See: docs/architecture/bdd_test_strategy.md §5 時刻制御の方針
 	// -------------------------------------------------------------------------
@@ -219,6 +255,13 @@ export class BattleBoardWorld extends World {
 		this.mypageResult = null;
 		this.postHistoryResult = null;
 		this.currentTime = null;
+		// ボットシステムコンテキストのリセット
+		// See: features/bot_system.feature
+		this.currentBot = null;
+		this.botMap = new Map();
+		this.botPostNumberToId = new Map();
+		this.lastAttackResult = null;
+		this.attackerUserIds = new Map();
 		// 管理者コンテキストのリセット
 		// See: features/admin.feature
 		this.currentAdminId = null;

@@ -18,6 +18,14 @@ commands:
     stealth: false
     hitBonus: 20
     falseAccusationBonus: 10
+  attack:
+    description: "指定レスに攻撃する"
+    cost: 5
+    damage: 10
+    compensation_multiplier: 3
+    targetFormat: ">>postNumber"
+    enabled: true
+    stealth: false
   w:
     description: "指定レスに草を生やす"
     cost: 0

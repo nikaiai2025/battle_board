@@ -93,13 +93,14 @@ export type SetUsernameResult =
 /**
  * 課金（有料ステータス切替）結果
  * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: features/user_registration.feature @仮ユーザーは課金できない
  */
 export type UpgradeToPremiumResult =
 	| { success: true }
 	| {
 			success: false;
 			error: string;
-			code: "ALREADY_PREMIUM" | "USER_NOT_FOUND";
+			code: "ALREADY_PREMIUM" | "USER_NOT_FOUND" | "NOT_REGISTERED";
 	  };
 
 /**
@@ -266,6 +267,17 @@ export async function upgradeToPremium(
 			success: false,
 			error: "ユーザーが見つかりません",
 			code: "USER_NOT_FOUND",
+		};
+	}
+
+	// 本登録未完了（仮ユーザー）の場合はエラー
+	// See: features/user_registration.feature @仮ユーザーは課金できない
+	// See: docs/architecture/components/user-registration.md §11.1
+	if (user.registrationType === null) {
+		return {
+			success: false,
+			error: "課金するには本登録が必要です",
+			code: "NOT_REGISTERED",
 		};
 	}
 

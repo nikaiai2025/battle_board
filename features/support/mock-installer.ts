@@ -27,10 +27,16 @@ import * as InMemoryAccusationRepo from "./in-memory/accusation-repository";
 // See: features/admin.feature
 // See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
 import * as InMemoryAdminRepo from "./in-memory/admin-repository";
+// 攻撃リポジトリ（TASK-096 で追加）
+// See: features/bot_system.feature
+import * as InMemoryAttackRepo from "./in-memory/attack-repository";
 import * as InMemoryAuthCodeRepo from "./in-memory/auth-code-repository";
 // ボット書き込みリポジトリ（TASK-079 で追加）
 // See: features/ai_accusation.feature
 import * as InMemoryBotPostRepo from "./in-memory/bot-post-repository";
+// ボットリポジトリ（TASK-096 で追加）
+// See: features/bot_system.feature
+import * as InMemoryBotRepo from "./in-memory/bot-repository";
 import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
 // Edge-token リポジトリ（TASK-085 で追加）
 // See: features/authentication.feature
@@ -87,6 +93,13 @@ export function resetAllStores(): void {
 	// See: features/ai_accusation.feature
 	InMemoryAccusationRepo.reset();
 	InMemoryBotPostRepo.reset();
+	// ボット・攻撃リポジトリのリセット（TASK-096 で追加）
+	// See: features/bot_system.feature
+	InMemoryBotRepo.reset();
+	InMemoryAttackRepo.reset();
+	// Supabase Auth ストアのリセット（TASK-097 で追加）
+	// See: features/user_registration.feature
+	InMemorySupabaseClient.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -98,8 +111,12 @@ export {
 	InMemoryAccusationRepo,
 	// 管理者リポジトリ（TASK-021 で追加）
 	InMemoryAdminRepo,
+	// 攻撃リポジトリ（TASK-096 で追加）
+	InMemoryAttackRepo,
 	InMemoryAuthCodeRepo,
 	InMemoryBotPostRepo,
+	// ボットリポジトリ（TASK-096 で追加）
+	InMemoryBotRepo,
 	InMemoryCurrencyRepo,
 	// Edge-token リポジトリ（TASK-085 で追加）
 	InMemoryEdgeTokenRepo,
