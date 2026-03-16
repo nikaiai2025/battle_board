@@ -1,6 +1,6 @@
 # D-08 コンポーネント境界設計書: UserRegistration（本登録・ログイン）
 
-> ステータス: ドラフト / 2026-03-16
+> ステータス: 運用中
 > 関連D-07: § 5 認証アーキテクチャ
 > 関連D-08: authentication.md（既存の認証コンポーネント。本書は拡張）
 > 関連BDD: features/未実装/user_registration.feature
