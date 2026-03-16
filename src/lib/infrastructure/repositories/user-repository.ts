@@ -163,6 +163,7 @@ export async function create(
 		| "registeredAt"
 		| "patToken"
 		| "patLastUsedAt"
+		| "grassCount"
 	> & { isVerified?: boolean },
 ): Promise<User> {
 	const { data, error } = await supabaseAdmin
