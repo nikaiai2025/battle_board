@@ -22,9 +22,9 @@
  * See: docs/architecture/components/admin.md §5 設計上の判断
  */
 
-import * as PostRepository from '../infrastructure/repositories/post-repository'
-import * as ThreadRepository from '../infrastructure/repositories/thread-repository'
-import { createPost } from './post-service'
+import * as PostRepository from "../infrastructure/repositories/post-repository";
+import * as ThreadRepository from "../infrastructure/repositories/thread-repository";
+import { createPost } from "./post-service";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -37,23 +37,30 @@ import { createPost } from './post-service'
  * See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
  */
 export type DeletePostResult =
-  | { success: true }
-  | { success: false; reason: 'not_found' }
+	| { success: true }
+	| { success: false; reason: "not_found" };
 
 /**
- * 管理者削除時のフォールバックメッセージ。
- * comment が未指定の場合にシステムレス本文に表示するメッセージ。
- * See: features/phase2/command_system.feature @管理者がコメントなしでレス削除した場合はフォールバックメッセージで通知される
+ * フォールバックメッセージのテンプレート。
+ * {postNumber} は実際のレス番号で置換される。
+ * See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
  */
-const ADMIN_DELETE_FALLBACK_MESSAGE = '管理者によりレスが削除されました'
+const ADMIN_DELETE_FALLBACK_TEMPLATE =
+	"🗑️ レス >>{postNumber} は管理者により削除されました";
+
+/**
+ * 管理者削除コメントのプレフィックス。
+ * See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
+ */
+const ADMIN_DELETE_COMMENT_PREFIX = "🗑️ ";
 
 /**
  * スレッド削除結果。
  * See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
  */
 export type DeleteThreadResult =
-  | { success: true }
-  | { success: false; reason: 'not_found' }
+	| { success: true }
+	| { success: false; reason: "not_found" };
 
 // ---------------------------------------------------------------------------
 // AdminService 関数
@@ -85,47 +92,55 @@ export type DeleteThreadResult =
  * @returns 削除結果
  */
 export async function deletePost(
-  postId: string,
-  adminId: string,
-  reason?: string,
-  comment?: string
+	postId: string,
+	adminId: string,
+	reason?: string,
+	comment?: string,
 ): Promise<DeletePostResult> {
-  // レスの存在確認
-  const post = await PostRepository.findById(postId)
-  if (!post) {
-    return { success: false, reason: 'not_found' }
-  }
+	// レスの存在確認
+	const post = await PostRepository.findById(postId);
+	if (!post) {
+		return { success: false, reason: "not_found" };
+	}
 
-  // ソフトデリート実行
-  // See: docs/architecture/components/admin.md §3.1 依存先 > PostRepository
-  await PostRepository.softDelete(postId)
+	// ソフトデリート実行
+	// See: docs/architecture/components/admin.md §3.1 依存先 > PostRepository
+	await PostRepository.softDelete(postId);
 
-  // 「★システム」名義の独立システムレスを挿入する（方式B）
-  // See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
-  // See: docs/architecture/components/posting.md §5 方式B
-  const systemMessageBody = comment || ADMIN_DELETE_FALLBACK_MESSAGE
-  try {
-    await createPost({
-      threadId: post.threadId,
-      body: systemMessageBody,
-      edgeToken: null,
-      ipHash: 'system',
-      displayName: '★システム',
-      isBotWrite: true, // 認証スキップ
-      isSystemMessage: true, // コマンド解析・インセンティブをスキップ
-    })
-  } catch (err) {
-    // システムレス挿入失敗は削除を巻き戻さない（削除自体は成功済み）
-    console.error('[AdminService] システムレス挿入失敗:', err)
-  }
+	// 「★システム」名義の独立システムレスを挿入する（方式B）
+	// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+	// See: docs/architecture/components/posting.md §5 方式B
+	// コメント付き: 🗑️ {comment} / コメントなし: フォールバックテンプレートにレス番号を埋め込む
+	// See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
+	// See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+	const systemMessageBody = comment
+		? `${ADMIN_DELETE_COMMENT_PREFIX}${comment}`
+		: ADMIN_DELETE_FALLBACK_TEMPLATE.replace(
+				"{postNumber}",
+				String(post.postNumber),
+			);
+	try {
+		await createPost({
+			threadId: post.threadId,
+			body: systemMessageBody,
+			edgeToken: null,
+			ipHash: "system",
+			displayName: "★システム",
+			isBotWrite: true, // 認証スキップ
+			isSystemMessage: true, // コマンド解析・インセンティブをスキップ
+		});
+	} catch (err) {
+		// システムレス挿入失敗は削除を巻き戻さない（削除自体は成功済み）
+		console.error("[AdminService] システムレス挿入失敗:", err);
+	}
 
-  // 将来の監査ログ用（現在は簡易ログのみ）
-  // See: docs/architecture/components/admin.md §3.1 依存先 > AuditLogRepository (将来)
-  console.info(
-    `[AdminService] deletePost: postId=${postId} adminId=${adminId} reason=${reason ?? '(なし)'} comment=${comment ?? '(なし)'}`
-  )
+	// 将来の監査ログ用（現在は簡易ログのみ）
+	// See: docs/architecture/components/admin.md §3.1 依存先 > AuditLogRepository (将来)
+	console.info(
+		`[AdminService] deletePost: postId=${postId} adminId=${adminId} reason=${reason ?? "(なし)"} comment=${comment ?? "(なし)"}`,
+	);
 
-  return { success: true }
+	return { success: true };
 }
 
 /**
@@ -144,29 +159,29 @@ export async function deletePost(
  * @returns 削除結果
  */
 export async function deleteThread(
-  threadId: string,
-  adminId: string,
-  reason?: string
+	threadId: string,
+	adminId: string,
+	reason?: string,
 ): Promise<DeleteThreadResult> {
-  // スレッドの存在確認
-  const thread = await ThreadRepository.findById(threadId)
-  if (!thread) {
-    return { success: false, reason: 'not_found' }
-  }
+	// スレッドの存在確認
+	const thread = await ThreadRepository.findById(threadId);
+	if (!thread) {
+		return { success: false, reason: "not_found" };
+	}
 
-  // スレッドをソフトデリート
-  // See: docs/architecture/components/admin.md §3.1 依存先 > ThreadRepository
-  await ThreadRepository.softDelete(threadId)
+	// スレッドをソフトデリート
+	// See: docs/architecture/components/admin.md §3.1 依存先 > ThreadRepository
+	await ThreadRepository.softDelete(threadId);
 
-  // スレッド内の全レスをソフトデリート
-  // See: features/phase1/admin.feature @スレッドとその中の全レスが削除される
-  const posts = await PostRepository.findByThreadId(threadId)
-  await Promise.all(posts.map((post) => PostRepository.softDelete(post.id)))
+	// スレッド内の全レスをソフトデリート
+	// See: features/phase1/admin.feature @スレッドとその中の全レスが削除される
+	const posts = await PostRepository.findByThreadId(threadId);
+	await Promise.all(posts.map((post) => PostRepository.softDelete(post.id)));
 
-  // 将来の監査ログ用（現在は簡易ログのみ）
-  console.info(
-    `[AdminService] deleteThread: threadId=${threadId} adminId=${adminId} reason=${reason ?? '(なし)'} postsDeleted=${posts.length}`
-  )
+	// 将来の監査ログ用（現在は簡易ログのみ）
+	console.info(
+		`[AdminService] deleteThread: threadId=${threadId} adminId=${adminId} reason=${reason ?? "(なし)"} postsDeleted=${posts.length}`,
+	);
 
-  return { success: true }
+	return { success: true };
 }

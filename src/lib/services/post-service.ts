@@ -322,15 +322,22 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// See: docs/architecture/architecture.md §7.2 同時実行制御（レス番号採番）
 	const postNumber = await PostRepository.getNextPostNumber(input.threadId);
 
-	// Step 7: IncentiveService 呼び出し（INSERT前に報酬計算を行い、inlineSystemInfoに含める）
-	// システムメッセージにはインセンティブ付与をスキップする
+	// Step 7: IncentiveService 同期ボーナス（Phase 1: INSERT前）
+	// 同期ボーナス（daily_login, reply, new_thread_join, streak, milestone_post）のみ計算し、
+	// 結果を inlineSystemInfo に含める。
+	// 遅延評価ボーナス（hot_post, thread_revival, thread_growth）は INSERT + incrementPostCount 後に
+	// Phase 2 として別途実行する（方針A: 二段階評価）。
 	// See: features/phase2/command_system.feature @システムメッセージは書き込み報酬の対象にならない
 	// See: docs/architecture/components/incentive.md §5 設計上の判断
 	// See: features/phase1/incentive.feature @PostService経由の統合
+	// See: tmp/workers/bdd-architect_TASK-070/analysis.md §4 方針A: 二段階評価
 	let incentiveGranted: { eventType: string; amount: number }[] = [];
 	// INSERT 前のため仮 postId を生成する（IncentiveService 内で incentive_log の contextId に使用される）
 	const prePostId = `pre-${Date.now()}-${postNumber}`;
 	const preCreatedAt = new Date(Date.now());
+
+	// PostContext を構築（同期・遅延の両方で再利用する）
+	let postContext: PostContext | null = null;
 
 	if (!isSystemMessage) {
 		try {
@@ -349,7 +356,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				}
 			}
 
-			const postContext: PostContext = {
+			postContext = {
 				postId: prePostId,
 				threadId: input.threadId,
 				userId: resolvedAuthorId ?? "",
@@ -358,21 +365,25 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				isReplyTo,
 			};
 
-			const incentiveResult =
-				await IncentiveService.evaluateOnPost(postContext);
+			// Phase 1: 同期ボーナスのみ評価（INSERT前）
+			const incentiveResult = await IncentiveService.evaluateOnPost(
+				postContext,
+				{ phase: "sync" },
+			);
 			incentiveGranted = incentiveResult.granted;
 		} catch (err) {
 			// インセンティブ失敗は書き込みを巻き戻さない
 			// See: docs/architecture/components/incentive.md §5 インセンティブ失敗は書き込みを巻き戻さない
 			console.error(
-				"[PostService] IncentiveService.evaluateOnPost failed:",
+				"[PostService] IncentiveService.evaluateOnPost (sync) failed:",
 				err,
 			);
 		}
 	}
 
 	// Step 8: inlineSystemInfo 構築
-	// コマンド結果 + 書き込み報酬を合成する
+	// コマンド結果 + 書き込み報酬（同期ボーナスのみ）を合成する
+	// 遅延評価ボーナスは他者への付与であり当該書き込みの inlineSystemInfo には含めない
 	// See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
 	// See: features/phase2/command_system.feature @書き込み報酬がレス末尾に表示される
 	const inlineSystemInfoParts: string[] = [];
@@ -382,7 +393,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		inlineSystemInfoParts.push(commandResult.systemMessage);
 	}
 
-	// 書き込み報酬メッセージを追加
+	// 書き込み報酬メッセージを追加（同期ボーナスのみ）
 	if (incentiveGranted.length > 0) {
 		const rewardMessages = incentiveGranted.map(
 			(g) => `📝 ${g.eventType} +${g.amount}`,
@@ -410,6 +421,33 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// See: docs/architecture/architecture.md §7.1 Step 2
 	await ThreadRepository.incrementPostCount(input.threadId);
 	await ThreadRepository.updateLastPostAt(input.threadId, new Date());
+
+	// Step 11: IncentiveService 遅延評価ボーナス（Phase 2: INSERT + incrementPostCount後）
+	// 対象: hot_post, thread_revival, thread_growth
+	// これらは「スレッド全体のレス一覧」「postCount」を参照する必要があるため、
+	// INSERT + incrementPostCount の後に実行する。
+	// inlineSystemInfo には含めない（他者への付与であり当該書き込みに表示不要）。
+	// See: tmp/workers/bdd-architect_TASK-070/analysis.md §4 方針A: 二段階評価
+	if (!isSystemMessage && postContext) {
+		try {
+			// postContext の postId を実際の createdPost.id に更新する
+			// （遅延評価ボーナスでは INSERT 済みのレスが threadPosts に含まれるため、
+			//  実際の postId を使って正しく除外判定等ができるようにする）
+			const deferredContext: PostContext = {
+				...postContext,
+				postId: createdPost.id,
+			};
+			await IncentiveService.evaluateOnPost(deferredContext, {
+				phase: "deferred",
+			});
+		} catch (err) {
+			// インセンティブ失敗は書き込みを巻き戻さない
+			console.error(
+				"[PostService] IncentiveService.evaluateOnPost (deferred) failed:",
+				err,
+			);
+		}
+	}
 
 	return {
 		success: true,
