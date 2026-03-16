@@ -28,7 +28,7 @@ AccusationInput {
 ```
 AccusationResult {
   result:        "hit" | "miss"
-  bonusAmount:   number         // 付与される通貨ボーナス（0の場合もある）
+  bonusAmount:   number         // v4以降は常に0。互換性のため残存
   systemMessage: string         // スレッドに表示するシステムメッセージ文字列
   alreadyAccused: boolean       // 重複告発フラグ（trueの場合は実行されない）
 }
@@ -44,8 +44,7 @@ AccusationResult {
 
 | コンポーネント | 依存の性質 |
 |---|---|
-| BotService | `isBot(postId)` でbotか人間かを判定（bot_postsには直接アクセスしない） |
-| CurrencyService | hit時のボーナス付与（`credit`） |
+| BotService | `isBot(postId)` でbotか人間かを判定（bot_postsには直接アクセスしない）。hit時は `revealBot()` でBOTマーク付与 |
 | AccusationRepository | `accusations` テーブルへのINSERT・重複チェック |
 
 ### 3.2 被依存
@@ -59,7 +58,6 @@ CommandService  →  AccusationService.accuse()
 ## 4. 隠蔽する実装詳細
 
 - `bot_posts` テーブルへのアクセスはBotService経由であり、AccusationServiceは直接参照しない
-- ボーナス金額の計算ロジック（miss時の冤罪ボーナス計算を含む）
 - 重複チェックの実装（`accusations` テーブルのユニーク制約に依存するか、事前SELECTするか）
 
 ---

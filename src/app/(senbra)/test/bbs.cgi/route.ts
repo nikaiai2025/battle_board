@@ -9,9 +9,13 @@
  *   2. ShiftJisEncoder.decodeFormData()でURL-エンコード済みShift-JISを正しい順序でデコードする
  *      （ASCIIとして読み取り → URLデコードでrawバイト取得 → Shift-JISデコード）
  *   3. BbsCgiParserでBbsCgiParsedRequestに変換する
- *   4. mail欄から write_token パターン (#<32文字hex>) を検出し除去する
- *   5. write_token が検出された場合: AuthService.verifyWriteToken() で検証し、
- *      成功時は edge-token Cookie を設定してから書き込みを続行する
+ *   4. D-08 §6 認証判定フローに従って認証を処理する:
+ *      ① edge-token Cookie 検証（既存）
+ *      ② mail欄の #pat_<32hex> パターン検出 → loginWithPat() → 新edge-token発行
+ *      ③ mail欄の #<32hex> パターン検出（write_token、既存）
+ *      ④ 未認証（既存）
+ *   5. mail欄から PAT パターンを除去する（DAT漏洩防止）
+ *      ※ Cookie認証成功時も除去する
  *   6. subjectパラメータがある場合は新規スレッド作成、ない場合は書き込み
  *   7. BbsCgiResponseBuilderでHTMLレスポンスを生成する
  *   8. ShiftJisEncoderでUTF-8 → Shift_JIS にエンコードして返す
@@ -23,8 +27,12 @@
  * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+ * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/未実装/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
+ * See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
  * See: docs/specs/openapi.yaml > /test/bbs.cgi
  * See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界
+ * See: docs/architecture/components/user-registration.md §6 認証判定フロー（改訂版）
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 
@@ -43,6 +51,21 @@ import {
 	verifyWriteToken,
 } from "@/lib/services/auth-service";
 import * as PostService from "@/lib/services/post-service";
+import { loginWithPat } from "@/lib/services/registration-service";
+
+/**
+ * mail欄から PAT を検出・除去するための正規表現。
+ * PAT は '#pat_' に続く 32 文字の hex 文字列。
+ * write_token パターン（#<32hex>）より先に判定すること（判定順序を明示的に保証）。
+ *
+ * 衝突しない根拠: '#pat_a1b2...' の '_' は hex 文字ではないため、
+ * /#([0-9a-f]{32})/i（write_token パターン）にはマッチしない。
+ *
+ * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+ * See: docs/architecture/components/user-registration.md §6 mail欄パース正規表現
+ */
+const PAT_PATTERN = /#pat_([0-9a-f]{32})/i;
 
 /**
  * mail欄から write_token を検出・除去するための正規表現。
@@ -91,6 +114,44 @@ function getIpHash(req: NextRequest): string {
 		req.headers.get("x-real-ip") ??
 		"127.0.0.1";
 	return hashIp(reduceIp(ip));
+}
+
+/**
+ * mail欄文字列から PAT を抽出する。
+ * mail欄に "#pat_<32文字hex>" パターンが含まれる場合、トークン値（32文字hex）を返す。
+ * 該当なしの場合は null を返す。
+ *
+ * 例: "sage#pat_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4" → "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+ * 例: "#PAT_A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4" → "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"（lowercase）
+ * 例: "sage" → null
+ *
+ * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: docs/architecture/components/user-registration.md §6 mail欄パース正規表現
+ *
+ * @param mail - mail欄の文字列
+ * @returns PAT 文字列（32文字hex、lowercase）または null
+ */
+function extractPat(mail: string): string | null {
+	const match = PAT_PATTERN.exec(mail);
+	return match ? match[1].toLowerCase() : null;
+}
+
+/**
+ * mail欄文字列から PAT パターンを除去した文字列を返す。
+ * PAT がない場合は元の文字列をそのまま返す。
+ *
+ * 例: "sage#pat_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4" → "sage"
+ * 例: "#pat_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4" → ""
+ * 例: "sage" → "sage"
+ *
+ * See: features/未実装/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
+ * See: docs/architecture/components/user-registration.md §6 ※ DAT漏洩防止
+ *
+ * @param mail - mail欄の文字列
+ * @returns PATを除去したmail欄文字列
+ */
+function removePat(mail: string): string {
+	return mail.replace(PAT_PATTERN, "").trim();
 }
 
 /**
@@ -215,7 +276,92 @@ export async function POST(req: NextRequest): Promise<Response> {
 	// Step 5: IP ハッシュを取得する
 	const ipHash = getIpHash(req);
 
-	// Step 6: mail欄から write_token を検出する
+	// Step 6: D-08 §6 認証判定フローに従って認証を処理する
+	// 上から順に判定し、最初に成功した方式で認証する。
+	//
+	// ① edge-token Cookie あり → verifyEdgeToken（既存）
+	// ② mail欄に #pat_ パターン → loginWithPat() → 新edge-token発行
+	// ③ mail欄に #<32hex> パターン → verifyWriteToken（既存）
+	// ④ 未認証（既存）
+	//
+	// See: docs/architecture/components/user-registration.md §6 認証判定フロー（改訂版）
+
+	// ① edge-token Cookie 検証
+	// Cookie が有効な場合: mail欄に PAT が含まれていても認証には使わず除去のみ行う
+	// See: docs/architecture/components/user-registration.md §8.3 専ブラでの使われ方（Cookie有効・mail欄PAT）
+	const edgeTokenFromCookie = parsed.edgeToken;
+	if (edgeTokenFromCookie) {
+		// edge-tokenをverifyEdgeTokenで検証する（PostServiceへの委譲前の事前確認用）
+		// NOTE: PostService.createPost/createThread が内部でも verifyEdgeToken を呼ぶが、
+		// ここでは mail 欄 PAT 除去を先行処理するために参照する。
+		// 実際の認証判定はPostServiceに委譲するため、ここではPAT除去のみ行う。
+
+		// DAT漏洩防止: mail欄からPATを除去してPostServiceに渡す
+		// See: docs/architecture/components/user-registration.md §6 ※ Cookie認証成功時もPATを除去
+		const cleanedMail = removePat(parsed.mail);
+		const parsedWithCleanMail = { ...parsed, mail: cleanedMail };
+
+		// Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
+		const subject = decodeHtmlNumericReferences(
+			bodyParams.get("subject") ?? "",
+		);
+		if (subject.trim() !== "") {
+			return handleCreateThread(parsedWithCleanMail, subject, ipHash);
+		}
+		return handleCreatePost(parsedWithCleanMail, ipHash);
+	}
+
+	// ② mail欄の #pat_<32hex> パターン検出 → loginWithPat()
+	// PAT判定はwrite_token判定より前に実行すること
+	// See: docs/architecture/components/user-registration.md §6 ② mail欄に #pat_ プレフィクスあり？
+	// See: タスク指示書 補足・制約 — PAT判定はwrite_token判定より前に実行すること
+	const detectedPat = extractPat(parsed.mail);
+
+	if (detectedPat !== null) {
+		// loginWithPat: PAT検証 + 新edge-token発行
+		const patResult = await loginWithPat(detectedPat);
+
+		if (!patResult.valid) {
+			// 無効なPAT: エラーレスポンスを返す
+			// See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+			const errorHtml = responseBuilder.buildError(
+				"認証トークンが無効または期限切れです",
+			);
+			return buildShiftJisHtmlResponse(errorHtml, 200);
+		}
+
+		// PAT認証成功: mail欄からPATを除去してPostServiceに渡す
+		// See: features/未実装/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
+		const cleanedMail = removePat(parsed.mail);
+		const newEdgeToken = patResult.edgeToken;
+
+		const parsedWithToken = {
+			...parsed,
+			mail: cleanedMail,
+			edgeToken: newEdgeToken,
+		};
+
+		// Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
+		const subject = decodeHtmlNumericReferences(
+			bodyParams.get("subject") ?? "",
+		);
+		let finalResponse: Response;
+		if (subject.trim() !== "") {
+			finalResponse = await handleCreateThread(
+				parsedWithToken,
+				subject,
+				ipHash,
+			);
+		} else {
+			finalResponse = await handleCreatePost(parsedWithToken, ipHash);
+		}
+
+		// 書き込み完了後: 新たに発行したedge-token CookieをSet-Cookieで返す
+		// See: features/未実装/user_registration.feature @edge-token Cookie が発行される
+		return setEdgeTokenCookie(finalResponse, newEdgeToken);
+	}
+
+	// ③ mail欄から write_token を検出する
 	// write_token が含まれる場合は検証し、除去した上で後続処理に渡す。
 	// DAT漏洩防止のため write_token は PostService に渡す前に必ず除去する。
 	// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
@@ -267,7 +413,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 		return setEdgeTokenCookie(finalResponse, verifiedEdgeToken);
 	}
 
-	// write_token なし: 通常フロー
+	// ④ 未認証フロー: write_token もPATもなし
 	// Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
 	// subjectもHTML数値参照をUTF-8に逆変換する（専ブラがスレタイの絵文字をHTML数値参照で送る場合への対応）
 	const subject = decodeHtmlNumericReferences(bodyParams.get("subject") ?? "");
@@ -275,10 +421,9 @@ export async function POST(req: NextRequest): Promise<Response> {
 	if (subject.trim() !== "") {
 		// 新規スレッド作成
 		return handleCreateThread(parsed, subject, ipHash);
-	} else {
-		// 既存スレッドへの書き込み
-		return handleCreatePost(parsed, ipHash);
 	}
+	// 既存スレッドへの書き込み
+	return handleCreatePost(parsed, ipHash);
 }
 
 /**
