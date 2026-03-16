@@ -20,10 +20,10 @@
  *   - スレッド不存在時は PostService からのエラーを 404 として返す
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import * as PostService from '@/lib/services/post-service'
-import { hashIp, reduceIp } from '@/lib/services/auth-service'
-import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
+import { type NextRequest, NextResponse } from "next/server";
+import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import { hashIp, reduceIp } from "@/lib/services/auth-service";
+import * as PostService from "@/lib/services/post-service";
 
 // ---------------------------------------------------------------------------
 // ユーティリティ
@@ -37,13 +37,13 @@ import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
  * @returns クライアント IP の SHA-512 ハッシュ
  */
 function getIpHash(req: NextRequest): string {
-  const forwarded = req.headers.get('x-forwarded-for')
-  // x-forwarded-for は "client, proxy1, proxy2" の形式のため先頭を使用する
-  const ip =
-    forwarded?.split(',')[0].trim() ??
-    req.headers.get('x-real-ip') ??
-    '127.0.0.1'
-  return hashIp(reduceIp(ip))
+	const forwarded = req.headers.get("x-forwarded-for");
+	// x-forwarded-for は "client, proxy1, proxy2" の形式のため先頭を使用する
+	const ip =
+		forwarded?.split(",")[0].trim() ??
+		req.headers.get("x-real-ip") ??
+		"127.0.0.1";
+	return hashIp(reduceIp(ip));
 }
 
 // ---------------------------------------------------------------------------
@@ -68,105 +68,111 @@ function getIpHash(req: NextRequest): string {
  *   404: ErrorResponse（スレッド不存在）
  */
 export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ threadId: string }> }
+	req: NextRequest,
+	{ params }: { params: Promise<{ threadId: string }> },
 ): Promise<NextResponse> {
-  const { threadId } = await params
+	const { threadId } = await params;
 
-  // --- リクエストボディのパース ---
-  let body: { body?: unknown }
-  try {
-    body = (await req.json()) as { body?: unknown }
-  } catch {
-    return NextResponse.json(
-      { error: 'INVALID_REQUEST', message: 'リクエストボディが不正です' },
-      { status: 400 }
-    )
-  }
+	// --- リクエストボディのパース ---
+	let body: { body?: unknown };
+	try {
+		body = (await req.json()) as { body?: unknown };
+	} catch {
+		return NextResponse.json(
+			{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
+			{ status: 400 },
+		);
+	}
 
-  const { body: postBody } = body
+	const { body: postBody } = body;
 
-  // --- バリデーション ---
-  if (!postBody || typeof postBody !== 'string' || postBody.trim() === '') {
-    return NextResponse.json(
-      { error: 'VALIDATION_ERROR', message: '本文を入力してください' },
-      { status: 400 }
-    )
-  }
+	// --- バリデーション ---
+	if (!postBody || typeof postBody !== "string" || postBody.trim() === "") {
+		return NextResponse.json(
+			{ error: "VALIDATION_ERROR", message: "本文を入力してください" },
+			{ status: 400 },
+		);
+	}
 
-  // --- Cookie から edge-token を読み取る ---
-  // See: src/lib/constants/cookie-names.ts
-  const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null
+	// --- Cookie から edge-token を読み取る ---
+	// See: src/lib/constants/cookie-names.ts
+	const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
 
-  // --- IP ハッシュの取得 ---
-  const ipHash = getIpHash(req)
+	// --- IP ハッシュの取得 ---
+	const ipHash = getIpHash(req);
 
-  // --- PostService への委譲 ---
-  const result = await PostService.createPost({
-    threadId,
-    body: postBody.trim(),
-    edgeToken,
-    ipHash,
-    isBotWrite: false,
-  })
+	// --- PostService への委譲 ---
+	const result = await PostService.createPost({
+		threadId,
+		body: postBody.trim(),
+		edgeToken,
+		ipHash,
+		isBotWrite: false,
+	});
 
-  // --- レスポンス整形 ---
+	// --- レスポンス整形 ---
 
-  // 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
-  if ('authRequired' in result) {
-    const response = NextResponse.json(
-      {
-        message: '認証コードを入力してください',
-        authCodeUrl: '/auth/auth-code',
-        authCode: result.code,
-      },
-      { status: 401 }
-    )
-    // edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
-    // See: docs/specs/openapi.yaml > /api/threads/{threadId}/posts > post > 401 > Set-Cookie
-    // See: src/lib/constants/cookie-names.ts
-    response.cookies.set(EDGE_TOKEN_COOKIE, result.edgeToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    })
-    return response
-  }
+	// 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
+	if ("authRequired" in result) {
+		const response = NextResponse.json(
+			{
+				message: "認証コードを入力してください",
+				authCodeUrl: "/auth/auth-code",
+				authCode: result.code,
+			},
+			{ status: 401 },
+		);
+		// edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
+		// See: docs/specs/openapi.yaml > /api/threads/{threadId}/posts > post > 401 > Set-Cookie
+		// See: src/lib/constants/cookie-names.ts
+		response.cookies.set(EDGE_TOKEN_COOKIE, result.edgeToken, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "lax",
+			maxAge: 60 * 60 * 24 * 365,
+			path: "/",
+		});
+		return response;
+	}
 
-  // 失敗の場合: エラーコードに応じてステータスを判定
-  if (!result.success) {
-    // スレッド不存在エラー
-    if (result.code === 'THREAD_NOT_FOUND') {
-      return NextResponse.json(
-        { error: result.code, message: result.error ?? 'スレッドが見つかりません' },
-        { status: 404 }
-      )
-    }
-    // その他のバリデーションエラー
-    return NextResponse.json(
-      { error: result.code ?? 'VALIDATION_ERROR', message: result.error ?? 'エラーが発生しました' },
-      { status: 400 }
-    )
-  }
+	// 失敗の場合: エラーコードに応じてステータスを判定
+	if (!result.success) {
+		// スレッド不存在エラー
+		if (result.code === "THREAD_NOT_FOUND") {
+			return NextResponse.json(
+				{
+					error: result.code,
+					message: result.error ?? "スレッドが見つかりません",
+				},
+				{ status: 404 },
+			);
+		}
+		// その他のバリデーションエラー
+		return NextResponse.json(
+			{
+				error: result.code ?? "VALIDATION_ERROR",
+				message: result.error ?? "エラーが発生しました",
+			},
+			{ status: 400 },
+		);
+	}
 
-  // 成功: 201 + { post: Post }
-  // PostService.createPost は postId と postNumber のみ返すため、
-  // 作成された Post を getPostList 経由で取得してレスポンスを組み立てる。
-  // postNumber で絞り込むことで、直前に作成された Post を取得する。
-  // See: docs/architecture/components/posting.md §2.2 PostResult
-  const posts = await PostService.getPostList(threadId, result.postNumber)
-  const createdPost = posts.find((p) => p.id === result.postId)
+	// 成功: 201 + { post: Post }
+	// PostService.createPost は postId と postNumber のみ返すため、
+	// 作成された Post を getPostList 経由で取得してレスポンスを組み立てる。
+	// postNumber で絞り込むことで、直前に作成された Post を取得する。
+	// See: docs/architecture/components/posting.md §2.2 PostResult
+	const posts = await PostService.getPostList(threadId, result.postNumber);
+	const createdPost = posts.find((p) => p.id === result.postId);
 
-  return NextResponse.json(
-    {
-      post: createdPost ?? {
-        id: result.postId,
-        threadId,
-        postNumber: result.postNumber,
-      },
-    },
-    { status: 201 }
-  )
+	return NextResponse.json(
+		{
+			post: createdPost ?? {
+				id: result.postId,
+				threadId,
+				postNumber: result.postNumber,
+			},
+		},
+		{ status: 201 },
+	);
 }

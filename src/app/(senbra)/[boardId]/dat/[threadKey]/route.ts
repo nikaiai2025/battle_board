@@ -16,11 +16,11 @@
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { DatFormatter } from "@/lib/infrastructure/adapters/dat-formatter";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
-import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
 import * as PostRepository from "@/lib/infrastructure/repositories/post-repository";
+import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
 
 /** DatFormatterのシングルトンインスタンス */
 const datFormatter = new DatFormatter();
@@ -38,10 +38,10 @@ const encoder = new ShiftJisEncoder();
  * @returns 開始バイト数（解析失敗時は null）
  */
 function parseRangeHeader(rangeHeader: string): number | null {
-  // "bytes=N-" 形式のみ対応（専ブラは常にこの形式を使う）
-  const match = rangeHeader.match(/^bytes=(\d+)-$/);
-  if (!match) return null;
-  return parseInt(match[1], 10);
+	// "bytes=N-" 形式のみ対応（専ブラは常にこの形式を使う）
+	const match = rangeHeader.match(/^bytes=(\d+)-$/);
+	if (!match) return null;
+	return parseInt(match[1], 10);
 }
 
 /**
@@ -64,43 +64,51 @@ function parseRangeHeader(rangeHeader: string): number | null {
  * @returns Shift_JISエンコードされたDATファイル（全体/差分）
  */
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ boardId: string; threadKey: string }> }
+	req: NextRequest,
+	{ params }: { params: Promise<{ boardId: string; threadKey: string }> },
 ): Promise<Response> {
-  const { threadKey } = await params;
+	// [DIAG] プロトコル診断ログ（確認後に削除すること）
+	console.log("[diag:dat]", {
+		url: req.url,
+		scheme: new URL(req.url).protocol,
+		xForwardedProto: req.headers.get("x-forwarded-proto"),
+		host: req.headers.get("host"),
+		userAgent: req.headers.get("user-agent"),
+	});
+	const { threadKey } = await params;
 
-  // スレッドをthreadKeyで取得する
-  const thread = await ThreadRepository.findByThreadKey(threadKey);
-  if (!thread) {
-    return new Response("Not Found", { status: 404 });
-  }
+	// スレッドをthreadKeyで取得する
+	const thread = await ThreadRepository.findByThreadKey(threadKey);
+	if (!thread) {
+		return new Response("Not Found", { status: 404 });
+	}
 
-  // If-Modified-Since による 304 Not Modified 判定
-  // threads.last_post_at と比較する（senbra-adapter.md §6 304 Not Modified の判定）
-  const ifModifiedSince = req.headers.get("if-modified-since");
-  if (ifModifiedSince) {
-    const sinceDate = new Date(ifModifiedSince);
-    if (!isNaN(sinceDate.getTime())) {
-      // HTTP Date 形式は秒単位のため、秒単位で比較する
-      const lastPostAtSec = Math.floor(thread.lastPostAt.getTime() / 1000);
-      const sinceSec = Math.floor(sinceDate.getTime() / 1000);
-      if (lastPostAtSec <= sinceSec) {
-        return new Response(null, { status: 304 });
-      }
-    }
-  }
+	// If-Modified-Since による 304 Not Modified 判定
+	// threads.last_post_at と比較する（senbra-adapter.md §6 304 Not Modified の判定）
+	const ifModifiedSince = req.headers.get("if-modified-since");
+	if (ifModifiedSince) {
+		const sinceDate = new Date(ifModifiedSince);
+		if (!isNaN(sinceDate.getTime())) {
+			// HTTP Date 形式は秒単位のため、秒単位で比較する
+			const lastPostAtSec = Math.floor(thread.lastPostAt.getTime() / 1000);
+			const sinceSec = Math.floor(sinceDate.getTime() / 1000);
+			if (lastPostAtSec <= sinceSec) {
+				return new Response(null, { status: 304 });
+			}
+		}
+	}
 
-  // Range ヘッダを解析する
-  const rangeHeader = req.headers.get("range");
-  const rangeStart = rangeHeader ? parseRangeHeader(rangeHeader) : null;
+	// Range ヘッダを解析する
+	const rangeHeader = req.headers.get("range");
+	const rangeStart = rangeHeader ? parseRangeHeader(rangeHeader) : null;
 
-  if (rangeStart !== null) {
-    // --- 差分応答（206 Partial Content）---
-    return handleRangeRequest(thread, rangeStart);
-  } else {
-    // --- 全体応答（200 OK）---
-    return handleFullRequest(thread);
-  }
+	if (rangeStart !== null) {
+		// --- 差分応答（206 Partial Content）---
+		return handleRangeRequest(thread, rangeStart);
+	} else {
+		// --- 全体応答（200 OK）---
+		return handleFullRequest(thread);
+	}
 }
 
 /**
@@ -109,26 +117,29 @@ export async function GET(
  * @param thread - スレッドエンティティ
  * @returns 全DATのShift_JISエンコードレスポンス（200 OK）
  */
-async function handleFullRequest(
-  thread: { id: string; title: string; lastPostAt: Date; datByteSize: number }
-): Promise<Response> {
-  // 全レスを取得する
-  const posts = await PostRepository.findByThreadId(thread.id);
+async function handleFullRequest(thread: {
+	id: string;
+	title: string;
+	lastPostAt: Date;
+	datByteSize: number;
+}): Promise<Response> {
+	// 全レスを取得する
+	const posts = await PostRepository.findByThreadId(thread.id);
 
-  // DatFormatterでDAT形式テキストを構築する（UTF-8）
-  const datText = datFormatter.buildDat(posts, thread.title);
+	// DatFormatterでDAT形式テキストを構築する（UTF-8）
+	const datText = datFormatter.buildDat(posts, thread.title);
 
-  // UTF-8 → Shift_JIS に変換
-  const sjisBuffer = encoder.encode(datText);
+	// UTF-8 → Shift_JIS に変換
+	const sjisBuffer = encoder.encode(datText);
 
-  return new Response(new Uint8Array(sjisBuffer), {
-    status: 200,
-    headers: {
-      "Content-Type": "text/plain; charset=Shift_JIS",
-      "Content-Length": String(sjisBuffer.length),
-      "Last-Modified": thread.lastPostAt.toUTCString(),
-    },
-  });
+	return new Response(new Uint8Array(sjisBuffer), {
+		status: 200,
+		headers: {
+			"Content-Type": "text/plain; charset=Shift_JIS",
+			"Content-Length": String(sjisBuffer.length),
+			"Last-Modified": thread.lastPostAt.toUTCString(),
+		},
+	});
 }
 
 /**
@@ -150,44 +161,44 @@ async function handleFullRequest(
  * @returns 差分DATのShift_JISエンコードレスポンス（206 Partial Content）
  */
 async function handleRangeRequest(
-  thread: { id: string; title: string; lastPostAt: Date; datByteSize: number },
-  rangeStart: number
+	thread: { id: string; title: string; lastPostAt: Date; datByteSize: number },
+	rangeStart: number,
 ): Promise<Response> {
-  // 全レスを取得する（差分計算のために全体が必要）
-  const allPosts = await PostRepository.findByThreadId(thread.id);
+	// 全レスを取得する（差分計算のために全体が必要）
+	const allPosts = await PostRepository.findByThreadId(thread.id);
 
-  // 全DATを構築する（UTF-8）
-  const fullDatText = datFormatter.buildDat(allPosts, thread.title);
+	// 全DATを構築する（UTF-8）
+	const fullDatText = datFormatter.buildDat(allPosts, thread.title);
 
-  // UTF-8 → Shift_JIS に変換（バイト単位の計算のため）
-  const fullSjisBuffer = encoder.encode(fullDatText);
-  const totalBytes = fullSjisBuffer.length;
+	// UTF-8 → Shift_JIS に変換（バイト単位の計算のため）
+	const fullSjisBuffer = encoder.encode(fullDatText);
+	const totalBytes = fullSjisBuffer.length;
 
-  if (rangeStart >= totalBytes) {
-    // 更新なし: rangeStart 以降のデータが存在しない
-    // 空の206を返す（専ブラは更新なしと判断する）
-    return new Response(new Uint8Array(0), {
-      status: 206,
-      headers: {
-        "Content-Type": "text/plain; charset=Shift_JIS",
-        "Content-Range": `bytes ${rangeStart}-${totalBytes - 1}/${totalBytes}`,
-        "Content-Length": "0",
-        "Last-Modified": thread.lastPostAt.toUTCString(),
-      },
-    });
-  }
+	if (rangeStart >= totalBytes) {
+		// 更新なし: rangeStart 以降のデータが存在しない
+		// 空の206を返す（専ブラは更新なしと判断する）
+		return new Response(new Uint8Array(0), {
+			status: 206,
+			headers: {
+				"Content-Type": "text/plain; charset=Shift_JIS",
+				"Content-Range": `bytes ${rangeStart}-${totalBytes - 1}/${totalBytes}`,
+				"Content-Length": "0",
+				"Last-Modified": thread.lastPostAt.toUTCString(),
+			},
+		});
+	}
 
-  // rangeStart 以降の差分データを切り出す
-  const diffBuffer = fullSjisBuffer.slice(rangeStart);
-  const diffEnd = totalBytes - 1;
+	// rangeStart 以降の差分データを切り出す
+	const diffBuffer = fullSjisBuffer.slice(rangeStart);
+	const diffEnd = totalBytes - 1;
 
-  return new Response(new Uint8Array(diffBuffer), {
-    status: 206,
-    headers: {
-      "Content-Type": "text/plain; charset=Shift_JIS",
-      "Content-Range": `bytes ${rangeStart}-${diffEnd}/${totalBytes}`,
-      "Content-Length": String(diffBuffer.length),
-      "Last-Modified": thread.lastPostAt.toUTCString(),
-    },
-  });
+	return new Response(new Uint8Array(diffBuffer), {
+		status: 206,
+		headers: {
+			"Content-Type": "text/plain; charset=Shift_JIS",
+			"Content-Range": `bytes ${rangeStart}-${diffEnd}/${totalBytes}`,
+			"Content-Length": String(diffBuffer.length),
+			"Last-Modified": thread.lastPostAt.toUTCString(),
+		},
+	});
 }

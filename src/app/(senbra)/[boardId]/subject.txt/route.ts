@@ -10,7 +10,7 @@
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { SubjectFormatter } from "@/lib/infrastructure/adapters/subject-formatter";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
@@ -35,48 +35,57 @@ const encoder = new ShiftJisEncoder();
  * @returns Shift_JISエンコードされたsubject.txtテキスト
  */
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ boardId: string }> }
+	req: NextRequest,
+	{ params }: { params: Promise<{ boardId: string }> },
 ): Promise<Response> {
-  const { boardId } = await params;
+	// [DIAG] プロトコル診断ログ（確認後に削除すること）
+	console.log("[diag:subject.txt]", {
+		url: req.url,
+		scheme: new URL(req.url).protocol,
+		xForwardedProto: req.headers.get("x-forwarded-proto"),
+		host: req.headers.get("host"),
+		userAgent: req.headers.get("user-agent"),
+	});
 
-  // ThreadRepositoryからbump順（last_post_at DESC）でスレッド一覧を取得する
-  // findByBoardId は is_deleted=false かつ last_post_at DESC ソート済みを返す
-  const threads = await ThreadRepository.findByBoardId(boardId, { limit: 100 });
+	const { boardId } = await params;
 
-  // If-Modified-Since による 304 Not Modified 判定
-  // スレッド一覧の最終更新時刻として最新スレッドの last_post_at を使用する
-  if (threads.length > 0) {
-    const latestPostAt = threads[0].lastPostAt;
-    const ifModifiedSince = req.headers.get("if-modified-since");
-    if (ifModifiedSince) {
-      const sinceDate = new Date(ifModifiedSince);
-      // sinceDate が有効かつ latestPostAt が sinceDate 以前の場合は 304 を返す
-      if (!isNaN(sinceDate.getTime()) && latestPostAt <= sinceDate) {
-        return new Response(null, { status: 304 });
-      }
-    }
-  }
+	// ThreadRepositoryからbump順（last_post_at DESC）でスレッド一覧を取得する
+	// findByBoardId は is_deleted=false かつ last_post_at DESC ソート済みを返す
+	const threads = await ThreadRepository.findByBoardId(boardId, { limit: 100 });
 
-  // SubjectFormatterでsubject.txtテキストを構築する（UTF-8）
-  // SubjectFormatterはbump順ソート済みのリストを受け取る（呼び出し元がソート責任を持つ）
-  const subjectText = subjectFormatter.buildSubjectTxt(threads);
+	// If-Modified-Since による 304 Not Modified 判定
+	// スレッド一覧の最終更新時刻として最新スレッドの last_post_at を使用する
+	if (threads.length > 0) {
+		const latestPostAt = threads[0].lastPostAt;
+		const ifModifiedSince = req.headers.get("if-modified-since");
+		if (ifModifiedSince) {
+			const sinceDate = new Date(ifModifiedSince);
+			// sinceDate が有効かつ latestPostAt が sinceDate 以前の場合は 304 を返す
+			if (!isNaN(sinceDate.getTime()) && latestPostAt <= sinceDate) {
+				return new Response(null, { status: 304 });
+			}
+		}
+	}
 
-  // UTF-8 → Shift_JIS に変換
-  const sjisBuffer = encoder.encode(subjectText);
+	// SubjectFormatterでsubject.txtテキストを構築する（UTF-8）
+	// SubjectFormatterはbump順ソート済みのリストを受け取る（呼び出し元がソート責任を持つ）
+	const subjectText = subjectFormatter.buildSubjectTxt(threads);
 
-  // Last-Modified ヘッダ用の日時を設定する
-  const lastModified =
-    threads.length > 0
-      ? threads[0].lastPostAt.toUTCString()
-      : new Date(0).toUTCString();
+	// UTF-8 → Shift_JIS に変換
+	const sjisBuffer = encoder.encode(subjectText);
 
-  return new Response(new Uint8Array(sjisBuffer), {
-    status: 200,
-    headers: {
-      "Content-Type": "text/plain; charset=Shift_JIS",
-      "Content-Length": String(sjisBuffer.length),
-      "Last-Modified": lastModified,
-    },
-  });
+	// Last-Modified ヘッダ用の日時を設定する
+	const lastModified =
+		threads.length > 0
+			? threads[0].lastPostAt.toUTCString()
+			: new Date(0).toUTCString();
+
+	return new Response(new Uint8Array(sjisBuffer), {
+		status: 200,
+		headers: {
+			"Content-Type": "text/plain; charset=Shift_JIS",
+			"Content-Length": String(sjisBuffer.length),
+			"Last-Modified": lastModified,
+		},
+	});
 }

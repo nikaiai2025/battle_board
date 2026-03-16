@@ -168,6 +168,52 @@ ubiquitous_language:
       - 課金ユーザー
     notes: "「有料ユーザー」で統一。将来的に追加特典が増える可能性がある"
 
+  - term: 仮ユーザー
+    english: temporary_user
+    definition: >
+      edge-token + 認証コードで認証済みだが、Supabase Auth 未連携のユーザー。
+      Cookie 喪失時にアイデンティティが失われる。課金（有料ステータス切り替え）不可。
+    forbidden_alias:
+      - 未登録ユーザー
+      - ゲストユーザー
+    notes: "DB判定: users.supabase_auth_id IS NULL"
+
+  - term: 本登録ユーザー
+    english: registered_user
+    definition: >
+      メールアドレスまたは Discord アカウントで Supabase Auth と連携済みのユーザー。
+      Cookie 喪失・端末変更時でもログインまたは PAT で同一ユーザーに復帰できる。
+      課金（有料ステータス切り替え）が可能。
+    forbidden_alias:
+      - 登録済みユーザー
+      - 正式ユーザー
+    notes: "DB判定: users.supabase_auth_id IS NOT NULL。本登録と有料・無料は直交する別概念"
+
+  - term: 本登録
+    english: registration
+    definition: >
+      仮ユーザーが自分の users レコードに Supabase Auth アカウントを紐付ける行為。
+      メール認証（確認メール経由）または Discord OAuth で完了する。
+      不可逆の遷移であり、本登録ユーザーから仮ユーザーに戻ることはない。
+      本登録完了時に PAT が自動発行される。
+    forbidden_alias:
+      - アカウント作成
+      - サインアップ
+    notes: "既存データ（通貨・書き込み履歴・ストリーク等）はすべて引き継がれる"
+
+  - term: PAT
+    english: personal_access_token
+    definition: >
+      パーソナルアクセストークン。本登録完了時に自動発行される専ブラ連携用の
+      長期トークン（32文字 hex）。専ブラのメール欄に「#pat_<token>」として
+      設定して認証する。設定しておけば Cookie 喪失時の自動復帰保険になるが、
+      Cookie 発行後は除去しても書き込みに支障はない。
+      1ユーザーにつき1個。再発行すると旧 PAT は即時無効化。
+    forbidden_alias:
+      - API キー
+      - アクセストークン
+    notes: "マイページに常時表示。平文保存（edge-token と同等のセキュリティレベル）"
+
   - term: 管理者
     english: admin
     definition: >

@@ -1,0 +1,224 @@
+# D-05 ユーザー登録状態遷移仕様書
+# ステータス: ドラフト
+# 作成日: 2026-03-16
+# 対象: Phase 3（本登録・ログイン・PAT）
+#
+# 本ファイルは既存の user_state_transitions.yaml を拡張するものであり、
+# 「登録状態」軸と「PAT状態」軸を新設する。
+# 既存の「認証状態」「アカウント種別」は user_state_transitions.yaml を参照。
+#
+# 関連BDD: features/phase3/user_registration.feature
+# 関連D-08: docs/architecture/components/user-registration.md
+
+entity: User (Phase 3 拡張)
+description: >
+  Phase 1-2 の認証状態・アカウント種別に加え、「登録状態」と「PAT状態」を定義する。
+  登録状態は仮ユーザーから本登録ユーザーへの不可逆遷移を管理する。
+  PAT 状態は専ブラ連携トークンのライフサイクルを管理する。
+
+# =============================================
+# 登録状態（新設）
+# =============================================
+registration_states:
+  - name: temporary_user
+    label: 仮ユーザー
+    description: >
+      edge-token + 認証コードで認証済みだが、Supabase Auth 未連携のユーザー。
+      Cookie 喪失時にアイデンティティが失われる。課金（有料ステータス）不可。
+    initial: true
+    db_condition: "users.supabase_auth_id IS NULL"
+
+  - name: registration_pending
+    label: 本登録確認待ち
+    description: >
+      メール認証の場合のみ存在する中間状態。
+      Supabase Auth にアカウントは作成済みだが、メール確認が未完了。
+      この状態では本登録ユーザーとしては扱われない。
+    db_condition: "Supabase Auth 側でメール未確認"
+
+  - name: registered_user
+    label: 本登録ユーザー
+    description: >
+      Supabase Auth アカウント連携済みのユーザー。
+      Cookie 喪失時でもログインまたは PAT で同一ユーザーに復帰可能。
+      課金（有料ステータス切り替え）が可能。
+    db_condition: "users.supabase_auth_id IS NOT NULL"
+
+registration_transitions:
+  - from: temporary_user
+    to: registration_pending
+    trigger: メールアドレスとパスワードで本登録を申請
+    action:
+      - Supabase Auth signUp() でアカウント作成
+      - 確認メール送信
+    feature_ref: user_registration.feature#仮ユーザーがメールアドレスとパスワードで本登録を申請する
+
+  - from: registration_pending
+    to: registered_user
+    trigger: メール確認リンクのクリック
+    action:
+      - users.supabase_auth_id = Supabase Auth user.id
+      - users.registration_type = 'email'
+      - users.registered_at = NOW()
+      - PAT 自動生成 → users.pat_token に保存
+      - 既存データ（通貨・書き込み履歴・ストリーク等）はそのまま維持
+    feature_ref: user_registration.feature#メール確認リンクをクリックして本登録が完了する
+
+  - from: temporary_user
+    to: registered_user
+    trigger: Discord アカウントで本登録（OAuth 認可完了）
+    action:
+      - Supabase Auth OAuth フロー完了
+      - users.supabase_auth_id = Supabase Auth user.id
+      - users.registration_type = 'discord'
+      - users.registered_at = NOW()
+      - PAT 自動生成 → users.pat_token に保存
+      - 既存データはそのまま維持
+    feature_ref: user_registration.feature#仮ユーザーがDiscordアカウントで本登録する
+    note: >
+      Discord OAuth は確認待ち状態を経由しない（認可完了 = 即時本登録）
+
+  # 本登録ユーザーから仮ユーザーへの遷移はない（不可逆）
+
+# =============================================
+# ログイン状態（本登録ユーザーのみ）
+# =============================================
+login_states:
+  - name: logged_out
+    label: ログアウト状態
+    description: >
+      edge-token Cookie が存在しない状態。
+      仮ユーザーの「未認証」とは異なり、ログインにより同一ユーザーに復帰可能。
+    note: "本登録ユーザー固有の状態。仮ユーザーの場合はCookie喪失=別人"
+
+  - name: logged_in
+    label: ログイン状態
+    description: >
+      edge-token Cookie が有効で、本登録ユーザーとして認証されている状態。
+      複数デバイスで同時にログイン状態を持てる。
+
+login_transitions:
+  - from: logged_out
+    to: logged_in
+    trigger: メールアドレス + パスワードでログイン
+    action:
+      - Supabase Auth signInWithPassword() で認証
+      - supabase_auth_id で users レコードを特定
+      - 新しい edge-token を生成し edge_tokens に INSERT
+      - edge-token Cookie を設定
+    feature_ref: user_registration.feature#本登録ユーザーがメールアドレスとパスワードでログインする
+
+  - from: logged_out
+    to: logged_in
+    trigger: Discord アカウントでログイン
+    action:
+      - Supabase Auth OAuth フローで認証
+      - supabase_auth_id で users レコードを特定
+      - 新しい edge-token を生成し edge_tokens に INSERT
+      - edge-token Cookie を設定
+    feature_ref: user_registration.feature#本登録ユーザーがDiscordアカウントでログインする
+
+  - from: logged_out
+    to: logged_in
+    trigger: PAT による専ブラ認証（mail 欄に #pat_<token>）
+    action:
+      - users.pat_token で照合
+      - 新しい edge-token を生成し edge_tokens に INSERT
+      - edge-token Cookie を設定
+      - users.pat_last_used_at を更新
+    feature_ref: user_registration.feature#専ブラのmail欄にPATを設定して書き込みできる
+
+  - from: logged_in
+    to: logged_out
+    trigger: ログアウト操作
+    action:
+      - edge_tokens から該当トークン行を DELETE
+      - edge-token Cookie を削除
+    feature_ref: user_registration.feature#ログアウトすると書き込みに再認証が必要になる
+    note: >
+      ログアウトは当該デバイスのみに影響する。
+      他デバイスの edge-token は引き続き有効。
+
+  - from: logged_in
+    to: logged_out
+    trigger: edge-token Cookie の期限切れ（365日）
+    action:
+      - 次回アクセス時にログインページまたは PAT で復帰可能
+    note: >
+      Cookie 期限切れは自動的に発生する。
+      edge_tokens テーブルの行は残るが、Cookie がないため使用されない。
+
+# =============================================
+# PAT 状態（本登録ユーザーのみ）
+# =============================================
+pat_states:
+  - name: not_issued
+    label: 未発行
+    description: 仮ユーザーの状態。PAT は本登録後に自動発行される。
+    initial: true
+    db_condition: "users.pat_token IS NULL"
+
+  - name: active
+    label: 有効
+    description: PAT が発行済みで使用可能な状態。マイページに常時表示される。
+    db_condition: "users.pat_token IS NOT NULL"
+
+pat_transitions:
+  - from: not_issued
+    to: active
+    trigger: 本登録完了
+    action:
+      - crypto.randomBytes(16).toString('hex') で 32 文字のトークンを生成
+      - users.pat_token に平文保存
+    feature_ref: user_registration.feature#本登録完了時にPATが自動発行される
+    note: ユーザー操作不要。本登録完了と同時に自動発行。
+
+  - from: active
+    to: active
+    trigger: PAT 再発行（マイページ操作）
+    action:
+      - 新しい PAT を生成
+      - users.pat_token を上書き（旧 PAT は即時無効化）
+      - users.pat_last_used_at = NULL にリセット
+    feature_ref: user_registration.feature#PATを再発行すると旧PATが無効になる
+
+# =============================================
+# 課金制約（既存 account_transitions への追加ガード）
+# =============================================
+account_transition_guard:
+  description: >
+    既存の user_state_transitions.yaml の free_user → premium_user 遷移に
+    以下のガードを追加する。仮ユーザーは課金不可。
+  transition: free_user → premium_user
+  additional_guard:
+    - "users.supabase_auth_id IS NOT NULL（本登録済みであること）"
+  feature_ref: user_registration.feature#仮ユーザーは課金できない
+
+# =============================================
+# edge-token ライフサイクル（edge_tokens テーブル）
+# =============================================
+edge_token_lifecycle:
+  description: >
+    Phase 1-2 では users.auth_token に単一の edge-token を保持していたが、
+    Phase 3 で edge_tokens テーブルに移行し、1 ユーザーに対して
+    複数の edge-token を保持可能にする。
+    これにより本登録ユーザーが複数デバイスで同時に利用できる。
+
+  creation:
+    - trigger: 初回書き込み時（認証コード発行と同時）
+      note: 仮ユーザー・本登録ユーザー共通
+    - trigger: ログイン時（新デバイス）
+      note: 本登録ユーザーのみ
+    - trigger: PAT 認証時（新デバイス・専ブラ）
+      note: 本登録ユーザーのみ
+
+  deletion:
+    - trigger: ログアウト操作
+      note: 当該デバイスの edge-token 行のみ削除
+    - trigger: 日次メンテナンス（将来）
+      note: last_used_at が一定期間以上前の行を掃除
+
+  cookie_max_age: 365日（31536000秒）
+  note: >
+    Web API・専ブラの両経路で 365 日に統一する。
+    現状 Web API 側が 30 日の箇所がありバグ修正が必要。

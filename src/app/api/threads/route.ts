@@ -19,10 +19,10 @@
  *   - 未認証時は 401 + AuthCodeIssuedResponse + Set-Cookie
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import * as PostService from '@/lib/services/post-service'
-import { hashIp, reduceIp } from '@/lib/services/auth-service'
-import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
+import { type NextRequest, NextResponse } from "next/server";
+import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import { hashIp, reduceIp } from "@/lib/services/auth-service";
+import * as PostService from "@/lib/services/post-service";
 
 // ---------------------------------------------------------------------------
 // ユーティリティ
@@ -36,13 +36,13 @@ import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
  * @returns クライアント IP の SHA-512 ハッシュ
  */
 function getIpHash(req: NextRequest): string {
-  const forwarded = req.headers.get('x-forwarded-for')
-  // x-forwarded-for は "client, proxy1, proxy2" の形式のため先頭を使用する
-  const ip =
-    forwarded?.split(',')[0].trim() ??
-    req.headers.get('x-real-ip') ??
-    '127.0.0.1'
-  return hashIp(reduceIp(ip))
+	const forwarded = req.headers.get("x-forwarded-for");
+	// x-forwarded-for は "client, proxy1, proxy2" の形式のため先頭を使用する
+	const ip =
+		forwarded?.split(",")[0].trim() ??
+		req.headers.get("x-real-ip") ??
+		"127.0.0.1";
+	return hashIp(reduceIp(ip));
 }
 
 // ---------------------------------------------------------------------------
@@ -59,12 +59,9 @@ function getIpHash(req: NextRequest): string {
  *   200: { threads: Thread[] }（最大50件、last_post_at DESC 順）
  */
 export async function GET(_req: NextRequest): Promise<NextResponse> {
-  const threads = await PostService.getThreadList('battleboard', 50)
+	const threads = await PostService.getThreadList("battleboard", 50);
 
-  return NextResponse.json(
-    { threads },
-    { status: 200 }
-  )
+	return NextResponse.json({ threads }, { status: 200 });
 }
 
 /**
@@ -85,85 +82,91 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
  *   401: AuthCodeIssuedResponse + Set-Cookie（未認証）
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // --- リクエストボディのパース ---
-  let body: { title?: unknown; body?: unknown }
-  try {
-    body = (await req.json()) as { title?: unknown; body?: unknown }
-  } catch {
-    return NextResponse.json(
-      { error: 'INVALID_REQUEST', message: 'リクエストボディが不正です' },
-      { status: 400 }
-    )
-  }
+	// --- リクエストボディのパース ---
+	let body: { title?: unknown; body?: unknown };
+	try {
+		body = (await req.json()) as { title?: unknown; body?: unknown };
+	} catch {
+		return NextResponse.json(
+			{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
+			{ status: 400 },
+		);
+	}
 
-  const { title, body: postBody } = body
+	const { title, body: postBody } = body;
 
-  // --- バリデーション ---
-  if (!title || typeof title !== 'string' || title.trim() === '') {
-    return NextResponse.json(
-      { error: 'VALIDATION_ERROR', message: 'スレッドタイトルを入力してください' },
-      { status: 400 }
-    )
-  }
+	// --- バリデーション ---
+	if (!title || typeof title !== "string" || title.trim() === "") {
+		return NextResponse.json(
+			{
+				error: "VALIDATION_ERROR",
+				message: "スレッドタイトルを入力してください",
+			},
+			{ status: 400 },
+		);
+	}
 
-  if (!postBody || typeof postBody !== 'string' || postBody.trim() === '') {
-    return NextResponse.json(
-      { error: 'VALIDATION_ERROR', message: '本文を入力してください' },
-      { status: 400 }
-    )
-  }
+	if (!postBody || typeof postBody !== "string" || postBody.trim() === "") {
+		return NextResponse.json(
+			{ error: "VALIDATION_ERROR", message: "本文を入力してください" },
+			{ status: 400 },
+		);
+	}
 
-  // --- Cookie から edge-token を読み取る ---
-  // See: src/lib/constants/cookie-names.ts
-  const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null
+	// --- Cookie から edge-token を読み取る ---
+	// See: src/lib/constants/cookie-names.ts
+	const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
 
-  // --- IP ハッシュの取得 ---
-  const ipHash = getIpHash(req)
+	// --- IP ハッシュの取得 ---
+	const ipHash = getIpHash(req);
 
-  // --- PostService への委譲 ---
-  const result = await PostService.createThread(
-    {
-      boardId: 'battleboard',
-      title: title.trim(),
-      firstPostBody: postBody.trim(),
-    },
-    edgeToken,
-    ipHash
-  )
+	// --- PostService への委譲 ---
+	const result = await PostService.createThread(
+		{
+			boardId: "battleboard",
+			title: title.trim(),
+			firstPostBody: postBody.trim(),
+		},
+		edgeToken,
+		ipHash,
+	);
 
-  // --- レスポンス整形 ---
+	// --- レスポンス整形 ---
 
-  // 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
-  if (result.authRequired) {
-    const response = NextResponse.json(
-      {
-        message: '認証コードを入力してください',
-        authCodeUrl: '/auth/auth-code',
-        authCode: result.authRequired.code,
-      },
-      { status: 401 }
-    )
-    // edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
-    // See: docs/specs/openapi.yaml > /api/threads > post > 401 > Set-Cookie
-    // See: src/lib/constants/cookie-names.ts
-    response.cookies.set(EDGE_TOKEN_COOKIE, result.authRequired.edgeToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    })
-    return response
-  }
+	// 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
+	if (result.authRequired) {
+		const response = NextResponse.json(
+			{
+				message: "認証コードを入力してください",
+				authCodeUrl: "/auth/auth-code",
+				authCode: result.authRequired.code,
+			},
+			{ status: 401 },
+		);
+		// edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
+		// See: docs/specs/openapi.yaml > /api/threads > post > 401 > Set-Cookie
+		// See: src/lib/constants/cookie-names.ts
+		response.cookies.set(EDGE_TOKEN_COOKIE, result.authRequired.edgeToken, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "lax",
+			maxAge: 60 * 60 * 24 * 365,
+			path: "/",
+		});
+		return response;
+	}
 
-  // バリデーションエラー
-  if (!result.success) {
-    return NextResponse.json(
-      { error: result.code ?? 'VALIDATION_ERROR', message: result.error ?? 'エラーが発生しました' },
-      { status: 400 }
-    )
-  }
+	// バリデーションエラー
+	if (!result.success) {
+		return NextResponse.json(
+			{
+				error: result.code ?? "VALIDATION_ERROR",
+				message: result.error ?? "エラーが発生しました",
+			},
+			{ status: 400 },
+		);
+	}
 
-  // 成功: 201 + Thread JSON
-  return NextResponse.json(result.thread, { status: 201 })
+	// 成功: 201 + Thread JSON
+	return NextResponse.json(result.thread, { status: 201 });
 }
