@@ -2,7 +2,7 @@
  * accusation-rules — AI告発の判定純粋関数
  *
  * 外部依存なしの純粋関数。テストが容易でドメインロジックのみを担う。
- * ボーナス額は config/commands.yaml で定義し、呼び出し元から引数で受け取る。
+ * !tell はコスト消費のみで報酬なしの偵察専用コマンド（v4）。
  *
  * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
@@ -34,16 +34,6 @@ export interface AccusationCheckInput {
 export type AccusationCheckResult =
 	| { ok: true }
 	| { ok: false; reason: "self_accusation" | "system_message" };
-
-/**
- * ボーナス計算の結果型。
- */
-export interface BonusCalculationResult {
-	/** 告発者への通貨付与額（miss 時は 0） */
-	accuserBonus: number;
-	/** 被告発者への冤罪ボーナス額（hit 時は 0） */
-	targetBonus: number;
-}
 
 // ---------------------------------------------------------------------------
 // 純粋関数
@@ -90,86 +80,46 @@ export function checkAccusationAllowed(
 }
 
 /**
- * 告発結果に応じたボーナス額を計算する。
- *
- * - hit（AIボット）: 告発者に hitBonus を付与。被告発者へのボーナスなし。
- * - miss（人間）: 告発者へのボーナスなし。被告発者に falseAccusationBonus を付与。
- *
- * ボーナス額は config/commands.yaml から読み込まれ、引数として渡される。
- *
- * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
- * See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
- *
- * @param isBot - 対象レスがAIボットの書き込みかどうか
- * @param hitBonus - 告発成功時に告発者に付与するボーナス額
- * @param falseAccusationBonus - 告発失敗時に被告発者に付与する冤罪ボーナス額
- * @returns ボーナス計算結果
- */
-export function calculateBonus(
-	isBot: boolean,
-	hitBonus: number,
-	falseAccusationBonus: number,
-): BonusCalculationResult {
-	if (isBot) {
-		// hit: 告発者に成功ボーナスを付与
-		return {
-			accuserBonus: hitBonus,
-			targetBonus: 0,
-		};
-	} else {
-		// miss: 被告発者に冤罪ボーナスを付与
-		return {
-			accuserBonus: 0,
-			targetBonus: falseAccusationBonus,
-		};
-	}
-}
-
-/**
  * 告発結果のシステムメッセージ文字列を生成する（hit の場合）。
+ *
+ * v4: ボーナス廃止。コスト消費のみでボーナス付与行は表示しない。
  *
  * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
  *
  * @param accuserDailyId - 告発者の日次ID（表示用）
  * @param targetPostNumber - 告発対象のレス番号
- * @param bonusAmount - 付与されたボーナス額
  * @returns システムメッセージ文字列
  */
 export function buildHitSystemMessage(
 	accuserDailyId: string,
 	targetPostNumber: number,
-	bonusAmount: number,
 ): string {
 	return (
 		`[システム] 名無しさん(ID:${accuserDailyId})が >>${targetPostNumber} をAI告発！\n` +
-		`判定結果：>>${targetPostNumber} は… AIでした！🤖\n` +
-		`ID:${accuserDailyId} の通貨 +${bonusAmount}`
+		`判定結果：>>${targetPostNumber} は… AIでした！🤖`
 	);
 }
 
 /**
  * 告発結果のシステムメッセージ文字列を生成する（miss の場合）。
  *
- * See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+ * v4: 冤罪ボーナス廃止。コスト消費のみのメッセージに簡素化。
+ *
+ * See: features/ai_accusation.feature @AI告発に失敗するとコストのみ消費される
  *
  * @param accuserDailyId - 告発者の日次ID（表示用）
  * @param targetPostNumber - 告発対象のレス番号
- * @param targetDailyId - 被告発者の日次ID（表示用）
  * @param accusationCost - 告発コスト（告発者の通貨消費額）
- * @param targetBonus - 被告発者への冤罪ボーナス額
  * @returns システムメッセージ文字列
  */
 export function buildMissSystemMessage(
 	accuserDailyId: string,
 	targetPostNumber: number,
-	targetDailyId: string,
 	accusationCost: number,
-	targetBonus: number,
 ): string {
 	return (
 		`[システム] 名無しさん(ID:${accuserDailyId})が >>${targetPostNumber} をAI告発！\n` +
 		`判定結果：>>${targetPostNumber} は… 人間でした！\n` +
-		`ID:${accuserDailyId} の通貨 -${accusationCost}\n` +
-		`>>${targetPostNumber} の名無しさん(ID:${targetDailyId})は冤罪ボーナス +${targetBonus} を獲得！`
+		`ID:${accuserDailyId} の通貨 -${accusationCost}`
 	);
 }

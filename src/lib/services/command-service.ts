@@ -115,10 +115,6 @@ interface CommandConfig {
 	targetFormat: string | null;
 	enabled: boolean;
 	stealth: boolean;
-	/** 告発成功時のボーナス額（tell コマンド専用） */
-	hitBonus?: number;
-	/** 冤罪ボーナス額（tell コマンド専用） */
-	falseAccusationBonus?: number;
 }
 
 /** config/commands.yaml のルート型 */
@@ -196,15 +192,14 @@ export class CommandService {
 
 		// YAML から tell コマンドの経済パラメータを抽出する
 		// AccusationService が未提供の場合、YAML設定値で内部生成する
-		// See: config/commands.yaml > tell.hitBonus, tell.falseAccusationBonus, tell.cost
+		// v4: ボーナス廃止。cost のみ使用する。
+		// See: config/commands.yaml > tell.cost
 		const tellConfig = parsed.commands.tell;
 		let resolvedAccusationService: AccusationService;
 		if (accusationService) {
 			resolvedAccusationService = accusationService;
 		} else {
 			const bonusConfig: AccusationBonusConfig = {
-				hitBonus: tellConfig?.hitBonus ?? 20,
-				falseAccusationBonus: tellConfig?.falseAccusationBonus ?? 10,
 				cost: tellConfig?.cost ?? 10,
 			};
 			resolvedAccusationService = createAccusationService(bonusConfig);

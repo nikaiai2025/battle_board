@@ -5,21 +5,21 @@
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
  *
  * テスト方針:
- *   - PostRepository, BotPostRepository, AccusationRepository, CurrencyService は全てモック化する
+ *   - PostRepository, BotPostRepository, AccusationRepository は全てモック化する
  *   - 各判定パス（hit/miss/重複/自分自身/システムメッセージ/存在しないレス）を網羅する
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
- *   - ボーナス額は AccusationBonusConfig で注入する（ハードコード定数は削除済み）
+ *   - v4: ボーナス廃止。ICurrencyService 依存を削除。bonusAmount は常に 0。
  *
  * カバレッジ対象:
- *   - hit（AIボット確認）: ボーナス付与 + システムメッセージ生成
- *   - miss（人間確認）: 冤罪ボーナス付与 + システムメッセージ生成
+ *   - hit（AIボット確認）: bonusAmount=0 + システムメッセージ生成（ボーナスなし）
+ *   - miss（人間確認）: bonusAmount=0 + システムメッセージ生成（冤罪ボーナスなし）
  *   - 重複告発: alreadyAccused=true を返す
  *   - 存在しないレス: エラーメッセージを返す
  *   - 自分自身の書き込みへの告発: エラーメッセージを返す
  *   - システムメッセージへの告発: エラーメッセージを返す
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Post } from "../../../lib/domain/models/post";
 import {
 	type AccusationBonusConfig,
@@ -27,18 +27,15 @@ import {
 	AccusationService,
 	type IAccusationRepository,
 	type IBotPostRepository,
-	type ICurrencyService,
 	type IPostRepository,
 } from "../../../lib/services/accusation-service";
 
 // ---------------------------------------------------------------------------
-// テスト用定数（config/commands.yaml の値と一致）
+// テスト用定数
 // ---------------------------------------------------------------------------
 
-/** テスト用ボーナス設定（config/commands.yaml の tell コマンド設定に準拠） */
+/** テスト用告発設定（config/commands.yaml の tell コマンド設定に準拠） */
 const TEST_BONUS_CONFIG: AccusationBonusConfig = {
-	hitBonus: 20,
-	falseAccusationBonus: 10,
 	cost: 10,
 };
 
@@ -118,13 +115,6 @@ function createMockAccusationRepository(
 	};
 }
 
-/** モック CurrencyService を生成する */
-function createMockCurrencyService(): ICurrencyService {
-	return {
-		credit: vi.fn().mockResolvedValue(undefined),
-	};
-}
-
 /** デフォルトのAccusationInputを生成する */
 function createAccusationInput(
 	overrides: Partial<AccusationInput> = {},
@@ -143,7 +133,6 @@ function createService(options: {
 	post?: Post | null;
 	isBot?: boolean;
 	alreadyExists?: boolean;
-	currencyService?: ICurrencyService;
 	bonusConfig?: AccusationBonusConfig;
 }): AccusationService {
 	// post が明示的に null を渡された場合は null を使う（存在しないレスのテスト用）
@@ -152,7 +141,6 @@ function createService(options: {
 		createMockPostRepository(post),
 		createMockBotPostRepository(options.isBot ?? false),
 		createMockAccusationRepository(options.alreadyExists ?? false),
-		options.currencyService ?? createMockCurrencyService(),
 		options.bonusConfig ?? TEST_BONUS_CONFIG,
 	);
 }
@@ -180,23 +168,16 @@ describe("AccusationService", () => {
 			expect(result.alreadyAccused).toBe(false);
 		});
 
-		it("hit時に告発者にhitBonusが付与される", async () => {
-			// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
-			const currencyService = createMockCurrencyService();
+		it("hit時にbonusAmountが0である（v4ボーナス廃止）", async () => {
+			// See: features/ai_accusation.feature @告発者に通貨報酬は付与されない
 			const service = createService({
 				post: createBotPost(),
 				isBot: true,
-				currencyService,
 			});
 
 			const result = await service.accuse(createAccusationInput());
 
-			expect(result.bonusAmount).toBe(TEST_BONUS_CONFIG.hitBonus);
-			expect(currencyService.credit).toHaveBeenCalledWith(
-				"accuser-user-001",
-				TEST_BONUS_CONFIG.hitBonus,
-				"accusation_hit",
-			);
+			expect(result.bonusAmount).toBe(0);
 		});
 
 		it("hit時のシステムメッセージにAI判定結果が含まれる", async () => {
@@ -211,13 +192,24 @@ describe("AccusationService", () => {
 			expect(result.systemMessage).toContain("[システム]");
 		});
 
-		it("hit時にAccusationRepositoryにrecordが保存される", async () => {
+		it("hit時のシステムメッセージにボーナス付与行が含まれない", async () => {
+			// See: features/ai_accusation.feature @告発者に通貨報酬は付与されない
+			const service = createService({
+				post: createBotPost(),
+				isBot: true,
+			});
+
+			const result = await service.accuse(createAccusationInput());
+
+			expect(result.systemMessage).not.toContain("通貨 +");
+		});
+
+		it("hit時にAccusationRepositoryにbonusAmount=0でrecordが保存される", async () => {
 			const accusationRepo = createMockAccusationRepository();
 			const service = new AccusationService(
 				createMockPostRepository(createBotPost()),
 				createMockBotPostRepository(true),
 				accusationRepo,
-				createMockCurrencyService(),
 				TEST_BONUS_CONFIG,
 			);
 
@@ -229,7 +221,7 @@ describe("AccusationService", () => {
 					targetPostId: "target-post-001",
 					threadId: "thread-001",
 					result: "hit",
-					bonusAmount: TEST_BONUS_CONFIG.hitBonus,
+					bonusAmount: 0,
 				}),
 			);
 		});
@@ -241,7 +233,7 @@ describe("AccusationService", () => {
 
 	describe("miss（人間確認）", () => {
 		it("対象が人間の場合、result='miss'を返す", async () => {
-			// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+			// See: features/ai_accusation.feature @AI告発に失敗するとコストのみ消費される
 			const service = createService({
 				post: createHumanPost(),
 				isBot: false,
@@ -253,23 +245,16 @@ describe("AccusationService", () => {
 			expect(result.alreadyAccused).toBe(false);
 		});
 
-		it("miss時に被告発者にfalseAccusationBonusが付与される", async () => {
-			// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
-			const currencyService = createMockCurrencyService();
+		it("miss時にbonusAmountが0である（v4ボーナス廃止）", async () => {
+			// See: features/ai_accusation.feature @被告発者に通貨は付与されない
 			const service = createService({
 				post: createHumanPost(),
 				isBot: false,
-				currencyService,
 			});
 
 			const result = await service.accuse(createAccusationInput());
 
-			expect(result.bonusAmount).toBe(TEST_BONUS_CONFIG.falseAccusationBonus);
-			expect(currencyService.credit).toHaveBeenCalledWith(
-				"target-user-001",
-				TEST_BONUS_CONFIG.falseAccusationBonus,
-				"false_accusation_bonus",
-			);
+			expect(result.bonusAmount).toBe(0);
 		});
 
 		it("miss時のシステムメッセージに人間判定結果が含まれる", async () => {
@@ -281,16 +266,26 @@ describe("AccusationService", () => {
 			const result = await service.accuse(createAccusationInput());
 
 			expect(result.systemMessage).toContain("人間でした");
-			expect(result.systemMessage).toContain("冤罪ボーナス");
 		});
 
-		it("miss時にAccusationRepositoryにrecordが保存される", async () => {
+		it("miss時のシステムメッセージに冤罪ボーナス関連文言が含まれない", async () => {
+			// See: features/ai_accusation.feature @被告発者に通貨は付与されない
+			const service = createService({
+				post: createHumanPost(),
+				isBot: false,
+			});
+
+			const result = await service.accuse(createAccusationInput());
+
+			expect(result.systemMessage).not.toContain("冤罪ボーナス");
+		});
+
+		it("miss時にAccusationRepositoryにbonusAmount=0でrecordが保存される", async () => {
 			const accusationRepo = createMockAccusationRepository();
 			const service = new AccusationService(
 				createMockPostRepository(createHumanPost()),
 				createMockBotPostRepository(false),
 				accusationRepo,
-				createMockCurrencyService(),
 				TEST_BONUS_CONFIG,
 			);
 
@@ -299,7 +294,7 @@ describe("AccusationService", () => {
 			expect(accusationRepo.create).toHaveBeenCalledWith(
 				expect.objectContaining({
 					result: "miss",
-					bonusAmount: TEST_BONUS_CONFIG.falseAccusationBonus,
+					bonusAmount: 0,
 				}),
 			);
 		});
@@ -332,25 +327,12 @@ describe("AccusationService", () => {
 			expect(result.bonusAmount).toBe(0);
 		});
 
-		it("重複告発時はCurrencyService.creditが呼ばれない", async () => {
-			const currencyService = createMockCurrencyService();
-			const service = createService({
-				alreadyExists: true,
-				currencyService,
-			});
-
-			await service.accuse(createAccusationInput());
-
-			expect(currencyService.credit).not.toHaveBeenCalled();
-		});
-
 		it("重複告発時はAccusationRepository.createが呼ばれない", async () => {
 			const accusationRepo = createMockAccusationRepository(true);
 			const service = new AccusationService(
 				createMockPostRepository(),
 				createMockBotPostRepository(false),
 				accusationRepo,
-				createMockCurrencyService(),
 				TEST_BONUS_CONFIG,
 			);
 
@@ -377,18 +359,6 @@ describe("AccusationService", () => {
 			expect(result.bonusAmount).toBe(0);
 			expect(result.alreadyAccused).toBe(false);
 		});
-
-		it("存在しないレスへの告発時はCurrencyService.creditが呼ばれない", async () => {
-			const currencyService = createMockCurrencyService();
-			const service = createService({
-				post: null,
-				currencyService,
-			});
-
-			await service.accuse(createAccusationInput());
-
-			expect(currencyService.credit).not.toHaveBeenCalled();
-		});
 	});
 
 	// =========================================================================
@@ -409,18 +379,6 @@ describe("AccusationService", () => {
 			);
 			expect(result.bonusAmount).toBe(0);
 			expect(result.alreadyAccused).toBe(false);
-		});
-
-		it("自分自身への告発時はCurrencyService.creditが呼ばれない", async () => {
-			const currencyService = createMockCurrencyService();
-			const service = createService({
-				post: createHumanPost({ authorId: "accuser-user-001" }),
-				currencyService,
-			});
-
-			await service.accuse(createAccusationInput());
-
-			expect(currencyService.credit).not.toHaveBeenCalled();
 		});
 	});
 
@@ -443,18 +401,6 @@ describe("AccusationService", () => {
 			expect(result.bonusAmount).toBe(0);
 			expect(result.alreadyAccused).toBe(false);
 		});
-
-		it("システムメッセージへの告発時はCurrencyService.creditが呼ばれない", async () => {
-			const currencyService = createMockCurrencyService();
-			const service = createService({
-				post: createSystemPost(),
-				currencyService,
-			});
-
-			await service.accuse(createAccusationInput());
-
-			expect(currencyService.credit).not.toHaveBeenCalled();
-		});
 	});
 
 	// =========================================================================
@@ -469,7 +415,6 @@ describe("AccusationService", () => {
 				postRepo,
 				createMockBotPostRepository(false),
 				createMockAccusationRepository(true),
-				createMockCurrencyService(),
 				TEST_BONUS_CONFIG,
 			);
 
@@ -487,7 +432,6 @@ describe("AccusationService", () => {
 				createMockPostRepository(myPost),
 				botPostRepo,
 				createMockAccusationRepository(),
-				createMockCurrencyService(),
 				TEST_BONUS_CONFIG,
 			);
 
@@ -513,44 +457,18 @@ describe("AccusationService", () => {
 			expect(result.result).toBe("hit");
 		});
 
-		it("miss時にtargetPost.authorIdがnullの場合はcreditが呼ばれない", async () => {
+		it("miss時にtargetPost.authorIdがnullの場合もbonusAmount=0で正常に動作する", async () => {
 			// authorId=null の非システムメッセージかつ非ボットという理論的ケース
-			const currencyService = createMockCurrencyService();
 			const service = createService({
 				post: createHumanPost({ authorId: null, isSystemMessage: false }),
 				isBot: false,
-				currencyService,
 			});
 
 			const result = await service.accuse(createAccusationInput());
 
-			// miss だが authorId=null なので冤罪ボーナスは付与されない
+			// miss で bonusAmount=0（v4: ボーナス廃止）
 			expect(result.result).toBe("miss");
-			expect(currencyService.credit).not.toHaveBeenCalled();
-		});
-
-		it("カスタムボーナス設定が正しく適用される", async () => {
-			const customConfig: AccusationBonusConfig = {
-				hitBonus: 999,
-				falseAccusationBonus: 500,
-				cost: 100,
-			};
-			const currencyService = createMockCurrencyService();
-			const service = createService({
-				post: createBotPost(),
-				isBot: true,
-				currencyService,
-				bonusConfig: customConfig,
-			});
-
-			const result = await service.accuse(createAccusationInput());
-
-			expect(result.bonusAmount).toBe(999);
-			expect(currencyService.credit).toHaveBeenCalledWith(
-				"accuser-user-001",
-				999,
-				"accusation_hit",
-			);
+			expect(result.bonusAmount).toBe(0);
 		});
 	});
 });

@@ -60,8 +60,6 @@ commands:
     targetFormat: ">>postNumber"
     enabled: true
     stealth: false
-    hitBonus: 20
-    falseAccusationBonus: 10
   w:
     description: "指定レスに草を生やす"
     cost: 0
@@ -79,8 +77,6 @@ commands:
     targetFormat: ">>postNumber"
     enabled: false
     stealth: false
-    hitBonus: 20
-    falseAccusationBonus: 10
   w:
     description: "指定レスに草を生やす"
     cost: 0

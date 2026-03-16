@@ -8,7 +8,8 @@
  *
  * !tell コマンドの仕様:
  *   - 引数: ">>postNumber" 形式でレスを指定する（例: "!tell >>5"）
- *   - 通貨コスト: 50（config/commands.yaml の tell.cost）
+ *   - 通貨コスト: 10（config/commands.yaml の tell.cost）
+ *   - コスト消費のみで報酬なしの偵察専用コマンド（v4）
  *   - 告発ロジックはすべて AccusationService に委譲する
  *   - CommandService は通貨引き落としを事前に行い、TellHandler は AccusationService を呼ぶだけ
  */

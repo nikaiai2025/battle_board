@@ -7,16 +7,17 @@
  *
  * 責務:
  *   - !tell コマンドの告発フロー全体を統括する
- *   - 重複チェック → 存在チェック → 告発ルール判定 → isBot判定 → ボーナス付与 → DB記録 → メッセージ生成
+ *   - 重複チェック → 存在チェック → 告発ルール判定 → isBot判定 → DB記録 → メッセージ生成
  *   - システムメッセージ文字列を返す（DB挿入はしない。PostService/CommandService が担当）
  *
  * DI設計:
- *   - PostRepository, BotPostRepository, CurrencyService, AccusationRepository を注入可能にする
+ *   - PostRepository, BotPostRepository, AccusationRepository を注入可能にする
  *   - テスト時はモックを注入し、外部DB依存を排除する
  *
- * ボーナス設定:
- *   - hitBonus / falseAccusationBonus / cost は config/commands.yaml で定義される
- *   - コンストラクタの bonusConfig 引数で注入する
+ * v4変更: ボーナス廃止。!tell はコスト消費のみ・報酬なしの偵察専用コマンド。
+ *   - hitBonus / falseAccusationBonus を削除
+ *   - ICurrencyService 依存を削除（通貨付与が不要になったため）
+ *   - bonusConfig は cost のみ保持（システムメッセージ表示用）
  *
  * Note: BotService は未実装のため、直接 BotPostRepository を使用する。
  *   Phase 3 で BotService 実装時にリファクタリングする。
@@ -24,40 +25,33 @@
  */
 
 import type { AccusationResult } from "../domain/models/accusation";
-import type { CreditReason } from "../domain/models/currency";
 import type { Post } from "../domain/models/post";
 import {
 	buildHitSystemMessage,
 	buildMissSystemMessage,
-	calculateBonus,
 	checkAccusationAllowed,
 } from "../domain/rules/accusation-rules";
 
 // ---------------------------------------------------------------------------
-// ボーナス設定型（config/commands.yaml から注入される）
+// 告発設定型（config/commands.yaml から注入される）
 // ---------------------------------------------------------------------------
 
 /**
  * 告発経済パラメータ。config/commands.yaml の tell コマンド設定から注入される。
- * See: config/commands.yaml > tell.hitBonus, tell.falseAccusationBonus, tell.cost
+ * v4: ボーナス廃止。cost のみ保持。
+ * See: config/commands.yaml > tell.cost
  */
 export interface AccusationBonusConfig {
-	/** 告発成功（hit）時に告発者に付与するボーナス額 */
-	hitBonus: number;
-	/** 告発失敗（miss）時に被告発者に付与する冤罪ボーナス額 */
-	falseAccusationBonus: number;
 	/** 告発コスト（システムメッセージ表示用） */
 	cost: number;
 }
 
 /**
- * デフォルトのボーナス設定。
+ * デフォルトの告発設定。
  * config/commands.yaml から値が渡されない場合のフォールバック。
  * See: config/commands.yaml
  */
 const DEFAULT_BONUS_CONFIG: AccusationBonusConfig = {
-	hitBonus: 20,
-	falseAccusationBonus: 10,
 	cost: 10,
 };
 
@@ -120,20 +114,14 @@ export interface IAccusationRepository {
 	}): Promise<{ id: string }>;
 }
 
-/**
- * CurrencyService の依存インターフェース。
- * AccusationService が使用する最小限のインターフェース（credit のみ）。
- */
-export interface ICurrencyService {
-	credit(userId: string, amount: number, reason: CreditReason): Promise<void>;
-}
-
 // ---------------------------------------------------------------------------
 // AccusationService クラス
 // ---------------------------------------------------------------------------
 
 /**
  * AccusationService — AI告発の統括サービス。
+ *
+ * v4: ボーナス廃止。!tell はコスト消費のみ・報酬なしの偵察専用コマンド。
  *
  * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
@@ -149,9 +137,7 @@ export class AccusationService {
 		private readonly botPostRepository: IBotPostRepository,
 		/** 告発記録の重複チェック・作成に使用するリポジトリ */
 		private readonly accusationRepository: IAccusationRepository,
-		/** ボーナス付与に使用する通貨サービス */
-		private readonly currencyService: ICurrencyService,
-		/** ボーナス設定（config/commands.yaml から注入。省略時はデフォルト値） */
+		/** 告発設定（config/commands.yaml から注入。省略時はデフォルト値） */
 		bonusConfig?: AccusationBonusConfig,
 	) {
 		this.bonusConfig = bonusConfig ?? DEFAULT_BONUS_CONFIG;
@@ -160,19 +146,17 @@ export class AccusationService {
 	/**
 	 * AI告発を実行する。
 	 *
-	 * 処理フロー（D-08 accusation.md §2 準拠）:
+	 * 処理フロー（D-08 accusation.md §2 準拠、v4ボーナス廃止版）:
 	 *   1. 重複チェック → alreadyAccused: true を返す
 	 *   2. 対象レス存在チェック → エラーを返す
 	 *   3. 自分の書き込みチェック → エラーを返す（accusation-rules 使用）
 	 *   4. システムメッセージチェック → エラーを返す（accusation-rules 使用）
 	 *   5. isBot判定 → hit or miss を決定
-	 *   6. ボーナス計算 → accusation-rules 使用（引数でボーナス額を渡す）
-	 *   7. ボーナス付与 → CurrencyService.credit
-	 *   8. DB記録 → AccusationRepository.create
-	 *   9. システムメッセージ文字列生成 → 返却
+	 *   6. DB記録 → AccusationRepository.create（bonusAmount: 0 固定）
+	 *   7. システムメッセージ文字列生成 → 返却
 	 *
 	 * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
-	 * See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+	 * See: features/ai_accusation.feature @AI告発に失敗するとコストのみ消費される
 	 * See: features/ai_accusation.feature @同一ユーザーが同一レスに対して再度告発を試みると拒否される
 	 * See: features/ai_accusation.feature @存在しないレスに対してAI告発を試みるとエラーになる
 	 * See: features/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
@@ -239,69 +223,37 @@ export class AccusationService {
 		);
 		const isBot = botRecord !== null;
 
-		// Step 6: ボーナス計算（accusation-rules 使用、引数でボーナス額を渡す）
-		// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
-		// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
-		const bonus = calculateBonus(
-			isBot,
-			this.bonusConfig.hitBonus,
-			this.bonusConfig.falseAccusationBonus,
-		);
-
-		// Step 7: ボーナス付与 → CurrencyService.credit
-		if (isBot) {
-			// hit: 告発者にボーナスを付与する
-			if (bonus.accuserBonus > 0) {
-				await this.currencyService.credit(
-					input.accuserId,
-					bonus.accuserBonus,
-					"accusation_hit",
-				);
-			}
-		} else {
-			// miss: 被告発者に冤罪ボーナスを付与する
-			if (bonus.targetBonus > 0 && targetPost.authorId !== null) {
-				await this.currencyService.credit(
-					targetPost.authorId,
-					bonus.targetBonus,
-					"false_accusation_bonus",
-				);
-			}
-		}
-
-		// Step 8: DB記録 → AccusationRepository.create
-		const bonusAmount = isBot ? bonus.accuserBonus : bonus.targetBonus;
+		// Step 6: DB記録 → AccusationRepository.create（bonusAmount: 0 固定）
+		// v4: ボーナス廃止。bonusAmount は互換性のため常に 0 を記録する。
 		await this.accusationRepository.create({
 			accuserId: input.accuserId,
 			targetPostId: input.targetPostId,
 			threadId: input.threadId,
 			result: isBot ? "hit" : "miss",
-			bonusAmount,
+			bonusAmount: 0,
 		});
 
-		// Step 9: システムメッセージ文字列生成 → 返却
+		// Step 7: システムメッセージ文字列生成 → 返却
+		// v4: ボーナス関連文言を除去した簡素なメッセージ
 		let systemMessage: string;
 		if (isBot) {
-			// hit: 告発成功メッセージ
+			// hit: 告発成功メッセージ（ボーナス付与なし）
 			systemMessage = buildHitSystemMessage(
 				input.accuserDailyId,
 				targetPost.postNumber,
-				bonus.accuserBonus,
 			);
 		} else {
-			// miss: 冤罪ボーナスメッセージ
+			// miss: コスト消費のみのメッセージ（冤罪ボーナスなし）
 			systemMessage = buildMissSystemMessage(
 				input.accuserDailyId,
 				targetPost.postNumber,
-				targetPost.dailyId,
 				this.bonusConfig.cost,
-				bonus.targetBonus,
 			);
 		}
 
 		return {
 			result: isBot ? "hit" : "miss",
-			bonusAmount,
+			bonusAmount: 0,
 			systemMessage,
 			alreadyAccused: false,
 		};
@@ -317,7 +269,7 @@ export class AccusationService {
  * 本番コードでは実際のリポジトリ・サービスを使用する。
  * テストコードでは AccusationService コンストラクタを直接使用してモックを注入する。
  *
- * @param bonusConfig - ボーナス設定（省略時はデフォルト値）
+ * @param bonusConfig - 告発設定（省略時はデフォルト値）
  *
  * See: docs/architecture/bdd_test_strategy.md §7-12 モック戦略
  */
@@ -331,14 +283,11 @@ export function createAccusationService(
 	const BotPostRepository = require("../infrastructure/repositories/bot-post-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const AccusationRepository = require("../infrastructure/repositories/accusation-repository");
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const CurrencyService = require("./currency-service");
 
 	return new AccusationService(
 		PostRepository,
 		BotPostRepository,
 		AccusationRepository,
-		CurrencyService,
 		bonusConfig,
 	);
 }

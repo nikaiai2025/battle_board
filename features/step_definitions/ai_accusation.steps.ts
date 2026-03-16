@@ -617,6 +617,51 @@ Then(
 // Then: ボーナス関連
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Then: 告発者に通貨報酬は付与されない
+// !tell はコスト消費のみで報酬なし。
+// 告発後の残高がコスト消費分のみ（AccusationService が credit を呼ばない）であることを検証する。
+// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+// See: features/ai_accusation.feature @AI告発に失敗するとコストのみ消費される
+// ---------------------------------------------------------------------------
+
+Then("告発者に通貨報酬は付与されない", async function (this: BattleBoardWorld) {
+	assert(this.currentUserId, "ユーザーIDが設定されていません");
+	const CurrencyService = getCurrencyService();
+	const currentBalance = await CurrencyService.getBalance(this.currentUserId);
+	// コスト消費後の残高が「告発前残高 - コスト」と一致すること
+	// つまり报酬（credit）が呼ばれていないことを確認する
+	const expectedBalance = accusationState.balanceBeforeAccusation - TELL_COST;
+	assert.strictEqual(
+		currentBalance,
+		expectedBalance,
+		`告発者への通貨報酬が付与されていないことを期待しました。期待残高=${expectedBalance}, 実際残高=${currentBalance}`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Then: 被告発者に通貨は付与されない
+// !tell 失敗時（対象が人間）でも被告発者への通貨付与はない（冤罪ボーナス廃止）。
+// See: features/ai_accusation.feature @AI告発に失敗するとコストのみ消費される
+// ---------------------------------------------------------------------------
+
+Then("被告発者に通貨は付与されない", async function (this: BattleBoardWorld) {
+	assert(
+		accusationState.targetAuthorUserId,
+		"被告発者のユーザーIDが設定されていません",
+	);
+	const CurrencyService = getCurrencyService();
+	const targetBalance = await CurrencyService.getBalance(
+		accusationState.targetAuthorUserId,
+	);
+	// Given ステップで被告発者の初期残高を 0 に設定しているため、0 のままであることを確認する
+	assert.strictEqual(
+		targetBalance,
+		0,
+		`被告発者に通貨が付与されていないことを期待しましたが、残高は ${targetBalance} でした`,
+	);
+});
+
 Then(
 	"告発者にはボーナスが付与されない",
 	async function (this: BattleBoardWorld) {

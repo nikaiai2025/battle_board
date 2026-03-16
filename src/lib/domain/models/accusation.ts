@@ -1,7 +1,7 @@
 /**
  * D-08 Domain Model: Accusation（AI告発）
  * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > accusations
- * See: docs/requirements/ubiquitous_language.yaml #AI告発 #冤罪ボーナス
+ * See: docs/requirements/ubiquitous_language.yaml #AI告発
  *
  * Step 2 スコープ: 型定義のみ。告発ルール純粋関数は Phase 2 で実装（accusation-rules.ts）。
  */
@@ -19,10 +19,10 @@ export interface Accusation {
 	/**
 	 * 判定結果。
 	 * 'hit' = 対象がAIボット（AI告発成功）
-	 * 'miss' = 対象が人間（冤罪ボーナス付与）
+	 * 'miss' = 対象が人間
 	 */
 	result: "hit" | "miss";
-	/** 付与ボーナス額 */
+	/** 付与ボーナス額（v4以降は常に0。互換性のため残す） */
 	bonusAmount: number;
 	/** 告発日時 */
 	createdAt: Date;
