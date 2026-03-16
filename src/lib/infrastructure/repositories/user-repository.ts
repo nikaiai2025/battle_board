@@ -4,6 +4,7 @@
  * See: docs/architecture/architecture.md §3.2 Infrastructure Layer
  * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > users
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
+ * See: docs/architecture/components/user-registration.md §10.1 依存先 > UserRepository
  *
  * 責務:
  *   - users テーブルへの CRUD 操作
@@ -11,8 +12,8 @@
  *   - ビジネスロジックを含まない薄いデータアクセス層
  */
 
-import { supabaseAdmin } from '../supabase/client'
-import type { User } from '../../domain/models/user'
+import type { User } from "../../domain/models/user";
+import { supabaseAdmin } from "../supabase/client";
 
 // ---------------------------------------------------------------------------
 // 型定義: users テーブルの DB 行型
@@ -20,19 +21,34 @@ import type { User } from '../../domain/models/user'
 
 /** users テーブルの DB レコード（snake_case）*/
 interface UserRow {
-  id: string
-  auth_token: string
-  author_id_seed: string
-  is_premium: boolean
-  /**
-   * edge-token の認証完了状態。
-   * See: supabase/migrations/00005_auth_verification.sql
-   */
-  is_verified: boolean
-  username: string | null
-  streak_days: number
-  last_post_date: string | null
-  created_at: string
+	id: string;
+	auth_token: string;
+	author_id_seed: string;
+	is_premium: boolean;
+	/**
+	 * edge-token の認証完了状態。
+	 * See: supabase/migrations/00005_auth_verification.sql
+	 */
+	is_verified: boolean;
+	username: string | null;
+	streak_days: number;
+	last_post_date: string | null;
+	created_at: string;
+	// ---------------------------------------------------------------------------
+	// Phase 3: 本登録・PAT 関連カラム（新設）
+	// See: supabase/migrations/00006_user_registration.sql
+	// See: docs/architecture/components/user-registration.md §3.1 users テーブル拡張
+	// ---------------------------------------------------------------------------
+	/** Supabase Auth ユーザーID。仮ユーザーは NULL */
+	supabase_auth_id: string | null;
+	/** 本登録方法: 'email' | 'discord'。仮ユーザーは NULL */
+	registration_type: string | null;
+	/** 本登録完了日時。仮ユーザーは NULL */
+	registered_at: string | null;
+	/** PAT（パーソナルアクセストークン）。本登録完了後に自動発行。仮ユーザーは NULL */
+	pat_token: string | null;
+	/** PAT 最終使用日時。未使用は NULL */
+	pat_last_used_at: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -43,19 +59,27 @@ interface UserRow {
  * DB レコード（snake_case）をドメインモデル（camelCase）に変換する。
  * Supabase レスポンスの日時フィールドは文字列で返るため Date に変換する。
  * last_post_date は DATE 型（日付のみ）のため文字列のまま保持する。
+ * Phase 3 追加カラムは NULL 許容のためオプショナル扱いとする。
  */
 function rowToUser(row: UserRow): User {
-  return {
-    id: row.id,
-    authToken: row.auth_token,
-    authorIdSeed: row.author_id_seed,
-    isPremium: row.is_premium,
-    isVerified: row.is_verified,
-    username: row.username,
-    streakDays: row.streak_days,
-    lastPostDate: row.last_post_date,
-    createdAt: new Date(row.created_at),
-  }
+	return {
+		id: row.id,
+		authToken: row.auth_token,
+		authorIdSeed: row.author_id_seed,
+		isPremium: row.is_premium,
+		isVerified: row.is_verified,
+		username: row.username,
+		streakDays: row.streak_days,
+		lastPostDate: row.last_post_date,
+		createdAt: new Date(row.created_at),
+		// Phase 3: 本登録・PAT 関連フィールド
+		supabaseAuthId: row.supabase_auth_id ?? null,
+		registrationType:
+			(row.registration_type as "email" | "discord" | null) ?? null,
+		registeredAt: row.registered_at ? new Date(row.registered_at) : null,
+		patToken: row.pat_token ?? null,
+		patLastUsedAt: row.pat_last_used_at ? new Date(row.pat_last_used_at) : null,
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -68,19 +92,19 @@ function rowToUser(row: UserRow): User {
  * @returns 見つかった User、存在しない場合は null
  */
 export async function findById(id: string): Promise<User | null> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('id', id)
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("users")
+		.select("*")
+		.eq("id", id)
+		.single();
 
-  if (error) {
-    // PGRST116: 行が見つからない場合
-    if (error.code === 'PGRST116') return null
-    throw new Error(`UserRepository.findById failed: ${error.message}`)
-  }
+	if (error) {
+		// PGRST116: 行が見つからない場合
+		if (error.code === "PGRST116") return null;
+		throw new Error(`UserRepository.findById failed: ${error.message}`);
+	}
 
-  return data ? rowToUser(data as UserRow) : null
+	return data ? rowToUser(data as UserRow) : null;
 }
 
 /**
@@ -93,18 +117,18 @@ export async function findById(id: string): Promise<User | null> {
  * @returns 見つかった User、存在しない場合は null
  */
 export async function findByAuthToken(authToken: string): Promise<User | null> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('auth_token', authToken)
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("users")
+		.select("*")
+		.eq("auth_token", authToken)
+		.single();
 
-  if (error) {
-    if (error.code === 'PGRST116') return null
-    throw new Error(`UserRepository.findByAuthToken failed: ${error.message}`)
-  }
+	if (error) {
+		if (error.code === "PGRST116") return null;
+		throw new Error(`UserRepository.findByAuthToken failed: ${error.message}`);
+	}
 
-  return data ? rowToUser(data as UserRow) : null
+	return data ? rowToUser(data as UserRow) : null;
 }
 
 /**
@@ -118,26 +142,40 @@ export async function findByAuthToken(authToken: string): Promise<User | null> {
  * @returns 作成された User（DB デフォルト値を含む）
  */
 export async function create(
-  user: Omit<User, 'id' | 'createdAt' | 'streakDays' | 'lastPostDate' | 'isVerified'> & { isVerified?: boolean }
+	user: Omit<
+		User,
+		| "id"
+		| "createdAt"
+		| "streakDays"
+		| "lastPostDate"
+		| "isVerified"
+		| "supabaseAuthId"
+		| "registrationType"
+		| "registeredAt"
+		| "patToken"
+		| "patLastUsedAt"
+	> & { isVerified?: boolean },
 ): Promise<User> {
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .insert({
-      auth_token: user.authToken,
-      author_id_seed: user.authorIdSeed,
-      is_premium: user.isPremium,
-      // isVerified が省略された場合は DB デフォルト（false）を使用する
-      ...(user.isVerified !== undefined ? { is_verified: user.isVerified } : {}),
-      username: user.username,
-    })
-    .select()
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("users")
+		.insert({
+			auth_token: user.authToken,
+			author_id_seed: user.authorIdSeed,
+			is_premium: user.isPremium,
+			// isVerified が省略された場合は DB デフォルト（false）を使用する
+			...(user.isVerified !== undefined
+				? { is_verified: user.isVerified }
+				: {}),
+			username: user.username,
+		})
+		.select()
+		.single();
 
-  if (error) {
-    throw new Error(`UserRepository.create failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`UserRepository.create failed: ${error.message}`);
+	}
 
-  return rowToUser(data as UserRow)
+	return rowToUser(data as UserRow);
 }
 
 /**
@@ -149,15 +187,18 @@ export async function create(
  * @param userId - 対象ユーザーの UUID
  * @param authToken - 新しい edge-token
  */
-export async function updateAuthToken(userId: string, authToken: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({ auth_token: authToken })
-    .eq('id', userId)
+export async function updateAuthToken(
+	userId: string,
+	authToken: string,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ auth_token: authToken })
+		.eq("id", userId);
 
-  if (error) {
-    throw new Error(`UserRepository.updateAuthToken failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`UserRepository.updateAuthToken failed: ${error.message}`);
+	}
 }
 
 /**
@@ -172,21 +213,21 @@ export async function updateAuthToken(userId: string, authToken: string): Promis
  * @param lastPostDate - 最終書き込み日（YYYY-MM-DD 形式）
  */
 export async function updateStreak(
-  userId: string,
-  streakDays: number,
-  lastPostDate: string
+	userId: string,
+	streakDays: number,
+	lastPostDate: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({
-      streak_days: streakDays,
-      last_post_date: lastPostDate,
-    })
-    .eq('id', userId)
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({
+			streak_days: streakDays,
+			last_post_date: lastPostDate,
+		})
+		.eq("id", userId);
 
-  if (error) {
-    throw new Error(`UserRepository.updateStreak failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`UserRepository.updateStreak failed: ${error.message}`);
+	}
 }
 
 /**
@@ -199,15 +240,18 @@ export async function updateStreak(
  * @param userId - 対象ユーザーの UUID
  * @param username - 新しいユーザーネーム（null でクリア）
  */
-export async function updateUsername(userId: string, username: string | null): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({ username })
-    .eq('id', userId)
+export async function updateUsername(
+	userId: string,
+	username: string | null,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ username })
+		.eq("id", userId);
 
-  if (error) {
-    throw new Error(`UserRepository.updateUsername failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`UserRepository.updateUsername failed: ${error.message}`);
+	}
 }
 
 /**
@@ -220,15 +264,18 @@ export async function updateUsername(userId: string, username: string | null): P
  * @param userId - 対象ユーザーの UUID
  * @param isPremium - 新しい有料ステータス
  */
-export async function updateIsPremium(userId: string, isPremium: boolean): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({ is_premium: isPremium })
-    .eq('id', userId)
+export async function updateIsPremium(
+	userId: string,
+	isPremium: boolean,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ is_premium: isPremium })
+		.eq("id", userId);
 
-  if (error) {
-    throw new Error(`UserRepository.updateIsPremium failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`UserRepository.updateIsPremium failed: ${error.message}`);
+	}
 }
 
 /**
@@ -242,13 +289,155 @@ export async function updateIsPremium(userId: string, isPremium: boolean): Promi
  * @param userId - 対象ユーザーの UUID
  * @param isVerified - 新しい認証完了状態（通常は true を渡す）
  */
-export async function updateIsVerified(userId: string, isVerified: boolean): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({ is_verified: isVerified })
-    .eq('id', userId)
+export async function updateIsVerified(
+	userId: string,
+	isVerified: boolean,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ is_verified: isVerified })
+		.eq("id", userId);
 
-  if (error) {
-    throw new Error(`UserRepository.updateIsVerified failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`UserRepository.updateIsVerified failed: ${error.message}`);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: 本登録・PAT 関連メソッド（新設）
+// See: features/未実装/user_registration.feature
+// See: docs/architecture/components/user-registration.md §10.1 依存先 > UserRepository
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザーを Supabase Auth ID で取得する。
+ * ログイン時に Supabase Auth 認証成功後、users レコードを特定するために使用する。
+ *
+ * See: docs/architecture/components/user-registration.md §5.2 ログイン
+ *
+ * @param supabaseAuthId - Supabase Auth の user.id（UUID）
+ * @returns 見つかった User、存在しない場合は null
+ */
+export async function findBySupabaseAuthId(
+	supabaseAuthId: string,
+): Promise<User | null> {
+	const { data, error } = await supabaseAdmin
+		.from("users")
+		.select("*")
+		.eq("supabase_auth_id", supabaseAuthId)
+		.single();
+
+	if (error) {
+		if (error.code === "PGRST116") return null;
+		throw new Error(
+			`UserRepository.findBySupabaseAuthId failed: ${error.message}`,
+		);
+	}
+
+	return data ? rowToUser(data as UserRow) : null;
+}
+
+/**
+ * ユーザーの Supabase Auth ID・本登録種別・本登録日時を更新する。
+ * 本登録完了コールバック（completeRegistration）から呼び出される。
+ *
+ * See: docs/architecture/components/user-registration.md §5.1 本登録 > completeRegistration
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param supabaseAuthId - Supabase Auth の user.id
+ * @param registrationType - 本登録方法: 'email' | 'discord'
+ */
+export async function updateSupabaseAuthId(
+	userId: string,
+	supabaseAuthId: string,
+	registrationType: "email" | "discord",
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({
+			supabase_auth_id: supabaseAuthId,
+			registration_type: registrationType,
+			registered_at: new Date().toISOString(),
+		})
+		.eq("id", userId);
+
+	if (error) {
+		throw new Error(
+			`UserRepository.updateSupabaseAuthId failed: ${error.message}`,
+		);
+	}
+}
+
+/**
+ * ユーザーの PAT（パーソナルアクセストークン）を更新する。
+ * 本登録完了時の自動発行（completeRegistration）と再発行（regeneratePat）から呼び出される。
+ * 旧 PAT は UNIQUE 制約により即時無効化される。
+ *
+ * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > regeneratePat
+ * See: features/未実装/user_registration.feature @本登録完了時にPATが自動発行される
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param patToken - 新しい PAT（32文字の hex 文字列）
+ */
+export async function updatePatToken(
+	userId: string,
+	patToken: string,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({
+			pat_token: patToken,
+			pat_last_used_at: null,
+		})
+		.eq("id", userId);
+
+	if (error) {
+		throw new Error(`UserRepository.updatePatToken failed: ${error.message}`);
+	}
+}
+
+/**
+ * PAT（パーソナルアクセストークン）でユーザーを取得する。
+ * 専ブラの mail 欄に #pat_<token> が含まれる場合の認証処理に使用する。
+ *
+ * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > verifyPat
+ * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ *
+ * @param patToken - 照合対象の PAT
+ * @returns 見つかった User、存在しない場合は null
+ */
+export async function findByPatToken(patToken: string): Promise<User | null> {
+	const { data, error } = await supabaseAdmin
+		.from("users")
+		.select("*")
+		.eq("pat_token", patToken)
+		.single();
+
+	if (error) {
+		if (error.code === "PGRST116") return null;
+		throw new Error(`UserRepository.findByPatToken failed: ${error.message}`);
+	}
+
+	return data ? rowToUser(data as UserRow) : null;
+}
+
+/**
+ * ユーザーの PAT 最終使用日時を現在時刻に更新する。
+ * PAT 認証に成功した直後に呼び出される。
+ *
+ * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > verifyPat
+ *
+ * @param userId - 対象ユーザーの UUID
+ */
+export async function updatePatLastUsedAt(userId: string): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ pat_last_used_at: new Date().toISOString() })
+		.eq("id", userId);
+
+	if (error) {
+		throw new Error(
+			`UserRepository.updatePatLastUsedAt failed: ${error.message}`,
+		);
+	}
 }

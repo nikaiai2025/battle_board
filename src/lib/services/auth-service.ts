@@ -19,12 +19,13 @@
  *     See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 
-import { createHash, randomBytes } from 'crypto'
-import { supabaseAdmin } from '../infrastructure/supabase/client'
-import * as UserRepository from '../infrastructure/repositories/user-repository'
-import * as AuthCodeRepository from '../infrastructure/repositories/auth-code-repository'
-import { verifyTurnstileToken } from '../infrastructure/external/turnstile-client'
-import { initializeBalance } from './currency-service'
+import { createHash, randomBytes } from "crypto";
+import { verifyTurnstileToken } from "../infrastructure/external/turnstile-client";
+import * as AuthCodeRepository from "../infrastructure/repositories/auth-code-repository";
+import * as EdgeTokenRepository from "../infrastructure/repositories/edge-token-repository";
+import * as UserRepository from "../infrastructure/repositories/user-repository";
+import { supabaseAdmin } from "../infrastructure/supabase/client";
+import { initializeBalance } from "./currency-service";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -42,17 +43,17 @@ import { initializeBalance } from './currency-service'
  * See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 export type VerifyResult =
-  | { valid: true; userId: string; authorIdSeed: string }
-  | { valid: false; reason: 'not_found' | 'not_verified' }
+	| { valid: true; userId: string; authorIdSeed: string }
+	| { valid: false; reason: "not_found" | "not_verified" };
 
 /**
  * 管理者セッション情報。
  * See: docs/architecture/components/authentication.md §2.3
  */
 export interface AdminSession {
-  userId: string
-  email: string
-  role: string
+	userId: string;
+	email: string;
+	role: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,18 +75,18 @@ export interface AdminSession {
  * reduceIp("2001:db8:85a3::8a2e:370:7334")         // => "2001:0db8:85a3" (/48)
  */
 export function reduceIp(ip: string): string {
-  // IPv6 の判定: コロンを含む場合は IPv6
-  if (!ip.includes(':')) {
-    // IPv4 はそのまま返す
-    return ip
-  }
+	// IPv6 の判定: コロンを含む場合は IPv6
+	if (!ip.includes(":")) {
+		// IPv4 はそのまま返す
+		return ip;
+	}
 
-  // IPv6: /48 プレフィックス（先頭48bit = 先頭3グループ × 16bit）を取り出す
-  // まず完全展開形式に正規化してから先頭3グループを抽出する
-  const expanded = expandIpv6(ip)
-  const groups = expanded.split(':')
-  // 先頭3グループ（48bit）を返す
-  return groups.slice(0, 3).join(':')
+	// IPv6: /48 プレフィックス（先頭48bit = 先頭3グループ × 16bit）を取り出す
+	// まず完全展開形式に正規化してから先頭3グループを抽出する
+	const expanded = expandIpv6(ip);
+	const groups = expanded.split(":");
+	// 先頭3グループ（48bit）を返す
+	return groups.slice(0, 3).join(":");
 }
 
 /**
@@ -94,26 +95,26 @@ export function reduceIp(ip: string): string {
  * @returns 完全展開形式（例: "2001:0db8:0000:0000:0000:0000:0000:0001"）
  */
 function expandIpv6(ipv6: string): string {
-  // '::' を含む場合は省略グループを 0 で補完する
-  const halves = ipv6.split('::')
+	// '::' を含む場合は省略グループを 0 で補完する
+	const halves = ipv6.split("::");
 
-  if (halves.length === 1) {
-    // '::' なし: 各グループを 4桁にゼロパディング
-    return halves[0]
-      .split(':')
-      .map((g) => g.padStart(4, '0'))
-      .join(':')
-  }
+	if (halves.length === 1) {
+		// '::' なし: 各グループを 4桁にゼロパディング
+		return halves[0]
+			.split(":")
+			.map((g) => g.padStart(4, "0"))
+			.join(":");
+	}
 
-  // '::' あり
-  const left = halves[0] ? halves[0].split(':') : []
-  const right = halves[1] ? halves[1].split(':') : []
-  const missing = 8 - left.length - right.length
-  const middle = Array(missing).fill('0000')
+	// '::' あり
+	const left = halves[0] ? halves[0].split(":") : [];
+	const right = halves[1] ? halves[1].split(":") : [];
+	const missing = 8 - left.length - right.length;
+	const middle = Array(missing).fill("0000");
 
-  return [...left, ...middle, ...right]
-    .map((g) => g.padStart(4, '0'))
-    .join(':')
+	return [...left, ...middle, ...right]
+		.map((g) => g.padStart(4, "0"))
+		.join(":");
 }
 
 /**
@@ -127,8 +128,8 @@ function expandIpv6(ipv6: string): string {
  * @returns SHA-512 ハッシュ文字列（16進数）
  */
 export function hashIp(ip: string): string {
-  const reduced = reduceIp(ip)
-  return createHash('sha512').update(reduced).digest('hex')
+	const reduced = reduceIp(ip);
+	return createHash("sha512").update(reduced).digest("hex");
 }
 
 /**
@@ -140,10 +141,10 @@ export function hashIp(ip: string): string {
  * @returns 6桁の数字文字列（例: "048293"）
  */
 function generateAuthCode(): string {
-  // 000000〜999999 の範囲で生成し、ゼロパディングで6桁に揃える
-  const { randomInt } = require('crypto') as typeof import('crypto')
-  const num = randomInt(0, 1_000_000)
-  return num.toString().padStart(6, '0')
+	// 000000〜999999 の範囲で生成し、ゼロパディングで6桁に揃える
+	const { randomInt } = require("crypto") as typeof import("crypto");
+	const num = randomInt(0, 1_000_000);
+	return num.toString().padStart(6, "0");
 }
 
 // ---------------------------------------------------------------------------
@@ -166,30 +167,38 @@ function generateAuthCode(): string {
  * @returns VerifyResult（valid: true のとき userId と authorIdSeed を含む）
  */
 export async function verifyEdgeToken(
-  token: string,
-  _ipHash: string
+	token: string,
+	_ipHash: string,
 ): Promise<VerifyResult> {
-  // UserRepository で edge-token に対応するユーザーを検索する
-  const user = await UserRepository.findByAuthToken(token)
+	// EdgeTokenRepository で edge-token レコードを検索する
+	// See: docs/architecture/components/user-registration.md §5.5 edge-token検証（改修）
+	const edgeToken = await EdgeTokenRepository.findByToken(token);
 
-  if (!user) {
-    return { valid: false, reason: 'not_found' }
-  }
+	if (!edgeToken) {
+		return { valid: false, reason: "not_found" };
+	}
 
-  // is_verified チェック
-  // See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
-  // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
-  if (!user.isVerified) {
-    return { valid: false, reason: 'not_verified' }
-  }
+	// edge_tokens.user_id から users レコードを取得する
+	const user = await UserRepository.findById(edgeToken.userId);
 
-  // IP チェックは廃止。edge-token の存在 + is_verified=true のみで認証成功とする。
-  // See: docs/research/eddist_edge_token_ip_report_2026-03-14.md §4 投稿時のトークン検証
-  return {
-    valid: true,
-    userId: user.id,
-    authorIdSeed: user.authorIdSeed,
-  }
+	if (!user) {
+		return { valid: false, reason: "not_found" };
+	}
+
+	// is_verified チェック
+	// See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+	// See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
+	if (!user.isVerified) {
+		return { valid: false, reason: "not_verified" };
+	}
+
+	// IP チェックは廃止。edge-token の存在 + is_verified=true のみで認証成功とする。
+	// See: docs/research/eddist_edge_token_ip_report_2026-03-14.md §4 投稿時のトークン検証
+	return {
+		valid: true,
+		userId: user.id,
+		authorIdSeed: user.authorIdSeed,
+	};
 }
 
 /**
@@ -203,24 +212,31 @@ export async function verifyEdgeToken(
  * @returns 発行したトークンと新規ユーザーの ID
  */
 export async function issueEdgeToken(
-  ipHash: string
+	ipHash: string,
 ): Promise<{ token: string; userId: string }> {
-  // CSPRNG でトークンを生成（暗号学的に安全）
-  const token = crypto.randomUUID()
+	// CSPRNG でトークンを生成（暗号学的に安全）
+	const token = crypto.randomUUID();
 
-  // ユーザーレコードを作成する
-  const user = await UserRepository.create({
-    authToken: token,
-    authorIdSeed: ipHash,
-    isPremium: false,
-    username: null,
-  })
+	// ユーザーレコードを作成する
+	// 後方互換のため users.auth_token にも同じ値を書き込む（移行期間中の二重書き込み）
+	// See: docs/architecture/components/user-registration.md §14 マイグレーション戦略 フェーズ2
+	const user = await UserRepository.create({
+		authToken: token,
+		authorIdSeed: ipHash,
+		isPremium: false,
+		username: null,
+	});
 
-  // 新規ユーザーに初期通貨 50 を付与する
-  // See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
-  await initializeBalance(user.id)
+	// edge_tokens テーブルにも同じトークンを INSERT する（Phase 3 移行）
+	// See: docs/architecture/components/user-registration.md §5.5 edge-token検証（改修）
+	// See: docs/architecture/components/user-registration.md §3.2 新テーブル: edge_tokens
+	await EdgeTokenRepository.create(user.id, token);
 
-  return { token, userId: user.id }
+	// 新規ユーザーに初期通貨 50 を付与する
+	// See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+	await initializeBalance(user.id);
+
+	return { token, userId: user.id };
 }
 
 /**
@@ -237,26 +253,26 @@ export async function issueEdgeToken(
  * @returns 認証コード文字列と有効期限
  */
 export async function issueAuthCode(
-  ipHash: string,
-  edgeToken: string
+	ipHash: string,
+	edgeToken: string,
 ): Promise<{ code: string; expiresAt: Date }> {
-  const code = generateAuthCode()
+	const code = generateAuthCode();
 
-  // 有効期限: 10分（600秒）
-  const expiresAt = new Date(Date.now() + 600 * 1000)
+	// 有効期限: 10分（600秒）
+	const expiresAt = new Date(Date.now() + 600 * 1000);
 
-  await AuthCodeRepository.create({
-    code,
-    tokenId: edgeToken,
-    ipHash,
-    verified: false,
-    expiresAt,
-    // 初回作成時は write_token は null（認証完了後に updateWriteToken で設定する）
-    writeToken: null,
-    writeTokenExpiresAt: null,
-  })
+	await AuthCodeRepository.create({
+		code,
+		tokenId: edgeToken,
+		ipHash,
+		verified: false,
+		expiresAt,
+		// 初回作成時は write_token は null（認証完了後に updateWriteToken で設定する）
+		writeToken: null,
+		writeTokenExpiresAt: null,
+	});
 
-  return { code, expiresAt }
+	return { code, expiresAt };
 }
 
 /**
@@ -283,55 +299,63 @@ export async function issueAuthCode(
  * @returns 検証成功時 { success: true, writeToken: string }、失敗時 { success: false }
  */
 export async function verifyAuthCode(
-  code: string,
-  turnstileToken: string,
-  ipHash: string
+	code: string,
+	turnstileToken: string,
+	ipHash: string,
 ): Promise<{ success: boolean; writeToken?: string }> {
-  // Step 1: コードの存在確認
-  const authCode = await AuthCodeRepository.findByCode(code)
-  if (!authCode) {
-    return { success: false }
-  }
+	// Step 1: コードの存在確認
+	const authCode = await AuthCodeRepository.findByCode(code);
+	if (!authCode) {
+		return { success: false };
+	}
 
-  // Step 2: 有効期限チェック
-  if (authCode.expiresAt < new Date()) {
-    return { success: false }
-  }
+	// Step 2: 有効期限チェック
+	if (authCode.expiresAt < new Date()) {
+		return { success: false };
+	}
 
-  // Step 3: IP 整合チェック（ソフトチェック）
-  if (authCode.ipHash !== ipHash) {
-    // モバイル回線等のIP変動を考慮し、ログ記録のみで続行する
-    console.warn(
-      `[AuthService] 認証コード検証時 IP 不一致: codeId=${authCode.id}（続行します）`
-    )
-  }
+	// Step 3: IP 整合チェック（ソフトチェック）
+	if (authCode.ipHash !== ipHash) {
+		// モバイル回線等のIP変動を考慮し、ログ記録のみで続行する
+		console.warn(
+			`[AuthService] 認証コード検証時 IP 不一致: codeId=${authCode.id}（続行します）`,
+		);
+	}
 
-  // Step 4: Turnstile 検証
-  // See: docs/architecture/architecture.md §2.2 > Cloudflare Turnstile
-  const turnstileValid = await verifyTurnstileToken(turnstileToken)
-  if (!turnstileValid) {
-    return { success: false }
-  }
+	// Step 4: Turnstile 検証
+	// See: docs/architecture/architecture.md §2.2 > Cloudflare Turnstile
+	const turnstileValid = await verifyTurnstileToken(turnstileToken);
+	if (!turnstileValid) {
+		return { success: false };
+	}
 
-  // Step 5: 認証済み状態に更新（auth_codes.verified = true）
-  await AuthCodeRepository.markVerified(authCode.id)
+	// Step 5: 認証済み状態に更新（auth_codes.verified = true）
+	await AuthCodeRepository.markVerified(authCode.id);
 
-  // Step 6: ユーザーを検証済みに更新（users.is_verified = true）
-  // tokenId は edge-token 文字列。findByAuthToken でユーザーを取得して ID を解決する
-  // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
-  const user = await UserRepository.findByAuthToken(authCode.tokenId)
-  if (user) {
-    await UserRepository.updateIsVerified(user.id, true)
-  }
+	// Step 6: ユーザーを検証済みに更新（users.is_verified = true）
+	// tokenId は edge-token 文字列。EdgeTokenRepository + UserRepository でユーザーを解決する
+	// See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
+	// See: docs/architecture/components/user-registration.md §5.5 edge-token検証（改修）
+	const edgeToken = await EdgeTokenRepository.findByToken(authCode.tokenId);
+	if (edgeToken) {
+		const user = await UserRepository.findById(edgeToken.userId);
+		if (user) {
+			await UserRepository.updateIsVerified(user.id, true);
+		}
+	}
 
-  // Step 7: write_token を生成して auth_codes に保存（専ブラ向け認証橋渡しトークン）
-  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
-  // See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
-  const writeToken = randomBytes(16).toString('hex') // 32文字 hex
-  const writeTokenExpiresAt = new Date(Date.now() + 600 * 1000) // 10分後
-  await AuthCodeRepository.updateWriteToken(authCode.id, writeToken, writeTokenExpiresAt)
+	// Step 7: write_token を生成して auth_codes に保存（専ブラ向け認証橋渡しトークン）
+	// See: tmp/auth_spec_review_report.md §3.2 write_token 方式
+	// See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+	const writeToken = randomBytes(16).toString("hex"); // 32文字 hex
+	const writeTokenExpiresAt = new Date(Date.now() + 600 * 1000); // 10分後
+	await AuthCodeRepository.updateWriteToken(
+		authCode.id,
+		writeToken,
+		writeTokenExpiresAt,
+	);
 
-  return { success: true, writeToken }
+	return { success: true, writeToken };
 }
 
 /**
@@ -352,37 +376,43 @@ export async function verifyAuthCode(
  * @returns 検証成功時 { valid: true, edgeToken: string }、失敗時 { valid: false }
  */
 export async function verifyWriteToken(
-  writeToken: string
+	writeToken: string,
 ): Promise<{ valid: boolean; edgeToken?: string }> {
-  // Step 1: write_token で auth_codes レコードを検索する（リポジトリ経由）
-  // See: src/lib/infrastructure/repositories/auth-code-repository.ts > findByWriteToken
-  // See: tmp/escalations/escalation_ESC-TASK-041-1.md — リポジトリ化で解決
-  const authCode = await AuthCodeRepository.findByWriteToken(writeToken)
+	// Step 1: write_token で auth_codes レコードを検索する（リポジトリ経由）
+	// See: src/lib/infrastructure/repositories/auth-code-repository.ts > findByWriteToken
+	// See: tmp/escalations/escalation_ESC-TASK-041-1.md — リポジトリ化で解決
+	const authCode = await AuthCodeRepository.findByWriteToken(writeToken);
 
-  if (!authCode) {
-    return { valid: false }
-  }
+	if (!authCode) {
+		return { valid: false };
+	}
 
-  // Step 2: write_token の有効期限チェック
-  if (!authCode.writeTokenExpiresAt) {
-    return { valid: false }
-  }
-  if (authCode.writeTokenExpiresAt < new Date()) {
-    return { valid: false }
-  }
+	// Step 2: write_token の有効期限チェック
+	if (!authCode.writeTokenExpiresAt) {
+		return { valid: false };
+	}
+	if (authCode.writeTokenExpiresAt < new Date()) {
+		return { valid: false };
+	}
 
-  // Step 3: ワンタイム消費（write_token を null に更新して再利用を防ぐ）
-  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式 > ワンタイム
-  await AuthCodeRepository.clearWriteToken(authCode.id)
+	// Step 3: ワンタイム消費（write_token を null に更新して再利用を防ぐ）
+	// See: tmp/auth_spec_review_report.md §3.2 write_token 方式 > ワンタイム
+	await AuthCodeRepository.clearWriteToken(authCode.id);
 
-  // Step 4: 対応ユーザーの is_verified = true に更新
-  // tokenId は edge-token 文字列。findByAuthToken でユーザーを取得して ID を解決する
-  const user = await UserRepository.findByAuthToken(authCode.tokenId)
-  if (user) {
-    await UserRepository.updateIsVerified(user.id, true)
-  }
+	// Step 4: 対応ユーザーの is_verified = true に更新
+	// tokenId は edge-token 文字列。EdgeTokenRepository + UserRepository でユーザーを解決する
+	// See: docs/architecture/components/user-registration.md §5.5 edge-token検証（改修）
+	const edgeTokenRecord = await EdgeTokenRepository.findByToken(
+		authCode.tokenId,
+	);
+	if (edgeTokenRecord) {
+		const user = await UserRepository.findById(edgeTokenRecord.userId);
+		if (user) {
+			await UserRepository.updateIsVerified(user.id, true);
+		}
+	}
 
-  return { valid: true, edgeToken: authCode.tokenId }
+	return { valid: true, edgeToken: authCode.tokenId };
 }
 
 // ---------------------------------------------------------------------------
@@ -401,32 +431,32 @@ export async function verifyWriteToken(
  * @returns 管理者セッション情報、無効なセッションの場合は null
  */
 export async function verifyAdminSession(
-  sessionToken: string
+	sessionToken: string,
 ): Promise<AdminSession | null> {
-  // Supabase Auth のユーザー情報を取得する
-  const { data, error } = await supabaseAdmin.auth.getUser(sessionToken)
+	// Supabase Auth のユーザー情報を取得する
+	const { data, error } = await supabaseAdmin.auth.getUser(sessionToken);
 
-  if (error || !data.user) {
-    return null
-  }
+	if (error || !data.user) {
+		return null;
+	}
 
-  const user = data.user
+	const user = data.user;
 
-  // admin_users テーブルで管理者ロールを確認する
-  const { data: adminUser, error: adminError } = await supabaseAdmin
-    .from('admin_users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+	// admin_users テーブルで管理者ロールを確認する
+	const { data: adminUser, error: adminError } = await supabaseAdmin
+		.from("admin_users")
+		.select("role")
+		.eq("id", user.id)
+		.single();
 
-  if (adminError || !adminUser) {
-    // admin_users テーブルに存在しない場合は管理者ではない
-    return null
-  }
+	if (adminError || !adminUser) {
+		// admin_users テーブルに存在しない場合は管理者ではない
+		return null;
+	}
 
-  return {
-    userId: user.id,
-    email: user.email ?? '',
-    role: (adminUser as { role: string }).role,
-  }
+	return {
+		userId: user.id,
+		email: user.email ?? "",
+		role: (adminUser as { role: string }).role,
+	};
 }

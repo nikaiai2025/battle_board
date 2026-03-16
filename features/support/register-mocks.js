@@ -117,6 +117,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/bot-post-repository.ts",
 		"./in-memory/bot-post-repository.ts",
 	],
+	// Edge-token リポジトリ（TASK-085 で追加）
+	// See: features/authentication.feature
+	[
+		"src/lib/infrastructure/repositories/edge-token-repository.ts",
+		"./in-memory/edge-token-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

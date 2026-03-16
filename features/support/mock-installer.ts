@@ -32,6 +32,9 @@ import * as InMemoryAuthCodeRepo from "./in-memory/auth-code-repository";
 // See: features/ai_accusation.feature
 import * as InMemoryBotPostRepo from "./in-memory/bot-post-repository";
 import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
+// Edge-token リポジトリ（TASK-085 で追加）
+// See: features/authentication.feature
+import * as InMemoryEdgeTokenRepo from "./in-memory/edge-token-repository";
 import * as InMemoryIncentiveLogRepo from "./in-memory/incentive-log-repository";
 import * as InMemoryPostRepo from "./in-memory/post-repository";
 import * as InMemorySupabaseClient from "./in-memory/supabase-client";
@@ -77,6 +80,9 @@ export function resetAllStores(): void {
 	// 管理者リポジトリのリセット（TASK-021 で追加）
 	// See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル
 	InMemoryAdminRepo.reset();
+	// Edge-token リポジトリのリセット（TASK-085 で追加）
+	// See: features/authentication.feature
+	InMemoryEdgeTokenRepo.reset();
 	// AI告発リポジトリのリセット（TASK-079 で追加）
 	// See: features/ai_accusation.feature
 	InMemoryAccusationRepo.reset();
@@ -95,6 +101,8 @@ export {
 	InMemoryAuthCodeRepo,
 	InMemoryBotPostRepo,
 	InMemoryCurrencyRepo,
+	// Edge-token リポジトリ（TASK-085 で追加）
+	InMemoryEdgeTokenRepo,
 	InMemoryIncentiveLogRepo,
 	InMemoryPostRepo,
 	InMemorySupabaseClient,
