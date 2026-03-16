@@ -15,7 +15,8 @@ Phase 2 Step 1（コマンド基盤）・Step 2（!tell告発）実装完了。c
   - pending 3件: インフラ制約（HTTP:80直接応答2件 + WAF非ブロック1件）— 意図的Pending
   - ai_accusation.feature: 8/8 PASS（BOTマーク2シナリオはPhase 3依存で除外）
   - command_system.feature: 15/15 PASS
-- playwright E2E: 1テスト / 全PASS（基本機能確認フロー）
+- playwright E2E smoke: 8テスト / 全PASS（ナビゲーションスモークテスト）
+- playwright E2E flow: 1テスト / 全PASS（基本機能確認フロー）
 - playwright API: 26テスト / 全PASS（専ブラ互換15 + 認証Cookie11）
 - cucumber-js integration: 4シナリオ / 全PASS（Supabase Local実DB）
 
@@ -37,6 +38,7 @@ Phase 2 Step 1（コマンド基盤）・Step 2（!tell告発）実装完了。c
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-29 | E2Eナビゲーションスモークテスト作成 + basic-flow統合 | completed | `tmp/orchestrator/sprint_29_plan.md` |
 | Sprint-28 | ai_accusation.feature改訂 + 告発経済パラメータ集約 | completed | `tmp/orchestrator/sprint_28_plan.md` |
 | Sprint-27 | Phase 2 Step 2: !tell ハンドラ + AccusationService実装 | completed | `tmp/orchestrator/sprint_27_plan.md` |
 | Sprint-26 | 専ブラ絵文字バグ修正（HTML数値参照→UTF-8逆変換） | completed | `tmp/orchestrator/sprint_26_plan.md` |

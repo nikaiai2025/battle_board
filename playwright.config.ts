@@ -12,8 +12,8 @@
 
 import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
-import * as path from "path";
 import * as fs from "fs";
+import * as path from "path";
 
 // ---------------------------------------------------------------------------
 // 環境変数の構築
@@ -22,7 +22,7 @@ import * as fs from "fs";
 // .env.local をベースとして読み込む
 const envLocalPath = path.resolve(__dirname, ".env.local");
 if (fs.existsSync(envLocalPath)) {
-  dotenv.config({ path: envLocalPath });
+	dotenv.config({ path: envLocalPath });
 }
 
 // Turnstile キーを除去してテストキー自動フォールバックを有効にする。
@@ -38,120 +38,137 @@ delete process.env.TURNSTILE_SECRET_KEY;
 // ---------------------------------------------------------------------------
 
 export default defineConfig({
-  /** E2E テストファイルの配置ディレクトリ */
-  testDir: "./e2e",
+	/** E2E テストファイルの配置ディレクトリ */
+	testDir: "./e2e",
 
-  /** テストファイルのパターン */
-  testMatch: "**/*.spec.ts",
+	/** テストファイルのパターン */
+	testMatch: "**/*.spec.ts",
 
-  /** 各テストのタイムアウト（ms）。Turnstile の自動パスを含む認証フローに時間がかかるため長めに設定 */
-  timeout: 60_000,
+	/** 各テストのタイムアウト（ms）。Turnstile の自動パスを含む認証フローに時間がかかるため長めに設定 */
+	timeout: 60_000,
 
-  /** expect() のタイムアウト（ms） */
-  expect: {
-    timeout: 15_000,
-  },
+	/** expect() のタイムアウト（ms） */
+	expect: {
+		timeout: 15_000,
+	},
 
-  /** 失敗時のリトライ回数 */
-  retries: 0,
+	/** 失敗時のリトライ回数 */
+	retries: 0,
 
-  /** テストの並列実行を無効化（DBの状態変更が競合しないよう直列実行） */
-  workers: 1,
+	/** テストの並列実行を無効化（DBの状態変更が競合しないよう直列実行） */
+	workers: 1,
 
-  /** テスト成果物（トレース・スクリーンショット等）の出力先 — git管理不要のためゴミ箱配下 */
-  outputDir: "ゴミ箱/test-results",
+	/** テスト成果物（トレース・スクリーンショット等）の出力先 — git管理不要のためゴミ箱配下 */
+	outputDir: "ゴミ箱/test-results",
 
-  /** テスト結果レポーター */
-  reporter: [["list"], ["html", { open: "never", outputFolder: "ゴミ箱/playwright-report" }]],
+	/** テスト結果レポーター */
+	reporter: [
+		["list"],
+		["html", { open: "never", outputFolder: "ゴミ箱/playwright-report" }],
+	],
 
-  /** 全テストに共通の設定 */
-  use: {
-    /** テスト対象の URL */
-    baseURL: "http://localhost:3000",
+	/** 全テストに共通の設定 */
+	use: {
+		/** テスト対象の URL */
+		baseURL: "http://localhost:3000",
 
-    /** テスト失敗時にスクリーンショットを保存 */
-    screenshot: "only-on-failure",
+		/** テスト失敗時にスクリーンショットを保存 */
+		screenshot: "only-on-failure",
 
-    /** テスト失敗時にトレースを保存 */
-    trace: "on-first-retry",
-  },
+		/** テスト失敗時にトレースを保存 */
+		trace: "on-first-retry",
+	},
 
-  /**
-   * テストプロジェクトの定義。
-   *
-   * - e2e: ブラウザ（Chromium）を使用したE2Eテスト（basic-flow.spec.ts等）
-   * - api: ブラウザ不要のHTTPレベルAPIテスト（e2e/api/ 配下）
-   *
-   * 実行方法:
-   *   全テスト:    npx playwright test
-   *   APIのみ:     npx playwright test --project=api
-   *   E2Eのみ:     npx playwright test --project=e2e
-   *   CF Smoke:    npx playwright test --project=cf-smoke
-   *
-   * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
-   * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
-   */
-  projects: [
-    {
-      name: "e2e",
-      testDir: "./e2e",
-      testIgnore: ["**/api/**", "**/cf-smoke/**"],
-      use: { ...devices["Desktop Chrome"] },
-    },
-    {
-      name: "api",
-      testDir: "./e2e/api",
-      use: {
-        // APIテストはブラウザ不要（baseURLのみ設定）
-        baseURL: "http://localhost:3000",
-      },
-    },
-    {
-      /**
-       * CF Smokeテスト: wrangler dev (Cloudflare Workers ローカルランタイム) に対する
-       * Node.js API互換性のスモークテスト。wrangler dev は手動起動前提。
-       *
-       * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
-       */
-      name: "cf-smoke",
-      testDir: "./e2e/cf-smoke",
-      use: {
-        baseURL: "http://localhost:8788", // wrangler dev のデフォルトポート
-      },
-    },
-  ],
+	/**
+	 * テストプロジェクトの定義。
+	 *
+	 * - e2e: ブラウザ（Chromium）を使用したE2Eフロー検証テスト（basic-flow.spec.ts等）
+	 * - smoke: ナビゲーションスモークテスト（e2e/smoke/ 配下）
+	 * - api: ブラウザ不要のHTTPレベルAPIテスト（e2e/api/ 配下）
+	 * - cf-smoke: CF Workers互換性スモークテスト（e2e/cf-smoke/ 配下）
+	 *
+	 * 実行方法:
+	 *   全テスト:       npx playwright test
+	 *   APIのみ:        npx playwright test --project=api
+	 *   E2Eのみ:        npx playwright test --project=e2e
+	 *   Smokeのみ:      npx playwright test --project=smoke
+	 *   CF Smoke:       npx playwright test --project=cf-smoke
+	 *
+	 * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
+	 * See: docs/architecture/bdd_test_strategy.md §10.5 ナビゲーションスモークテスト
+	 * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
+	 */
+	projects: [
+		{
+			name: "e2e",
+			testDir: "./e2e",
+			testIgnore: ["**/api/**", "**/cf-smoke/**", "**/smoke/**"],
+			use: { ...devices["Desktop Chrome"] },
+		},
+		{
+			/**
+			 * ナビゲーションスモークテスト: 全ページの到達性・JSエラーなし・主要UI要素の存在を検証。
+			 *
+			 * See: docs/architecture/bdd_test_strategy.md §10.5 ナビゲーションスモークテスト
+			 */
+			name: "smoke",
+			testDir: "./e2e/smoke",
+			use: { ...devices["Desktop Chrome"] },
+		},
+		{
+			name: "api",
+			testDir: "./e2e/api",
+			use: {
+				// APIテストはブラウザ不要（baseURLのみ設定）
+				baseURL: "http://localhost:3000",
+			},
+		},
+		{
+			/**
+			 * CF Smokeテスト: wrangler dev (Cloudflare Workers ローカルランタイム) に対する
+			 * Node.js API互換性のスモークテスト。wrangler dev は手動起動前提。
+			 *
+			 * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
+			 */
+			name: "cf-smoke",
+			testDir: "./e2e/cf-smoke",
+			use: {
+				baseURL: "http://localhost:8788", // wrangler dev のデフォルトポート
+			},
+		},
+	],
 
-  /**
-   * Next.js 開発サーバーを自動起動する。
-   * webServer はテスト開始前に起動され、テスト終了後に停止される。
-   *
-   * 環境変数の渡し方:
-   * - Turnstile キーは上記で削除済みのため process.env から引き継がれない
-   * - NEXT_PUBLIC_BASE_URL を設定することで Server Component の fetchThreads が
-   *   正しく内部 API を絶対 URL で呼び出せるようにする
-   * See: src/app/(web)/page.tsx > fetchThreads
-   */
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    timeout: 120_000,
-    reuseExistingServer: true,
-    env: {
-      // Supabase Local 接続情報（.env.local から引き継ぎ）
-      SUPABASE_URL: process.env.SUPABASE_URL ?? "http://127.0.0.1:54321",
-      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ?? "",
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      // Bot API キー
-      BOT_API_KEY: process.env.BOT_API_KEY ?? "",
-      // ベース URL（Server Component が内部 API を絶対 URL で呼ぶ際に使用）
-      NEXT_PUBLIC_BASE_URL: "http://localhost:3000",
-      // Turnstile キーを空文字列で上書きしてテストフォールバックを有効にする。
-      // - NEXT_PUBLIC_TURNSTILE_SITE_KEY: 空 → AuthModal が "1x00000000000000000000AA" を使用
-      // - TURNSTILE_SECRET_KEY: 空 → turnstile-client.ts が !secretKey 判定で常に true を返す
-      // .env.local に値が設定されていても Next.js サーバーに渡されないよう空文字列で上書きする。
-      // See: src/lib/infrastructure/external/turnstile-client.ts > if (!secretKey) → return true
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
-      TURNSTILE_SECRET_KEY: "",
-    },
-  },
+	/**
+	 * Next.js 開発サーバーを自動起動する。
+	 * webServer はテスト開始前に起動され、テスト終了後に停止される。
+	 *
+	 * 環境変数の渡し方:
+	 * - Turnstile キーは上記で削除済みのため process.env から引き継がれない
+	 * - NEXT_PUBLIC_BASE_URL を設定することで Server Component の fetchThreads が
+	 *   正しく内部 API を絶対 URL で呼び出せるようにする
+	 * See: src/app/(web)/page.tsx > fetchThreads
+	 */
+	webServer: {
+		command: "npm run dev",
+		url: "http://localhost:3000",
+		timeout: 120_000,
+		reuseExistingServer: true,
+		env: {
+			// Supabase Local 接続情報（.env.local から引き継ぎ）
+			SUPABASE_URL: process.env.SUPABASE_URL ?? "http://127.0.0.1:54321",
+			SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ?? "",
+			SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+			// Bot API キー
+			BOT_API_KEY: process.env.BOT_API_KEY ?? "",
+			// ベース URL（Server Component が内部 API を絶対 URL で呼ぶ際に使用）
+			NEXT_PUBLIC_BASE_URL: "http://localhost:3000",
+			// Turnstile キーを空文字列で上書きしてテストフォールバックを有効にする。
+			// - NEXT_PUBLIC_TURNSTILE_SITE_KEY: 空 → AuthModal が "1x00000000000000000000AA" を使用
+			// - TURNSTILE_SECRET_KEY: 空 → turnstile-client.ts が !secretKey 判定で常に true を返す
+			// .env.local に値が設定されていても Next.js サーバーに渡されないよう空文字列で上書きする。
+			// See: src/lib/infrastructure/external/turnstile-client.ts > if (!secretKey) → return true
+			NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
+			TURNSTILE_SECRET_KEY: "",
+		},
+	},
 });
