@@ -80,6 +80,7 @@ export async function create(
 		| "registeredAt"
 		| "patToken"
 		| "patLastUsedAt"
+		| "grassCount"
 	> & {
 		isVerified?: boolean;
 		supabaseAuthId?: string | null;
@@ -87,6 +88,8 @@ export async function create(
 		registeredAt?: Date | null;
 		patToken?: string | null;
 		patLastUsedAt?: Date | null;
+		/** 草カウント(通算)。省略時は 0。See: features/reactions.feature */
+		grassCount?: number;
 	},
 ): Promise<User> {
 	const newUser: User = {
@@ -103,6 +106,9 @@ export async function create(
 		registeredAt: user.registeredAt ?? null,
 		patToken: user.patToken ?? null,
 		patLastUsedAt: user.patLastUsedAt ?? null,
+		// Phase 4 フィールド: 草カウント。省略時は 0（新規ユーザーは草ゼロ）
+		// See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+		grassCount: user.grassCount ?? 0,
 	};
 	store.set(newUser.id, newUser);
 	return newUser;
@@ -294,5 +300,27 @@ export async function updatePatLastUsedAt(userId: string): Promise<void> {
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, patLastUsedAt: new Date() });
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: 草カウント関連メソッド（新設）
+// See: features/reactions.feature
+// See: features/mypage.feature @草カウントとアイコンを確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザーの草カウントを直接設定する（BDDテスト用）。
+ * GrassHandler ではなく、テスト前の状態セットアップに使用する。
+ *
+ * See: features/mypage.feature @ユーザーの草カウントが {int} である
+ */
+export async function updateGrassCount(
+	userId: string,
+	grassCount: number,
+): Promise<void> {
+	const user = store.get(userId);
+	if (user) {
+		store.set(userId, { ...user, grassCount });
 	}
 }

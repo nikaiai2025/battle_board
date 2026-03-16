@@ -62,6 +62,9 @@ module.exports = {
 			// TASK-096: ボットシステム BDD シナリオ追加
 			// See: features/bot_system.feature
 			"features/bot_system.feature",
+			// TASK-100: 草コマンド(!w) BDD シナリオ追加
+			// See: features/reactions.feature
+			"features/reactions.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -96,6 +99,9 @@ module.exports = {
 			"features/step_definitions/specialist_browser_compat.steps.ts",
 			"features/step_definitions/thread.steps.ts",
 			"features/step_definitions/user_registration.steps.ts",
+			// TASK-100: 草コマンド(!w) BDD ステップ定義
+			// See: features/reactions.feature
+			"features/step_definitions/reactions.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

@@ -199,16 +199,61 @@ export class BattleBoardWorld extends World {
 	botPostNumberToId: Map<number, string> = new Map();
 
 	/**
+	 * !attack コマンドの実行結果（最後の操作）のバッキングフィールド。
+	 * 直接参照せず lastAttackResult getter を使用すること。
+	 * See: features/bot_system.feature
+	 */
+	private _lastAttackResult: {
+		success: boolean;
+		systemMessage: string;
+	} | null = null;
+
+	/**
 	 * !attack コマンドの実行結果（最後の操作）。
 	 * Then ステップでのアサーション対象。
+	 *
+	 * 草コマンドとの統合: lastAttackResult が null の場合、lastGrassResult を返す。
+	 * これにより、草コマンドが {string} を実行する (command_system.steps.ts) 経由で
+	 * 実行された場合でも bot_system.steps.ts の Then ステップが正常に動作する。
+	 *
+	 * See: features/bot_system.feature
+	 * See: features/reactions.feature
 	 */
-	lastAttackResult: { success: boolean; systemMessage: string } | null = null;
+	get lastAttackResult(): { success: boolean; systemMessage: string } | null {
+		return this._lastAttackResult ?? this.lastGrassResult;
+	}
+
+	set lastAttackResult(value: {
+		success: boolean;
+		systemMessage: string;
+	} | null,) {
+		this._lastAttackResult = value;
+	}
 
 	/**
 	 * 攻撃者（複数ユーザーシナリオ用）。
 	 * See: features/bot_system.feature @複数ユーザーがそれぞれ同一ボットを攻撃できる
 	 */
 	attackerUserIds: Map<string, string> = new Map();
+
+	// -------------------------------------------------------------------------
+	// 草（!w）コマンドコンテキスト
+	// See: features/reactions.feature
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 草コマンド（!w）の最後の実行結果。
+	 * Then ステップでのアサーション対象。
+	 * See: features/reactions.feature §基本機能
+	 */
+	lastGrassResult: { success: boolean; systemMessage: string } | null = null;
+
+	/**
+	 * 名前付きユーザーの草カウント初期値マップ（"UserA" → 初期草カウント）。
+	 * シナリオ内で草カウントの増加を検証する際の基準値として使用する。
+	 * See: features/reactions.feature §重複制限
+	 */
+	grassCountBaseline: Map<string, number> = new Map();
 
 	// -------------------------------------------------------------------------
 	// 時刻制御
@@ -260,8 +305,12 @@ export class BattleBoardWorld extends World {
 		this.currentBot = null;
 		this.botMap = new Map();
 		this.botPostNumberToId = new Map();
-		this.lastAttackResult = null;
+		this._lastAttackResult = null;
 		this.attackerUserIds = new Map();
+		// 草（!w）コマンドコンテキストのリセット
+		// See: features/reactions.feature
+		this.lastGrassResult = null;
+		this.grassCountBaseline = new Map();
 		// 管理者コンテキストのリセット
 		// See: features/admin.feature
 		this.currentAdminId = null;

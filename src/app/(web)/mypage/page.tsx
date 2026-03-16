@@ -638,6 +638,27 @@ export default function MypagePage() {
 			</section>
 
 			{/* =============================
+          草カウントセクション
+          See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+          See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+          See: src/lib/domain/rules/grass-icon.ts @getGrassIcon
+          ============================= */}
+			<section
+				id="grass-section"
+				className="bg-white border border-gray-300 rounded p-4"
+			>
+				<h2 className="text-base font-bold text-gray-700 mb-2">草カウント</h2>
+				{/* grass-count-display: 草カウントの表示要素（"{grassIcon} {grassCount}本" フォーマット）
+          See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる */}
+				<p
+					id="grass-count-display"
+					className="text-2xl font-bold text-green-600"
+				>
+					{mypageInfo.grassIcon} {mypageInfo.grassCount}本
+				</p>
+			</section>
+
+			{/* =============================
           書き込み履歴セクション
           See: features/mypage.feature @自分の書き込み履歴を確認できる
           See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される

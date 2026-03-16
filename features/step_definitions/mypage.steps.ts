@@ -14,6 +14,7 @@
 
 import { Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
+import { getGrassIcon } from "../../src/lib/domain/rules/grass-icon";
 import {
 	InMemoryPostRepo,
 	InMemoryThreadRepo,
@@ -659,3 +660,90 @@ Then("通知欄が表示される", function (this: BattleBoardWorld) {
 	// mypageResult が取得できていれば、UI側で通知欄（空配列）を表示できる状態にある。
 	// Phase 2 以降でこのステップに通知件数の検証を追加する。
 });
+
+// ---------------------------------------------------------------------------
+// Given: ユーザーの草カウントが {int} である
+// See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+// See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+// ---------------------------------------------------------------------------
+
+/**
+ * 指定された草カウントを持つユーザーを作成し、ログイン済み状態にする。
+ * InMemoryUserRepo に直接 grassCount を設定することで、
+ * GrassHandler を経由せずにテスト前提条件を構築する。
+ *
+ * See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+ * See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+ */
+Given(
+	"ユーザーの草カウントが {int} である",
+	async function (this: BattleBoardWorld, grassCount: number) {
+		const AuthService = getAuthService();
+
+		// ユーザーをログイン済みにする
+		const { token, userId } = await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
+		this.currentEdgeToken = token;
+		this.currentUserId = userId;
+		this.currentIpHash = DEFAULT_IP_HASH;
+
+		// 指定された草カウントを設定する（GrassHandler を経由せずに直接設定）
+		// See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+		await InMemoryUserRepo.updateGrassCount(userId, grassCount);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: 草カウント "{string}" が表示される
+// See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+// See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+// ---------------------------------------------------------------------------
+
+/**
+ * mypageResult の grassCount・grassIcon から「🌳 25本」形式の文字列を生成し、
+ * 期待値と一致することを確認する。
+ *
+ * 表示フォーマット: "{grassIcon} {grassCount}本"
+ * 例: "🌳 25本"（25本）、"🌱 0本"（0本）
+ *
+ * See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+ * See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+ * See: src/lib/domain/rules/grass-icon.ts @getGrassIcon
+ */
+Then(
+	"草カウント {string} が表示される",
+	function (this: BattleBoardWorld, expectedDisplay: string) {
+		assert(
+			this.mypageResult !== null,
+			"マイページ情報が取得されていません（草カウント表示の確認のためマイページが必要）",
+		);
+
+		const { grassCount, grassIcon } = this.mypageResult;
+
+		// grassCount と grassIcon が存在することを確認する
+		assert(
+			typeof grassCount === "number",
+			`grassCount が数値であることを期待しましたが "${typeof grassCount}" でした`,
+		);
+		assert(
+			typeof grassIcon === "string" && grassIcon.length > 0,
+			`grassIcon が文字列であることを期待しましたが "${typeof grassIcon}" でした`,
+		);
+
+		// 表示フォーマット "{grassIcon} {grassCount}本" を生成して期待値と比較する
+		// See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+		const actualDisplay = `${grassIcon} ${grassCount}本`;
+		assert.strictEqual(
+			actualDisplay,
+			expectedDisplay,
+			`草カウント表示が "${expectedDisplay}" であることを期待しましたが "${actualDisplay}" でした`,
+		);
+
+		// grassIcon が getGrassIcon(grassCount) と一致することを確認する（ドメインルールとの整合性）
+		const expectedIcon = getGrassIcon(grassCount);
+		assert.strictEqual(
+			grassIcon,
+			expectedIcon,
+			`草アイコンが getGrassIcon(${grassCount})="${expectedIcon}" と一致することを期待しましたが "${grassIcon}" でした`,
+		);
+	},
+);

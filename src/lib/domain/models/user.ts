@@ -73,4 +73,18 @@ export interface User {
 	 * PAT で認証するたびに更新される。未使用の場合は NULL。
 	 */
 	patLastUsedAt: Date | null;
+
+	// ---------------------------------------------------------------------------
+	// Phase 4: 草コマンド(!w) 関連フィールド（新設）
+	// See: features/reactions.feature
+	// See: supabase/migrations/00008_grass_system.sql
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * 草カウント(通算)。
+	 * 他ユーザーから !w コマンドで草を付与されるたびに +1 される。
+	 * アイコン決定(getGrassIcon)とマイページ表示(mypage.feature)で参照される。
+	 * See: features/reactions.feature §成長ビジュアル
+	 */
+	grassCount: number;
 }

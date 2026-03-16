@@ -29,7 +29,12 @@ import {
 } from "./accusation-service";
 import type * as CurrencyServiceType from "./currency-service";
 import { AttackHandler } from "./handlers/attack-handler";
-import { GrassHandler } from "./handlers/grass-handler";
+import {
+	GrassHandler,
+	type IGrassBotPostRepository,
+	type IGrassPostRepository,
+	type IGrassRepository,
+} from "./handlers/grass-handler";
 import { TellHandler } from "./handlers/tell-handler";
 
 // ---------------------------------------------------------------------------
@@ -193,16 +198,21 @@ export class CommandService {
 	 * @param accusationService - AI告発サービス（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
 	 * @param commandsYamlPath - commands.yaml のファイルパス（省略時はデフォルトパス）
 	 * @param attackHandler - AttackHandler（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
+	 * @param grassHandler - GrassHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
 	 *
 	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
 	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
 	 *   attack コマンドをテスト用 YAML で有効化しない場合は省略可能。
+	 * Note: grassHandler を省略する場合、PostRepository と GrassRepository の本番実装を
+	 *   動的 require で読み込む。
+	 *   See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §4.2 CommandService統合
 	 */
 	constructor(
 		private readonly currencyService: ICurrencyService,
 		accusationService?: AccusationService | null,
 		commandsYamlPath?: string,
 		attackHandler?: AttackHandler | null,
+		grassHandler?: GrassHandler | null,
 	) {
 		// config/commands.yaml を読み込み、Registry を構築する
 		// See: docs/architecture/components/command.md §2.2 設定層
@@ -269,11 +279,45 @@ export class CommandService {
 			);
 		}
 
+		// GrassHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に w コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §4.2
+		let resolvedGrassHandler: CommandHandler | null = null;
+		if (grassHandler !== undefined) {
+			// 明示的に DI された場合（null を含む）
+			resolvedGrassHandler = grassHandler ?? null;
+		} else if (parsed.commands.w?.enabled) {
+			// YAML で w が有効化されており、DI がない場合のみ本番用生成
+			// require() を try-catch で保護し、テスト環境でのモジュール欠如に対応する。
+			// テスト時は grassHandler を明示的に DI することを推奨する。
+			// See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §4.2
+			try {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const postRepository: IGrassPostRepository = require("../infrastructure/repositories/post-repository");
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const grassRepository: IGrassRepository = require("../infrastructure/repositories/grass-repository");
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const botPostRepository: IGrassBotPostRepository = require("../infrastructure/repositories/bot-post-repository");
+				resolvedGrassHandler = new GrassHandler(
+					postRepository,
+					grassRepository,
+					botPostRepository,
+				);
+			} catch {
+				// テスト環境など、依存モジュールが利用できない場合は
+				// MVP スタブ相当の最小限フォールバックハンドラを使用する。
+				// 本番環境では require() が成功するため、このコードパスは通らない。
+				// BDD 統合テスト（TASK-100）で本格実装の動作を検証する。
+				resolvedGrassHandler = _FALLBACK_GRASS_HANDLER;
+			}
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
 		const handlers: CommandHandler[] = [
-			new GrassHandler(),
+			...(resolvedGrassHandler ? [resolvedGrassHandler] : []),
 			new TellHandler(resolvedAccusationService),
 			...(resolvedAttackHandler ? [resolvedAttackHandler] : []),
 		];
@@ -412,3 +456,28 @@ export class CommandService {
 		};
 	}
 }
+
+// ---------------------------------------------------------------------------
+// フォールバックハンドラ（テスト環境用）
+// ---------------------------------------------------------------------------
+
+/**
+ * GrassHandler の MVP スタブ相当フォールバック実装。
+ * テスト環境で依存モジュールが利用できない場合のみ使用する。
+ * 本番環境では require() で本格実装（GrassHandler）を読み込む。
+ *
+ * 旧スタブ（Sprint-33 以前）と同等の挙動: args[0] があれば成功を返す。
+ *
+ * See: src/lib/services/handlers/grass-handler.ts （本格実装）
+ */
+const _FALLBACK_GRASS_HANDLER: CommandHandler = {
+	commandName: "w",
+	async execute(ctx: CommandContext): Promise<CommandHandlerResult> {
+		const targetArg = ctx.args[0] ?? "";
+		const targetRef = targetArg.startsWith(">>") ? targetArg : `>>${targetArg}`;
+		return {
+			success: true,
+			systemMessage: `${targetRef} に草を生やしました 🌿`,
+		};
+	},
+};

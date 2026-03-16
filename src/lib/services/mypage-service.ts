@@ -19,6 +19,7 @@
 
 import type { Post } from "../domain/models/post";
 import type { User } from "../domain/models/user";
+import { getGrassIcon } from "../domain/rules/grass-icon";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
 import * as UserRepository from "../infrastructure/repositories/user-repository";
 import * as CurrencyService from "./currency-service";
@@ -76,6 +77,26 @@ export interface MypageInfo {
 	 * See: features/未実装/user_registration.feature @マイページでPATを確認できる
 	 */
 	patLastUsedAt: string | null;
+
+	// ---------------------------------------------------------------------------
+	// Phase 4: 草カウント関連フィールド（新設）
+	// See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+	// See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * 草カウント（通算）。
+	 * 他ユーザーから !w コマンドで草を付与されるたびに +1 される。
+	 * See: features/reactions.feature §成長ビジュアル
+	 */
+	grassCount: number;
+
+	/**
+	 * 草アイコン。草カウントに応じて変化する。
+	 * getGrassIcon(grassCount) の結果。
+	 * See: src/lib/domain/rules/grass-icon.ts
+	 */
+	grassIcon: string;
 }
 
 /**
@@ -165,6 +186,13 @@ export async function getMypage(userId: string): Promise<MypageInfo | null> {
 
 	// authToken は CR-002 修正によりレスポンスから除去済み
 	// Cookieで自動送信されるため、JSONレスポンスに含める必要はない
+
+	// 草カウントとアイコンを計算する（pure function: getGrassIcon）
+	// See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+	// See: src/lib/domain/rules/grass-icon.ts
+	const grassCount = user.grassCount;
+	const grassIcon = getGrassIcon(grassCount);
+
 	return {
 		userId: user.id,
 		balance,
@@ -177,6 +205,10 @@ export async function getMypage(userId: string): Promise<MypageInfo | null> {
 		registrationType: user.registrationType,
 		patToken: user.patToken,
 		patLastUsedAt: user.patLastUsedAt?.toISOString() ?? null,
+		// Phase 4: 草カウント・アイコン
+		// See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
+		grassCount,
+		grassIcon,
 	};
 }
 

@@ -1,20 +1,21 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-16
+> 最終更新: 2026-03-17
 
 ## 現在のフェーズ
 
-**Phase 2 実装中 + Bot v5実装完了 + 本登録機能完了**
+**Phase 2 実装中 — Sprint-34 草コマンド実装**
 
-Phase 2 Step 1（コマンド基盤）・Step 2（!tell告発）・Step 3（!attack攻撃）実装完了。
-Sprint-30〜32で本登録機能完成、Sprint-33でBot v5実装+BDDステップ定義完了。
+Phase 2 Step 1〜3（コマンド基盤・告発・攻撃）完了。本登録機能完了。Bot v5完了。
+Sprint-34で草コマンド（!w）+ mypage草カウント表示を実装中。
 
 ## テスト状況
 
-- vitest: 34ファイル / 950テスト / 全PASS
-- cucumber-js: 190シナリオ (179 passed, 9 pending, 2 undefined) / 0 failed
+- vitest: 36ファイル / 1005テスト / 全PASS
+- cucumber-js: 211シナリオ (202 passed, 9 pending) / 0 failed
   - pending 9件: インフラ制約3件 + bot_system UI/GitHub Actions 6件 — 意図的Pending
-  - undefined 2件: mypage草カウント（次スプリントで実装予定）
+  - undefined 0件（Sprint-34で全解消）
+  - reactions.feature: 22/22 PASS（Sprint-34新規）
   - ai_accusation.feature: 9/9 PASS
   - command_system.feature: 15/15 PASS
   - bot_system.feature: 18/27 PASS, 9 pending (UI/GHA)
@@ -73,16 +74,27 @@ Sprint-32で完了:
 - bbs.cgi PAT認証統合（D-08 §6認証判定フロー準拠）
 - テスト49件追加（mypage 30 + PAT 19）
 
-## 人間によるfeature更新（Sprint-33以降で実装対象）
+## 実装ロードマップ（承認済み）
 
-- **reactions.feature（新規 v3）**: リアクション系コマンド !w（草）の振る舞い定義。草カウント（ユーザー単位通算）、成長ビジュアル（10刻み5段階ループ）、重複制限（同日同一付与先1回）、ボットへの草、エラーケース。22シナリオ。
-- **mypage.feature（更新）**: 草カウント表示シナリオ2件追加（「マイページで草カウントとアイコン確認」「草カウント0のデフォルト表示」）。reactions.feature連動。
+| Sprint | 内容 | 規模 | 計画書/設計書 |
+|---|---|---|---|
+| **Sprint-34（進行中）** | 草コマンド !w 本格実装 + mypage草カウント | 中 | `sprint_34_plan.md` |
+| Sprint-35 | 固定スレッド + 開発連絡板（dev板） | 小〜中 | `tmp/feature_plan_pinned_thread_and_dev_board.md` |
+| Sprint-36 | 管理機能拡充①（DB + BAN + 通貨付与） | 中 | `tmp/feature_plan_admin_expansion.md` |
+| Sprint-37 | 管理機能拡充②（ユーザー管理 + ダッシュボード + 管理画面UI） | 大 | 同上 |
+
+### feature更新状況（人間承認済み）
+
+- **reactions.feature（v3）**: 22シナリオ — Sprint-34で実装
+- **mypage.feature（草カウント追加）**: 2シナリオ — Sprint-34で実装
+- **thread.feature**: 固定スレッドシナリオ追加予定 — Sprint-35で feature更新+実装
+- **admin.feature**: BAN/通貨/ユーザー管理/ダッシュボード 12シナリオ追加予定 — Sprint-36〜37で feature更新+実装
 
 ## 残課題
 
-- **Sprint-33 完了**: bot_system v5 実装 + user_registration BDDステップ定義
-- reactions.feature の実装（!w 草コマンド。GrassHandler拡張 + 草カウントDB + BDDステップ定義）
-- mypage.feature 草カウント表示の実装（reactions.feature と連動）
+- **Sprint-34**: reactions.feature 草コマンド + mypage草カウント
+- 固定スレッド + dev板（Sprint-35予定）
+- 管理機能拡充: BAN/通貨付与/ユーザー管理/ダッシュボード（Sprint-36〜37予定）
 - デザイン・レイアウト改善（機能優先のため後回し）
 
 ## Phase 3 未実装事項（BDDスコープ外・インフラ層）
@@ -103,6 +115,7 @@ BDDシナリオのうち対応するものは pending 扱いで、Phase 3 のイ
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-34 | 草コマンド !w 本格実装 + mypage草カウント | completed | `tmp/orchestrator/sprint_34_plan.md` |
 | Sprint-33 | Bot v5実装(DB+Service+BDD) + user_registration BDD + mypage課金ガード | completed | `tmp/orchestrator/sprint_33_plan.md` |
 | Sprint-32 | Doc sync + マイページUI本登録 + bbs.cgi PAT + bot_system v5.1 | completed | `tmp/orchestrator/sprint_32_plan.md` |
 | Sprint-31 | Bot v5設計 + 告発ボーナス廃止 + 本登録APIルート | completed | `tmp/orchestrator/sprint_31_plan.md` |

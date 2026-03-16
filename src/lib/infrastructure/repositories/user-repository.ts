@@ -49,6 +49,12 @@ interface UserRow {
 	pat_token: string | null;
 	/** PAT 最終使用日時。未使用は NULL */
 	pat_last_used_at: string | null;
+	// ---------------------------------------------------------------------------
+	// Phase 4: 草コマンド(!w) 関連カラム（新設）
+	// See: supabase/migrations/00008_grass_system.sql
+	// ---------------------------------------------------------------------------
+	/** 草カウント(通算)。草付与時に +1 される。デフォルト 0 */
+	grass_count: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +85,9 @@ function rowToUser(row: UserRow): User {
 		registeredAt: row.registered_at ? new Date(row.registered_at) : null,
 		patToken: row.pat_token ?? null,
 		patLastUsedAt: row.pat_last_used_at ? new Date(row.pat_last_used_at) : null,
+		// Phase 4: 草コマンド(!w) 関連フィールド
+		// See: supabase/migrations/00008_grass_system.sql
+		grassCount: row.grass_count ?? 0,
 	};
 }
 
