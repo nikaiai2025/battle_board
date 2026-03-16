@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-rm.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path') && [[ $FILE == *.ts || $FILE == *.tsx || $FILE == *.js || $FILE == *.jsx ]] && biome format --write $FILE && biome check --fix $FILE || true"
+          }
+        ]
+      }
+    ]
+  }
+}

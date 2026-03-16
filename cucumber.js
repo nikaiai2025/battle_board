@@ -89,7 +89,7 @@ module.exports = {
 			"^(?!.*(コマンド文字列がゲームコマンドとして解釈される|告発成功したボットにBOTマークが表示される|BOTマークがついたボットは書き込みを継続する)).*$",
 		],
 
-		format: ["@cucumber/pretty-formatter"],
+		format: ["@cucumber/pretty-formatter", "json:ゴミ箱/bdd_result.json"],
 	},
 
 	// ---------------------------------------------------------------------------
@@ -179,6 +179,6 @@ module.exports = {
 			"^(未認証ユーザーが書き込みを行うと認証コードが案内される|スレッドタイトルが空の場合はスレッドが作成されない|スレッドタイトルが上限文字数を超えている場合はエラーになる|スレッドが0件の場合はメッセージが表示される)$",
 		],
 
-		format: ["@cucumber/pretty-formatter"],
+		format: ["@cucumber/pretty-formatter", "json:ゴミ箱/bdd_result.json"],
 	},
 };
