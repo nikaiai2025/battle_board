@@ -249,9 +249,19 @@ export class CommandService {
 			const botService = require("./bot-service").createBotService();
 			// eslint-disable-next-line @typescript-eslint/no-require-imports
 			const postRepository = require("../infrastructure/repositories/post-repository");
+			// ICurrencyService (deduct/getBalance) → IAttackCurrencyService (debit/credit/getBalance) アダプター
+			// AttackHandler は debit（=deduct）と credit の両方を使用するため、
+			// credit は CurrencyService モジュールから直接取得する
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const CurrencyServiceModule = require("./currency-service");
+			const attackCurrencyService = {
+				getBalance: this.currencyService.getBalance,
+				debit: this.currencyService.deduct,
+				credit: CurrencyServiceModule.credit,
+			};
 			resolvedAttackHandler = new AttackHandler(
 				botService,
-				this.currencyService,
+				attackCurrencyService,
 				postRepository,
 				attackConfig?.cost ?? 5,
 				attackConfig?.damage ?? 10,
