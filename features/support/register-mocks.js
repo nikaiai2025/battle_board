@@ -15,13 +15,12 @@
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
-const path = require('path')
+const path = require("path");
 
-
-const PROJECT_ROOT = path.resolve(__dirname, '../../')
+const PROJECT_ROOT = path.resolve(__dirname, "../../");
 
 function resolveFromRoot(relativePath) {
-  return path.resolve(PROJECT_ROOT, relativePath)
+	return path.resolve(PROJECT_ROOT, relativePath);
 }
 
 // ---------------------------------------------------------------------------
@@ -29,33 +28,40 @@ function resolveFromRoot(relativePath) {
 // ---------------------------------------------------------------------------
 
 const dummyClient = {
-  from: (_table) => ({
-    select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
-    insert: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }) }),
-    update: () => ({ eq: async () => ({ error: null }) }),
-    delete: () => ({ lt: () => ({ select: async () => ({ data: [], error: null }) }) }),
-  }),
-  rpc: async (_fn, _args) => ({ data: null, error: null }),
-  auth: {
-    getUser: async (_token) => ({ data: { user: null }, error: null }),
-  },
-}
+	from: (_table) => ({
+		select: () => ({
+			eq: () => ({ single: async () => ({ data: null, error: null }) }),
+		}),
+		insert: () => ({
+			select: () => ({ single: async () => ({ data: null, error: null }) }),
+		}),
+		update: () => ({ eq: async () => ({ error: null }) }),
+		delete: () => ({
+			lt: () => ({ select: async () => ({ data: [], error: null }) }),
+		}),
+	}),
+	rpc: async (_fn, _args) => ({ data: null, error: null }),
+	auth: {
+		getUser: async (_token) => ({ data: { user: null }, error: null }),
+	},
+};
 
 const supabaseClientMock = {
-  id: resolveFromRoot('src/lib/infrastructure/supabase/client.ts'),
-  filename: resolveFromRoot('src/lib/infrastructure/supabase/client.ts'),
-  loaded: true,
-  exports: {
-    supabaseClient: dummyClient,
-    supabaseAdmin: dummyClient,
-  },
-  parent: null,
-  children: [],
-  paths: [],
-}
+	id: resolveFromRoot("src/lib/infrastructure/supabase/client.ts"),
+	filename: resolveFromRoot("src/lib/infrastructure/supabase/client.ts"),
+	loaded: true,
+	exports: {
+		supabaseClient: dummyClient,
+		supabaseAdmin: dummyClient,
+	},
+	parent: null,
+	children: [],
+	paths: [],
+};
 
 // supabase/client.ts をキャッシュに差し込む（.ts 拡張子で登録）
-require.cache[resolveFromRoot('src/lib/infrastructure/supabase/client.ts')] = supabaseClientMock
+require.cache[resolveFromRoot("src/lib/infrastructure/supabase/client.ts")] =
+	supabaseClientMock;
 
 // ---------------------------------------------------------------------------
 // 全リポジトリ + 外部依存のキャッシュ事前差し込み
@@ -66,31 +72,67 @@ require.cache[resolveFromRoot('src/lib/infrastructure/supabase/client.ts')] = su
 // キャッシュを埋めることで、import 解決時にインメモリ実装を参照させる。
 
 const REPO_MOCKS = [
-  ['src/lib/infrastructure/repositories/user-repository.ts', './in-memory/user-repository.ts'],
-  ['src/lib/infrastructure/repositories/auth-code-repository.ts', './in-memory/auth-code-repository.ts'],
-  ['src/lib/infrastructure/repositories/post-repository.ts', './in-memory/post-repository.ts'],
-  ['src/lib/infrastructure/repositories/thread-repository.ts', './in-memory/thread-repository.ts'],
-  ['src/lib/infrastructure/repositories/currency-repository.ts', './in-memory/currency-repository.ts'],
-  ['src/lib/infrastructure/repositories/incentive-log-repository.ts', './in-memory/incentive-log-repository.ts'],
-  ['src/lib/infrastructure/external/turnstile-client.ts', './in-memory/turnstile-client.ts'],
-  // 管理者リポジトリ（TASK-021 で追加）
-  // See: features/phase1/admin.feature
-  // See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
-  ['src/lib/infrastructure/repositories/admin-user-repository.ts', './in-memory/admin-repository.ts'],
-]
+	[
+		"src/lib/infrastructure/repositories/user-repository.ts",
+		"./in-memory/user-repository.ts",
+	],
+	[
+		"src/lib/infrastructure/repositories/auth-code-repository.ts",
+		"./in-memory/auth-code-repository.ts",
+	],
+	[
+		"src/lib/infrastructure/repositories/post-repository.ts",
+		"./in-memory/post-repository.ts",
+	],
+	[
+		"src/lib/infrastructure/repositories/thread-repository.ts",
+		"./in-memory/thread-repository.ts",
+	],
+	[
+		"src/lib/infrastructure/repositories/currency-repository.ts",
+		"./in-memory/currency-repository.ts",
+	],
+	[
+		"src/lib/infrastructure/repositories/incentive-log-repository.ts",
+		"./in-memory/incentive-log-repository.ts",
+	],
+	[
+		"src/lib/infrastructure/external/turnstile-client.ts",
+		"./in-memory/turnstile-client.ts",
+	],
+	// 管理者リポジトリ（TASK-021 で追加）
+	// See: features/phase1/admin.feature
+	// See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+	[
+		"src/lib/infrastructure/repositories/admin-user-repository.ts",
+		"./in-memory/admin-repository.ts",
+	],
+	// AI告発・ボット書き込みリポジトリ（TASK-079 で追加）
+	// See: features/phase2/ai_accusation.feature
+	[
+		"src/lib/infrastructure/repositories/accusation-repository.ts",
+		"./in-memory/accusation-repository.ts",
+	],
+	[
+		"src/lib/infrastructure/repositories/bot-post-repository.ts",
+		"./in-memory/bot-post-repository.ts",
+	],
+];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {
-  const srcPath = resolveFromRoot(srcRelPath)
-  const mock = require(path.resolve(__dirname, mockRelPath))
-  require.cache[srcPath] = {
-    id: srcPath,
-    filename: srcPath,
-    loaded: true,
-    exports: mock,
-    parent: null,
-    children: [],
-    paths: [],
-  }
+	const srcPath = resolveFromRoot(srcRelPath);
+	const mock = require(path.resolve(__dirname, mockRelPath));
+	require.cache[srcPath] = {
+		id: srcPath,
+		filename: srcPath,
+		loaded: true,
+		exports: mock,
+		parent: null,
+		children: [],
+		paths: [],
+	};
 }
 
-console.log('[register-mocks] Supabase クライアント + 全リポジトリのモック差し替えが完了しました')
+console.log(
+	"[register-mocks] Supabase クライアント + 全リポジトリのモック差し替えが完了しました",
+);

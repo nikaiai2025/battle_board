@@ -20,18 +20,24 @@
 // インメモリ実装のインポート
 // ---------------------------------------------------------------------------
 
-import * as InMemoryUserRepo from './in-memory/user-repository'
-import * as InMemoryAuthCodeRepo from './in-memory/auth-code-repository'
-import * as InMemoryPostRepo from './in-memory/post-repository'
-import * as InMemoryThreadRepo from './in-memory/thread-repository'
-import * as InMemoryCurrencyRepo from './in-memory/currency-repository'
-import * as InMemoryIncentiveLogRepo from './in-memory/incentive-log-repository'
-import * as InMemoryTurnstileClient from './in-memory/turnstile-client'
-import * as InMemorySupabaseClient from './in-memory/supabase-client'
+// AI告発リポジトリ（TASK-079 で追加）
+// See: features/phase2/ai_accusation.feature
+import * as InMemoryAccusationRepo from "./in-memory/accusation-repository";
 // 管理者リポジトリ（TASK-021 で追加）
 // See: features/phase1/admin.feature
 // See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
-import * as InMemoryAdminRepo from './in-memory/admin-repository'
+import * as InMemoryAdminRepo from "./in-memory/admin-repository";
+import * as InMemoryAuthCodeRepo from "./in-memory/auth-code-repository";
+// ボット書き込みリポジトリ（TASK-079 で追加）
+// See: features/phase2/ai_accusation.feature
+import * as InMemoryBotPostRepo from "./in-memory/bot-post-repository";
+import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
+import * as InMemoryIncentiveLogRepo from "./in-memory/incentive-log-repository";
+import * as InMemoryPostRepo from "./in-memory/post-repository";
+import * as InMemorySupabaseClient from "./in-memory/supabase-client";
+import * as InMemoryThreadRepo from "./in-memory/thread-repository";
+import * as InMemoryTurnstileClient from "./in-memory/turnstile-client";
+import * as InMemoryUserRepo from "./in-memory/user-repository";
 
 // ---------------------------------------------------------------------------
 // インストール関数
@@ -47,7 +53,7 @@ import * as InMemoryAdminRepo from './in-memory/admin-repository'
  * See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル
  */
 export function installMocks(): void {
-  // register-mocks.js で差し込み済み — 二重差し込みを避けるため no-op
+	// register-mocks.js で差し込み済み — 二重差し込みを避けるため no-op
 }
 
 // ---------------------------------------------------------------------------
@@ -61,16 +67,20 @@ export function installMocks(): void {
  * See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル
  */
 export function resetAllStores(): void {
-  InMemoryUserRepo.reset()
-  InMemoryAuthCodeRepo.reset()
-  InMemoryPostRepo.reset()
-  InMemoryThreadRepo.reset()
-  InMemoryCurrencyRepo.reset()
-  InMemoryIncentiveLogRepo.reset()
-  InMemoryTurnstileClient.reset()
-  // 管理者リポジトリのリセット（TASK-021 で追加）
-  // See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル
-  InMemoryAdminRepo.reset()
+	InMemoryUserRepo.reset();
+	InMemoryAuthCodeRepo.reset();
+	InMemoryPostRepo.reset();
+	InMemoryThreadRepo.reset();
+	InMemoryCurrencyRepo.reset();
+	InMemoryIncentiveLogRepo.reset();
+	InMemoryTurnstileClient.reset();
+	// 管理者リポジトリのリセット（TASK-021 で追加）
+	// See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル
+	InMemoryAdminRepo.reset();
+	// AI告発リポジトリのリセット（TASK-079 で追加）
+	// See: features/phase2/ai_accusation.feature
+	InMemoryAccusationRepo.reset();
+	InMemoryBotPostRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -78,14 +88,17 @@ export function resetAllStores(): void {
 // ---------------------------------------------------------------------------
 
 export {
-  InMemoryUserRepo,
-  InMemoryAuthCodeRepo,
-  InMemoryPostRepo,
-  InMemoryThreadRepo,
-  InMemoryCurrencyRepo,
-  InMemoryIncentiveLogRepo,
-  InMemoryTurnstileClient,
-  InMemorySupabaseClient,
-  // 管理者リポジトリ（TASK-021 で追加）
-  InMemoryAdminRepo,
-}
+	// AI告発・ボット書き込みリポジトリ（TASK-079 で追加）
+	InMemoryAccusationRepo,
+	// 管理者リポジトリ（TASK-021 で追加）
+	InMemoryAdminRepo,
+	InMemoryAuthCodeRepo,
+	InMemoryBotPostRepo,
+	InMemoryCurrencyRepo,
+	InMemoryIncentiveLogRepo,
+	InMemoryPostRepo,
+	InMemorySupabaseClient,
+	InMemoryThreadRepo,
+	InMemoryTurnstileClient,
+	InMemoryUserRepo,
+};

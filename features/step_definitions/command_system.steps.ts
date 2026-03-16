@@ -30,6 +30,10 @@ import {
 	InMemoryUserRepo,
 } from "../support/mock-installer";
 import type { BattleBoardWorld } from "../support/world";
+// AI告発ステップの状態とコマンド実行関数（TASK-079 で追加）
+// !tell コマンドは PostService 経由ではなく AccusationService を直接呼び出す必要がある
+// See: features/phase2/ai_accusation.feature
+import { accusationState, executeTellCommand } from "./ai_accusation.steps";
 
 // ---------------------------------------------------------------------------
 // サービス層の動的 require ヘルパー
@@ -125,6 +129,9 @@ Given(
 
 		// CommandService をインスタンス化して PostService に DI する
 		// CurrencyService はインメモリリポジトリ経由で動作する
+		// AccusationService は TellHandler が使用する（TASK-079 で追加）
+		// See: src/lib/services/command-service.ts > constructor
+		// See: features/phase2/ai_accusation.feature
 		const PostService = getPostService();
 		const CurrencyService = getCurrencyService();
 
@@ -132,7 +139,14 @@ Given(
 			const {
 				CommandService,
 			} = require("../../src/lib/services/command-service");
-			const commandService = new CommandService(CurrencyService);
+			const {
+				createAccusationService,
+			} = require("../../src/lib/services/accusation-service");
+			const accusationService = createAccusationService();
+			const commandService = new CommandService(
+				CurrencyService,
+				accusationService,
+			);
 			PostService.setCommandService(commandService);
 		} catch (err) {
 			// CommandService のインスタンス化に失敗した場合はログ出力して続行
@@ -586,6 +600,9 @@ Given(
 			createdAt: new Date(),
 		});
 		postNumberToId.set(10, postId);
+		// AI告発シナリオでも使用されるため accusationState にも登録する（TASK-079）
+		// See: features/phase2/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
+		accusationState.postNumberToId.set(10, postId);
 	},
 );
 
@@ -667,6 +684,43 @@ When(
 When(
 	"{string} を実行する",
 	async function (this: BattleBoardWorld, commandString: string) {
+		// !tell コマンドの場合、ai_accusation シナリオでは AccusationService 経由で実行する（TASK-079）
+		// TellHandler は postNumber → postId の変換を行わないため、
+		// BDD ステップで直接 AccusationService を呼び出す。
+		// command_system シナリオでは PostService 経由で実行する（inlineSystemInfo の検証が必要）。
+		// accusationState.active フラグで判別する。
+		// See: src/lib/services/handlers/tell-handler.ts
+		// See: features/phase2/ai_accusation.feature
+		const tellMatch = commandString.match(/^!tell\s+>>(\d+)$/);
+		if (tellMatch && accusationState.active) {
+			const postNumber = parseInt(tellMatch[1], 10);
+
+			// ユーザーが未セットアップの場合はセットアップする
+			if (!this.currentUserId) {
+				const AuthService = getAuthService();
+				const { token, userId } =
+					await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
+				this.currentEdgeToken = token;
+				this.currentUserId = userId;
+				this.currentIpHash = DEFAULT_IP_HASH;
+				await InMemoryUserRepo.updateIsVerified(userId, true);
+			}
+
+			// スレッドが未作成の場合は作成する
+			if (!this.currentThreadId) {
+				const thread = await InMemoryThreadRepo.create({
+					threadKey: Math.floor(Date.now() / 1000).toString(),
+					boardId: TEST_BOARD_ID,
+					title: "AI告発テスト用スレッド",
+					createdBy: this.currentUserId!,
+				});
+				this.currentThreadId = thread.id;
+			}
+
+			await executeTellCommand(this, postNumber);
+			return;
+		}
+
 		const PostService = getPostService();
 
 		assert(this.currentUserId, "ユーザーIDが設定されていません");
@@ -1311,9 +1365,10 @@ Then(
 		assert(systemPosts.length > 0, "システムレスが存在しません");
 
 		const lastSystemPost = systemPosts[systemPosts.length - 1];
-		assert.strictEqual(
-			lastSystemPost.body,
-			"管理者によりレスが削除されました",
+		// フォールバックメッセージはテンプレート "🗑️ レス >>{postNumber} は管理者により削除されました" を使用する
+		// See: src/lib/services/admin-service.ts > ADMIN_DELETE_FALLBACK_TEMPLATE
+		assert(
+			lastSystemPost.body.includes("管理者により削除されました"),
 			`フォールバックメッセージを期待しましたが "${lastSystemPost.body}" でした`,
 		);
 	},
