@@ -4,7 +4,7 @@
  * SSRで取得した初期レスデータを post_number ASC 順に表示する。
  * ポーリングによる新着レス表示は PostListLiveWrapper が担う。
  *
- * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @スレッドのレスが書き込み順に表示される
  * See: docs/architecture/components/web-ui.md §3.2 スレッドページ
  * See: docs/specs/screens/thread-view.yaml > post-list
  */

@@ -38,7 +38,7 @@ export type DeductReason =
 /**
  * 通貨付与理由。
  * See: docs/architecture/components/currency.md §2 公開インターフェース
- * See: features/phase1/incentive.feature（インセンティブ種別一覧）
+ * See: features/incentive.feature（インセンティブ種別一覧）
  */
 export type CreditReason =
   | "incentive_daily_login"       // 書き込みログインボーナス

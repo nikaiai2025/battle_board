@@ -6,7 +6,7 @@
  * - レス数
  * - 最終書き込み日時（相対時間: 「3分前」「1時間前」等）
  *
- * See: features/phase1/thread.feature @スレッド一覧にスレッドの基本情報が表示される
+ * See: features/thread.feature @スレッド一覧にスレッドの基本情報が表示される
  * See: docs/specs/screens/thread-list.yaml > elements > thread-list > itemTemplate
  */
 

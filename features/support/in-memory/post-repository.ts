@@ -8,8 +8,8 @@
  * 採番操作はロックフラグで同期する（シングルスレッド JS 環境では
  * Promise チェーンによる直列実行で十分）。
  *
- * See: features/phase1/posting.feature
- * See: features/phase1/thread.feature
+ * See: features/posting.feature
+ * See: features/thread.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
@@ -29,7 +29,7 @@ const store = new Map<string, Post>()
  * 前の採番が返した番号を次の採番の起点とすることで、
  * store への書き込み完了を待たずに連番を保証する。
  *
- * See: features/phase1/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
+ * See: features/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
  */
 const numberingQueues = new Map<string, Promise<number>>()
 
@@ -84,7 +84,7 @@ export async function findByThreadId(
  * マイページの書き込み履歴表示に使用する。
  *
  * See: src/lib/infrastructure/repositories/post-repository.ts
- * See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
  */
 export async function findByAuthorId(
   authorId: string,
@@ -104,7 +104,7 @@ export async function findByAuthorId(
  * これにより JS の単一スレッド内でのレース競合を防ぐ。
  *
  * See: src/lib/infrastructure/repositories/post-repository.ts
- * See: features/phase1/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
+ * See: features/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
  */
 export async function getNextPostNumber(threadId: string): Promise<number> {
   // 並行採番を直列化する。
@@ -112,7 +112,7 @@ export async function getNextPostNumber(threadId: string): Promise<number> {
   // 2回目以降: 前回返した番号に +1 する（store への書き込み完了を待たずに連番を保証）。
   // これにより Promise.all での並行 createPost でも重複番号が発生しない。
   //
-  // See: features/phase1/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
+  // See: features/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
   const prevQueue = numberingQueues.get(threadId)
 
   let nextQueue: Promise<number>

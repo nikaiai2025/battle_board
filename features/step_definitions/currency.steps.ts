@@ -6,7 +6,7 @@
  *
  * サービス層は動的 require で取得する（モック差し替え後に呼ばれるため）。
  *
- * See: features/phase1/currency.feature
+ * See: features/currency.feature
  * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト
  * See: tmp/orchestrator/sprint_8_bdd_guide.md §4 currency.feature
  */
@@ -40,7 +40,7 @@ const TEST_DEDUCT_REASON = 'bot_create' as const
 
 // ---------------------------------------------------------------------------
 // Given: 操作コストの設定
-// See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
+// See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
 // ---------------------------------------------------------------------------
 
 /**
@@ -66,7 +66,7 @@ Given('操作コストが {int} である', function (
 
 // ---------------------------------------------------------------------------
 // When: 新規ユーザーとして登録を完了する
-// See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+// See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
 // ---------------------------------------------------------------------------
 
 /**
@@ -87,7 +87,7 @@ When('新規ユーザーとして登録を完了する', async function (this: B
 
 // ---------------------------------------------------------------------------
 // When: 操作を実行する
-// See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
+// See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
 // ---------------------------------------------------------------------------
 
 /**
@@ -116,7 +116,7 @@ When('操作を実行する', async function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // Then: 操作実行結果の検証
-// See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
+// See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
 // ---------------------------------------------------------------------------
 
 Then('操作は実行されない', function (this: BattleBoardWorld) {
@@ -130,7 +130,7 @@ Then('操作は実行されない', function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // When: 同一ユーザーが同時に2つの操作を実行する
-// See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+// See: features/currency.feature @同時操作による通貨の二重消費が発生しない
 // ---------------------------------------------------------------------------
 
 /** 同時操作の結果を保持する */
@@ -170,7 +170,7 @@ When('同一ユーザーが同時に2つの操作を実行する', async functio
 
 // ---------------------------------------------------------------------------
 // Then: 同時操作の検証
-// See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+// See: features/currency.feature @同時操作による通貨の二重消費が発生しない
 // ---------------------------------------------------------------------------
 
 Then('1つの操作のみ成功する', function (this: BattleBoardWorld) {
@@ -188,7 +188,7 @@ Then('1つの操作のみ成功する', function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // Then: 通貨残高 "{string}" が表示される
-// See: features/phase1/currency.feature @マイページで通貨残高を確認する
+// See: features/currency.feature @マイページで通貨残高を確認する
 // ---------------------------------------------------------------------------
 
 /**
@@ -197,7 +197,7 @@ Then('1つの操作のみ成功する', function (this: BattleBoardWorld) {
  *
  * "When マイページを表示する" は mypage.steps.ts で定義している。
  *
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/currency.feature @マイページで通貨残高を確認する
  */
 Then('通貨残高 {string} が表示される', function (
   this: BattleBoardWorld,

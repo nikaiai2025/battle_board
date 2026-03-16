@@ -1,4 +1,4 @@
-# features/phase1/mypage.feature
+# features/mypage.feature
 # ステータス: ドラフト v3
 Feature: マイページ
 
@@ -10,7 +10,7 @@ Feature: マイページ
   # US-009: 課金（モック実装）
   # US-010: マイページの基本機能
   # US-011: 有料ユーザーのユーザーネーム設定
-  # Phase 3 追加制約: features/phase3/user_registration.feature（課金は本登録ユーザーのみ）
+  # Phase 3 追加制約: features/未実装/user_registration.feature（課金は本登録ユーザーのみ）
   # ===========================================
   # 基本表示
   # ===========================================

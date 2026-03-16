@@ -1,4 +1,4 @@
-# features/phase1/incentive.feature
+# features/incentive.feature
 # ステータス: ドラフト v4
 Feature: インセンティブ — 通貨獲得ボーナスイベント
 

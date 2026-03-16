@@ -1,8 +1,8 @@
 /**
  * ルートレイアウト — BattleBoard アプリケーション全体の共通設定
  *
- * See: features/phase1/thread.feature
- * See: features/phase1/authentication.feature
+ * See: features/thread.feature
+ * See: features/authentication.feature
  */
 
 import type { Metadata } from "next";

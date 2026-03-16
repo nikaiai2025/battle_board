@@ -6,7 +6,7 @@
  * D-10 §1 に従いサービス層（AdminService）を直接呼び出す。
  * APIルートは経由しない。
  *
- * See: features/phase1/admin.feature
+ * See: features/admin.feature
  * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト
  * See: src/lib/services/admin-service.ts
  */
@@ -22,7 +22,7 @@ import type { BattleBoardWorld } from "../support/world";
 
 // ---------------------------------------------------------------------------
 // テスト用定数
-// See: features/phase1/admin.feature
+// See: features/admin.feature
 // ---------------------------------------------------------------------------
 
 /** BDD テストで使用するデフォルト板 ID */
@@ -62,9 +62,9 @@ const postNumberToId = new Map<number, string>();
 
 // ---------------------------------------------------------------------------
 // Given: 管理者がログイン済みである
-// See: features/phase1/admin.feature @管理者が指定したレスを削除する
-// See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
-// See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+// See: features/admin.feature @管理者が指定したレスを削除する
+// See: features/admin.feature @管理者が指定したスレッドを削除する
+// See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
 // ---------------------------------------------------------------------------
 
 /**
@@ -89,7 +89,7 @@ Given("管理者がログイン済みである", async function (this: BattleBoa
 
 // ---------------------------------------------------------------------------
 // Given: 管理者でないユーザーがログイン済みである
-// See: features/phase1/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
+// See: features/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
 // ---------------------------------------------------------------------------
 
 /**
@@ -108,14 +108,14 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: スレッド "..." にレス >>N が存在する
-// See: features/phase1/admin.feature @管理者が指定したレスを削除する
+// See: features/admin.feature @管理者が指定したレスを削除する
 // ---------------------------------------------------------------------------
 
 /**
  * 指定したタイトルのスレッドに指定番号のレスを作成するヘルパー関数。
  * 固定リテラルステップから呼び出す共通ロジック。
  *
- * See: features/phase1/admin.feature @管理者が指定したレスを削除する
+ * See: features/admin.feature @管理者が指定したレスを削除する
  */
 async function createThreadWithPost(
 	world: BattleBoardWorld,
@@ -159,7 +159,7 @@ async function createThreadWithPost(
  * thread.steps.ts の `スレッド {string} にレス >>1 が存在する` と異なり、
  * admin.steps.ts では固定リテラルで定義して曖昧さを排除する。
  *
- * See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
+ * See: features/admin.feature @管理者がコメント付きでレスを削除する
  * See: docs/architecture/bdd_test_strategy.md §4 ファイル分割方針
  */
 Given(
@@ -176,7 +176,7 @@ Given(
  * thread.steps.ts の `スレッド {string} にレス >>1 が存在する` と同様に
  * 固定リテラルで定義して曖昧さを排除する。
  *
- * See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+ * See: features/admin.feature @管理者がコメントなしでレスを削除する
  * See: docs/architecture/bdd_test_strategy.md §4 ファイル分割方針
  */
 Given(
@@ -188,7 +188,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: レス >>N は存在しない
-// See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+// See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
 // ---------------------------------------------------------------------------
 
 /**
@@ -197,7 +197,7 @@ Given(
  * admin.feature の「存在しないレスの削除を試みるとエラーになる」シナリオで使用する。
  * ストアには何も挿入しない（デフォルトで存在しない）。
  *
- * See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+ * See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
  */
 Given("レス >>999 は存在しない", function (this: BattleBoardWorld) {
 	// 何もしない（ストアには対応するレスが存在しない状態がデフォルト）
@@ -207,8 +207,8 @@ Given("レス >>999 は存在しない", function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // When: レス >>N の削除を実行する（管理者）
-// See: features/phase1/admin.feature @管理者が指定したレスを削除する
-// See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+// See: features/admin.feature @管理者が指定したレスを削除する
+// See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
 // ---------------------------------------------------------------------------
 
 /**
@@ -217,7 +217,7 @@ Given("レス >>999 は存在しない", function (this: BattleBoardWorld) {
  * AdminService.deletePost を呼び出してレスを削除する。
  * 管理者（isAdmin = true）が実行する正規の削除操作。
  *
- * See: features/phase1/admin.feature @管理者が指定したレスを削除する
+ * See: features/admin.feature @管理者が指定したレスを削除する
  * See: src/lib/services/admin-service.ts > deletePost
  */
 When("レス >>5 の削除を実行する", async function (this: BattleBoardWorld) {
@@ -252,7 +252,7 @@ When("レス >>5 の削除を実行する", async function (this: BattleBoardWor
  *
  * AdminService.deletePost を呼び出すが、>>999 はストアに存在しないため not_found が返る。
  *
- * See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+ * See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
  * See: src/lib/services/admin-service.ts > deletePost
  */
 When("レス >>999 の削除を実行する", async function (this: BattleBoardWorld) {
@@ -277,7 +277,7 @@ When("レス >>999 の削除を実行する", async function (this: BattleBoardW
 
 // ---------------------------------------------------------------------------
 // When: レス >>N の削除を試みる（非管理者）
-// See: features/phase1/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
+// See: features/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
 // ---------------------------------------------------------------------------
 
 /**
@@ -286,7 +286,7 @@ When("レス >>999 の削除を実行する", async function (this: BattleBoardW
  * 管理者権限のないユーザーがレス削除を試みる。
  * AdminService は adminId を信頼するため、ステップ定義側で isAdmin フラグを確認する。
  *
- * See: features/phase1/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
+ * See: features/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
  * See: src/lib/services/admin-service.ts §設計上の判断（adminId を信頼する）
  */
 When("レス >>5 の削除を試みる", async function (this: BattleBoardWorld) {
@@ -324,7 +324,7 @@ When("レス >>5 の削除を試みる", async function (this: BattleBoardWorld)
 
 // ---------------------------------------------------------------------------
 // When: スレッド "..." の削除を実行する
-// See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+// See: features/admin.feature @管理者が指定したスレッドを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -363,14 +363,14 @@ When(
 
 // ---------------------------------------------------------------------------
 // Then: レス >>N の表示位置に "このレスは削除されました" と表示される
-// See: features/phase1/admin.feature @管理者が指定したレスを削除する
+// See: features/admin.feature @管理者が指定したレスを削除する
 // ---------------------------------------------------------------------------
 
 // (レス >>5 の表示位置 / レス番号 >>5 の欠番確認は汎用ステップ >>{int} に統合済み)
 
 // ---------------------------------------------------------------------------
 // Then: 権限エラーメッセージが表示される
-// See: features/phase1/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
+// See: features/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
 // ---------------------------------------------------------------------------
 
 /**
@@ -396,7 +396,7 @@ Then("権限エラーメッセージが表示される", function (this: BattleB
 
 // ---------------------------------------------------------------------------
 // Then: レスは削除されない
-// See: features/phase1/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
+// See: features/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
 // ---------------------------------------------------------------------------
 
 /**
@@ -418,7 +418,7 @@ Then("レスは削除されない", async function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // Given: スレッド "..." が存在する
-// See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+// See: features/admin.feature @管理者が指定したスレッドを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -459,7 +459,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Then: スレッドとその中の全レスが削除される
-// See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+// See: features/admin.feature @管理者が指定したスレッドを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -504,7 +504,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: スレッド一覧から "..." が消える
-// See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+// See: features/admin.feature @管理者が指定したスレッドを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -526,7 +526,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // When: レス >>N の削除をコメント付きで実行する
-// See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
+// See: features/admin.feature @管理者がコメント付きでレスを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -535,7 +535,7 @@ Then(
  * AdminService.deletePost を comment 引数付きで呼び出す。
  * 削除後、システムレスに管理者コメントが表示される。
  *
- * See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
+ * See: features/admin.feature @管理者がコメント付きでレスを削除する
  * See: src/lib/services/admin-service.ts > deletePost
  */
 When(
@@ -575,7 +575,7 @@ When(
 
 // ---------------------------------------------------------------------------
 // When: レス >>N の削除をコメントなしで実行する
-// See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+// See: features/admin.feature @管理者がコメントなしでレスを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -584,7 +584,7 @@ When(
  * AdminService.deletePost を comment 引数なしで呼び出す。
  * 削除後、システムレスにはフォールバックメッセージが表示される。
  *
- * See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+ * See: features/admin.feature @管理者がコメントなしでレスを削除する
  * See: src/lib/services/admin-service.ts > deletePost（comment 未指定時はフォールバック）
  */
 When(
@@ -619,7 +619,7 @@ When(
 
 // ---------------------------------------------------------------------------
 // Then: レス >>N の表示位置に "このレスは削除されました" と表示される（汎用版）
-// See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+// See: features/admin.feature @管理者がコメントなしでレスを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -629,7 +629,7 @@ When(
  * 表示文字列の置換はプレゼンテーション層の責務のため、
  * BDD テストでは isDeleted フラグが true であることを検証する。
  *
- * See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+ * See: features/admin.feature @管理者がコメントなしでレスを削除する
  * See: src/lib/services/admin-service.ts §責務（表示文字列の置換はUIの責務）
  */
 Then(
@@ -662,7 +662,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: レス番号 >>N は欠番にならず保持される（汎用版）
-// See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+// See: features/admin.feature @管理者がコメントなしでレスを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -671,7 +671,7 @@ Then(
  * 削除後もレス番号がストアに存在することを確認する。
  * ソフトデリートのため物理削除されず postNumber は保持される。
  *
- * See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+ * See: features/admin.feature @管理者がコメントなしでレスを削除する
  */
 Then(
 	"レス番号 >>{int} は欠番にならず保持される",
@@ -696,8 +696,8 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: 独立したシステムレスが追加される: (DocString)
-// See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
-// See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+// See: features/admin.feature @管理者がコメント付きでレスを削除する
+// See: features/admin.feature @管理者がコメントなしでレスを削除する
 // ---------------------------------------------------------------------------
 
 /**
@@ -714,8 +714,8 @@ Then(
  * スレッド内に isSystemMessage=true かつ displayName=★システム のレスが
  * 存在し、その body が期待値（DocString 2行目）に含まれる文字列であることを確認する。
  *
- * See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
- * See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+ * See: features/admin.feature @管理者がコメント付きでレスを削除する
+ * See: features/admin.feature @管理者がコメントなしでレスを削除する
  * See: src/lib/services/admin-service.ts > deletePost（createPost で挿入）
  * See: docs/architecture/components/posting.md §5 方式B: 独立システムレス
  */

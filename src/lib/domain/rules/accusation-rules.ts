@@ -4,7 +4,7 @@
  * 外部依存なしの純粋関数。テストが容易でドメインロジックのみを担う。
  * ボーナス額は config/commands.yaml で定義し、呼び出し元から引数で受け取る。
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
  * See: docs/architecture/architecture.md §3.2 > domain/rules: 純粋関数
  */
@@ -16,8 +16,8 @@
 /**
  * 告発前チェックの入力型。
  * 自分自身の書き込みチェックおよびシステムメッセージチェックに使用する。
- * See: features/phase2/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
- * See: features/phase2/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
+ * See: features/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
+ * See: features/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
  */
 export interface AccusationCheckInput {
 	/** 告発者のユーザーID */
@@ -63,8 +63,8 @@ export interface BonusCalculationResult {
  * Note: authorId=null のレスには isSystemMessage フラグで判断する。
  *       ボット書き込みも authorId=null だが、ボットへの告発は許可する（!tell の主目的）。
  *
- * See: features/phase2/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
- * See: features/phase2/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
+ * See: features/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
+ * See: features/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
  *
  * @param input - 告発前チェックの入力
  * @returns チェック結果（ok: true なら告発可能）
@@ -97,8 +97,8 @@ export function checkAccusationAllowed(
  *
  * ボーナス額は config/commands.yaml から読み込まれ、引数として渡される。
  *
- * See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
- * See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+ * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+ * See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
  *
  * @param isBot - 対象レスがAIボットの書き込みかどうか
  * @param hitBonus - 告発成功時に告発者に付与するボーナス額
@@ -128,7 +128,7 @@ export function calculateBonus(
 /**
  * 告発結果のシステムメッセージ文字列を生成する（hit の場合）。
  *
- * See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+ * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
  *
  * @param accuserDailyId - 告発者の日次ID（表示用）
  * @param targetPostNumber - 告発対象のレス番号
@@ -150,7 +150,7 @@ export function buildHitSystemMessage(
 /**
  * 告発結果のシステムメッセージ文字列を生成する（miss の場合）。
  *
- * See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+ * See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
  *
  * @param accuserDailyId - 告発者の日次ID（表示用）
  * @param targetPostNumber - 告発対象のレス番号

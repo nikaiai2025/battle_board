@@ -4,7 +4,7 @@
  * BDD テスト用の Supabase 非依存実装。
  * auth-code-repository.ts と同一シグネチャの関数を提供する。
  *
- * See: features/phase1/authentication.feature
+ * See: features/authentication.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 

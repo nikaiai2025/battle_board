@@ -1,7 +1,7 @@
 /**
  * CommandHandler 実装: !w（草）コマンド
  *
- * See: features/phase2/command_system.feature @無料コマンドは通貨消費なしで実行できる
+ * See: features/command_system.feature @無料コマンドは通貨消費なしで実行できる
  * See: docs/architecture/components/command.md §2.2 ロジック層: CommandHandler
  *
  * !w コマンドの仕様（MVP）:
@@ -17,7 +17,7 @@ import type { CommandHandler, CommandContext, CommandHandlerResult } from '../co
  * 対象レスに草を生やすシステムメッセージを生成する。
  * MVP では草カウントの永続化は行わず、メッセージ文字列のみを返す。
  *
- * See: features/phase2/command_system.feature @無料コマンドは通貨消費なしで実行できる
+ * See: features/command_system.feature @無料コマンドは通貨消費なしで実行できる
  */
 export class GrassHandler implements CommandHandler {
   /** コマンド名（! を除いた名前） */

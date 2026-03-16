@@ -1,4 +1,4 @@
-# features/phase2/ai_accusation.feature
+# features/ai_accusation.feature
 # ステータス: ドラフト v3
 #
 # US-020のBOTマーク表示・攻撃フローは ai_accusation（告発→BOTマーク付与）と

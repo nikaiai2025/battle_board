@@ -112,7 +112,7 @@ export async function findByAuthToken(authToken: string): Promise<User | null> {
  * id / createdAt / streakDays / lastPostDate は DB のデフォルト値を使用する。
  * isVerified は省略時 false（DBデフォルト値と一致）。
  *
- * See: features/phase1/authentication.feature @認証フロー是正
+ * See: features/authentication.feature @認証フロー是正
  *
  * @param user - 作成するユーザーのデータ（自動設定フィールドを除く）
  * @returns 作成された User（DB デフォルト値を含む）
@@ -214,7 +214,7 @@ export async function updateUsername(userId: string, username: string | null): P
  * ユーザーの有料ステータス（isPremium）を更新する。
  * 課金モック実装（MypageService.upgradeToPremium）から呼び出される。
  *
- * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
  * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > users > is_premium
  *
  * @param userId - 対象ユーザーの UUID
@@ -236,7 +236,7 @@ export async function updateIsPremium(userId: string, isPremium: boolean): Promi
  * AuthService.verifyAuthCode が認証コードとTurnstileの検証に成功した後に呼び出される。
  * is_verified = true への更新により、書き込み時の認証チェック（G1 是正）が機能する。
  *
- * See: features/phase1/authentication.feature @認証フロー是正
+ * See: features/authentication.feature @認証フロー是正
  * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
  *
  * @param userId - 対象ユーザーの UUID

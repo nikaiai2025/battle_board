@@ -1,7 +1,7 @@
 /**
  * 単体テスト: incentive-rules.ts（インセンティブ発火条件判定）
  * See: docs/architecture/components/incentive.md §2.2 イベント種別と評価方式の一覧
- * See: features/phase1/incentive.feature
+ * See: features/incentive.feature
  * See: docs/requirements/ubiquitous_language.yaml #ストリーク #ホットレス #キリ番
  */
 
@@ -34,7 +34,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // ① 書き込みログインボーナス判定
-// See: features/phase1/incentive.feature Rule: 1日の初回書き込み時に +10
+// See: features/incentive.feature Rule: 1日の初回書き込み時に +10
 // ---------------------------------------------------------------------------
 
 describe("shouldGrantDailyLogin", () => {
@@ -57,7 +57,7 @@ describe("shouldGrantDailyLogin", () => {
 
 // ---------------------------------------------------------------------------
 // ② スレッド作成ログインボーナス判定
-// See: features/phase1/incentive.feature Rule: 1日の初回スレッド作成時に +10
+// See: features/incentive.feature Rule: 1日の初回スレッド作成時に +10
 // ---------------------------------------------------------------------------
 
 describe("shouldGrantThreadCreationBonus", () => {
@@ -76,7 +76,7 @@ describe("shouldGrantThreadCreationBonus", () => {
 
 // ---------------------------------------------------------------------------
 // ③ スレッド成長ボーナス判定
-// See: features/phase1/incentive.feature Rule: 立てたスレッドのレスがマイルストーン達成
+// See: features/incentive.feature Rule: 立てたスレッドのレスがマイルストーン達成
 // ---------------------------------------------------------------------------
 
 describe("calcThreadGrowthBonus", () => {
@@ -126,7 +126,7 @@ describe("calcThreadGrowthBonus", () => {
 
 // ---------------------------------------------------------------------------
 // ④ 返信ボーナス判定
-// See: features/phase1/incentive.feature Rule: 他人から返信が付くと +5（同一IDは1日1回）
+// See: features/incentive.feature Rule: 他人から返信が付くと +5（同一IDは1日1回）
 // ---------------------------------------------------------------------------
 
 describe("shouldGrantReplyBonus", () => {
@@ -157,7 +157,7 @@ describe("shouldGrantReplyBonus", () => {
 
 // ---------------------------------------------------------------------------
 // ⑤ ホットレスボーナス判定
-// See: features/phase1/incentive.feature Rule: 60分以内に3人以上の異なるIDから返信で +15
+// See: features/incentive.feature Rule: 60分以内に3人以上の異なるIDから返信で +15
 // ---------------------------------------------------------------------------
 
 describe("shouldGrantHotPostBonus", () => {
@@ -210,7 +210,7 @@ describe("shouldGrantHotPostBonus", () => {
 
 // ---------------------------------------------------------------------------
 // ⑥ 新スレッド参加ボーナス判定
-// See: features/phase1/incentive.feature Rule: 未参加スレッドへの初書き込みで +3（1日3スレッドまで）
+// See: features/incentive.feature Rule: 未参加スレッドへの初書き込みで +3（1日3スレッドまで）
 // ---------------------------------------------------------------------------
 
 describe("shouldGrantNewThreadJoinBonus", () => {
@@ -246,7 +246,7 @@ describe("shouldGrantNewThreadJoinBonus", () => {
 
 // ---------------------------------------------------------------------------
 // ⑦ スレッド復興ボーナス判定
-// See: features/phase1/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み
+// See: features/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み
 // See: docs/requirements/ubiquitous_language.yaml #低活性スレッド
 // ---------------------------------------------------------------------------
 
@@ -313,7 +313,7 @@ describe("shouldGrantThreadRevivalBonus", () => {
 
 // ---------------------------------------------------------------------------
 // ⑧ ストリークボーナス判定
-// See: features/phase1/incentive.feature Rule: N日連続でマイルストーン到達時にボーナス
+// See: features/incentive.feature Rule: N日連続でマイルストーン到達時にボーナス
 // ---------------------------------------------------------------------------
 
 describe("calcStreakBonus", () => {
@@ -371,7 +371,7 @@ describe("updateStreakDays", () => {
 
 // ---------------------------------------------------------------------------
 // ⑨ キリ番ボーナス判定
-// See: features/phase1/incentive.feature Rule: レス番号が100の倍数でボーナス
+// See: features/incentive.feature Rule: レス番号が100の倍数でボーナス
 // ---------------------------------------------------------------------------
 
 describe("calcMilestonePostBonus", () => {

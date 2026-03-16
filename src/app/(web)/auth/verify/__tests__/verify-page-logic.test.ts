@@ -9,9 +9,9 @@
  *   - write_token の表示ロジック（存在する場合 / 存在しない場合）
  *   - エラーレスポンスの解釈ロジック
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
- * See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ * See: features/authentication.feature @期限切れ認証コードでは認証できない
  * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
  */
 
@@ -61,7 +61,7 @@ describe('/auth/verify ページロジック', () => {
 
   describe('validateAuthCode', () => {
     describe('正常系: 有効な6桁数字コード', () => {
-      // See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+      // See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
 
       it('6桁数字のコードは有効と判定する', () => {
         expect(validateAuthCode('123456').valid).toBe(true)
@@ -76,7 +76,7 @@ describe('/auth/verify ページロジック', () => {
     })
 
     describe('異常系: 無効なコード', () => {
-      // See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+      // See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
 
       it('5桁のコードは無効と判定する', () => {
         const result = validateAuthCode('12345')
@@ -165,8 +165,8 @@ describe('/auth/verify ページロジック', () => {
   // =========================================================================
 
   describe('extractErrorMessage', () => {
-    // See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
-    // See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+    // See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+    // See: features/authentication.feature @期限切れ認証コードでは認証できない
 
     it('レスポンスの error フィールドが存在する場合はそのメッセージを使用する', () => {
       const response = { success: false, error: '認証コードが無効または期限切れです' }
@@ -194,7 +194,7 @@ describe('/auth/verify ページロジック', () => {
   // =========================================================================
 
   describe('write_token 表示分岐', () => {
-    // See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+    // See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
     // write_tokenが発行される
 
     it('write_token が存在する場合は表示すべき', () => {

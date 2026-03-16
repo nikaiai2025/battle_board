@@ -1,7 +1,7 @@
 /**
  * 単体テスト: anchor-parser.ts（アンカー解析）
  * See: docs/requirements/ubiquitous_language.yaml #アンカー
- * See: features/phase1/incentive.feature（返信ボーナス・ホットレスボーナスの条件）
+ * See: features/incentive.feature（返信ボーナス・ホットレスボーナスの条件）
  */
 
 import { describe, it, expect } from "vitest";

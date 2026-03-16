@@ -1,7 +1,7 @@
 /**
  * ドメインルール: アンカー解析
  * See: docs/requirements/ubiquitous_language.yaml #アンカー
- * See: features/phase1/incentive.feature（返信ボーナス・ホットレスボーナスの条件）
+ * See: features/incentive.feature（返信ボーナス・ホットレスボーナスの条件）
  *
  * 5ch互換のアンカー記法を解析してレス番号の配列を返す純粋関数。
  * 対応形式:

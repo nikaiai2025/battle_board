@@ -1,9 +1,9 @@
 /**
  * POST /api/auth/auth-code — 認証コード検証 API エンドポイント
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
- * See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ * See: features/authentication.feature @期限切れ認証コードでは認証できない
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
  * See: docs/specs/openapi.yaml > /api/auth/auth-code
  *

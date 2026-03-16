@@ -3,8 +3,8 @@
 /**
  * マイページ — /mypage
  *
- * See: features/phase1/mypage.feature
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/mypage.feature
+ * See: features/currency.feature @マイページで通貨残高を確認する
  * See: docs/specs/screens/mypage.yaml @SCR-003（予定）
  * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
  *
@@ -47,8 +47,8 @@ interface PostHistoryItem {
 /**
  * マイページ（Client Component）
  *
- * See: features/phase1/mypage.feature @マイページに基本情報が表示される
- * See: features/phase1/mypage.feature @通知欄が存在する
+ * See: features/mypage.feature @マイページに基本情報が表示される
+ * See: features/mypage.feature @通知欄が存在する
  */
 export default function MypagePage() {
   // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ export default function MypagePage() {
 
   /**
    * マイページ基本情報を取得する。
-   * See: features/phase1/mypage.feature @マイページに基本情報が表示される
+   * See: features/mypage.feature @マイページに基本情報が表示される
    */
   const fetchMypageInfo = useCallback(async () => {
     try {
@@ -102,7 +102,7 @@ export default function MypagePage() {
 
   /**
    * 書き込み履歴を取得する。
-   * See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
+   * See: features/mypage.feature @自分の書き込み履歴を確認できる
    */
   const fetchPostHistory = useCallback(async () => {
     try {
@@ -132,7 +132,7 @@ export default function MypagePage() {
 
   /**
    * ユーザーネームを設定する。
-   * See: features/phase1/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
+   * See: features/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
    */
   const handleSetUsername = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,7 +168,7 @@ export default function MypagePage() {
 
   /**
    * 課金（有料ステータス切替モック）を実行する。
-   * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+   * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
    */
   const handleUpgrade = async () => {
     setUpgradeError(null);
@@ -233,7 +233,7 @@ export default function MypagePage() {
 
       {/* =============================
           アカウント情報セクション
-          See: features/phase1/mypage.feature @マイページに基本情報が表示される
+          See: features/mypage.feature @マイページに基本情報が表示される
           ============================= */}
       <section
         id="account-info"
@@ -245,7 +245,7 @@ export default function MypagePage() {
         <div className="text-sm text-gray-600">
           <span className="font-medium">ステータス: </span>
           {/* premium-badge: 有料/無料ステータス表示
-              See: features/phase1/mypage.feature @マイページに基本情報が表示される */}
+              See: features/mypage.feature @マイページに基本情報が表示される */}
           <span
             id="premium-badge"
             className={
@@ -267,8 +267,8 @@ export default function MypagePage() {
 
       {/* =============================
           通貨残高セクション
-          See: features/phase1/mypage.feature @通貨残高が表示される
-          See: features/phase1/currency.feature @マイページで通貨残高を確認する
+          See: features/mypage.feature @通貨残高が表示される
+          See: features/currency.feature @マイページで通貨残高を確認する
           ============================= */}
       <section
         id="currency-section"
@@ -276,7 +276,7 @@ export default function MypagePage() {
       >
         <h2 className="text-base font-bold text-gray-700 mb-2">通貨残高</h2>
         {/* currency-balance: 通貨残高の表示要素
-            See: features/phase1/currency.feature @マイページで通貨残高を確認する */}
+            See: features/currency.feature @マイページで通貨残高を確認する */}
         <p id="currency-balance" className="text-2xl font-bold text-yellow-600">
           {mypageInfo.balance} BT
         </p>
@@ -284,8 +284,8 @@ export default function MypagePage() {
 
       {/* =============================
           ユーザーネーム設定セクション
-          See: features/phase1/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
-          See: features/phase1/mypage.feature @無料ユーザーはユーザーネームを設定できない
+          See: features/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
+          See: features/mypage.feature @無料ユーザーはユーザーネームを設定できない
           ============================= */}
       <section
         id="username-section"
@@ -326,7 +326,7 @@ export default function MypagePage() {
           </form>
         ) : (
           /* 無料ユーザー: 利用不可メッセージ
-             See: features/phase1/mypage.feature @無料ユーザーはユーザーネームを設定できない */
+             See: features/mypage.feature @無料ユーザーはユーザーネームを設定できない */
           <p id="username-unavailable" className="text-gray-500 text-sm">
             ユーザーネームの設定は有料ユーザー限定の機能です
           </p>
@@ -335,8 +335,8 @@ export default function MypagePage() {
 
       {/* =============================
           課金セクション（モック）
-          See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
-          See: features/phase1/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
+          See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+          See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
           ============================= */}
       <section
         id="upgrade-section"
@@ -353,7 +353,7 @@ export default function MypagePage() {
         )}
         {/* upgrade-button: 課金ボタン
             有料ユーザーの場合は disabled
-            See: features/phase1/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である */}
+            See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である */}
         <button
           id="upgrade-button"
           onClick={handleUpgrade}
@@ -374,8 +374,8 @@ export default function MypagePage() {
 
       {/* =============================
           書き込み履歴セクション
-          See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
-          See: features/phase1/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
+          See: features/mypage.feature @自分の書き込み履歴を確認できる
+          See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
           ============================= */}
       <section
         id="post-history"
@@ -385,7 +385,7 @@ export default function MypagePage() {
 
         {posts.length === 0 ? (
           /* 0件の場合のメッセージ
-             See: features/phase1/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される */
+             See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される */
           <p id="no-posts-message" className="text-gray-500 text-sm">
             まだ書き込みがありません
           </p>
@@ -397,7 +397,7 @@ export default function MypagePage() {
                 className="border-b border-gray-100 pb-2 last:border-b-0"
               >
                 {/* スレッド名・本文・日時を表示
-                    See: features/phase1/mypage.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる */}
+                    See: features/mypage.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる */}
                 <div className="text-xs text-gray-500 mb-0.5">
                   <span className="font-medium">スレッド ID:</span> {post.threadId}
                   <span className="ml-2">
@@ -413,7 +413,7 @@ export default function MypagePage() {
 
       {/* =============================
           通知欄セクション（Phase 2 プレースホルダー）
-          See: features/phase1/mypage.feature @通知欄が存在する
+          See: features/mypage.feature @通知欄が存在する
           ============================= */}
       <section
         id="notifications"

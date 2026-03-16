@@ -1,8 +1,8 @@
 /**
  * 単体テスト: mypage-service.ts（MypageService）
  *
- * See: features/phase1/mypage.feature
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/mypage.feature
+ * See: features/currency.feature @マイページで通貨残高を確認する
  *
  * テスト方針:
  *   - UserRepository・CurrencyService・PostRepository はモック化する（Supabase に依存しない）
@@ -113,8 +113,8 @@ describe('MypageService', () => {
 
     describe('正常系: 無料ユーザー', () => {
       it('残高・アカウント情報を含む MypageInfo を返す', async () => {
-        // See: features/phase1/mypage.feature @マイページに基本情報が表示される
-        // See: features/phase1/currency.feature @マイページで通貨残高を確認する
+        // See: features/mypage.feature @マイページに基本情報が表示される
+        // See: features/currency.feature @マイページで通貨残高を確認する
         vi.mocked(UserRepository.findById).mockResolvedValue(FREE_USER)
         vi.mocked(CurrencyService.getBalance).mockResolvedValue(150)
 
@@ -216,7 +216,7 @@ describe('MypageService', () => {
 
     describe('正常系: 有料ユーザーがユーザーネームを設定する', () => {
       it('成功時に { success: true, username } を返す', async () => {
-        // See: features/phase1/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
+        // See: features/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
         vi.mocked(UserRepository.findById).mockResolvedValue(PREMIUM_USER)
         vi.mocked(UserRepository.updateUsername).mockResolvedValue(undefined)
 
@@ -263,7 +263,7 @@ describe('MypageService', () => {
 
     describe('異常系: 無料ユーザーが設定を試みる', () => {
       it('{ success: false, code: "NOT_PREMIUM" } を返す', async () => {
-        // See: features/phase1/mypage.feature @無料ユーザーはユーザーネームを設定できない
+        // See: features/mypage.feature @無料ユーザーはユーザーネームを設定できない
         vi.mocked(UserRepository.findById).mockResolvedValue(FREE_USER)
 
         const result = await setUsername('user-free-001', 'テスト名')
@@ -382,7 +382,7 @@ describe('MypageService', () => {
 
     describe('正常系: 無料ユーザーが課金する', () => {
       it('成功時に { success: true } を返す', async () => {
-        // See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+        // See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
         vi.mocked(UserRepository.findById).mockResolvedValue(FREE_USER)
         vi.mocked(UserRepository.updateIsPremium).mockResolvedValue(undefined)
 
@@ -407,7 +407,7 @@ describe('MypageService', () => {
 
     describe('異常系: 既に有料ユーザー', () => {
       it('{ success: false, code: "ALREADY_PREMIUM" } を返す', async () => {
-        // See: features/phase1/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
+        // See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
         vi.mocked(UserRepository.findById).mockResolvedValue(PREMIUM_USER)
 
         const result = await upgradeToPremium('user-premium-001')
@@ -467,7 +467,7 @@ describe('MypageService', () => {
 
     describe('正常系: 書き込みがある場合', () => {
       it('PostHistoryItem 配列を返す', async () => {
-        // See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
+        // See: features/mypage.feature @自分の書き込み履歴を確認できる
         vi.mocked(PostRepository.findByAuthorId).mockResolvedValue([SAMPLE_POST])
 
         const result = await getPostHistory('user-free-001')
@@ -513,7 +513,7 @@ describe('MypageService', () => {
 
     describe('エッジケース: 書き込みが 0 件', () => {
       it('空配列を返す', async () => {
-        // See: features/phase1/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
+        // See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
         vi.mocked(PostRepository.findByAuthorId).mockResolvedValue([])
 
         const result = await getPostHistory('user-free-001')

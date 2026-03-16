@@ -1,7 +1,7 @@
 /**
  * 単体テスト: currency-service.ts（CurrencyService）
  *
- * See: features/phase1/currency.feature
+ * See: features/currency.feature
  * See: docs/architecture/components/currency.md §2 公開インターフェース
  *
  * テスト方針:
@@ -53,7 +53,7 @@ describe('CurrencyService', () => {
 
   describe('INITIAL_BALANCE 定数', () => {
     it('初期付与額が 50 に設定されている', () => {
-      // See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+      // See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
       expect(INITIAL_BALANCE).toBe(50)
     })
   })
@@ -65,7 +65,7 @@ describe('CurrencyService', () => {
   describe('credit', () => {
     describe('正常系: 通常の加算', () => {
       it('CurrencyRepository.credit を userId・amount で呼び出す', async () => {
-        // See: features/phase1/currency.feature
+        // See: features/currency.feature
         vi.mocked(CurrencyRepository.credit).mockResolvedValue(undefined)
 
         await credit('user-001', 100, 'incentive_daily_login')
@@ -134,7 +134,7 @@ describe('CurrencyService', () => {
   describe('deduct', () => {
     describe('正常系: 残高が十分にある場合', () => {
       it('成功時に DeductResult { success: true, newBalance } を返す', async () => {
-        // See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
+        // See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
         const mockResult: DeductResult = { success: true, newBalance: 90 }
         vi.mocked(CurrencyRepository.deduct).mockResolvedValue(mockResult)
 
@@ -156,7 +156,7 @@ describe('CurrencyService', () => {
 
     describe('異常系: 残高不足', () => {
       it('残高不足時に { success: false, reason: "insufficient_balance" } を返す', async () => {
-        // See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
+        // See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
         const mockResult: DeductResult = { success: false, reason: 'insufficient_balance' }
         vi.mocked(CurrencyRepository.deduct).mockResolvedValue(mockResult)
 
@@ -178,7 +178,7 @@ describe('CurrencyService', () => {
 
     describe('同時操作による二重消費防止（楽観的ロック）', () => {
       it('同時2件のdeductで1件が失敗型を返す（楽観的ロック動作）', async () => {
-        // See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+        // See: features/currency.feature @同時操作による通貨の二重消費が発生しない
         // 楽観的ロックはCurrencyRepositoryが担当するため、サービス層はDeductResultをそのまま伝播する
         const successResult: DeductResult = { success: true, newBalance: 5 }
         const failResult: DeductResult = { success: false, reason: 'insufficient_balance' }
@@ -291,7 +291,7 @@ describe('CurrencyService', () => {
   describe('initializeBalance', () => {
     describe('正常系', () => {
       it('CurrencyRepository.create を userId と初期残高50で呼び出す', async () => {
-        // See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+        // See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
         vi.mocked(CurrencyRepository.create).mockResolvedValue({
           userId: 'user-001',
           balance: 50,

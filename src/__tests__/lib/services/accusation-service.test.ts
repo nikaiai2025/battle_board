@@ -1,7 +1,7 @@
 /**
  * 単体テスト: AccusationService（AI告発サービス）
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
  *
  * テスト方針:
@@ -168,7 +168,7 @@ describe("AccusationService", () => {
 
 	describe("hit（AIボット確認）", () => {
 		it("対象がAIボットの場合、result='hit'を返す", async () => {
-			// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+			// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 			const service = createService({
 				post: createBotPost(),
 				isBot: true,
@@ -181,7 +181,7 @@ describe("AccusationService", () => {
 		});
 
 		it("hit時に告発者にhitBonusが付与される", async () => {
-			// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+			// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 			const currencyService = createMockCurrencyService();
 			const service = createService({
 				post: createBotPost(),
@@ -241,7 +241,7 @@ describe("AccusationService", () => {
 
 	describe("miss（人間確認）", () => {
 		it("対象が人間の場合、result='miss'を返す", async () => {
-			// See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+			// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
 			const service = createService({
 				post: createHumanPost(),
 				isBot: false,
@@ -254,7 +254,7 @@ describe("AccusationService", () => {
 		});
 
 		it("miss時に被告発者にfalseAccusationBonusが付与される", async () => {
-			// See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+			// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
 			const currencyService = createMockCurrencyService();
 			const service = createService({
 				post: createHumanPost(),
@@ -311,7 +311,7 @@ describe("AccusationService", () => {
 
 	describe("重複告発", () => {
 		it("同一ユーザーが同一レスに対して再度告発するとalreadyAccused=trueが返される", async () => {
-			// See: features/phase2/ai_accusation.feature @同一ユーザーが同一レスに対して再度告発を試みると拒否される
+			// See: features/ai_accusation.feature @同一ユーザーが同一レスに対して再度告発を試みると拒否される
 			const service = createService({
 				alreadyExists: true,
 			});
@@ -366,7 +366,7 @@ describe("AccusationService", () => {
 
 	describe("存在しないレス", () => {
 		it("対象レスが存在しない場合はエラーメッセージを返す", async () => {
-			// See: features/phase2/ai_accusation.feature @存在しないレスに対してAI告発を試みるとエラーになる
+			// See: features/ai_accusation.feature @存在しないレスに対してAI告発を試みるとエラーになる
 			const service = createService({
 				post: null,
 			});
@@ -397,7 +397,7 @@ describe("AccusationService", () => {
 
 	describe("自分自身の書き込みへの告発", () => {
 		it("自分の書き込みに対して告発するとエラーメッセージを返す", async () => {
-			// See: features/phase2/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
+			// See: features/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
 			const service = createService({
 				post: createHumanPost({ authorId: "accuser-user-001" }),
 			});
@@ -430,7 +430,7 @@ describe("AccusationService", () => {
 
 	describe("システムメッセージへの告発", () => {
 		it("システムメッセージに対して告発するとエラーメッセージを返す", async () => {
-			// See: features/phase2/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
+			// See: features/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
 			const service = createService({
 				post: createSystemPost(),
 			});

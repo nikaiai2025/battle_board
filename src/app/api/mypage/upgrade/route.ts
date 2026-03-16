@@ -1,8 +1,8 @@
 /**
  * POST /api/mypage/upgrade — 課金（有料ステータス切替）モック
  *
- * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
- * See: features/phase1/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
+ * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
  * See: docs/specs/openapi.yaml > /api/mypage/upgrade
  *
  * 責務:
@@ -24,7 +24,7 @@ import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
 /**
  * POST /api/mypage/upgrade — 課金（モック）
  *
- * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
  *
  * リクエスト:
  *   Cookie: edge-token（認証済みトークン）
@@ -56,8 +56,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // --- 認証フロー完了チェック（is_verified） ---
-  // See: features/phase1/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
-  // See: features/phase1/authentication.feature @認証フロー是正
+  // See: features/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
+  // See: features/authentication.feature @認証フロー是正
   if (!user.isVerified) {
     return NextResponse.json(
       { error: 'UNAUTHORIZED', message: '認証が必要です' },

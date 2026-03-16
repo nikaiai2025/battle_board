@@ -164,7 +164,7 @@ describe("DatFormatter", () => {
 
     // -----------------------------------------------------------------------
     // inlineSystemInfo 連結出力
-    // See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+    // See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
     // See: docs/architecture/components/posting.md §5 方式A: レス内マージ
     // -----------------------------------------------------------------------
 

@@ -2,8 +2,8 @@
  * GET /api/threads — スレッド一覧取得
  * POST /api/threads — スレッド作成
  *
- * See: features/phase1/thread.feature @ログイン済みユーザーがスレッドを作成する
- * See: features/phase1/thread.feature @スレッド一覧には最新50件のみ表示される
+ * See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
+ * See: features/thread.feature @スレッド一覧には最新50件のみ表示される
  * See: docs/specs/openapi.yaml > /api/threads
  * See: docs/architecture/components/posting.md §2.3 createThread / getThreadList
  *
@@ -52,7 +52,7 @@ function getIpHash(req: NextRequest): string {
 /**
  * GET /api/threads — スレッド一覧取得
  *
- * See: features/phase1/thread.feature @スレッド一覧には最新50件のみ表示される
+ * See: features/thread.feature @スレッド一覧には最新50件のみ表示される
  * See: docs/specs/openapi.yaml > /api/threads > get
  *
  * レスポンス:
@@ -67,8 +67,8 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
 /**
  * POST /api/threads — スレッド作成
  *
- * See: features/phase1/thread.feature @ログイン済みユーザーがスレッドを作成する
- * See: features/phase1/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
+ * See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
+ * See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
  * See: docs/specs/openapi.yaml > /api/threads > post
  *
  * リクエスト:

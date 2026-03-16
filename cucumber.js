@@ -43,17 +43,18 @@ module.exports = {
 		// TASK-024: specialist_browser_compat.feature を追加
 		// TASK-026: mypage.feature を追加
 		// TASK-079: phase2 feature を追加
+		// TASK-083: phase1/phase2サブディレクトリ廃止によりパス更新
 		paths: [
-			"features/phase1/authentication.feature",
-			"features/phase1/posting.feature",
-			"features/phase1/thread.feature",
-			"features/phase1/currency.feature",
-			"features/phase1/incentive.feature",
-			"features/phase1/admin.feature",
+			"features/authentication.feature",
+			"features/posting.feature",
+			"features/thread.feature",
+			"features/currency.feature",
+			"features/incentive.feature",
+			"features/admin.feature",
 			"features/constraints/specialist_browser_compat.feature",
-			"features/phase1/mypage.feature",
-			"features/phase2/command_system.feature",
-			"features/phase2/ai_accusation.feature",
+			"features/mypage.feature",
+			"features/command_system.feature",
+			"features/ai_accusation.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -130,10 +131,8 @@ module.exports = {
 	integration: {
 		// 統合テスト対象 feature ファイル
 		// InMemory直接操作が不要なシナリオを含む feature に限定する
-		paths: [
-			"features/phase1/thread.feature",
-			"features/phase1/authentication.feature",
-		],
+		// TASK-083: phase1サブディレクトリ廃止によりパス更新
+		paths: ["features/thread.feature", "features/authentication.feature"],
 
 		// ステップ定義と support ファイルを読み込む
 		// register-real-repos.js を先頭に配置する（register-mocks.js の代わり）

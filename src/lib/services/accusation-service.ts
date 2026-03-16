@@ -1,7 +1,7 @@
 /**
  * AccusationService — AI告発（!tell コマンド）の統括サービス
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
  * See: docs/architecture/components/accusation.md §3 依存関係
  *
@@ -135,7 +135,7 @@ export interface ICurrencyService {
 /**
  * AccusationService — AI告発の統括サービス。
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
  */
 export class AccusationService {
@@ -171,19 +171,19 @@ export class AccusationService {
 	 *   8. DB記録 → AccusationRepository.create
 	 *   9. システムメッセージ文字列生成 → 返却
 	 *
-	 * See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
-	 * See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
-	 * See: features/phase2/ai_accusation.feature @同一ユーザーが同一レスに対して再度告発を試みると拒否される
-	 * See: features/phase2/ai_accusation.feature @存在しないレスに対してAI告発を試みるとエラーになる
-	 * See: features/phase2/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
-	 * See: features/phase2/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
+	 * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+	 * See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+	 * See: features/ai_accusation.feature @同一ユーザーが同一レスに対して再度告発を試みると拒否される
+	 * See: features/ai_accusation.feature @存在しないレスに対してAI告発を試みるとエラーになる
+	 * See: features/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
+	 * See: features/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
 	 *
 	 * @param input - 告発入力
 	 * @returns 告発結果（alreadyAccused: true の場合は実行されない）
 	 */
 	async accuse(input: AccusationInput): Promise<AccusationResult> {
 		// Step 1: 重複チェック
-		// See: features/phase2/ai_accusation.feature @同一ユーザーが同一レスに対して再度告発を試みると拒否される
+		// See: features/ai_accusation.feature @同一ユーザーが同一レスに対して再度告発を試みると拒否される
 		const existingAccusation =
 			await this.accusationRepository.findByAccuserAndTarget(
 				input.accuserId,
@@ -200,7 +200,7 @@ export class AccusationService {
 		}
 
 		// Step 2: 対象レス存在チェック
-		// See: features/phase2/ai_accusation.feature @存在しないレスに対してAI告発を試みるとエラーになる
+		// See: features/ai_accusation.feature @存在しないレスに対してAI告発を試みるとエラーになる
 		const targetPost = await this.postRepository.findById(input.targetPostId);
 
 		if (!targetPost) {
@@ -240,8 +240,8 @@ export class AccusationService {
 		const isBot = botRecord !== null;
 
 		// Step 6: ボーナス計算（accusation-rules 使用、引数でボーナス額を渡す）
-		// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
-		// See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+		// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+		// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
 		const bonus = calculateBonus(
 			isBot,
 			this.bonusConfig.hitBonus,

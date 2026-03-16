@@ -18,7 +18,7 @@ mypage.feature「ユーザーネームに★が含まれる場合は☆に置換
 
 ## 対象BDDシナリオ
 
-- `features/phase1/mypage.feature` — 「ユーザーネームに「★」が含まれる場合は「☆」に置換される」(L28-32)
+- `features/mypage.feature` — 「ユーザーネームに「★」が含まれる場合は「☆」に置換される」(L28-32)
 
 ## 失敗症状
 
@@ -30,7 +30,7 @@ AssertionError: ユーザーネームが "☆最強☆戦士" であることを
 
 ## 必読ドキュメント
 
-1. [必須] `features/phase1/mypage.feature` — 対象シナリオ
+1. [必須] `features/mypage.feature` — 対象シナリオ
 2. [必須] `features/step_definitions/mypage.steps.ts` — ステップ定義
 3. [参考] `src/lib/services/user-service.ts` — ユーザーネーム更新ロジック
 

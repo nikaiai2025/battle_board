@@ -4,7 +4,7 @@
  * 書き込み時に8種のボーナスイベントを判定・付与・記録する。
  * ドメイン層の純粋関数（incentive-rules.ts）を組み合わせてオーケストレーションする。
  *
- * See: features/phase1/incentive.feature @全30シナリオ
+ * See: features/incentive.feature @全30シナリオ
  * See: docs/architecture/components/incentive.md §2 公開インターフェース
  * See: docs/architecture/architecture.md §3.2 IncentiveService / §7.3 遅延評価ボーナス / TDR-004
  */
@@ -50,7 +50,7 @@ import * as CurrencyService from "./currency-service";
  * - 'deferred': 遅延評価ボーナスのみ（INSERT + incrementPostCount後に実行）。hot_post, thread_revival, thread_growth
  * - 'all': 全ボーナスを一括評価（従来互換。BDDステップ定義の直接呼び出し等で使用）
  *
- * See: features/phase1/incentive.feature @PostService経由の統合
+ * See: features/incentive.feature @PostService経由の統合
  * See: docs/architecture/architecture.md §7.3 遅延評価ボーナス
  */
 export type EvaluatePhase = "sync" | "deferred" | "all";
@@ -78,7 +78,7 @@ export interface EvaluateOnPostOptions {
 
 /**
  * 指定した Date の JST 日付文字列（YYYY-MM-DD）を返す。
- * See: features/phase1/incentive.feature（日次ボーナスの日付単位重複チェック）
+ * See: features/incentive.feature（日次ボーナスの日付単位重複チェック）
  *
  * @param date - 対象日時（UTC Date）
  * @returns JST の YYYY-MM-DD 文字列
@@ -98,7 +98,7 @@ export function getTodayJst(date: Date): string {
  * スレッド内のユニーク日次リセットID数を集計する。
  * thread_growth ボーナスのユニークID条件の判定に使用する。
  *
- * See: features/phase1/incentive.feature @立てたスレッドのレス数がマイルストーション達成
+ * See: features/incentive.feature @立てたスレッドのレス数がマイルストーション達成
  *
  * @param posts - スレッドのレス一覧
  * @returns ユニーク dailyId の数
@@ -132,7 +132,7 @@ function countUniqueIds(posts: Post[]): number {
  *   - 個別ボーナスの失敗は catch してログし、他の判定を継続する
  *   - See: docs/architecture/components/incentive.md §5 設計上の判断
  *
- * See: features/phase1/incentive.feature @全30シナリオ
+ * See: features/incentive.feature @全30シナリオ
  * See: docs/architecture/components/incentive.md §2.1 書き込みトリガー型
  *
  * @param ctx - 書き込みコンテキスト
@@ -174,7 +174,7 @@ export async function evaluateOnPost(
 	if (runSync) {
 		// -------------------------------------------------------------------------
 		// ① daily_login: 書き込みログインボーナス
-		// See: features/phase1/incentive.feature Rule: 1日の初回書き込み時に +10 が付与される
+		// See: features/incentive.feature Rule: 1日の初回書き込み時に +10 が付与される
 		// -------------------------------------------------------------------------
 		try {
 			const lastPostDate = user?.lastPostDate ?? null;
@@ -212,7 +212,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ② thread_creation: スレッド作成ログインボーナス
-		// See: features/phase1/incentive.feature Rule: 1日の初回スレッド作成時に +10 が付与される
+		// See: features/incentive.feature Rule: 1日の初回スレッド作成時に +10 が付与される
 		// -------------------------------------------------------------------------
 		if (options.isThreadCreation) {
 			try {
@@ -253,7 +253,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ③ reply: 返信ボーナス（アンカー先レスの作者に付与）
-		// See: features/phase1/incentive.feature Rule: 他人から返信（アンカー付き）が付くと +5
+		// See: features/incentive.feature Rule: 他人から返信（アンカー付き）が付くと +5
 		// -------------------------------------------------------------------------
 		if (ctx.isReplyTo) {
 			try {
@@ -311,7 +311,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ④ new_thread_join: 新スレッド参加ボーナス
-		// See: features/phase1/incentive.feature Rule: 過去に書き込んだことがないスレッドへの初書き込みで +3
+		// See: features/incentive.feature Rule: 過去に書き込んだことがないスレッドへの初書き込みで +3
 		// -------------------------------------------------------------------------
 		try {
 			// スレッドのレス一覧を取得
@@ -332,7 +332,7 @@ export async function evaluateOnPost(
 			// その後 evaluateOnPost を再度 isThreadCreation=true で呼ぶ。
 			// createPost 内の evaluateOnPost が呼ばれた時点でスレッドには今回のレスのみ存在するため、
 			// スレッド作成者かつ今回が初レスの場合はスレッド作成の書き込みと判断してスキップする。
-			// See: features/phase1/incentive.feature Rule: 1日の初回スレッド作成時に +10 が付与される
+			// See: features/incentive.feature Rule: 1日の初回スレッド作成時に +10 が付与される
 			// See: tmp/escalations/escalation_ESC-TASK-019-1.md (副作用の詳細)
 			let isThreadCreatorFirstPost = false;
 			if (existingPostsWithoutCurrent.length === 0) {
@@ -390,7 +390,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ⑤ streak: ストリークボーナス
-		// See: features/phase1/incentive.feature Rule: N日連続で書き込みログインボーナスを獲得するとマイルストーンでボーナス
+		// See: features/incentive.feature Rule: N日連続で書き込みログインボーナスを獲得するとマイルストーンでボーナス
 		// -------------------------------------------------------------------------
 		try {
 			if (user) {
@@ -439,7 +439,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ⑥ milestone_post: キリ番ボーナス
-		// See: features/phase1/incentive.feature Rule: スレッド内のレス番号が100の倍数のとき書き込んだユーザーにボーナス
+		// See: features/incentive.feature Rule: スレッド内のレス番号が100の倍数のとき書き込んだユーザーにボーナス
 		// -------------------------------------------------------------------------
 		try {
 			const milestoneAmount = calcMilestonePostBonus(ctx.postNumber);
@@ -502,7 +502,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ⑦ hot_post: ホットレスボーナス（遅延評価）
-		// See: features/phase1/incentive.feature Rule: 自分の1レスに60分以内に3人以上の異なるIDから返信が付くと +15
+		// See: features/incentive.feature Rule: 自分の1レスに60分以内に3人以上の異なるIDから返信が付くと +15
 		// -------------------------------------------------------------------------
 		try {
 			await evaluateHotPostBonus(
@@ -518,7 +518,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ⑧ thread_revival: スレッド復興ボーナス（遅延評価）
-		// See: features/phase1/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み、30分以内に別ユーザーのレスが付くと +10
+		// See: features/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み、30分以内に別ユーザーのレスが付くと +10
 		// -------------------------------------------------------------------------
 		try {
 			if (thread) {
@@ -540,7 +540,7 @@ export async function evaluateOnPost(
 
 		// -------------------------------------------------------------------------
 		// ⑨ thread_growth: スレッド成長ボーナス（遅延評価）
-		// See: features/phase1/incentive.feature Rule: 立てたスレッドのレス数がマイルストーン達成
+		// See: features/incentive.feature Rule: 立てたスレッドのレス数がマイルストーン達成
 		// -------------------------------------------------------------------------
 		try {
 			if (thread) {
@@ -573,7 +573,7 @@ export async function evaluateOnPost(
  * 現在の書き込みに対してアンカーが向いている過去レスを走査し、
  * 60分以内に3人以上から返信が付いたレスの作者に +15 を付与する。
  *
- * See: features/phase1/incentive.feature Rule: 自分の1レスに60分以内に3人以上の異なるIDから返信が付くと +15
+ * See: features/incentive.feature Rule: 自分の1レスに60分以内に3人以上の異なるIDから返信が付くと +15
  * See: docs/architecture/components/incentive.md §2.2 hot_post
  */
 async function evaluateHotPostBonus(
@@ -663,7 +663,7 @@ async function evaluateHotPostBonus(
  *   このため thread.lastPostAt を使わず、threadPosts の時系列（隣接レス間の間隔）から
  *   低活性期間と復興書き込みを判定する。
  *
- * See: features/phase1/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み、30分以内に別ユーザーのレスが付くと +10
+ * See: features/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み、30分以内に別ユーザーのレスが付くと +10
  * See: docs/architecture/components/incentive.md §2.2 thread_revival
  * See: tmp/escalations/escalation_ESC-TASK-018-2.md (バグ2 の根本原因)
  */
@@ -752,7 +752,7 @@ async function evaluateThreadRevivalBonus(
  * スレッドのレス数がマイルストーン（10件/100件）に達し、
  * ユニークID条件も満たした場合にスレッド作成者に付与する。
  *
- * See: features/phase1/incentive.feature Rule: 立てたスレッドのレス数がマイルストーンに達するとスレッド作成者にボーナスが付与される
+ * See: features/incentive.feature Rule: 立てたスレッドのレス数がマイルストーンに達するとスレッド作成者にボーナスが付与される
  * See: docs/architecture/components/incentive.md §2.2 thread_growth
  */
 async function evaluateThreadGrowthBonus(

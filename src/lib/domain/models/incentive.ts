@@ -2,14 +2,14 @@
  * D-08 Domain Model: Incentive（インセンティブ・ボーナスイベント）
  * See: docs/architecture/components/incentive.md
  * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > incentive_logs
- * See: features/phase1/incentive.feature（8種ボーナスイベント一覧）
+ * See: features/incentive.feature（8種ボーナスイベント一覧）
  * See: docs/requirements/ubiquitous_language.yaml #ストリーク #ホットレス #キリ番
  */
 
 /**
  * ボーナスイベント種別。
  * See: docs/architecture/components/incentive.md §2.2 イベント種別と評価方式の一覧
- * See: features/phase1/incentive.feature
+ * See: features/incentive.feature
  */
 export type IncentiveEventType =
   | "daily_login"         // 書き込みログインボーナス（1日1回 +10）

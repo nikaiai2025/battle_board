@@ -7,7 +7,7 @@
  * 楽観的ロック（deduct）: 単一の Promise チェーンで直列実行して
  * balance >= amount の条件チェックと減算をアトミックに再現する。
  *
- * See: features/phase1/currency.feature
+ * See: features/currency.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
@@ -23,7 +23,7 @@ const store = new Map<string, Currency>()
 /**
  * 楽観的ロックを直列化するための Promise チェーン（ユーザーごと）。
  *
- * See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+ * See: features/currency.feature @同時操作による通貨の二重消費が発生しない
  */
 const deductQueues = new Map<string, Promise<DeductResult>>()
 
@@ -90,7 +90,7 @@ export async function credit(userId: string, amount: number): Promise<void> {
  * balance >= amount の条件を満たす場合のみ減算し、成功/失敗を返す。
  *
  * See: src/lib/infrastructure/repositories/currency-repository.ts
- * See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+ * See: features/currency.feature @同時操作による通貨の二重消費が発生しない
  */
 export async function deduct(userId: string, amount: number): Promise<DeductResult> {
   // 前の deduct 処理が完了してから次を実行するよう直列化する

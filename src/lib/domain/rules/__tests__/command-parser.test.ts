@@ -1,6 +1,6 @@
 /**
  * 単体テスト: command-parser.ts（コマンド解析）
- * See: features/phase2/command_system.feature @command_parsing
+ * See: features/command_system.feature @command_parsing
  * See: docs/architecture/components/command.md §2.3 コマンド解析仕様
  *
  * テスト対象BDDシナリオ:
@@ -53,7 +53,7 @@ describe("parseCommand", () => {
   describe("正常系: 本文中の任意の位置のコマンド検出", () => {
     /**
      * BDDシナリオ「書き込み本文中のコマンドが解析され実行される」に対応
-     * See: features/phase2/command_system.feature
+     * See: features/command_system.feature
      * When 本文に "これAIだろ !tell >>5" を含めて投稿する
      */
     it("前後にテキストがある場合もコマンドを検出する（これAIだろ !tell >>5）", () => {
@@ -94,7 +94,7 @@ describe("parseCommand", () => {
   describe("正常系: 複数コマンド", () => {
     /**
      * BDDシナリオ「1レスに複数のコマンドが含まれる場合は先頭のみ実行される」に対応
-     * See: features/phase2/command_system.feature
+     * See: features/command_system.feature
      * When 本文に "!tell >>5 あと !w >>3 もよろしく" を含めて投稿する
      * Then コマンド "!tell" が対象 ">>5" に対して実行される
      * And "!w" は実行されない
@@ -139,7 +139,7 @@ describe("parseCommand", () => {
   describe("null を返すケース: 未登録コマンド", () => {
     /**
      * BDDシナリオ「存在しないコマンドは無視され通常の書き込みとして扱われる」に対応
-     * See: features/phase2/command_system.feature
+     * See: features/command_system.feature
      * When 本文に "!unknowncommand なんか適当に" を含めて投稿する
      * Then コマンドは実行されない
      */

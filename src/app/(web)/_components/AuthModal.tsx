@@ -14,8 +14,8 @@
  * 3. POST /api/auth/auth-code へ送信
  * 4. 認証成功 → onSuccess() コールバックを呼び出し（呼び出し元が書き込みをリトライ）
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
  * See: docs/specs/screens/auth-code.yaml @SCR-004
  * See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
  */
@@ -159,7 +159,7 @@ export default function AuthModal({
   /**
    * 認証フォーム送信ハンドラ
    *
-   * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+   * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

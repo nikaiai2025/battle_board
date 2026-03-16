@@ -34,7 +34,7 @@ VerifyResult:
 IP不一致時の挙動：`reason: "ip_mismatch"` を返しつつも、**呼び出し元（PostService）はこの場合も処理を続行**する（警告ログ記録のみ）。拒否するかどうかはPostServiceの判断に委ねる。
 
 `not_verified` 時の挙動：PostServiceの `resolveAuth` が認証コード入力ページへの案内を再表示する。
-See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
 
 ```
 issueAuthCode(ipHash: string, edgeToken: string): AuthCodeResult
@@ -57,7 +57,7 @@ VerifyAuthCodeResult:
 
 Turnstile検証はAuthService内でTurnstileClientを呼び出す。外部から見れば「コードとTurnstileトークンを渡すと有効化され、write_tokenが返される」インターフェース。
 検証成功時に `users.is_verified = true` に更新し、write_tokenを `auth_codes` テーブルに保存する。
-See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
 See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
 
 ```

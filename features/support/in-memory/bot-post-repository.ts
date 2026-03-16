@@ -4,7 +4,7 @@
  * BDD テスト用の Supabase 非依存実装。
  * bot-post-repository.ts と同一シグネチャの関数を提供する。
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
@@ -32,7 +32,7 @@ export function reset(): void {
  * テスト用ヘルパー: ボット書き込み紐付けを直接ストアに追加する。
  * BDDステップで「レス >>N はAIボットの書き込みである」を設定する際に使用する。
  *
- * See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+ * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
  */
 export function _insert(postId: string, botId: string): void {
 	store.push({ postId, botId });

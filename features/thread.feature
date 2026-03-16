@@ -1,4 +1,4 @@
-# features/phase1/thread.feature
+# features/thread.feature
 # ステータス: ドラフト v2
 Feature: スレッド管理
 

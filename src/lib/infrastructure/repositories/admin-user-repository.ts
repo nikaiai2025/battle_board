@@ -1,8 +1,8 @@
 /**
  * AdminUserRepository — 管理者ユーザーの永続化・検索を担うリポジトリ
  *
- * See: features/phase1/admin.feature
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/admin.feature
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
  * See: docs/architecture/components/admin.md §3 依存関係
  * See: docs/architecture/architecture.md §5.3 管理者認証
  *
@@ -85,8 +85,8 @@ export async function findById(id: string): Promise<AdminUser | null> {
  * Supabase Auth を使用して管理者のメール・パスワード認証を行う。
  * 認証成功後、admin_users テーブルで管理者ロールを確認する。
  *
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
- * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
  * See: docs/architecture/architecture.md §5.3 管理者認証
  *
  * @param email - 管理者メールアドレス

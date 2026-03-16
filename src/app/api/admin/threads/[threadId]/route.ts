@@ -1,8 +1,8 @@
 /**
  * DELETE /api/admin/threads/{threadId} — スレッド削除（管理者）
  *
- * See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
- * See: features/phase1/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
+ * See: features/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
  * See: docs/specs/openapi.yaml > /api/admin/threads/{threadId}
  * See: docs/architecture/components/admin.md §2 公開インターフェース
  * See: docs/architecture/components/admin.md §5 設計上の判断 > 認証と認可の分離
@@ -29,7 +29,7 @@ import { ADMIN_SESSION_COOKIE } from '@/lib/constants/cookie-names'
 /**
  * DELETE /api/admin/threads/{threadId} — スレッド削除（管理者）
  *
- * See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
  * See: docs/specs/openapi.yaml > /api/admin/threads/{threadId}
  *
  * リクエスト:

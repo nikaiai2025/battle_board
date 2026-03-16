@@ -13,7 +13,7 @@
  * - ポーリング間隔30秒（コスト対応答速度のバランス）
  * - SSRで取得済みのレス群との重複表示を防ぐため、lastPostNumber より大きいものだけ表示
  *
- * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @スレッドのレスが書き込み順に表示される
  * See: docs/architecture/components/web-ui.md §3.2 スレッドページ > ポーリング方式
  */
 

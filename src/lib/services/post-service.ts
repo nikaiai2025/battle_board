@@ -1,10 +1,10 @@
 /**
  * PostService — 書き込み・スレッド管理の統括サービス
  *
- * See: features/phase1/posting.feature
- * See: features/phase1/thread.feature
- * See: features/phase1/incentive.feature @PostService経由の統合
- * See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+ * See: features/posting.feature
+ * See: features/thread.feature
+ * See: features/incentive.feature @PostService経由の統合
+ * See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
  * See: docs/architecture/components/posting.md §2 公開インターフェース
  * See: docs/architecture/components/posting.md §5 システムメッセージの表示方式
  * See: docs/architecture/architecture.md §3.2 PostService
@@ -22,7 +22,7 @@
  *   - 表示名デフォルトは「名無しさん」（ユビキタス言語辞書準拠）
  *   - isBotWrite=true の場合は edge-token 検証をスキップする
  *   - 投稿時の IP 一致チェックは廃止（verifyEdgeToken が「存在 + is_verified」のみで判定する）
- *     See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+ *     See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 
 import type { PostContext } from "../domain/models/incentive";
@@ -70,8 +70,8 @@ export interface PostInput {
 	isBotWrite: boolean;
 	/**
 	 * システムメッセージフラグ（true の場合はコマンド解析・インセンティブ付与をスキップ）。
-	 * See: features/phase2/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
-	 * See: features/phase2/command_system.feature @システムメッセージは書き込み報酬の対象にならない
+	 * See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
+	 * See: features/command_system.feature @システムメッセージは書き込み報酬の対象にならない
 	 */
 	isSystemMessage?: boolean;
 }
@@ -105,12 +105,12 @@ export interface CreateThreadResult {
 /** 表示名のデフォルト値。See: docs/requirements/ubiquitous_language.yaml #名無しさん */
 const DEFAULT_DISPLAY_NAME = "名無しさん";
 
-/** スレッド一覧の最大取得件数。See: features/phase1/thread.feature @最新50件 */
+/** スレッド一覧の最大取得件数。See: features/thread.feature @最新50件 */
 const THREAD_LIST_MAX_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
 // CommandService インスタンス管理
-// See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
 // See: docs/architecture/components/posting.md §3.1 依存先 > CommandService
 // ---------------------------------------------------------------------------
 
@@ -158,8 +158,8 @@ function getTodayJst(): string {
  * IP チェックは廃止。verifyEdgeToken は「edge-token の存在 + is_verified=true」のみで判定する。
  *
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
- * See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
- * See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+ * See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
  *
  * @returns 認証成功時は userId と authorIdSeed、認証フロー起動時は authRequired 情報
@@ -195,7 +195,7 @@ async function resolveAuth(
 		if (verifyResult.reason === "not_verified") {
 			// 未検証（G1 是正）: 認証コード未入力で再書き込みされた場合。
 			// 新規 edge-token の発行は不要。既存の edge-token に紐づく認証コードを再発行する。
-			// See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+			// See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
 			// See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
 			const { code } = await AuthService.issueAuthCode(ipHash, edgeToken);
 			return { authenticated: false, authRequired: { code, edgeToken } };
@@ -238,8 +238,8 @@ async function resolveAuth(
  *  10. スレッド更新（ThreadRepository.incrementPostCount + updateLastPostAt）
  *  11. PostResult 返却
  *
- * See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
- * See: features/phase1/posting.feature @有料ユーザーがユーザーネーム付きで書き込みを行う
+ * See: features/posting.feature @無料ユーザーが書き込みを行う
+ * See: features/posting.feature @有料ユーザーがユーザーネーム付きで書き込みを行う
  * See: docs/architecture/architecture.md §7.1 書き込み + コマンド実行の一体処理
  *
  * @param input - 書き込み入力データ
@@ -298,7 +298,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 
 	// Step 5: コマンド解析 → コマンド実行（方式A: レス内マージ）
 	// システムメッセージにはコマンド解析をスキップする
-	// See: features/phase2/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
+	// See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
 	// See: docs/architecture/components/posting.md §5 方式A
 	let commandResult: CommandExecutionResult | null = null;
 	const isSystemMessage = input.isSystemMessage ?? false;
@@ -327,9 +327,9 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// 結果を inlineSystemInfo に含める。
 	// 遅延評価ボーナス（hot_post, thread_revival, thread_growth）は INSERT + incrementPostCount 後に
 	// Phase 2 として別途実行する（方針A: 二段階評価）。
-	// See: features/phase2/command_system.feature @システムメッセージは書き込み報酬の対象にならない
+	// See: features/command_system.feature @システムメッセージは書き込み報酬の対象にならない
 	// See: docs/architecture/components/incentive.md §5 設計上の判断
-	// See: features/phase1/incentive.feature @PostService経由の統合
+	// See: features/incentive.feature @PostService経由の統合
 	// See: tmp/workers/bdd-architect_TASK-070/analysis.md §4 方針A: 二段階評価
 	let incentiveGranted: { eventType: string; amount: number }[] = [];
 	// INSERT 前のため仮 postId を生成する（IncentiveService 内で incentive_log の contextId に使用される）
@@ -384,8 +384,8 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// Step 8: inlineSystemInfo 構築
 	// コマンド結果 + 書き込み報酬（同期ボーナスのみ）を合成する
 	// 遅延評価ボーナスは他者への付与であり当該書き込みの inlineSystemInfo には含めない
-	// See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
-	// See: features/phase2/command_system.feature @書き込み報酬がレス末尾に表示される
+	// See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+	// See: features/command_system.feature @書き込み報酬がレス末尾に表示される
 	const inlineSystemInfoParts: string[] = [];
 
 	// コマンド結果メッセージを追加
@@ -472,7 +472,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
  *   5. 1レス目を createPost のロジックで書き込み
  *   6. 結果返却
  *
- * See: features/phase1/thread.feature @ログイン済みユーザーがスレッドを作成する
+ * See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
  * See: docs/architecture/components/posting.md §2.3 createThread
  *
  * @param input - スレッド作成入力データ
@@ -486,7 +486,7 @@ export async function createThread(
 	ipHash: string,
 ): Promise<CreateThreadResult> {
 	// Step 1: タイトルバリデーション
-	// See: features/phase1/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
+	// See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
 	const titleValidation = validateThreadTitle(input.title);
 	if (!titleValidation.valid) {
 		return {
@@ -536,7 +536,7 @@ export async function createThread(
 	});
 
 	// Step 5: 1レス目を createPost のロジックで書き込み
-	// See: features/phase1/thread.feature @1件目のレスとして本文が書き込まれる
+	// See: features/thread.feature @1件目のレスとして本文が書き込まれる
 	const postResult = await createPost({
 		threadId: thread.id,
 		body: input.firstPostBody,
@@ -587,7 +587,7 @@ export async function createThread(
 	// Step 6: スレッド作成ボーナス — IncentiveService 呼び出し（isThreadCreation=true）
 	// createPost 内でも evaluateOnPost が呼ばれるが、スレッド作成ボーナスは別途付与が必要
 	// IncentiveService 側の重複ガード（ON CONFLICT DO NOTHING）により二重付与は発生しない
-	// See: features/phase1/incentive.feature @スレッド作成時のボーナス
+	// See: features/incentive.feature @スレッド作成時のボーナス
 	// See: docs/architecture/components/incentive.md §5 インセンティブ失敗は書き込みを巻き戻さない
 	try {
 		const threadCreationContext: PostContext = {
@@ -622,7 +622,7 @@ export async function createThread(
 /**
  * スレッド一覧を取得する（最大50件、last_post_at DESC）。
  *
- * See: features/phase1/thread.feature @スレッド一覧には最新50件のみ表示される
+ * See: features/thread.feature @スレッド一覧には最新50件のみ表示される
  * See: docs/architecture/components/posting.md §2.3 getThreadList
  *
  * @param boardId - 板 ID（例: 'battleboard'）
@@ -640,7 +640,7 @@ export async function getThreadList(
 /**
  * スレッド内のレス一覧を取得する（post_number ASC）。
  *
- * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @スレッドのレスが書き込み順に表示される
  * See: docs/architecture/components/posting.md §2.3 getPostList
  *
  * @param threadId - スレッドの UUID
@@ -658,7 +658,7 @@ export async function getPostList(
 /**
  * スレッドを ID で取得する。
  *
- * See: features/phase1/thread.feature @一覧外のスレッドにURLで直接アクセスできる
+ * See: features/thread.feature @一覧外のスレッドにURLで直接アクセスできる
  * See: docs/architecture/components/posting.md §2.3 getThread
  *
  * @param threadId - スレッドの UUID

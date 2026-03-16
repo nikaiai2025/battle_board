@@ -1,8 +1,8 @@
 /**
  * POST /api/admin/login — 管理者ログイン
  *
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
- * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
  * See: docs/specs/openapi.yaml > /api/admin/login
  * See: docs/architecture/components/authentication.md §2.3 管理者認証
  * See: docs/architecture/components/admin.md §5 設計上の判断 > 認証と認可の分離
@@ -30,7 +30,7 @@ import { ADMIN_SESSION_COOKIE } from '@/lib/constants/cookie-names'
 /**
  * POST /api/admin/login — 管理者ログイン
  *
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
  * See: docs/specs/openapi.yaml > /api/admin/login
  *
  * リクエスト:

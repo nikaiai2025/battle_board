@@ -9,7 +9,7 @@
  *   (userId, eventType, contextId, contextDate) の組み合わせを
  *   重複チェックのキーとして使用する。
  *
- * See: features/phase1/incentive.feature
+ * See: features/incentive.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  * See: task_TASK-016.md §補足・制約 > incentive-log-repository の一意制約
  */

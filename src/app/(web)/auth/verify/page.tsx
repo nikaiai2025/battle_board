@@ -24,9 +24,9 @@
  * - 環境変数 NEXT_PUBLIC_TURNSTILE_SITE_KEY から取得
  * - 未設定の場合はテスト用のダミーキー（1x00000000000000000000AA）を使用
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
- * See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ * See: features/authentication.feature @期限切れ認証コードでは認証できない
  * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
  * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
@@ -75,7 +75,7 @@ interface AuthCodeResponse {
 /**
  * 認証ページコンポーネント
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
  * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
  */
 export default function VerifyPage() {
@@ -212,7 +212,7 @@ function VerifyPageContent() {
    * 成功時は write_token を state に保存して画面に表示する。
    * 失敗時はエラーメッセージを表示する。
    *
-   * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+   * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,7 +249,7 @@ function VerifyPageContent() {
         setWriteToken(data.writeToken ?? null);
       } else {
         // 認証失敗: エラーメッセージを表示
-        // See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+        // See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
         setError(data.error ?? "認証に失敗しました。もう一度お試しください");
 
         // Turnstile ウィジェットをリセット（再試行できるようにする）

@@ -1,8 +1,8 @@
 /**
  * GET /api/threads/{threadId} — スレッド閲覧（レス一覧）
  *
- * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
- * See: features/phase1/thread.feature @一覧外のスレッドにURLで直接アクセスできる
+ * See: features/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @一覧外のスレッドにURLで直接アクセスできる
  * See: docs/specs/openapi.yaml > /api/threads/{threadId}
  * See: docs/architecture/components/posting.md §2.3 getThread / getPostList
  *
@@ -26,7 +26,7 @@ import * as PostService from '@/lib/services/post-service'
 /**
  * GET /api/threads/{threadId} — スレッド詳細とレス一覧取得
  *
- * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @スレッドのレスが書き込み順に表示される
  * See: docs/specs/openapi.yaml > /api/threads/{threadId} > get
  *
  * レスポンス:

@@ -1,9 +1,9 @@
 /**
  * POST /api/threads/{threadId}/posts — 書き込み（レス投稿）
  *
- * See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
- * See: features/phase1/posting.feature @有料ユーザーがユーザーネーム付きで書き込みを行う
- * See: features/phase1/posting.feature @本文が空の場合は書き込みが行われない
+ * See: features/posting.feature @無料ユーザーが書き込みを行う
+ * See: features/posting.feature @有料ユーザーがユーザーネーム付きで書き込みを行う
+ * See: features/posting.feature @本文が空の場合は書き込みが行われない
  * See: docs/specs/openapi.yaml > /api/threads/{threadId}/posts
  * See: docs/architecture/components/posting.md §2.1 PostInput / §2.2 PostResult
  *
@@ -53,7 +53,7 @@ function getIpHash(req: NextRequest): string {
 /**
  * POST /api/threads/{threadId}/posts — レス投稿
  *
- * See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
+ * See: features/posting.feature @無料ユーザーが書き込みを行う
  * See: docs/specs/openapi.yaml > /api/threads/{threadId}/posts > post
  *
  * リクエスト:

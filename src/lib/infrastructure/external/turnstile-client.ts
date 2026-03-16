@@ -1,8 +1,8 @@
 /**
  * TurnstileClient — Cloudflare Turnstile CAPTCHA 検証クライアント
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
  * See: docs/architecture/components/authentication.md §3.1 依存先 > TurnstileClient
  *

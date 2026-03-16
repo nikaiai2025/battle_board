@@ -1,7 +1,7 @@
 /**
  * 単体テスト: CommandService（コマンドレジストリ + ディスパッチ基盤）
  *
- * See: features/phase2/command_system.feature
+ * See: features/command_system.feature
  * See: docs/architecture/components/command.md §2
  *
  * テスト方針:
@@ -220,7 +220,7 @@ commands:
 	// =========================================================================
 
 	describe("!w コマンド（無料コマンド）", () => {
-		it(// See: features/phase2/command_system.feature @無料コマンドは通貨消費なしで実行できる
+		it(// See: features/command_system.feature @無料コマンドは通貨消費なしで実行できる
 		"無料コマンドは通貨消費なしで実行できる（残高0でも実行可能）", async () => {
 			const currencyService = createMockCurrencyService(0); // 残高0
 			const service = new CommandService(currencyService, accusationService);
@@ -266,7 +266,7 @@ commands:
 	// =========================================================================
 
 	describe("!tell コマンド（有料コマンド）", () => {
-		it(// See: features/phase2/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
+		it(// See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
 		"通貨コストが必要な場合は通貨が消費される", async () => {
 			const currencyService = createMockCurrencyService(100);
 			const service = new CommandService(currencyService, accusationService);
@@ -285,7 +285,7 @@ commands:
 			);
 		});
 
-		it(// See: features/phase2/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
+		it(// See: features/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
 		"通貨不足の場合はコマンドが実行されずエラーメッセージが返される", async () => {
 			const currencyService = createMockCurrencyService(5); // 残高5、コスト10
 			const service = new CommandService(currencyService, accusationService);
@@ -348,7 +348,7 @@ commands:
 	// =========================================================================
 
 	describe("未登録コマンド", () => {
-		it(// See: features/phase2/command_system.feature @存在しないコマンドは無視され通常の書き込みとして扱われる
+		it(// See: features/command_system.feature @存在しないコマンドは無視され通常の書き込みとして扱われる
 		"存在しないコマンドの場合は null が返される", async () => {
 			const currencyService = createMockCurrencyService();
 			const service = new CommandService(currencyService, accusationService);
@@ -398,7 +398,7 @@ commands:
 		});
 
 		it("1レスに複数コマンドが含まれる場合は先頭のみ実行される", async () => {
-			// See: features/phase2/command_system.feature @1レスに複数のコマンドが含まれる場合は先頭のみ実行される
+			// See: features/command_system.feature @1レスに複数のコマンドが含まれる場合は先頭のみ実行される
 			const currencyService = createMockCurrencyService(100);
 			const service = new CommandService(currencyService, accusationService);
 

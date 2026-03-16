@@ -114,7 +114,7 @@ function rowToAuthCode(row: AuthCodeRow): AuthCode {
  * writeToken, writeTokenExpiresAt は認証完了後に updateWriteToken で設定するため、
  * 初回作成時は NULL（省略時デフォルト）となる。
  *
- * See: features/phase1/authentication.feature @認証フロー是正
+ * See: features/authentication.feature @認証フロー是正
  *
  * @param authCode 作成する認証コードデータ（id, createdAt を除く）
  * @returns 作成された認証コードレコード

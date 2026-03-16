@@ -1,4 +1,4 @@
-# features/phase2/command_system.feature
+# features/command_system.feature
 # ステータス: ドラフト v4
 #
 # Phase 2スコープ: !tell, !w のみ実装

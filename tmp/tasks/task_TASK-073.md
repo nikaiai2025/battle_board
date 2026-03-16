@@ -40,14 +40,14 @@ evaluateOnPostを2段階に分割する:
 ## 必読ドキュメント
 
 1. [必須] `tmp/workers/bdd-architect_TASK-070/analysis.md` — 根本原因分析（全セクション必読）
-2. [必須] `features/phase1/incentive.feature` — 対象シナリオ
+2. [必須] `features/incentive.feature` — 対象シナリオ
 3. [必須] `src/lib/services/post-service.ts` — PostService.createPost のフロー
 4. [必須] `src/lib/services/incentive-service.ts` — IncentiveService
 5. [必須] `features/step_definitions/incentive.steps.ts` — ステップ定義
 
 ## 対象BDDシナリオ
 
-- `features/phase1/incentive.feature` の以下7シナリオ:
+- `features/incentive.feature` の以下7シナリオ:
   1. スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス (L80)
   2. スレッドにレスが100個付き、ユニークID 10個以上で +100 ボーナス (L98)
   3. 60分以内に3人以上から返信が付くと +15 ボーナスが付与される (L156)

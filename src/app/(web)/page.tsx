@@ -8,8 +8,8 @@
  *
  * ルート: / （(web) ルートグループのため `/` にマッピングされる）
  *
- * See: features/phase1/thread.feature @スレッド一覧にスレッドの基本情報が表示される
- * See: features/phase1/thread.feature @スレッドが0件の場合はメッセージが表示される
+ * See: features/thread.feature @スレッド一覧にスレッドの基本情報が表示される
+ * See: features/thread.feature @スレッドが0件の場合はメッセージが表示される
  * See: docs/specs/screens/thread-list.yaml @SCR-001
  * See: docs/architecture/components/web-ui.md §2 SSR方式 > スレッド一覧表示
  * See: docs/architecture/components/web-ui.md §3.1 スレッド一覧ページ

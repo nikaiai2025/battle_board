@@ -43,7 +43,7 @@ Before(async function (this: BattleBoardWorld, scenario: any) {
 	resetAllStores();
 
 	// AI告発シナリオの共有状態をリセットする（TASK-079 で追加）
-	// See: features/phase2/ai_accusation.feature
+	// See: features/ai_accusation.feature
 	// ai_accusation.feature のシナリオは accusationState.active = true にする。
 	// これにより "{string} を実行する" When ステップで !tell コマンドの
 	// ルーティングを AccusationService 直接呼び出しに切り替える。
@@ -63,7 +63,7 @@ Before(async function (this: BattleBoardWorld, scenario: any) {
 	// common.steps.ts の「ユーザーの通貨残高が N である」ステップが
 	// this.currentUserId を前提とするため、ここで事前にユーザーを生成する。
 	// デフォルト残高を200に設定（通貨残高指定のないシナリオでも告発可能にする）。
-	// See: features/phase2/ai_accusation.feature
+	// See: features/ai_accusation.feature
 	if (isAccusationScenario) {
 		const { InMemoryCurrencyRepo, InMemoryUserRepo } =
 			require("./mock-installer");

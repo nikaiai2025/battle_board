@@ -7,8 +7,8 @@
  * - dangerouslySetInnerHTML 禁止（白スペース表示は white-space: pre-wrap で対応）
  * - 日時フォーマット: YYYY/MM/DD(ddd) HH:mm:ss
  *
- * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
- * See: features/phase1/thread.feature @レス内のアンカーで他のレスを参照できる
+ * See: features/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @レス内のアンカーで他のレスを参照できる
  * See: docs/specs/screens/thread-view.yaml > elements > post-list > itemTemplate
  * See: docs/architecture/components/web-ui.md §6 > dangerouslySetInnerHTML使用禁止
  */
@@ -68,7 +68,7 @@ export function formatDateTime(dateStr: string): string {
  * dangerouslySetInnerHTML を使わずに Reactの標準エスケープを利用する。
  * >> の後に続く数字列をページ内リンク（#post-N）に変換する。
  *
- * See: features/phase1/thread.feature @レス内のアンカーで他のレスを参照できる
+ * See: features/thread.feature @レス内のアンカーで他のレスを参照できる
  * See: docs/architecture/components/web-ui.md §6 > dangerouslySetInnerHTML使用禁止
  *
  * @param body - 本文テキスト

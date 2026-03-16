@@ -1,7 +1,7 @@
 /**
  * 単体テスト: accusation-rules（AI告発の判定純粋関数）
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2
  *
  * テスト方針:
@@ -45,7 +45,7 @@ describe("checkAccusationAllowed", () => {
 	// -----------------------------------------------------------------------
 
 	it("他人の通常レスへの告発は許可される", () => {
-		// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+		// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 		const input: AccusationCheckInput = {
 			accuserId: "user-001",
 			targetAuthorId: "user-002",
@@ -75,7 +75,7 @@ describe("checkAccusationAllowed", () => {
 	// -----------------------------------------------------------------------
 
 	it("自分自身の書き込みへの告発は拒否される", () => {
-		// See: features/phase2/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
+		// See: features/ai_accusation.feature @自分の書き込みに対してAI告発を試みると拒否される
 		const input: AccusationCheckInput = {
 			accuserId: "user-001",
 			targetAuthorId: "user-001",
@@ -95,7 +95,7 @@ describe("checkAccusationAllowed", () => {
 	// -----------------------------------------------------------------------
 
 	it("システムメッセージへの告発は拒否される", () => {
-		// See: features/phase2/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
+		// See: features/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
 		const input: AccusationCheckInput = {
 			accuserId: "user-001",
 			targetAuthorId: null,
@@ -168,7 +168,7 @@ describe("checkAccusationAllowed", () => {
 
 describe("calculateBonus", () => {
 	it("hit（AIボット）の場合、告発者にhitBonusが付与される", () => {
-		// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+		// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 		const result = calculateBonus(true, HIT_BONUS, FALSE_ACCUSATION_BONUS);
 
 		expect(result.accuserBonus).toBe(HIT_BONUS);
@@ -176,7 +176,7 @@ describe("calculateBonus", () => {
 	});
 
 	it("miss（人間）の場合、被告発者にfalseAccusationBonusが付与される", () => {
-		// See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+		// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
 		const result = calculateBonus(false, HIT_BONUS, FALSE_ACCUSATION_BONUS);
 
 		expect(result.accuserBonus).toBe(0);
@@ -217,7 +217,7 @@ describe("calculateBonus", () => {
 
 describe("buildHitSystemMessage", () => {
 	it("告発成功のシステムメッセージに告発者のdailyIdが含まれる", () => {
-		// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+		// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 		const message = buildHitSystemMessage("AbCd1234", 5, 20);
 
 		expect(message).toContain("AbCd1234");
@@ -266,7 +266,7 @@ describe("buildHitSystemMessage", () => {
 
 describe("buildMissSystemMessage", () => {
 	it("冤罪のシステムメッセージに告発者のdailyIdが含まれる", () => {
-		// See: features/phase2/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+		// See: features/ai_accusation.feature @AI告発に失敗すると冤罪ボーナスが被告発者に付与される
 		const message = buildMissSystemMessage("AbCd1234", 5, "XyZw5678", 10, 10);
 
 		expect(message).toContain("AbCd1234");

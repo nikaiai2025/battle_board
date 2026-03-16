@@ -1,9 +1,9 @@
 /**
  * 単体テスト: post-service.ts（PostService）
  *
- * See: features/phase1/posting.feature
- * See: features/phase1/thread.feature
- * See: features/phase1/incentive.feature @PostService経由の統合
+ * See: features/posting.feature
+ * See: features/thread.feature
+ * See: features/incentive.feature @PostService経由の統合
  * See: docs/architecture/components/posting.md §2 公開インターフェース
  *
  * テスト方針:
@@ -170,7 +170,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("正常系: 認証済み無料ユーザーが書き込みを行う", () => {
-			// See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
+			// See: features/posting.feature @無料ユーザーが書き込みを行う
 
 			it("書き込みが成功し PostResult(success:true) を返す", async () => {
 				// Arrange
@@ -208,7 +208,7 @@ describe("PostService", () => {
 			});
 
 			it("表示名のデフォルトは「名無しさん」である", async () => {
-				// See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
+				// See: features/posting.feature @無料ユーザーが書き込みを行う
 				vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
 					valid: true,
 					userId: "user-001",
@@ -239,7 +239,7 @@ describe("PostService", () => {
 			});
 
 			it("日次リセットIDが生成されレスに付与される", async () => {
-				// See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
+				// See: features/posting.feature @無料ユーザーが書き込みを行う
 				vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
 					valid: true,
 					userId: "user-001",
@@ -312,7 +312,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("正常系: 認証済み有料ユーザーがユーザーネーム付きで書き込む", () => {
-			// See: features/phase1/posting.feature @有料ユーザーがユーザーネーム付きで書き込みを行う
+			// See: features/posting.feature @有料ユーザーがユーザーネーム付きで書き込みを行う
 
 			it("有料ユーザーのユーザーネームが表示名として使用される", async () => {
 				const premiumPost = {
@@ -475,7 +475,7 @@ describe("PostService", () => {
 			});
 
 			it("edge-token が not_verified の場合は既存 edge-token を維持して認証コードを再発行する（G1 是正）", async () => {
-				// See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+				// See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
 				vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
 					valid: false,
 					reason: "not_verified",
@@ -514,7 +514,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("IPアドレスが変わっても認証済みなら書き込みが成功する", () => {
-			// See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+			// See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
 			// 投稿時の IP チェックは廃止。verifyEdgeToken は「存在 + is_verified」のみで判定する。
 
 			it("IPが変わっても is_verified=true なら書き込みが成功する", async () => {
@@ -554,7 +554,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("バリデーション: 本文が空の場合はエラーを返す", () => {
-			// See: features/phase1/posting.feature @本文が空の場合は書き込みが行われない
+			// See: features/posting.feature @本文が空の場合は書き込みが行われない
 
 			it("空文字列の本文でエラーを返す", async () => {
 				const result = await createPost({
@@ -622,7 +622,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("IncentiveService 統合: 書き込み成功後に evaluateOnPost が呼ばれる", () => {
-			// See: features/phase1/incentive.feature @PostService経由の統合
+			// See: features/incentive.feature @PostService経由の統合
 			// See: docs/architecture/components/incentive.md §5 設計上の判断
 
 			it("createPost 成功後に IncentiveService.evaluateOnPost が呼ばれる", async () => {
@@ -716,7 +716,7 @@ describe("PostService", () => {
 			});
 
 			it("アンカー（>>N）を含む本文では isReplyTo に対象レスIDが設定される", async () => {
-				// See: features/phase1/incentive.feature @返信ボーナス
+				// See: features/incentive.feature @返信ボーナス
 				const anchorTargetPost: Post = {
 					id: "post-target-001",
 					threadId: "thread-001",
@@ -1046,7 +1046,7 @@ describe("PostService", () => {
 
 		// -----------------------------------------------------------------------
 		// CommandService 統合: コマンド解析と inlineSystemInfo 設定
-		// See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+		// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
 		// See: docs/architecture/components/posting.md §5 方式A
 		// -----------------------------------------------------------------------
 
@@ -1091,7 +1091,7 @@ describe("PostService", () => {
 			});
 
 			it("CommandService がコマンドを検出した場合、結果が inlineSystemInfo に設定される", async () => {
-				// See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+				// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
 				setupAuthenticatedUser();
 				const mockCommandService = {
 					executeCommand: vi.fn().mockResolvedValue({
@@ -1130,7 +1130,7 @@ describe("PostService", () => {
 			});
 
 			it("CommandService がコマンドを検出しない場合は inlineSystemInfo が null になる", async () => {
-				// See: features/phase2/command_system.feature @存在しないコマンドは無視され通常の書き込みとして扱われる
+				// See: features/command_system.feature @存在しないコマンドは無視され通常の書き込みとして扱われる
 				setupAuthenticatedUser();
 				const mockCommandService = {
 					executeCommand: vi.fn().mockResolvedValue(null),
@@ -1154,7 +1154,7 @@ describe("PostService", () => {
 			});
 
 			it("isSystemMessage=true の場合はコマンド解析をスキップする", async () => {
-				// See: features/phase2/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
+				// See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
 				setupAuthenticatedUser();
 				const mockCommandService = {
 					executeCommand: vi.fn(),
@@ -1182,7 +1182,7 @@ describe("PostService", () => {
 			});
 
 			it("isSystemMessage=true の場合は IncentiveService もスキップする", async () => {
-				// See: features/phase2/command_system.feature @システムメッセージは書き込み報酬の対象にならない
+				// See: features/command_system.feature @システムメッセージは書き込み報酬の対象にならない
 				setupAuthenticatedUser();
 				const { setCommandService } = await import("../post-service");
 				setCommandService(null);
@@ -1224,7 +1224,7 @@ describe("PostService", () => {
 			});
 
 			it("コマンド結果とインセンティブ報酬の両方が inlineSystemInfo に含まれる", async () => {
-				// See: features/phase2/command_system.feature
+				// See: features/command_system.feature
 				// 完了条件: コマンド実行結果 + 書き込み報酬が両方ある場合、両方がinlineSystemInfoに含まれる
 				setupAuthenticatedUser();
 				const mockCommandService = {
@@ -1277,7 +1277,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("正常系: スレッド作成が成功する", () => {
-			// See: features/phase1/thread.feature @ログイン済みユーザーがスレッドを作成する
+			// See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
 
 			it("スレッドが作成され、1レス目が書き込まれる", async () => {
 				vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
@@ -1349,7 +1349,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("バリデーション: タイトルが空の場合はエラーを返す", () => {
-			// See: features/phase1/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
+			// See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
 
 			it("空タイトルでエラーを返す", async () => {
 				const result = await createThread(
@@ -1384,7 +1384,7 @@ describe("PostService", () => {
 		});
 
 		describe("バリデーション: タイトルが上限文字数超過の場合はエラーを返す", () => {
-			// See: features/phase1/thread.feature @スレッドタイトルが上限文字数を超えている場合はエラーになる
+			// See: features/thread.feature @スレッドタイトルが上限文字数を超えている場合はエラーになる
 
 			it("97文字以上のタイトルでエラーを返す", async () => {
 				const longTitle = "あ".repeat(97);
@@ -1462,7 +1462,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("IncentiveService 統合: createThread 成功後に isThreadCreation=true で evaluateOnPost が呼ばれる", () => {
-			// See: features/phase1/incentive.feature @スレッド作成時のボーナス
+			// See: features/incentive.feature @スレッド作成時のボーナス
 			// See: docs/architecture/components/incentive.md §2.2 イベント種別 thread_creation
 
 			it("createThread 成功後に isThreadCreation:true で IncentiveService.evaluateOnPost が呼ばれる", async () => {
@@ -1585,7 +1585,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("正常系: スレッド一覧を返す", () => {
-			// See: features/phase1/thread.feature @スレッド一覧にスレッドの基本情報が表示される
+			// See: features/thread.feature @スレッド一覧にスレッドの基本情報が表示される
 
 			it("スレッド一覧（Thread 配列）を返す", async () => {
 				const mockThreads = [mockThread];
@@ -1603,7 +1603,7 @@ describe("PostService", () => {
 			});
 
 			it("最大50件制限が適用される", async () => {
-				// See: features/phase1/thread.feature @スレッド一覧には最新50件のみ表示される
+				// See: features/thread.feature @スレッド一覧には最新50件のみ表示される
 				const many = Array.from({ length: 50 }, (_, i) => ({
 					...mockThread,
 					id: `thread-${i + 1}`,
@@ -1633,7 +1633,7 @@ describe("PostService", () => {
 			});
 
 			it("スレッドが0件の場合は空配列を返す", async () => {
-				// See: features/phase1/thread.feature @スレッドが0件の場合はメッセージが表示される
+				// See: features/thread.feature @スレッドが0件の場合はメッセージが表示される
 				vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([]);
 
 				const result = await getThreadList("battleboard");
@@ -1669,7 +1669,7 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("正常系: レス一覧を post_number ASC で返す", () => {
-			// See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
+			// See: features/thread.feature @スレッドのレスが書き込み順に表示される
 
 			it("レス一覧（Post 配列）を返す", async () => {
 				const mockPosts = [

@@ -5,8 +5,8 @@
  * - サイトタイトル「BattleBoard」表示
  * - 認証済みの場合のみ「マイページ」リンクを表示
  *
- * See: features/phase1/thread.feature
- * See: features/phase1/authentication.feature
+ * See: features/thread.feature
+ * See: features/authentication.feature
  * See: docs/specs/screens/thread-list.yaml > elements > header
  */
 

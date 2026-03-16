@@ -13,7 +13,7 @@
  *   - 存在しないレスに対してAI告発を試みるとエラーになる
  *   - システムメッセージに対してAI告発を試みると拒否される
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/bdd_test_strategy.md
  */
 
@@ -136,7 +136,7 @@ async function ensureUserAndThread(world: BattleBoardWorld): Promise<void> {
  * BDDステップでこの変換を担う。
  *
  * See: src/lib/services/handlers/tell-handler.ts > Note
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  */
 export async function executeTellCommand(
 	world: BattleBoardWorld,
@@ -501,7 +501,7 @@ When(
 
 // ---------------------------------------------------------------------------
 // Then: 通貨が N 消費され残高が M になる
-// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 // ---------------------------------------------------------------------------
 
 Then(
@@ -578,7 +578,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: 告発成功ボーナス N が告発者に付与され残高が M になる
-// See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 // ---------------------------------------------------------------------------
 
 Then(

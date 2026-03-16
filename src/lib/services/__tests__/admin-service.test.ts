@@ -1,7 +1,7 @@
 /**
  * 単体テスト: admin-service.ts（AdminService）
  *
- * See: features/phase1/admin.feature
+ * See: features/admin.feature
  * See: docs/architecture/components/admin.md §2 公開インターフェース
  *
  * テスト方針:
@@ -28,7 +28,7 @@ vi.mock("@/lib/infrastructure/repositories/thread-repository", () => ({
 }));
 
 // PostService をモック化する（AdminService が createPost を使ってシステムレスを挿入するため）
-// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 vi.mock("@/lib/services/post-service", () => ({
 	createPost: vi.fn(),
 }));
@@ -92,7 +92,7 @@ describe("AdminService", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		// PostService.createPost のデフォルトモック（システムレス挿入用）
-		// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+		// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 		vi.mocked(PostService.createPost).mockResolvedValue({
 			success: true,
 			postId: "system-post-uuid-001",
@@ -112,7 +112,7 @@ describe("AdminService", () => {
 
 		describe("正常系: レスが存在する場合", () => {
 			it("存在するレスを削除すると success: true を返す", async () => {
-				// See: features/phase1/admin.feature @管理者が指定したレスを削除する
+				// See: features/admin.feature @管理者が指定したレスを削除する
 				const post = makePost({ id: "post-uuid-001" });
 				vi.mocked(PostRepository.findById).mockResolvedValue(post);
 				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
@@ -123,7 +123,7 @@ describe("AdminService", () => {
 			});
 
 			it("削除時に PostRepository.softDelete を正しい postId で呼び出す", async () => {
-				// See: features/phase1/admin.feature @管理者が指定したレスを削除する
+				// See: features/admin.feature @管理者が指定したレスを削除する
 				// See: docs/architecture/components/admin.md §4 > ソフトデリートのみ
 				const post = makePost({ id: "post-uuid-001" });
 				vi.mocked(PostRepository.findById).mockResolvedValue(post);
@@ -166,7 +166,7 @@ describe("AdminService", () => {
 
 		describe("異常系: レスが存在しない場合", () => {
 			it("存在しないレスの削除は not_found を返す", async () => {
-				// See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+				// See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
 				vi.mocked(PostRepository.findById).mockResolvedValue(null);
 
 				const result = await deletePost(
@@ -181,7 +181,7 @@ describe("AdminService", () => {
 			});
 
 			it("存在しないレスの場合は softDelete を呼び出さない", async () => {
-				// See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+				// See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
 				vi.mocked(PostRepository.findById).mockResolvedValue(null);
 
 				await deletePost("non-existent-post-uuid", "admin-uuid-001");
@@ -246,13 +246,13 @@ describe("AdminService", () => {
 
 		// -----------------------------------------------------------------------
 		// システムレス挿入（方式B: 独立システムレス）
-		// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+		// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 		// See: docs/architecture/components/posting.md §5 方式B
 		// -----------------------------------------------------------------------
 
 		describe("システムレス挿入: 削除時に「★システム」名義のレスが追加される", () => {
 			it("削除時にcreatePostで★システム名義のシステムレスが挿入される", async () => {
-				// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+				// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 				const post = makePost({
 					id: "post-uuid-001",
 					threadId: "thread-uuid-001",
@@ -273,7 +273,7 @@ describe("AdminService", () => {
 			});
 
 			it("commentが指定された場合、コメント内容がシステムレス本文に設定される", async () => {
-				// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+				// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 				const post = makePost({ id: "post-uuid-001" });
 				vi.mocked(PostRepository.findById).mockResolvedValue(post);
 				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
@@ -293,7 +293,7 @@ describe("AdminService", () => {
 			});
 
 			it("commentが未指定の場合、フォールバックメッセージがシステムレス本文に設定される", async () => {
-				// See: features/phase2/command_system.feature @管理者がコメントなしでレス削除した場合はフォールバックメッセージで通知される
+				// See: features/command_system.feature @管理者がコメントなしでレス削除した場合はフォールバックメッセージで通知される
 				const post = makePost({ id: "post-uuid-001" });
 				vi.mocked(PostRepository.findById).mockResolvedValue(post);
 				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
@@ -335,7 +335,7 @@ describe("AdminService", () => {
 
 		describe("正常系: スレッドが存在する場合", () => {
 			it("存在するスレッドを削除すると success: true を返す", async () => {
-				// See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+				// See: features/admin.feature @管理者が指定したスレッドを削除する
 				const thread = makeThread({ id: "thread-uuid-001" });
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
@@ -348,7 +348,7 @@ describe("AdminService", () => {
 			});
 
 			it("スレッド削除時に ThreadRepository.softDelete を呼び出す", async () => {
-				// See: features/phase1/admin.feature @スレッドとその中の全レスが削除される
+				// See: features/admin.feature @スレッドとその中の全レスが削除される
 				const thread = makeThread({ id: "thread-uuid-001" });
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
@@ -364,7 +364,7 @@ describe("AdminService", () => {
 			});
 
 			it("スレッド内の全レスをソフトデリートする", async () => {
-				// See: features/phase1/admin.feature @スレッドとその中の全レスが削除される
+				// See: features/admin.feature @スレッドとその中の全レスが削除される
 				const thread = makeThread({ id: "thread-uuid-001" });
 				const posts = [
 					makePost({ id: "post-uuid-001", threadId: "thread-uuid-001" }),

@@ -17,14 +17,14 @@ locked_files:
 CommandService（コマンドレジストリ + ディスパッチ）と !w（草）ハンドラを実装する。config/commands.yamlからコマンド設定を読み込み、CommandHandlerRegistryを構築し、executeCommand でコマンドを実行する基盤を完成させる。
 
 ## 対象BDDシナリオ
-- `features/phase2/command_system.feature`
+- `features/command_system.feature`
   - 「無料コマンドは通貨消費なしで実行できる」（!w）
   - 「コマンド実行に通貨コストが必要な場合は通貨が消費される」（コスト引き落とし基盤）
   - 「通貨不足でコマンドが実行できない場合はエラーになる」（残高不足チェック）
 
 ## 必読ドキュメント（優先度順）
 1. [必須] `docs/architecture/components/command.md` — §2.1 主要操作、§2.2 2層構造
-2. [必須] `features/phase2/command_system.feature` — BDDシナリオ
+2. [必須] `features/command_system.feature` — BDDシナリオ
 3. [必須] `src/lib/domain/models/command.ts` — Command, ParsedCommand型
 4. [必須] `src/lib/domain/rules/command-parser.ts` — TASK-067で実装済みのパーサー
 5. [必須] `config/commands.yaml` — コマンド設定

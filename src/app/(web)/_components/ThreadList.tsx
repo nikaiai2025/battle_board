@@ -4,8 +4,8 @@
  * スレッドデータを受け取り、ThreadCard のリストとしてレンダリングする。
  * スレッドが0件の場合は「スレッドがありません」メッセージを表示。
  *
- * See: features/phase1/thread.feature @スレッド一覧にスレッドの基本情報が表示される
- * See: features/phase1/thread.feature @スレッドが0件の場合はメッセージが表示される
+ * See: features/thread.feature @スレッド一覧にスレッドの基本情報が表示される
+ * See: features/thread.feature @スレッドが0件の場合はメッセージが表示される
  * See: docs/specs/screens/thread-list.yaml > elements > thread-list
  */
 

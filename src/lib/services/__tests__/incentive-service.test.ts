@@ -1,7 +1,7 @@
 /**
  * 単体テスト: incentive-service.ts（IncentiveService）
  *
- * See: features/phase1/incentive.feature @全30シナリオ
+ * See: features/incentive.feature @全30シナリオ
  * See: docs/architecture/components/incentive.md §2 公開インターフェース
  *
  * テスト方針:
@@ -174,7 +174,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('daily_login ボーナス', () => {
     describe('正常系: 当日初回書き込み', () => {
       it('lastPostDate が null（初回書き込み）の場合、+10 が付与される', async () => {
-        // See: features/phase1/incentive.feature @その日の初回書き込みでログインボーナス +10 が付与される
+        // See: features/incentive.feature @その日の初回書き込みでログインボーナス +10 が付与される
         vi.mocked(UserRepository.findById).mockResolvedValue(
           makeUser({ lastPostDate: null })
         )
@@ -204,7 +204,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 同日2回目以降の書き込み', () => {
       it('lastPostDate が今日の場合、daily_login はスキップされる', async () => {
-        // See: features/phase1/incentive.feature @同日の2回目以降の書き込みではボーナスは付与されない
+        // See: features/incentive.feature @同日の2回目以降の書き込みではボーナスは付与されない
         // JST 日付を固定するため、createdAt を '2026-03-09T01:00:00Z'（JST: 2026-03-09 10:00）に設定
         vi.mocked(UserRepository.findById).mockResolvedValue(
           makeUser({ lastPostDate: '2026-03-09' })
@@ -227,7 +227,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('thread_creation ボーナス', () => {
     describe('正常系: 当日初回スレッド作成', () => {
       it('isThreadCreation=true かつ当日スレッド作成ログがない場合、+10 が付与される', async () => {
-        // See: features/phase1/incentive.feature @その日の初回スレッド作成でボーナス +10 が付与される
+        // See: features/incentive.feature @その日の初回スレッド作成でボーナス +10 が付与される
         vi.mocked(IncentiveLogRepository.findByUserIdAndDate).mockResolvedValue([])
         vi.mocked(IncentiveLogRepository.create).mockResolvedValue(makeIncentiveLog({
           eventType: 'thread_creation',
@@ -246,7 +246,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 同日2回目以降のスレッド作成', () => {
       it('当日すでにスレッド作成ログがある場合、thread_creation はスキップされる', async () => {
-        // See: features/phase1/incentive.feature @同日の2回目以降のスレッド作成ではボーナスは付与されない
+        // See: features/incentive.feature @同日の2回目以降のスレッド作成ではボーナスは付与されない
         vi.mocked(IncentiveLogRepository.findByUserIdAndDate).mockResolvedValue([
           makeIncentiveLog({ eventType: 'thread_creation', amount: 10 }),
         ])
@@ -276,7 +276,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('reply ボーナス（アンカー先レス作者への付与）', () => {
     describe('正常系: 他者からの返信', () => {
       it('isReplyTo が設定されていて、アンカー先ユーザーが返信者と異なる場合、アンカー先ユーザーに +5 が付与される', async () => {
-        // See: features/phase1/incentive.feature @他のユーザーから返信が付くと +5 ボーナスが付与される
+        // See: features/incentive.feature @他のユーザーから返信が付くと +5 ボーナスが付与される
         const replyTargetPost = makePost({
           id: 'post-target',
           authorId: 'user-b',  // アンカー先は別ユーザー
@@ -300,7 +300,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 自己返信', () => {
       it('書き込みユーザーとアンカー先ユーザーが同じ場合、reply はスキップされる', async () => {
-        // See: features/phase1/incentive.feature @自分自身への返信ではボーナスは付与されない
+        // See: features/incentive.feature @自分自身への返信ではボーナスは付与されない
         const replyTargetPost = makePost({
           id: 'post-target',
           authorId: 'user-a',  // 自分のレスへの返信
@@ -319,7 +319,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 同一IDからの重複返信', () => {
       it('当日すでに同一ユーザー（user-a）から user-b へ返信ボーナスが付与済みの場合、スキップされる', async () => {
-        // See: features/phase1/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
+        // See: features/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
         const replyTargetPost = makePost({
           id: 'post-target',
           authorId: 'user-b',
@@ -367,7 +367,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('new_thread_join ボーナス', () => {
     describe('正常系: 初参加スレッド', () => {
       it('スレッドへの初書き込みで +3 が付与される', async () => {
-        // See: features/phase1/incentive.feature @未参加のスレッドに初めて書き込むと +3 ボーナスが付与される
+        // See: features/incentive.feature @未参加のスレッドに初めて書き込むと +3 ボーナスが付与される
         // スレッドのレス一覧に書き込みユーザーのレスが存在しない（初参加）
         // incentive-service.ts はスレッド作成者の初レスを new_thread_join 対象外とするため、
         // thread.createdBy を ctx.userId と異なるユーザーに設定して「他ユーザー作成スレッドへの初参加」を再現する
@@ -389,7 +389,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 既参加スレッド', () => {
       it('スレッドに既存のレスがある場合（2回目以降）、new_thread_join はスキップされる', async () => {
-        // See: features/phase1/incentive.feature @同一スレッドへの2回目の書き込みではボーナスは付与されない
+        // See: features/incentive.feature @同一スレッドへの2回目の書き込みではボーナスは付与されない
         vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
           makePost({ authorId: 'user-a' }),  // 既にuser-aのレスがある
         ])
@@ -403,7 +403,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 日次上限（3スレッド）', () => {
       it('当日すでに3スレッドへ初参加済みの場合、new_thread_join はスキップされる', async () => {
-        // See: features/phase1/incentive.feature @同日4スレッド目の初参加ではボーナスは付与されない
+        // See: features/incentive.feature @同日4スレッド目の初参加ではボーナスは付与されない
         vi.mocked(PostRepository.findByThreadId).mockResolvedValue([])
         vi.mocked(IncentiveLogRepository.findByUserIdAndDate).mockResolvedValue([
           makeIncentiveLog({ eventType: 'new_thread_join' }),
@@ -426,7 +426,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('streak ボーナス', () => {
     describe('正常系: 7日連続でマイルストーン到達', () => {
       it('6日連続 → 7日目の初回書き込みで +20 が付与される', async () => {
-        // See: features/phase1/incentive.feature @7日連続書き込みで +20 ストリークボーナスが付与される
+        // See: features/incentive.feature @7日連続書き込みで +20 ストリークボーナスが付与される
         vi.mocked(UserRepository.findById).mockResolvedValue(
           makeUser({ streakDays: 6, lastPostDate: '2026-03-08' })
         )
@@ -443,7 +443,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('正常系: 30日連続でマイルストーン到達', () => {
       it('29日連続 → 30日目の初回書き込みで +100 が付与される', async () => {
-        // See: features/phase1/incentive.feature @30日連続書き込みで +100 ストリークボーナスが付与される
+        // See: features/incentive.feature @30日連続書き込みで +100 ストリークボーナスが付与される
         vi.mocked(UserRepository.findById).mockResolvedValue(
           makeUser({ streakDays: 29, lastPostDate: '2026-03-08' })
         )
@@ -459,7 +459,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: ストリークリセット', () => {
       it('2日以上連続しなかった場合、ストリークがリセットされボーナスは付与されない', async () => {
-        // See: features/phase1/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
+        // See: features/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
         vi.mocked(UserRepository.findById).mockResolvedValue(
           makeUser({ streakDays: 5, lastPostDate: '2026-03-07' }) // 2日前
         )
@@ -505,7 +505,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('milestone_post ボーナス', () => {
     describe('正常系: レス番号 100（+10）', () => {
       it('postNumber=100 のとき +10 が付与される', async () => {
-        // See: features/phase1/incentive.feature @レス番号 >>100 を踏むと +10 ボーナスが付与される
+        // See: features/incentive.feature @レス番号 >>100 を踏むと +10 ボーナスが付与される
         const ctx = makeCtx({ postNumber: 100 })
         const result = await evaluateOnPost(ctx)
 
@@ -518,7 +518,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('正常系: レス番号 1000（+100）', () => {
       it('postNumber=1000 のとき +100 が付与される', async () => {
-        // See: features/phase1/incentive.feature @レス番号 >>1000 を踏むと +100 ボーナスが付与される
+        // See: features/incentive.feature @レス番号 >>1000 を踏むと +100 ボーナスが付与される
         const ctx = makeCtx({ postNumber: 1000 })
         const result = await evaluateOnPost(ctx)
 
@@ -530,7 +530,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: キリ番でない場合', () => {
       it('postNumber=50 のとき milestone_post は付与されない', async () => {
-        // See: features/phase1/incentive.feature @100の倍数でないレス番号ではキリ番ボーナスは付与されない
+        // See: features/incentive.feature @100の倍数でないレス番号ではキリ番ボーナスは付与されない
         const ctx = makeCtx({ postNumber: 50 })
         const result = await evaluateOnPost(ctx)
 
@@ -555,7 +555,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('hot_post ボーナス（遅延評価）', () => {
     describe('正常系: 60分以内に3人以上の異なるIDが返信', () => {
       it('過去60分以内のレスに3人以上が返信した場合、過去レスの作者に +15 が付与される', async () => {
-        // See: features/phase1/incentive.feature @60分以内に3人以上から返信が付くと +15 ボーナスが付与される
+        // See: features/incentive.feature @60分以内に3人以上から返信が付くと +15 ボーナスが付与される
         const now = new Date('2026-03-09T10:00:00Z')
         const originalPost = makePost({
           id: 'post-original',
@@ -618,7 +618,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 時間超過', () => {
       it('originalPost から60分以上経過している場合、hot_post ボーナスは付与されない', async () => {
-        // See: features/phase1/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
+        // See: features/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
         const originalPost = makePost({
           id: 'post-original',
           postNumber: 5,
@@ -667,7 +667,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 返信者が3人未満', () => {
       it('返信者が2人の場合、hot_post ボーナスは付与されない', async () => {
-        // See: features/phase1/incentive.feature @返信者が3人未満の場合はホットレスボーナスは付与されない
+        // See: features/incentive.feature @返信者が3人未満の場合はホットレスボーナスは付与されない
         const originalPost = makePost({
           id: 'post-original',
           postNumber: 5,
@@ -715,7 +715,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('thread_revival ボーナス（遅延評価）', () => {
     describe('正常系: 低活性スレッドへの書き込み後30分以内に別ユーザーが返信', () => {
       it('24時間以上低活性だったスレッドに書き込み後30分以内に他ユーザーが返信すると +10', async () => {
-        // See: features/phase1/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと +10 ボーナスが付与される
+        // See: features/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと +10 ボーナスが付与される
         // 修正後の evaluateThreadRevivalBonus は threadPosts の時系列から低活性期間を判定する。
         // lastOldPost → revivalPost の間隔が 24時間以上であることを threadPosts で表現する必要がある。
         const lastOldPost = makePost({
@@ -769,7 +769,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 30分以内に別ユーザーのレスがない', () => {
       it('followup がない場合、thread_revival は付与されない', async () => {
-        // See: features/phase1/incentive.feature @30分以内に他ユーザーのレスが付かなければボーナスは付与されない
+        // See: features/incentive.feature @30分以内に他ユーザーのレスが付かなければボーナスは付与されない
         const revivalPost = makePost({
           id: 'post-revival',
           postNumber: 2,
@@ -797,7 +797,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: 24時間以内のアクティブスレッド', () => {
       it('最終レスが24時間以内のスレッドでは低活性判定にならず、ボーナスは付与されない', async () => {
-        // See: features/phase1/incentive.feature @最終レスが24時間以内のスレッドでは低活性判定にならない
+        // See: features/incentive.feature @最終レスが24時間以内のスレッドでは低活性判定にならない
         vi.mocked(ThreadRepository.findById).mockResolvedValue(
           makeThread({ lastPostAt: new Date('2026-03-09T00:00:00Z') }) // 10時間前（24時間以内）
         )
@@ -851,7 +851,7 @@ describe('IncentiveService.evaluateOnPost', () => {
   describe('thread_growth ボーナス（遅延評価）', () => {
     describe('正常系: 10件マイルストーン（+50）', () => {
       it('スレッドが10件に達し、ユニークID 3以上で +50 がスレッド作成者に付与される', async () => {
-        // See: features/phase1/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
+        // See: features/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
         const thread = makeThread({ postCount: 10, createdBy: 'user-creator' })
         vi.mocked(ThreadRepository.findById).mockResolvedValue(thread)
 
@@ -882,7 +882,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('正常系: 100件マイルストーン（+100）', () => {
       it('スレッドが100件に達し、ユニークID 10以上で +100 がスレッド作成者に付与される', async () => {
-        // See: features/phase1/incentive.feature @スレッドにレスが100個付き、ユニークID 10個以上で +100 ボーナス
+        // See: features/incentive.feature @スレッドにレスが100個付き、ユニークID 10個以上で +100 ボーナス
         const thread = makeThread({ postCount: 100, createdBy: 'user-creator' })
         vi.mocked(ThreadRepository.findById).mockResolvedValue(thread)
 
@@ -914,7 +914,7 @@ describe('IncentiveService.evaluateOnPost', () => {
 
     describe('異常系: ユニークID数不足', () => {
       it('スレッドが10件でもユニークIDが3未満の場合、thread_growth は付与されない', async () => {
-        // See: features/phase1/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
+        // See: features/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
         const thread = makeThread({ postCount: 10, createdBy: 'user-creator' })
         vi.mocked(ThreadRepository.findById).mockResolvedValue(thread)
 

@@ -4,8 +4,8 @@
  * BDD テスト用の Supabase 非依存実装。
  * admin-user-repository.ts と同一シグネチャの関数を提供する。
  *
- * See: features/phase1/admin.feature
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/admin.feature
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
@@ -64,8 +64,8 @@ export async function findById(id: string): Promise<AdminUser | null> {
  * Supabase Auth を模倣したメール・パスワード認証。
  * credentialStore で照合し、一致する場合は成功を返す。
  *
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
- * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
  * See: src/lib/infrastructure/repositories/admin-user-repository.ts
  */
 export async function loginWithPassword(

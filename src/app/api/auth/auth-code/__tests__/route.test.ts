@@ -1,9 +1,9 @@
 /**
  * 単体テスト: POST /api/auth/auth-code Route Handler
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
- * See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ * See: features/authentication.feature @期限切れ認証コードでは認証できない
  *
  * テスト方針:
  *   - AuthService はモック化する
@@ -103,7 +103,7 @@ describe('POST /api/auth/auth-code', () => {
   // =========================================================================
 
   describe('正常系: 認証成功', () => {
-    // See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+    // See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
 
     it('認証成功時に 200 と { success: true, writeToken } を返す', async () => {
       vi.mocked(AuthService.verifyAuthCode).mockResolvedValue({
@@ -171,8 +171,8 @@ describe('POST /api/auth/auth-code', () => {
   // =========================================================================
 
   describe('異常系: 認証失敗', () => {
-    // See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
-    // See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+    // See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+    // See: features/authentication.feature @期限切れ認証コードでは認証できない
 
     it('認証失敗時に 401 と { success: false, error } を返す', async () => {
       vi.mocked(AuthService.verifyAuthCode).mockResolvedValue({

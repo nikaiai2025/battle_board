@@ -12,9 +12,9 @@
  * edge-token Cookie は httpOnly のためクライアントから直接読めない。
  * フォームは常に表示し、送信時に401を受け取ったら AuthModal を表示する方式。
  *
- * See: features/phase1/thread.feature @ログイン済みユーザーがスレッドを作成する
- * See: features/phase1/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
- * See: features/phase1/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+ * See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
+ * See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
+ * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
  * See: docs/specs/screens/thread-list.yaml @SCR-001 > thread-create-form
  * See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
  */
@@ -66,7 +66,7 @@ export default function ThreadCreateForm({ onCreated }: ThreadCreateFormProps) {
 
     if (res.status === 401) {
       // 未認証: 認証コードを表示してAuthModalを開く
-      // See: features/phase1/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+      // See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
       const data = (await res.json()) as { authCode?: string };
       setAuthCode(data.authCode);
       setShowAuthModal(true);

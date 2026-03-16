@@ -1,7 +1,7 @@
 /**
  * CommandService — コマンドレジストリ + ディスパッチ基盤
  *
- * See: features/phase2/command_system.feature
+ * See: features/command_system.feature
  * See: docs/architecture/components/command.md §2 公開インターフェース
  * See: docs/architecture/components/command.md §2.2 コマンド定義の2層構造
  * See: docs/architecture/components/command.md §5 設計上の判断 > 通貨引き落としの順序
@@ -163,7 +163,7 @@ function resolveDeductReason(commandName: string): DeductReason {
 /**
  * CommandService — コマンドの解析・ディスパッチ・副作用の統括。
  *
- * See: features/phase2/command_system.feature
+ * See: features/command_system.feature
  * See: docs/architecture/components/command.md §2
  */
 export class CommandService {
@@ -247,7 +247,7 @@ export class CommandService {
 
 	/**
 	 * 登録済みコマンド名の一覧を返す（コマンドヘルプ表示等に使用）。
-	 * See: features/phase2/command_system.feature @ユーザーがコマンド一覧を確認できる
+	 * See: features/command_system.feature @ユーザーがコマンド一覧を確認できる
 	 */
 	getRegisteredCommandNames(): string[] {
 		return [...this.registeredCommandNames];
@@ -263,9 +263,9 @@ export class CommandService {
 	 *   4. 通貨消費（CurrencyService.deduct）
 	 *   5. ハンドラ実行
 	 *
-	 * See: features/phase2/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
-	 * See: features/phase2/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
-	 * See: features/phase2/command_system.feature @無料コマンドは通貨消費なしで実行できる
+	 * See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
+	 * See: features/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
+	 * See: features/command_system.feature @無料コマンドは通貨消費なしで実行できる
 	 *
 	 * @param input - コマンド実行入力
 	 * @returns コマンド実行結果。コマンドが検出されない場合は null
@@ -294,7 +294,7 @@ export class CommandService {
 		const cost = config.cost;
 
 		// Step 3: 通貨残高チェック（cost > 0 のコマンドのみ）
-		// See: features/phase2/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
+		// See: features/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
 		if (cost > 0) {
 			const balance = await this.currencyService.getBalance(input.userId);
 			if (balance < cost) {
@@ -306,7 +306,7 @@ export class CommandService {
 			}
 
 			// Step 4: 通貨消費（引き落とし → 実行の順。D-08 command.md §5）
-			// See: features/phase2/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
+			// See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
 			const deductResult = await this.currencyService.deduct(
 				input.userId,
 				cost,

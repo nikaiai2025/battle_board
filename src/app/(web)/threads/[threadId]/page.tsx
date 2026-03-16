@@ -7,9 +7,9 @@
  * - 新着レスは PostListLiveWrapper（Client Component）がポーリングで取得
  * - 書き込みフォーム（PostForm: Client Component）を表示
  *
- * See: features/phase1/thread.feature @スレッドのレスが書き込み順に表示される
- * See: features/phase1/thread.feature @一覧外のスレッドにURLで直接アクセスできる
- * See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
+ * See: features/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @一覧外のスレッドにURLで直接アクセスできる
+ * See: features/posting.feature @無料ユーザーが書き込みを行う
  * See: docs/specs/screens/thread-view.yaml @SCR-002
  * See: docs/architecture/components/web-ui.md §3.2 スレッドページ
  */

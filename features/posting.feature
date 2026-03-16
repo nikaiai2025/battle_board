@@ -1,4 +1,4 @@
-# features/phase1/posting.feature
+# features/posting.feature
 # ステータス: ドラフト v2
 Feature: 書き込み
   ログイン済みユーザーとして、スレッドにレスを書き込んで他のユーザーやAIボットと

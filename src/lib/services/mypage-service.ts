@@ -1,8 +1,8 @@
 /**
  * MypageService — マイページ機能の統括サービス
  *
- * See: features/phase1/mypage.feature
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/mypage.feature
+ * See: features/currency.feature @マイページで通貨残高を確認する
  * See: docs/architecture/architecture.md §3.2 Service Layer
  *
  * 責務:
@@ -29,8 +29,8 @@ import * as CurrencyService from "./currency-service";
 
 /**
  * マイページ基本情報レスポンス
- * See: features/phase1/mypage.feature @マイページに基本情報が表示される
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/mypage.feature @マイページに基本情報が表示される
+ * See: features/currency.feature @マイページで通貨残高を確認する
  *
  * NOTE: authToken（edge-token）はセキュリティ上の理由からレスポンスに含めない。
  *   クライアントはCookieを通じて自動送信されるため、JSONレスポンスでの返却は不要。
@@ -51,7 +51,7 @@ export interface MypageInfo {
 
 /**
  * ユーザーネーム設定結果
- * See: features/phase1/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
+ * See: features/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
  */
 export type SetUsernameResult =
 	| { success: true; username: string }
@@ -63,7 +63,7 @@ export type SetUsernameResult =
 
 /**
  * 課金（有料ステータス切替）結果
- * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
  */
 export type UpgradeToPremiumResult =
 	| { success: true }
@@ -75,7 +75,7 @@ export type UpgradeToPremiumResult =
 
 /**
  * 書き込み履歴アイテム
- * See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
  */
 export interface PostHistoryItem {
 	/** レスID */
@@ -99,13 +99,13 @@ const USERNAME_MAX_LENGTH = 20;
 
 /**
  * ★（黒星）文字。システム予約文字のため一般ユーザーは使用不可。
- * See: features/phase1/mypage.feature @ユーザーネームに「★」が含まれる場合は「☆」に置換される
+ * See: features/mypage.feature @ユーザーネームに「★」が含まれる場合は「☆」に置換される
  */
 const RESERVED_STAR_CHAR = "★";
 
 /**
  * ☆（白星）文字。★の代替として使用する。
- * See: features/phase1/mypage.feature @ユーザーネームに「★」が含まれる場合は「☆」に置換される
+ * See: features/mypage.feature @ユーザーネームに「★」が含まれる場合は「☆」に置換される
  */
 const SAFE_STAR_CHAR = "☆";
 
@@ -117,8 +117,8 @@ const SAFE_STAR_CHAR = "☆";
  * マイページ基本情報を取得する。
  * 通貨残高・アカウント情報（有料/無料ステータス・ユーザーネーム）を一括取得する。
  *
- * See: features/phase1/mypage.feature @マイページに基本情報が表示される
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/mypage.feature @マイページに基本情報が表示される
+ * See: features/currency.feature @マイページで通貨残高を確認する
  *
  * @param userId - 対象ユーザーの UUID
  * @returns MypageInfo、ユーザーが存在しない場合は null
@@ -147,8 +147,8 @@ export async function getMypage(userId: string): Promise<MypageInfo | null> {
 /**
  * ユーザーネームを設定する。有料ユーザーのみ許可。
  *
- * See: features/phase1/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
- * See: features/phase1/mypage.feature @無料ユーザーはユーザーネームを設定できない
+ * See: features/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
+ * See: features/mypage.feature @無料ユーザーはユーザーネームを設定できない
  *
  * @param userId - 対象ユーザーの UUID
  * @param username - 設定するユーザーネーム
@@ -180,7 +180,7 @@ export async function setUsername(
 	// ★（黒星）をシステム予約文字から☆（白星）に置換する
 	// ★は「★システム」等のシステム表示に使用する予約文字のため、一般ユーザーは使用不可。
 	// 入力時に自動置換することで、表示上の混乱を防ぐ。
-	// See: features/phase1/mypage.feature @ユーザーネームに「★」が含まれる場合は「☆」に置換される
+	// See: features/mypage.feature @ユーザーネームに「★」が含まれる場合は「☆」に置換される
 	const sanitizedUsername = trimmedUsername
 		.split(RESERVED_STAR_CHAR)
 		.join(SAFE_STAR_CHAR);
@@ -196,7 +196,7 @@ export async function setUsername(
 	}
 
 	// 有料ユーザー権限チェック
-	// See: features/phase1/mypage.feature @無料ユーザーはユーザーネームを設定できない
+	// See: features/mypage.feature @無料ユーザーはユーザーネームを設定できない
 	if (!user.isPremium) {
 		return {
 			success: false,
@@ -215,8 +215,8 @@ export async function setUsername(
  * 無料ユーザーを有料ユーザーにアップグレードする（課金モック）。
  * MVP フェーズでは実決済なし。isPremium フラグの切替のみ行う。
  *
- * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
- * See: features/phase1/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
+ * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
  *
  * @param userId - 対象ユーザーの UUID
  * @returns UpgradeToPremiumResult — 成功時は { success: true }、失敗時はエラー情報
@@ -235,7 +235,7 @@ export async function upgradeToPremium(
 	}
 
 	// 既に有料ユーザーの場合はエラー
-	// See: features/phase1/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
+	// See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
 	if (user.isPremium) {
 		return {
 			success: false,
@@ -253,8 +253,8 @@ export async function upgradeToPremium(
 /**
  * ユーザーの書き込み履歴を取得する。
  *
- * See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
- * See: features/phase1/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
+ * See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
  *
  * @param userId - 対象ユーザーの UUID
  * @param options.limit - 取得件数（デフォルト 50）

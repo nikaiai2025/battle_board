@@ -1,8 +1,8 @@
 /**
  * AdminService — 管理者操作のユースケース実行サービス
  *
- * See: features/phase1/admin.feature
- * See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+ * See: features/admin.feature
+ * See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
  * See: docs/architecture/components/admin.md §2 公開インターフェース
  * See: docs/architecture/components/posting.md §5 方式B: 独立システムレス
  * See: docs/architecture/architecture.md §3.2 AdminService
@@ -32,9 +32,9 @@ import { createPost } from "./post-service";
 
 /**
  * レス削除結果。
- * See: features/phase1/admin.feature @管理者が指定したレスを削除する
- * See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
- * See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+ * See: features/admin.feature @管理者が指定したレスを削除する
+ * See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
+ * See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
  */
 export type DeletePostResult =
 	| { success: true }
@@ -43,20 +43,20 @@ export type DeletePostResult =
 /**
  * フォールバックメッセージのテンプレート。
  * {postNumber} は実際のレス番号で置換される。
- * See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+ * See: features/admin.feature @管理者がコメントなしでレスを削除する
  */
 const ADMIN_DELETE_FALLBACK_TEMPLATE =
 	"🗑️ レス >>{postNumber} は管理者により削除されました";
 
 /**
  * 管理者削除コメントのプレフィックス。
- * See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
+ * See: features/admin.feature @管理者がコメント付きでレスを削除する
  */
 const ADMIN_DELETE_COMMENT_PREFIX = "🗑️ ";
 
 /**
  * スレッド削除結果。
- * See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
  */
 export type DeleteThreadResult =
 	| { success: true }
@@ -78,10 +78,10 @@ export type DeleteThreadResult =
  * レス番号は欠番にならず保持される。
  * 表示文字列の置換はプレゼンテーション層（UIまたはDATアダプター）の責務。
  *
- * See: features/phase1/admin.feature @管理者が指定したレスを削除する
- * See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
- * See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
- * See: features/phase2/command_system.feature @管理者がコメントなしでレス削除した場合はフォールバックメッセージで通知される
+ * See: features/admin.feature @管理者が指定したレスを削除する
+ * See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
+ * See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
+ * See: features/command_system.feature @管理者がコメントなしでレス削除した場合はフォールバックメッセージで通知される
  * See: docs/architecture/components/admin.md §2 公開インターフェース > deletePost
  * See: docs/architecture/components/posting.md §5 方式B: 独立システムレス
  *
@@ -108,11 +108,11 @@ export async function deletePost(
 	await PostRepository.softDelete(postId);
 
 	// 「★システム」名義の独立システムレスを挿入する（方式B）
-	// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+	// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 	// See: docs/architecture/components/posting.md §5 方式B
 	// コメント付き: 🗑️ {comment} / コメントなし: フォールバックテンプレートにレス番号を埋め込む
-	// See: features/phase1/admin.feature @管理者がコメント付きでレスを削除する
-	// See: features/phase1/admin.feature @管理者がコメントなしでレスを削除する
+	// See: features/admin.feature @管理者がコメント付きでレスを削除する
+	// See: features/admin.feature @管理者がコメントなしでレスを削除する
 	const systemMessageBody = comment
 		? `${ADMIN_DELETE_COMMENT_PREFIX}${comment}`
 		: ADMIN_DELETE_FALLBACK_TEMPLATE.replace(
@@ -150,7 +150,7 @@ export async function deletePost(
  * スレッド内の全レスも is_deleted = true にする。
  * スレッド一覧から消え、スレッド内のレスも閲覧不可になる。
  *
- * See: features/phase1/admin.feature @管理者が指定したスレッドを削除する
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
  * See: docs/architecture/components/admin.md §2 公開インターフェース > deleteThread
  *
  * @param threadId - 削除対象スレッドの UUID
@@ -174,7 +174,7 @@ export async function deleteThread(
 	await ThreadRepository.softDelete(threadId);
 
 	// スレッド内の全レスをソフトデリート
-	// See: features/phase1/admin.feature @スレッドとその中の全レスが削除される
+	// See: features/admin.feature @スレッドとその中の全レスが削除される
 	const posts = await PostRepository.findByThreadId(threadId);
 	await Promise.all(posts.map((post) => PostRepository.softDelete(post.id)));
 

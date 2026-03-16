@@ -1,4 +1,4 @@
-# features/phase3/user_registration.feature
+# features/未実装/user_registration.feature
 # ステータス: ドラフト v1
 #
 # 設計背景:
@@ -14,8 +14,8 @@
 # 関連ドキュメント:
 #   設計詳細 → D-08 docs/architecture/components/user-registration.md
 #   状態遷移 → D-05 docs/specs/user_registration_state_transitions.yaml
-#   既存認証 → features/phase1/authentication.feature
-#   既存マイページ → features/phase1/mypage.feature
+#   既存認証 → features/authentication.feature
+#   既存マイページ → features/mypage.feature
 #   専ブラ互換 → features/constraints/specialist_browser_compat.feature
 #
 # 既存 BDD への影響:

@@ -1,7 +1,7 @@
 /**
  * 単体テスト: auth-service.ts（AuthService）
  *
- * See: features/phase1/authentication.feature
+ * See: features/authentication.feature
  * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
  * See: docs/architecture/components/authentication.md §2 公開インターフェース
  *
@@ -50,7 +50,7 @@ vi.mock('@/lib/infrastructure/external/turnstile-client', () => ({
 }))
 
 // currency-service をモック化する（issueEdgeToken 内で initializeBalance が呼ばれるため）
-// See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+// See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
 vi.mock('@/lib/services/currency-service', () => ({
   initializeBalance: vi.fn(),
 }))
@@ -244,7 +244,7 @@ describe('AuthService', () => {
 
   describe('verifyEdgeToken', () => {
     describe('正常系: トークンが有効でIP一致・認証済み', () => {
-      // See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+      // See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
       it('有効なトークンと一致するIPで valid: true を返す', async () => {
         const user = makeUser({ authToken: 'valid-token', authorIdSeed: 'ip-hash', isVerified: true })
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(user)
@@ -273,7 +273,7 @@ describe('AuthService', () => {
     })
 
     describe('異常系: 未検証ユーザー（G1 是正）', () => {
-      // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+      // See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
       it('is_verified=false のユーザーで not_verified を返す', async () => {
         const unverifiedUser = makeUser({ authToken: 'valid-token', authorIdSeed: 'ip-hash', isVerified: false })
         vi.mocked(UserRepository.findByAuthToken).mockResolvedValue(unverifiedUser)
@@ -301,7 +301,7 @@ describe('AuthService', () => {
     })
 
     describe('正常系: IPアドレスが変わっても認証済みなら成功する', () => {
-      // See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+      // See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
       // 投稿時の IP 一致チェックは廃止。is_verified=true であれば IP が変わっても valid: true を返す。
       it('IP不一致でも is_verified=true なら valid: true を返す', async () => {
         // ユーザー作成時の IP ハッシュ（authorIdSeed）と異なる IP でアクセスする
@@ -410,7 +410,7 @@ describe('AuthService', () => {
       })
 
       it('新規ユーザー登録時に CurrencyService.initializeBalance を呼び出す', async () => {
-        // See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+        // See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
         const user = makeUser({ id: 'user-for-currency-init' })
         vi.mocked(UserRepository.create).mockResolvedValue(user)
 
@@ -516,7 +516,7 @@ describe('AuthService', () => {
 
   describe('verifyAuthCode', () => {
     describe('正常系: 認証成功', () => {
-      // See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+      // See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
       it('有効なコードとTurnstile成功で { success: true, writeToken } を返す', async () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(makeAuthCode())
         vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true)
@@ -547,7 +547,7 @@ describe('AuthService', () => {
       })
 
       it('認証成功後に UserRepository.updateIsVerified(userId, true) を呼び出す', async () => {
-        // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+        // See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
         const authCode = makeAuthCode({ tokenId: 'test-edge-token' })
         const user = makeUser({ id: 'test-user-id' })
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode)
@@ -627,7 +627,7 @@ describe('AuthService', () => {
     })
 
     describe('異常系: 有効期限切れ', () => {
-      // See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+      // See: features/authentication.feature @期限切れ認証コードでは認証できない
       it('期限切れコードで { success: false } を返す', async () => {
         const expiredCode = makeAuthCode({
           expiresAt: new Date(Date.now() - 1000), // 1秒前に期限切れ
@@ -643,7 +643,7 @@ describe('AuthService', () => {
     })
 
     describe('異常系: Turnstile 検証失敗', () => {
-      // See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+      // See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
       it('Turnstile 検証失敗で { success: false } を返す', async () => {
         vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(makeAuthCode())
         vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(false)

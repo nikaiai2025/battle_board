@@ -1,8 +1,8 @@
 /**
  * GET /api/mypage — マイページ基本情報取得
  *
- * See: features/phase1/mypage.feature @マイページに基本情報が表示される
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/mypage.feature @マイページに基本情報が表示される
+ * See: features/currency.feature @マイページで通貨残高を確認する
  * See: docs/specs/openapi.yaml > /api/mypage
  *
  * 責務:
@@ -23,7 +23,7 @@ import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
 /**
  * GET /api/mypage — マイページ基本情報取得
  *
- * See: features/phase1/mypage.feature @マイページに基本情報が表示される
+ * See: features/mypage.feature @マイページに基本情報が表示される
  *
  * レスポンス:
  *   200: MypageInfo（基本情報）
@@ -52,8 +52,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   // --- 認証フロー完了チェック（is_verified） ---
-  // See: features/phase1/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
-  // See: features/phase1/authentication.feature @認証フロー是正
+  // See: features/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
+  // See: features/authentication.feature @認証フロー是正
   if (!user.isVerified) {
     return NextResponse.json(
       { error: 'UNAUTHORIZED', message: '認証が必要です' },

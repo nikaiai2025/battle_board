@@ -21,15 +21,15 @@
 // ---------------------------------------------------------------------------
 
 // AI告発リポジトリ（TASK-079 で追加）
-// See: features/phase2/ai_accusation.feature
+// See: features/ai_accusation.feature
 import * as InMemoryAccusationRepo from "./in-memory/accusation-repository";
 // 管理者リポジトリ（TASK-021 で追加）
-// See: features/phase1/admin.feature
-// See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+// See: features/admin.feature
+// See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
 import * as InMemoryAdminRepo from "./in-memory/admin-repository";
 import * as InMemoryAuthCodeRepo from "./in-memory/auth-code-repository";
 // ボット書き込みリポジトリ（TASK-079 で追加）
-// See: features/phase2/ai_accusation.feature
+// See: features/ai_accusation.feature
 import * as InMemoryBotPostRepo from "./in-memory/bot-post-repository";
 import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
 import * as InMemoryIncentiveLogRepo from "./in-memory/incentive-log-repository";
@@ -78,7 +78,7 @@ export function resetAllStores(): void {
 	// See: docs/architecture/bdd_test_strategy.md §2 ライフサイクル
 	InMemoryAdminRepo.reset();
 	// AI告発リポジトリのリセット（TASK-079 で追加）
-	// See: features/phase2/ai_accusation.feature
+	// See: features/ai_accusation.feature
 	InMemoryAccusationRepo.reset();
 	InMemoryBotPostRepo.reset();
 }

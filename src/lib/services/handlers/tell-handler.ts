@@ -1,8 +1,8 @@
 /**
  * CommandHandler 実装: !tell（AI告発）コマンド
  *
- * See: features/phase2/ai_accusation.feature
- * See: features/phase2/command_system.feature @!tellコマンド
+ * See: features/ai_accusation.feature
+ * See: features/command_system.feature @!tellコマンド
  * See: docs/architecture/components/accusation.md §1 分割方針
  * See: docs/architecture/components/command.md §2.2 ロジック層: CommandHandler
  *
@@ -24,7 +24,7 @@ import type {
  * !tell（AI告発）ハンドラ。
  * AccusationService.accuse() に告発ロジックを委譲する。
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/components/accusation.md §2 公開インターフェース
  */
 export class TellHandler implements CommandHandler {
@@ -52,7 +52,7 @@ export class TellHandler implements CommandHandler {
 	 *       呼び出し元（CommandService またはPostService）の責務とする。
 	 *       BDDステップ定義の実装（TASK-079）でこの変換を担う。
 	 *
-	 * See: features/phase2/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+	 * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
 	 * See: docs/architecture/components/command.md §3.1 依存先 > AccusationService
 	 *
 	 * @param ctx - コマンド実行コンテキスト

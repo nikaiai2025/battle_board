@@ -4,7 +4,7 @@
  * プロジェクト全体で使用するCookie名を一元定義する。
  * 名称の不一致（edge_token vs edge-token など）による認証フローの破綻を防ぐ。
  *
- * See: features/phase1/authentication.feature
+ * See: features/authentication.feature
  * See: features/constraints/specialist_browser_compat.feature
  * See: docs/architecture/components/authentication.md §5 Cookie命名規則
  */

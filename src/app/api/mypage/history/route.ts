@@ -1,8 +1,8 @@
 /**
  * GET /api/mypage/history — 書き込み履歴取得
  *
- * See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
- * See: features/phase1/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
+ * See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
  * See: docs/specs/openapi.yaml > /api/mypage/history
  *
  * 責務:
@@ -24,7 +24,7 @@ import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
 /**
  * GET /api/mypage/history — 書き込み履歴取得
  *
- * See: features/phase1/mypage.feature @自分の書き込み履歴を確認できる
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
  *
  * クエリパラメータ:
  *   limit: 取得件数（デフォルト 50、最大 100）
@@ -55,8 +55,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   // --- 認証フロー完了チェック（is_verified） ---
-  // See: features/phase1/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
-  // See: features/phase1/authentication.feature @認証フロー是正
+  // See: features/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
+  // See: features/authentication.feature @認証フロー是正
   if (!user.isVerified) {
     return NextResponse.json(
       { error: 'UNAUTHORIZED', message: '認証が必要です' },

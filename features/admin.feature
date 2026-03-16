@@ -1,4 +1,4 @@
-# features/phase1/admin.feature
+# features/admin.feature
 # ステータス: ドラフト v3
 Feature: 管理者機能
 

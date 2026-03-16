@@ -101,14 +101,14 @@ const REPO_MOCKS = [
 		"./in-memory/turnstile-client.ts",
 	],
 	// 管理者リポジトリ（TASK-021 で追加）
-	// See: features/phase1/admin.feature
-	// See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+	// See: features/admin.feature
+	// See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
 	[
 		"src/lib/infrastructure/repositories/admin-user-repository.ts",
 		"./in-memory/admin-repository.ts",
 	],
 	// AI告発・ボット書き込みリポジトリ（TASK-079 で追加）
-	// See: features/phase2/ai_accusation.feature
+	// See: features/ai_accusation.feature
 	[
 		"src/lib/infrastructure/repositories/accusation-repository.ts",
 		"./in-memory/accusation-repository.ts",

@@ -15,7 +15,7 @@
  *   - 専ブラからのコマンド実行
  *   - コマンドヘルプページ
  *
- * See: features/phase2/command_system.feature
+ * See: features/command_system.feature
  * See: docs/architecture/bdd_test_strategy.md
  * See: docs/architecture/components/posting.md §5 システムメッセージの表示方式
  */
@@ -32,7 +32,7 @@ import {
 import type { BattleBoardWorld } from "../support/world";
 // AI告発ステップの状態とコマンド実行関数（TASK-079 で追加）
 // !tell コマンドは PostService 経由ではなく AccusationService を直接呼び出す必要がある
-// See: features/phase2/ai_accusation.feature
+// See: features/ai_accusation.feature
 import { accusationState, executeTellCommand } from "./ai_accusation.steps";
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ const postNumberToId = new Map<number, string>();
 
 // ---------------------------------------------------------------------------
 // Background: コマンドレジストリに以下のコマンドが登録されている
-// See: features/phase2/command_system.feature Background
+// See: features/command_system.feature Background
 // ---------------------------------------------------------------------------
 
 /**
@@ -131,7 +131,7 @@ Given(
 		// CurrencyService はインメモリリポジトリ経由で動作する
 		// AccusationService は TellHandler が使用する（TASK-079 で追加）
 		// See: src/lib/services/command-service.ts > constructor
-		// See: features/phase2/ai_accusation.feature
+		// See: features/ai_accusation.feature
 		const PostService = getPostService();
 		const CurrencyService = getCurrencyService();
 
@@ -159,7 +159,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: ユーザーがスレッドに書き込んでいる
-// See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
 // ---------------------------------------------------------------------------
 
 /**
@@ -192,7 +192,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: ユーザー（ID:{string}）がスレッドに書き込んでいる
-// See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+// See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
 // ---------------------------------------------------------------------------
 
 /**
@@ -225,7 +225,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: ユーザーがスレッドに通常の書き込みを投稿する
-// See: features/phase2/command_system.feature @書き込み報酬がレス末尾に表示される
+// See: features/command_system.feature @書き込み報酬がレス末尾に表示される
 // ---------------------------------------------------------------------------
 
 /**
@@ -287,7 +287,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: コマンドコスト設定（common.steps.ts から利用される残高設定との連携）
-// See: features/phase2/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
+// See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
 // ---------------------------------------------------------------------------
 
 /**
@@ -316,14 +316,14 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: 専ブラ認証済みユーザー
-// See: features/phase2/command_system.feature @専ブラからの書き込みに含まれるコマンドが実行される
+// See: features/command_system.feature @専ブラからの書き込みに含まれるコマンドが実行される
 // NOTE: 「ユーザーが専ブラで認証済みである」は specialist_browser_compat.steps.ts で定義済み
 //       command_system.feature の専ブラシナリオではその定義を再利用する
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Given: 管理者削除シナリオ用
-// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 // ---------------------------------------------------------------------------
 
 /**
@@ -455,7 +455,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: システムメッセージの安全性シナリオ用
-// See: features/phase2/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
+// See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
 // ---------------------------------------------------------------------------
 
 /**
@@ -601,14 +601,14 @@ Given(
 		});
 		postNumberToId.set(10, postId);
 		// AI告発シナリオでも使用されるため accusationState にも登録する（TASK-079）
-		// See: features/phase2/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
+		// See: features/ai_accusation.feature @システムメッセージに対してAI告発を試みると拒否される
 		accusationState.postNumberToId.set(10, postId);
 	},
 );
 
 // ---------------------------------------------------------------------------
 // Given: コマンドヘルプページ
-// See: features/phase2/command_system.feature @ユーザーがコマンド一覧を確認できる
+// See: features/command_system.feature @ユーザーがコマンド一覧を確認できる
 // ---------------------------------------------------------------------------
 
 /**
@@ -631,7 +631,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // When: 本文にコマンドを含めて投稿する
-// See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
 // ---------------------------------------------------------------------------
 
 /**
@@ -674,7 +674,7 @@ When(
 
 // ---------------------------------------------------------------------------
 // When: コマンドを直接実行する（通貨消費シナリオ）
-// See: features/phase2/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
+// See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
 // ---------------------------------------------------------------------------
 
 /**
@@ -690,7 +690,7 @@ When(
 		// command_system シナリオでは PostService 経由で実行する（inlineSystemInfo の検証が必要）。
 		// accusationState.active フラグで判別する。
 		// See: src/lib/services/handlers/tell-handler.ts
-		// See: features/phase2/ai_accusation.feature
+		// See: features/ai_accusation.feature
 		const tellMatch = commandString.match(/^!tell\s+>>(\d+)$/);
 		if (tellMatch && accusationState.active) {
 			const postNumber = parseInt(tellMatch[1], 10);
@@ -775,7 +775,7 @@ When(
 
 // ---------------------------------------------------------------------------
 // When: bbs.cgi の MESSAGE に含めて POST する（専ブラシナリオ）
-// See: features/phase2/command_system.feature @専ブラからの書き込みに含まれるコマンドが実行される
+// See: features/command_system.feature @専ブラからの書き込みに含まれるコマンドが実行される
 // ---------------------------------------------------------------------------
 
 /**
@@ -813,14 +813,14 @@ When(
 
 // ---------------------------------------------------------------------------
 // Then: 書き込みが1レスとしてスレッドに追加される
-// See: features/phase2/command_system.feature
+// See: features/command_system.feature
 // NOTE: 「書き込みがスレッドに追加される」は specialist_browser_compat.steps.ts で定義済み
 // ---------------------------------------------------------------------------
 
 /**
  * 書き込みが1レスとしてスレッドに追加される。
  * 書き込み成功を確認し、1件のレスとして追加されたことを検証する。
- * See: features/phase2/command_system.feature @書き込み本文中のコマンドが解析され実行される
+ * See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
  */
 Then(
 	"書き込みが1レスとしてスレッドに追加される",
@@ -840,7 +840,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: 書き込み本文の検証
-// See: features/phase2/command_system.feature
+// See: features/command_system.feature
 // ---------------------------------------------------------------------------
 
 /**
@@ -898,7 +898,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: コマンド実行検証
-// See: features/phase2/command_system.feature
+// See: features/command_system.feature
 // ---------------------------------------------------------------------------
 
 /**
@@ -1016,7 +1016,7 @@ Then("コマンドが実行される", async function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // Then: レス内マージ表示（方式A: inlineSystemInfo）
-// See: features/phase2/command_system.feature @コマンド実行結果がレス末尾にマージ表示される
+// See: features/command_system.feature @コマンド実行結果がレス末尾にマージ表示される
 // ---------------------------------------------------------------------------
 
 /**
@@ -1156,7 +1156,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: 通貨関連
-// See: features/phase2/command_system.feature
+// See: features/command_system.feature
 // ---------------------------------------------------------------------------
 
 /**
@@ -1185,7 +1185,7 @@ Then("通貨は消費されない", async function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // Then: コマンド実行結果がDATファイルに含まれる（専ブラ互換）
-// See: features/phase2/command_system.feature @専ブラからの書き込みに含まれるコマンドが実行される
+// See: features/command_system.feature @専ブラからの書き込みに含まれるコマンドが実行される
 // ---------------------------------------------------------------------------
 
 /**
@@ -1228,7 +1228,7 @@ Then("書き込みが追加される", async function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // Then: 管理者レス削除の独立システムレス（方式B）
-// See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+// See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
 // ---------------------------------------------------------------------------
 
 /**
@@ -1376,7 +1376,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: システムメッセージの安全性
-// See: features/phase2/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
+// See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
 // ---------------------------------------------------------------------------
 
 /**
@@ -1473,7 +1473,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: コマンドヘルプ
-// See: features/phase2/command_system.feature @ユーザーがコマンド一覧を確認できる
+// See: features/command_system.feature @ユーザーがコマンド一覧を確認できる
 // ---------------------------------------------------------------------------
 
 /**

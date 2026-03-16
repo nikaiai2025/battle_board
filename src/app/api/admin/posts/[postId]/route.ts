@@ -1,9 +1,9 @@
 /**
  * DELETE /api/admin/posts/{postId} — レス削除（管理者）
  *
- * See: features/phase1/admin.feature @管理者が指定したレスを削除する
- * See: features/phase1/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
- * See: features/phase1/admin.feature @存在しないレスの削除を試みるとエラーになる
+ * See: features/admin.feature @管理者が指定したレスを削除する
+ * See: features/admin.feature @管理者でないユーザーがレス削除を試みると権限エラーになる
+ * See: features/admin.feature @存在しないレスの削除を試みるとエラーになる
  * See: docs/specs/openapi.yaml > /api/admin/posts/{postId}
  * See: docs/architecture/components/admin.md §2 公開インターフェース
  * See: docs/architecture/components/admin.md §5 設計上の判断 > 認証と認可の分離
@@ -30,8 +30,8 @@ import { ADMIN_SESSION_COOKIE } from '@/lib/constants/cookie-names'
 /**
  * DELETE /api/admin/posts/{postId} — レス削除（管理者）
  *
- * See: features/phase1/admin.feature @管理者が指定したレスを削除する
- * See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+ * See: features/admin.feature @管理者が指定したレスを削除する
+ * See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
  * See: docs/specs/openapi.yaml > /api/admin/posts/{postId}
  *
  * リクエスト:
@@ -72,7 +72,7 @@ export async function DELETE(
   }
 
   // --- comment クエリパラメータを取得 ---
-  // See: features/phase2/command_system.feature @管理者のレス削除がシステムレスとして通知される
+  // See: features/command_system.feature @管理者のレス削除がシステムレスとして通知される
   // See: docs/specs/openapi.yaml > adminDeletePost > parameters > comment
   const comment = req.nextUrl.searchParams.get('comment') ?? undefined
 

@@ -1,4 +1,4 @@
-# features/phase2/bot_system.feature
+# features/未実装/bot_system.feature
 # ステータス: ドラフト v2
 #
 # Phase 2では運営ボット（荒らし役＝チュートリアルMob）を最初の1体として実装する。

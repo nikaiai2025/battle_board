@@ -10,7 +10,7 @@
  *   @scenario レス内の改行がHTMLのbrタグに変換される
  *   @scenario レス内のHTML特殊文字がエスケープされる
  *   @scenario 日次リセットIDがDATの日付フィールドに正しく含まれる
- * See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+ * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
  * See: docs/architecture/components/senbra-adapter.md §2 DatFormatter, §3 公開インターフェース
  * See: docs/architecture/components/posting.md §5 方式A: レス内マージ
  */
@@ -27,7 +27,7 @@ const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"] as const;
  */
 /**
  * inlineSystemInfo の区切り線（全角ダッシュ10個）。
- * See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+ * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
  * See: docs/architecture/components/posting.md §5 方式A
  */
 const INLINE_SYSTEM_INFO_SEPARATOR = "──────────";
@@ -96,7 +96,7 @@ export class DatFormatter {
    * - 改行(\n)を<br>に変換（DAT形式では1レス=1物理行）
    * - inlineSystemInfoが存在する場合、区切り線付きで本文末尾に連結
    *
-   * See: features/phase2/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+   * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
    * See: docs/architecture/components/posting.md §5 方式A: レス内マージ
    *
    * @param post - レスエンティティ
@@ -113,7 +113,7 @@ export class DatFormatter {
     let body = botReplaced.replace(/\n/g, "<br>");
 
     // inlineSystemInfo が存在する場合、区切り線付きで末尾に連結する
-    // See: features/phase2/command_system.feature @書き込み報酬がレス末尾に表示される
+    // See: features/command_system.feature @書き込み報酬がレス末尾に表示される
     if (post.inlineSystemInfo && post.inlineSystemInfo.length > 0) {
       const escapedInfo = this.escapeHtml(post.inlineSystemInfo);
       const botReplacedInfo = this.replaceBotEmoji(escapedInfo);

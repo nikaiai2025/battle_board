@@ -1,7 +1,7 @@
 /**
  * CurrencyService — 通貨操作の統括サービス
  *
- * See: features/phase1/currency.feature
+ * See: features/currency.feature
  * See: docs/architecture/components/currency.md §2 公開インターフェース
  * See: docs/architecture/architecture.md §3.2 CurrencyService
  *
@@ -25,7 +25,7 @@ import type { DeductResult, DeductReason, CreditReason } from '../domain/models/
 
 /**
  * 新規ユーザー登録時の初期通貨付与額。
- * See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+ * See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
  */
 export const INITIAL_BALANCE = 50
 
@@ -37,7 +37,7 @@ export const INITIAL_BALANCE = 50
  * 残高に指定額を加算する（credit）。
  * 加算は必ず成功する。DB障害時のみ例外をスローし、呼び出し元のトランザクションをロールバックさせる。
  *
- * See: features/phase1/currency.feature
+ * See: features/currency.feature
  * See: docs/architecture/components/currency.md §2 公開インターフェース
  *
  * @param userId - 対象ユーザーの UUID
@@ -59,8 +59,8 @@ export async function credit(
  * 楽観的ロック（CurrencyRepository 担当）により二重消費と残高不足を防ぐ。
  * 残高不足時は例外ではなく失敗型（DeductResult）を返す。
  *
- * See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
- * See: features/phase1/currency.feature @同時操作による通貨の二重消費が発生しない
+ * See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
+ * See: features/currency.feature @同時操作による通貨の二重消費が発生しない
  * See: docs/architecture/components/currency.md §2 公開インターフェース
  * See: docs/architecture/architecture.md §7.2 同時実行制御 TDR-003
  *
@@ -83,7 +83,7 @@ export async function deduct(
  * ユーザーの現在の通貨残高を取得する。
  * マイページ表示など残高確認のみに使用する（消費操作には deduct を使うこと）。
  *
- * See: features/phase1/currency.feature @マイページで通貨残高を確認する
+ * See: features/currency.feature @マイページで通貨残高を確認する
  * See: docs/architecture/components/currency.md §2 公開インターフェース
  *
  * @param userId - 対象ユーザーの UUID
@@ -97,7 +97,7 @@ export async function getBalance(userId: string): Promise<number> {
  * 新規ユーザーの通貨レコードを作成し、初期通貨 INITIAL_BALANCE を付与する。
  * AuthService.issueEdgeToken から呼び出される。
  *
- * See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+ * See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
  * See: docs/architecture/components/currency.md §2 公開インターフェース
  *
  * @param userId - 新規ユーザーの UUID

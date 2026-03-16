@@ -4,7 +4,7 @@
  * BDD テスト用の Supabase 非依存実装。
  * accusation-repository.ts と同一シグネチャの関数を提供する。
  *
- * See: features/phase2/ai_accusation.feature
+ * See: features/ai_accusation.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 

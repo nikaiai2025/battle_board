@@ -9,8 +9,8 @@
  * NOTE: Cookie 存在チェックは認証の簡易判定であり、トークンの有効性検証は
  *       API 境界（Route Handler）で行う。
  *
- * See: features/phase1/mypage.feature @マイページに基本情報が表示される
- * See: features/phase1/authentication.feature
+ * See: features/mypage.feature @マイページに基本情報が表示される
+ * See: features/authentication.feature
  * See: docs/architecture/components/web-ui.md §3.1 スレッド一覧ページ
  */
 
@@ -29,7 +29,7 @@ interface WebLayoutProps {
  * edge-token Cookie が存在する場合は isAuthenticated=true を Header に渡し、
  * マイページへのリンクを表示する。
  *
- * See: features/phase1/mypage.feature @マイページに基本情報が表示される
+ * See: features/mypage.feature @マイページに基本情報が表示される
  * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
  */
 export default async function WebLayout({ children }: WebLayoutProps) {

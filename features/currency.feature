@@ -1,4 +1,4 @@
-# features/phase1/currency.feature
+# features/currency.feature
 # ステータス: ドラフト v4
 Feature: 通貨システム — 残高管理
 

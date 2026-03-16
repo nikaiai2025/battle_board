@@ -21,13 +21,13 @@ locked_files:
 AccusationService（AI告発サービス）、accusation-rules（告発判定純粋関数）、tell-handler（!tell コマンドハンドラ）を実装する。現在 command-service.ts にある TellHandlerStub を本実装の TellHandler に置き換える。単体テストを作成し全PASS。
 
 ## 対象BDDシナリオ
-- `features/phase2/ai_accusation.feature` — 全10シナリオ（本タスクではBDDステップ定義は作成しない。サービス層の実装と単体テストのみ）
-- `features/phase2/command_system.feature` — !tell 関連シナリオ
+- `features/ai_accusation.feature` — 全10シナリオ（本タスクではBDDステップ定義は作成しない。サービス層の実装と単体テストのみ）
+- `features/command_system.feature` — !tell 関連シナリオ
 
 ## 必読ドキュメント（優先度順）
 1. [必須] `docs/architecture/components/accusation.md` — AccusationService 設計
 2. [必須] `docs/architecture/components/command.md` — CommandService + Handler設計
-3. [必須] `features/phase2/ai_accusation.feature` — 告発シナリオ（振る舞い仕様）
+3. [必須] `features/ai_accusation.feature` — 告発シナリオ（振る舞い仕様）
 4. [必須] `src/lib/services/command-service.ts` — 現在のTellHandlerStub
 5. [参考] `src/lib/domain/models/accusation.ts` — Accusation 型定義（実装済み）
 6. [参考] `src/lib/infrastructure/repositories/accusation-repository.ts` — AccusationRepository（実装済み）

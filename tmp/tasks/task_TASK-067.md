@@ -16,14 +16,14 @@ locked_files:
 コマンドパーサー（command-parser）を純粋関数として実装する。書き込み本文からコマンドを検出し、ParsedCommandを返す。D-08 command.md §2.3 の解析仕様に完全準拠する。
 
 ## 対象BDDシナリオ
-- `features/phase2/command_system.feature`
+- `features/command_system.feature`
   - 「書き込み本文中のコマンドが解析され実行される」（パース部分）
   - 「存在しないコマンドは無視され通常の書き込みとして扱われる」（パース部分）
   - 「1レスに複数のコマンドが含まれる場合は先頭のみ実行される」
 
 ## 必読ドキュメント（優先度順）
 1. [必須] `docs/architecture/components/command.md` — §2.3 コマンド解析仕様
-2. [必須] `features/phase2/command_system.feature` — BDDシナリオ
+2. [必須] `features/command_system.feature` — BDDシナリオ
 3. [必須] `src/lib/domain/models/command.ts` — ParsedCommand型定義
 4. [参考] `config/commands.yaml` — 登録済みコマンド名
 

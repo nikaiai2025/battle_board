@@ -4,7 +4,7 @@
  * インセンティブ（通貨獲得ボーナス）に関する全30シナリオのステップを実装する。
  * PostService.createPost / createThread 経由でインセンティブを発火させる（直接呼び出し禁止）。
  *
- * See: features/phase1/incentive.feature @全30シナリオ
+ * See: features/incentive.feature @全30シナリオ
  * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト
  * See: tmp/orchestrator/sprint_8_bdd_guide.md §4 incentive.feature
  */
@@ -58,7 +58,7 @@ async function ensureNamedUser(
 		const ipHash = getIpHashForUser(name);
 		const { token, userId } = await AuthService.issueEdgeToken(ipHash);
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
-		// See: features/phase1/authentication.feature @認証フロー是正
+		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
 		ctx = {
 			userId,
@@ -144,7 +144,7 @@ const threadRevivalInactiveTimes = new WeakMap<BattleBoardWorld, Date>();
  * また、daily_login テストシナリオ以外では書き込み前に currentUserId / namedUsers の
  * lastPostDate を今日に設定して余分な daily_login ボーナス発火を抑制する。
  *
- * See: features/phase1/incentive.feature Background
+ * See: features/incentive.feature Background
  * See: features/step_definitions/common.steps.ts:175
  */
 BeforeStep(async function (
@@ -242,7 +242,7 @@ async function findAllLogsForUser(userId: string): Promise<IncentiveLog[]> {
  * 意図的にテストするシナリオ（newThreadJoinTestWorlds=true）以外では、
  * 書き込み前にユーザー自身のダミーレスを追加して「参加済み」状態にする必要がある。
  *
- * See: features/phase1/incentive.feature Rule: 過去に書き込んだことがないスレッドへの初書き込みで +3
+ * See: features/incentive.feature Rule: 過去に書き込んだことがないスレッドへの初書き込みで +3
  * See: tmp/escalations/escalation_ESC-TASK-019-1.md (副作用の詳細)
  *
  * @param world - BattleBoardWorld インスタンス
@@ -284,7 +284,7 @@ function ensureUserParticipated(
  * 今日まだ書き込みをしていない状態を設定する。
  * ユーザーの lastPostDate を昨日の日付に設定（または null のまま）する。
  *
- * See: features/phase1/incentive.feature @その日の初回書き込みでログインボーナス +10 が付与される
+ * See: features/incentive.feature @その日の初回書き込みでログインボーナス +10 が付与される
  */
 Given("今日まだ書き込みをしていない", async function (this: BattleBoardWorld) {
 	assert(this.currentUserId, "ユーザーがログイン済みである必要があります");
@@ -306,7 +306,7 @@ Given("今日まだ書き込みをしていない", async function (this: Battle
  * 今日すでに1回書き込みをしている状態を設定する。
  * ユーザーの lastPostDate を今日の日付に設定する。
  *
- * See: features/phase1/incentive.feature @同日の2回目以降の書き込みではボーナスは付与されない
+ * See: features/incentive.feature @同日の2回目以降の書き込みではボーナスは付与されない
  */
 Given(
 	"今日すでに1回書き込みをしている",
@@ -337,7 +337,7 @@ Given(
 /**
  * 今日まだスレッドを作成していない状態を設定する（thread_creation ログなし）。
  *
- * See: features/phase1/incentive.feature @その日の初回スレッド作成でボーナス +10 が付与される
+ * See: features/incentive.feature @その日の初回スレッド作成でボーナス +10 が付与される
  */
 Given(
 	"今日まだスレッドを作成していない",
@@ -351,7 +351,7 @@ Given(
  * 今日すでに1回スレッドを作成している状態を設定する。
  * thread_creation インセンティブログを追加して重複ガードを有効化する。
  *
- * See: features/phase1/incentive.feature @同日の2回目以降のスレッド作成ではボーナスは付与されない
+ * See: features/incentive.feature @同日の2回目以降のスレッド作成ではボーナスは付与されない
  */
 Given(
 	"今日すでに1回スレッドを作成している",
@@ -385,7 +385,7 @@ Given(
  * daily_login は発火させない（スレッド作成は書き込みログインボーナスの対象外）。
  * lastPostDate を今日の日付に設定して daily_login の誤発火を防ぐ。
  *
- * See: features/phase1/incentive.feature @スレッド作成は書き込みログインボーナスの対象外である
+ * See: features/incentive.feature @スレッド作成は書き込みログインボーナスの対象外である
  */
 Given(
 	"今日まだ書き込みもスレッド作成もしていない",
@@ -413,7 +413,7 @@ Given(
  * ユーザー "{string}" がスレッドを作成済みである状態を設定する。
  * 名前付きユーザーを作成し、そのユーザーのスレッドを作成する。
  *
- * See: features/phase1/incentive.feature Rule: 立てたスレッドのレス数がマイルストーンに達する
+ * See: features/incentive.feature Rule: 立てたスレッドのレス数がマイルストーンに達する
  */
 Given(
 	"{string} がスレッドを作成済みである",
@@ -434,7 +434,7 @@ Given(
 /**
  * ユーザー "{string}" がスレッドを作成済みである（"ユーザー" プレフィックスあり版）。
  *
- * See: features/phase1/incentive.feature @スレッドにレスが10個付き
+ * See: features/incentive.feature @スレッドにレスが10個付き
  */
 Given(
 	"ユーザー {string} がスレッドを作成済みである",
@@ -456,7 +456,7 @@ Given(
  * そのスレッドのレス数が {int} である状態を設定する。
  * postCount を指定数まで incrementPostCount で増加させる。
  *
- * See: features/phase1/incentive.feature @スレッドにレスが10個付き
+ * See: features/incentive.feature @スレッドにレスが10個付き
  */
 Given(
 	"そのスレッドのレス数が {int} である",
@@ -478,7 +478,7 @@ Given(
  * そのスレッドのユニークID数が {int} 以上である状態を設定する。
  * 異なる dailyId を持つダミーレスをスレッドに追加する。
  *
- * See: features/phase1/incentive.feature @スレッドにレスが10個付き
+ * See: features/incentive.feature @スレッドにレスが10個付き
  */
 Given(
 	"そのスレッドのユニークID数が {int} 以上である",
@@ -508,7 +508,7 @@ Given(
  * そのスレッドのユニークID数が {int} である状態を設定する。
  * ちょうど指定数の異なる dailyId を持つダミーレスをスレッドに追加する。
  *
- * See: features/phase1/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
+ * See: features/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
  */
 Given(
 	"そのスレッドのユニークID数が {int} である",
@@ -542,7 +542,7 @@ Given(
  * ユーザー "{string}" がレス >>{int} を書き込み済みである状態を設定する。
  * 指定レス番号のレスを名前付きユーザーのものとして直接ストアに挿入する。
  *
- * See: features/phase1/incentive.feature Rule: 他人から返信（アンカー付き）が付くと +5
+ * See: features/incentive.feature Rule: 他人から返信（アンカー付き）が付くと +5
  */
 Given(
 	"ユーザー {string} がレス >>{int} を書き込み済みである",
@@ -584,7 +584,7 @@ Given(
 /**
  * ユーザー "{string}" がレス >>{int} とレス >>{int} を書き込み済みである状態を設定する。
  *
- * See: features/phase1/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
+ * See: features/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
  */
 Given(
 	"ユーザー {string} がレス >>{int} とレス >>{int} を書き込み済みである",
@@ -631,7 +631,7 @@ Given(
  * 今日すでに "UserB" からの返信で +5 を受け取っている状態を設定する。
  * reply インセンティブログを追加して重複ガードを有効化する。
  *
- * See: features/phase1/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
+ * See: features/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
  */
 Given(
 	"今日すでに {string} からの返信で +5 を受け取っている",
@@ -662,7 +662,7 @@ Given(
  * レス >>{int} の書き込みから60分以上経過している状態を設定する。
  * 現在時刻を過去に設定してレスを挿入後、時刻を進める。
  *
- * See: features/phase1/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
+ * See: features/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
  */
 Given(
 	"レス >>{int} の書き込みから60分以上経過している",
@@ -697,7 +697,7 @@ Given(
  * そのスレッドに過去書き込みをしたことがない状態（デフォルト）。
  * Beforeフックでリセット済みのため特に何もしない。
  *
- * See: features/phase1/incentive.feature @未参加のスレッドに初めて書き込むと +3 ボーナス
+ * See: features/incentive.feature @未参加のスレッドに初めて書き込むと +3 ボーナス
  */
 Given(
 	"そのスレッドに過去書き込みをしたことがない",
@@ -731,7 +731,7 @@ Given(
  * そのスレッドに過去書き込みをしたことがある状態を設定する。
  * 現在のユーザーのレスをそのスレッドに追加する。
  *
- * See: features/phase1/incentive.feature @同一スレッドへの2回目の書き込みではボーナスは付与されない
+ * See: features/incentive.feature @同一スレッドへの2回目の書き込みではボーナスは付与されない
  */
 Given(
 	"そのスレッドに過去書き込みをしたことがある",
@@ -770,7 +770,7 @@ Given(
  * 今日すでに3つの新スレッドに初書き込みをしている状態を設定する。
  * new_thread_join インセンティブログを3件追加する。
  *
- * See: features/phase1/incentive.feature @同日4スレッド目の初参加ではボーナスは付与されない
+ * See: features/incentive.feature @同日4スレッド目の初参加ではボーナスは付与されない
  */
 Given(
 	"今日すでに3つの新スレッドに初書き込みをしている",
@@ -804,7 +804,7 @@ Given(
  * Named User（UserA 等）が存在する場合はそのユーザーのダミーレスを追加し、
  * new_thread_join ボーナスの誤発火も同時に防止する。
  *
- * See: features/phase1/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み
+ * See: features/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み
  * See: TASK-019 バグ2修正（threadPosts 時系列判定のための事前条件設定）
  */
 Given(
@@ -887,7 +887,7 @@ Given(
  * Named User（UserA 等）が存在する場合はそのユーザーのダミーレスとして追加し、
  * new_thread_join ボーナスの誤発火も同時に防止する。
  *
- * See: features/phase1/incentive.feature @最終レスが24時間以内のスレッドでは低活性判定にならない
+ * See: features/incentive.feature @最終レスが24時間以内のスレッドでは低活性判定にならない
  * See: TASK-019 バグ2修正（threadPosts 時系列判定のための事前条件設定）
  */
 Given(
@@ -964,7 +964,7 @@ Given(
  * streakDays と lastPostDate（昨日）を設定する。
  * 正規表現でパラメータを抽出する（日本語の数字+日が {int} に直接マッチしない問題を回避）。
  *
- * See: features/phase1/incentive.feature Rule: N日連続で書き込みログインボーナスを獲得する
+ * See: features/incentive.feature Rule: N日連続で書き込みログインボーナスを獲得する
  */
 Given(
 	/^ユーザーが(\d+)日連続で書き込みログインボーナスを獲得済みである$/,
@@ -994,7 +994,7 @@ Given(
  * 昨日は書き込みをしなかった状態を設定する。
  * lastPostDate を一昨日以前に設定してストリークを切れた状態にする。
  *
- * See: features/phase1/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
+ * See: features/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
  */
 Given("昨日は書き込みをしなかった", async function (this: BattleBoardWorld) {
 	assert(this.currentUserId, "ユーザーがログイン済みである必要があります");
@@ -1019,7 +1019,7 @@ Given("昨日は書き込みをしなかった", async function (this: BattleBoa
 /**
  * ユーザー "{string}" の通貨残高が {int} である（名前付きユーザー版）。
  *
- * See: features/phase1/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと
+ * See: features/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと
  */
 Given(
 	"ユーザー {string} の通貨残高が {int} である",
@@ -1041,7 +1041,7 @@ Given(
  * ログインする（通貨付与なしの確認用）。
  * ログインだけでは通貨残高は変化しないことを確認するステップ。
  *
- * See: features/phase1/incentive.feature @ログインしただけでは通貨は付与されない
+ * See: features/incentive.feature @ログインしただけでは通貨は付与されない
  */
 When("ログインする", async function (this: BattleBoardWorld) {
 	// ログインは edge-token の発行のみ（インセンティブは発火しない）
@@ -1058,7 +1058,7 @@ When("ログインする", async function (this: BattleBoardWorld) {
  * 別のユーザーを作成してスレッドに書き込みを行う。
  * 正規表現でパラメータを抽出する（日本語の数字+件目が {int} に直接マッチしない問題を回避）。
  *
- * See: features/phase1/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
+ * See: features/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
  */
 When(
 	/^他のユーザーが(\d+)件目のレスを書き込む$/,
@@ -1102,7 +1102,7 @@ When(
  * 既存のダミーユーザーを再利用して書き込みを行う。
  * 正規表現でパラメータを抽出する（日本語の数字+件目が {int} に直接マッチしない問題を回避）。
  *
- * See: features/phase1/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
+ * See: features/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
  */
 When(
 	/^同一ユーザーが(\d+)件目のレスを書き込む$/,
@@ -1172,7 +1172,7 @@ When(
 /**
  * ユーザー "{string}" がレス >>{int} にアンカー付きで返信を書き込む。
  *
- * See: features/phase1/incentive.feature Rule: 他人から返信（アンカー付き）が付くと +5
+ * See: features/incentive.feature Rule: 他人から返信（アンカー付き）が付くと +5
  */
 When(
 	"ユーザー {string} がレス >>{int} にアンカー付きで返信を書き込む",
@@ -1224,7 +1224,7 @@ When(
  * 返信前に対象レス作者への reply ログを予め挿入して重複ガードを有効化し、
  * reply ボーナスの誤発火（期待値外の残高変動）を防ぐ。
  *
- * See: features/phase1/incentive.feature @60分以内に3人以上から返信が付くと +15 ボーナスが付与される
+ * See: features/incentive.feature @60分以内に3人以上から返信が付くと +15 ボーナスが付与される
  */
 When(
 	"60分以内にユーザー {string}, {string}, {string} がレス >>{int} にアンカー付きで返信する",
@@ -1287,7 +1287,7 @@ When(
  * 返信前に対象レス作者への reply ログを予め挿入して重複ガードを有効化し、
  * reply ボーナスの誤発火を防ぐ。
  *
- * See: features/phase1/incentive.feature @返信者が3人未満の場合はホットレスボーナスは付与されない
+ * See: features/incentive.feature @返信者が3人未満の場合はホットレスボーナスは付与されない
  */
 When(
 	"60分以内にユーザー {string}, {string} の2人がレス >>{int} にアンカー付きで返信する",
@@ -1351,7 +1351,7 @@ When(
  * 返信前に対象レス作者への reply ログを予め挿入して重複ガードを有効化し、
  * reply ボーナスの誤発火（残高変動）を防ぐ。
  *
- * See: features/phase1/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
+ * See: features/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
  */
 When(
 	"3人目のユーザーがレス >>{int} にアンカー付きで返信する",
@@ -1453,7 +1453,7 @@ When(
  * そのスレッドに書き込みを1件行う（スレッド参加ボーナス用）。
  * currentThreadId で設定済みのスレッドに現在のユーザーが書き込む。
  *
- * See: features/phase1/incentive.feature Rule: 未参加スレッドへの初書き込みで +3
+ * See: features/incentive.feature Rule: 未参加スレッドへの初書き込みで +3
  */
 When(
 	"そのスレッドに書き込みを1件行う",
@@ -1500,7 +1500,7 @@ When(
  * thread_revival シナリオでは、ダミーレスの createdAt を inactiveTime より前に設定することで
  * evaluateThreadRevivalBonus の低活性期間判定が正しく機能するよう制御する。
  *
- * See: features/phase1/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み
+ * See: features/incentive.feature Rule: 24時間以上レスのないスレッドに書き込み
  * See: tmp/escalations/escalation_ESC-TASK-019-1.md (new_thread_join 副作用)
  */
 When(
@@ -1619,7 +1619,7 @@ When(
 /**
  * 30分以内に別のユーザーがそのスレッドにレスを書き込む。
  *
- * See: features/phase1/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと
+ * See: features/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと
  */
 When(
 	"30分以内に別のユーザーがそのスレッドにレスを書き込む",
@@ -1650,7 +1650,7 @@ When(
 /**
  * 30分以内に他のユーザーのレスが付かない（何もしない）。
  *
- * See: features/phase1/incentive.feature @30分以内に他ユーザーのレスが付かなければボーナスは付与されない
+ * See: features/incentive.feature @30分以内に他ユーザーのレスが付かなければボーナスは付与されない
  */
 When(
 	"30分以内に他のユーザーのレスが付かない",
@@ -1668,7 +1668,7 @@ When(
  * 現在のユーザーでスレッドに書き込みを行う。
  * 正規表現でパラメータを抽出する（日本語の数字+日が {int} に直接マッチしない問題を回避）。
  *
- * See: features/phase1/incentive.feature @7日連続書き込みで +20 ストリークボーナスが付与される
+ * See: features/incentive.feature @7日連続書き込みで +20 ストリークボーナスが付与される
  */
 When(
 	/^(\d+)日目の初回書き込みを行う$/,
@@ -1714,7 +1714,7 @@ When(
 /**
  * 今日の初回書き込みを行う（ストリークリセット確認用）。
  *
- * See: features/phase1/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
+ * See: features/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
  */
 When("今日の初回書き込みを行う", async function (this: BattleBoardWorld) {
 	assert(this.currentUserId, "ユーザーがログイン済みである必要があります");
@@ -1760,7 +1760,7 @@ When("今日の初回書き込みを行う", async function (this: BattleBoardWo
  * スレッドのレス番号 {int} に書き込みを行う。
  * 事前に (postCount - 1) 件のダミーレスを挿入してからスレッドに書き込む。
  *
- * See: features/phase1/incentive.feature Rule: スレッド内のレス番号が100の倍数のとき書き込んだユーザーにボーナス
+ * See: features/incentive.feature Rule: スレッド内のレス番号が100の倍数のとき書き込んだユーザーにボーナス
  */
 When(
 	"スレッドのレス番号 {int} に書き込みを行う",
@@ -1827,7 +1827,7 @@ When(
  * 4つ目の未参加スレッドに書き込みを1件行う（1日3スレッド上限超過）。
  * 新しいスレッドを作成してそこに書き込む。
  *
- * See: features/phase1/incentive.feature @同日4スレッド目の初参加ではボーナスは付与されない
+ * See: features/incentive.feature @同日4スレッド目の初参加ではボーナスは付与されない
  */
 When(
 	"4つ目の未参加スレッドに書き込みを1件行う",
@@ -1871,7 +1871,7 @@ When(
  * 書き込みログインボーナスとして +{int} が付与される。
  * daily_login イベントが granted に含まれることを検証する。
  *
- * See: features/phase1/incentive.feature @その日の初回書き込みでログインボーナス +10 が付与される
+ * See: features/incentive.feature @その日の初回書き込みでログインボーナス +10 が付与される
  */
 Then(
 	"書き込みログインボーナスとして +{int} が付与される",
@@ -1894,7 +1894,7 @@ Then(
 /**
  * 書き込みログインボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @同日の2回目以降の書き込みではボーナスは付与されない
+ * See: features/incentive.feature @同日の2回目以降の書き込みではボーナスは付与されない
  */
 Then(
 	"書き込みログインボーナスは付与されない",
@@ -1915,7 +1915,7 @@ Then(
 /**
  * スレッド作成ログインボーナスとして +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @その日の初回スレッド作成でボーナス +10 が付与される
+ * See: features/incentive.feature @その日の初回スレッド作成でボーナス +10 が付与される
  */
 Then(
 	"スレッド作成ログインボーナスとして +{int} が付与される",
@@ -1940,7 +1940,7 @@ Then(
 /**
  * スレッド作成ログインボーナス +{int} が付与される（別の表現形式）。
  *
- * See: features/phase1/incentive.feature @スレッド作成は書き込みログインボーナスの対象外である
+ * See: features/incentive.feature @スレッド作成は書き込みログインボーナスの対象外である
  */
 Then(
 	"スレッド作成ログインボーナス +{int} が付与される",
@@ -1965,7 +1965,7 @@ Then(
 /**
  * スレッド作成ログインボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @同日の2回目以降のスレッド作成ではボーナスは付与されない
+ * See: features/incentive.feature @同日の2回目以降のスレッド作成ではボーナスは付与されない
  */
 Then(
 	"スレッド作成ログインボーナスは付与されない",
@@ -1990,7 +1990,7 @@ Then(
 /**
  * "{string}" にスレッド成長ボーナスとして +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
+ * See: features/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
  */
 Then(
 	"{string} にスレッド成長ボーナスとして +{int} が付与される",
@@ -2014,7 +2014,7 @@ Then(
 /**
  * スレッド成長ボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
+ * See: features/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
  */
 Then(
 	"スレッド成長ボーナスは付与されない",
@@ -2035,7 +2035,7 @@ Then(
 /**
  * "{string}" の通貨残高が {int} になる（名前付きユーザー版）。
  *
- * See: features/phase1/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
+ * See: features/incentive.feature @スレッドにレスが10個付き、ユニークID 3個以上で +50 ボーナス
  */
 Then(
 	"{string} の通貨残高が {int} になる",
@@ -2054,7 +2054,7 @@ Then(
 /**
  * "{string}" の通貨残高は {int} のまま変化しない（名前付きユーザー版）。
  *
- * See: features/phase1/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
+ * See: features/incentive.feature @レスが10個付いてもユニークIDが3未満ならボーナスは付与されない
  */
 Then(
 	"{string} の通貨残高は {int} のまま変化しない",
@@ -2077,7 +2077,7 @@ Then(
 /**
  * "{string}" に返信ボーナスとして +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @他のユーザーから返信が付くと +5 ボーナスが付与される
+ * See: features/incentive.feature @他のユーザーから返信が付くと +5 ボーナスが付与される
  */
 Then(
 	"{string} に返信ボーナスとして +{int} が付与される",
@@ -2102,7 +2102,7 @@ Then(
 /**
  * 返信ボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
+ * See: features/incentive.feature @同一IDからの2回目以降の返信ではボーナスは付与されない
  */
 Then("返信ボーナスは付与されない", async function (this: BattleBoardWorld) {
 	// UserA に新しい reply ボーナスが付与されていないことを確認
@@ -2131,7 +2131,7 @@ Then("返信ボーナスは付与されない", async function (this: BattleBoar
 /**
  * "{string}" に返信ボーナスが合計 +{int} 付与される（複数返信用）。
  *
- * See: features/phase1/incentive.feature @異なるIDからの返信にはそれぞれボーナスが付与される
+ * See: features/incentive.feature @異なるIDからの返信にはそれぞれボーナスが付与される
  */
 Then(
 	"{string} に返信ボーナスが合計 +{int} 付与される",
@@ -2160,7 +2160,7 @@ Then(
 /**
  * "{string}" にホットレスボーナスとして +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @60分以内に3人以上から返信が付くと +15 ボーナスが付与される
+ * See: features/incentive.feature @60分以内に3人以上から返信が付くと +15 ボーナスが付与される
  */
 Then(
 	"{string} にホットレスボーナスとして +{int} が付与される",
@@ -2184,7 +2184,7 @@ Then(
 /**
  * ホットレスボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
+ * See: features/incentive.feature @返信が60分を超えた場合はホットレスボーナスは付与されない
  */
 Then(
 	"ホットレスボーナスは付与されない",
@@ -2207,7 +2207,7 @@ Then(
 /**
  * 新スレッド参加ボーナスとして +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @未参加のスレッドに初めて書き込むと +3 ボーナスが付与される
+ * See: features/incentive.feature @未参加のスレッドに初めて書き込むと +3 ボーナスが付与される
  */
 Then(
 	"新スレッド参加ボーナスとして +{int} が付与される",
@@ -2230,7 +2230,7 @@ Then(
 /**
  * 新スレッド参加ボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @同一スレッドへの2回目の書き込みではボーナスは付与されない
+ * See: features/incentive.feature @同一スレッドへの2回目の書き込みではボーナスは付与されない
  */
 Then(
 	"新スレッド参加ボーナスは付与されない",
@@ -2257,7 +2257,7 @@ Then(
 /**
  * "{string}" にスレッド復興ボーナスとして +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと
+ * See: features/incentive.feature @低活性スレッドに書き込み後30分以内に他ユーザーのレスが付くと
  */
 Then(
 	"{string} にスレッド復興ボーナスとして +{int} が付与される",
@@ -2281,7 +2281,7 @@ Then(
 /**
  * スレッド復興ボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @30分以内に他ユーザーのレスが付かなければボーナスは付与されない
+ * See: features/incentive.feature @30分以内に他ユーザーのレスが付かなければボーナスは付与されない
  */
 Then(
 	"スレッド復興ボーナスは付与されない",
@@ -2312,7 +2312,7 @@ Then(
 /**
  * 書き込みログインボーナス +{int} に加え、ストリークボーナス +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @7日連続書き込みで +20 ストリークボーナスが付与される
+ * See: features/incentive.feature @7日連続書き込みで +20 ストリークボーナスが付与される
  */
 Then(
 	"書き込みログインボーナス +{int} に加え、ストリークボーナス +{int} が付与される",
@@ -2352,7 +2352,7 @@ Then(
  * ストリークは1日目からリセットされる。
  * ユーザーの streakDays が 1 になっていることを確認する。
  *
- * See: features/phase1/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
+ * See: features/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
  */
 Then(
 	"ストリークは1日目からリセットされる",
@@ -2371,7 +2371,7 @@ Then(
 /**
  * ストリークボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
+ * See: features/incentive.feature @途中で1日書き込みを休むとストリークがリセットされる
  */
 Then(
 	"ストリークボーナスは付与されない",
@@ -2393,7 +2393,7 @@ Then(
 /**
  * キリ番ボーナスとして +{int} が付与される。
  *
- * See: features/phase1/incentive.feature @レス番号 >>100 を踏むと +10 ボーナスが付与される
+ * See: features/incentive.feature @レス番号 >>100 を踏むと +10 ボーナスが付与される
  */
 Then(
 	"キリ番ボーナスとして +{int} が付与される",
@@ -2416,7 +2416,7 @@ Then(
 /**
  * キリ番ボーナスは付与されない。
  *
- * See: features/phase1/incentive.feature @100の倍数でないレス番号ではキリ番ボーナスは付与されない
+ * See: features/incentive.feature @100の倍数でないレス番号ではキリ番ボーナスは付与されない
  */
 Then("キリ番ボーナスは付与されない", async function (this: BattleBoardWorld) {
 	assert(this.currentUserId, "通貨残高確認のためユーザーIDが必要です");

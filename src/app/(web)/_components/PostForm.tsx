@@ -14,8 +14,8 @@
  * 3. ユーザーが認証コードを入力 → POST /api/auth/auth-code
  * 4. 認証成功 → 書き込みをリトライ
  *
- * See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
- * See: features/phase1/posting.feature @本文が空の場合は書き込みが行われない
+ * See: features/posting.feature @無料ユーザーが書き込みを行う
+ * See: features/posting.feature @本文が空の場合は書き込みが行われない
  * See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
  * See: docs/specs/screens/thread-view.yaml > post-form
  */
@@ -62,7 +62,7 @@ export default function PostForm({ threadId }: PostFormProps) {
   /**
    * 書き込みAPIを呼び出す。
    *
-   * See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
+   * See: features/posting.feature @無料ユーザーが書き込みを行う
    * See: docs/specs/openapi.yaml > /api/threads/{threadId}/posts > post
    *
    * @param postBody - 投稿する本文
@@ -99,7 +99,7 @@ export default function PostForm({ threadId }: PostFormProps) {
   /**
    * フォーム送信ハンドラ
    *
-   * See: features/phase1/posting.feature @本文が空の場合は書き込みが行われない
+   * See: features/posting.feature @本文が空の場合は書き込みが行われない
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

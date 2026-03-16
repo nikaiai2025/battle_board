@@ -1,4 +1,4 @@
-# features/phase1/authentication.feature
+# features/authentication.feature
 # ステータス: ドラフト v4
 Feature: 書き込み認証・管理者認証と日次リセットID
 

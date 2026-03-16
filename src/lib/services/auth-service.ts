@@ -1,7 +1,7 @@
 /**
  * AuthService — 認証ロジック統括サービス
  *
- * See: features/phase1/authentication.feature
+ * See: features/authentication.feature
  * See: docs/architecture/components/authentication.md §2 公開インターフェース
  * See: docs/architecture/architecture.md §5 認証アーキテクチャ
  *
@@ -16,7 +16,7 @@
  *   - 投稿時の IP 一致チェックは廃止。「edge-token の存在 + is_verified=true」のみで認証判定する
  *     （eddist 参考実装に倣い。モバイル回線等の IP 変動時の再認証問題を解消）
  *     See: docs/research/eddist_edge_token_ip_report_2026-03-14.md
- *     See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+ *     See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 
 import { createHash, randomBytes } from 'crypto'
@@ -36,10 +36,10 @@ import { initializeBalance } from './currency-service'
  *
  * not_verified: edge-token は存在するが認証コード未検証（is_verified=false）。
  * G1 是正対応。PostService の resolveAuth が認証案内を再表示する。
- * See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
  *
  * Note: ip_mismatch は廃止（投稿時の IP チェックを廃止したため）。
- * See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+ * See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 export type VerifyResult =
   | { valid: true; userId: string; authorIdSeed: string }
@@ -135,7 +135,7 @@ export function hashIp(ip: string): string {
  * 6桁の認証コードを生成する（0〜9 のランダムな数字列）。
  * crypto.randomInt を使用して安全な乱数を生成する。
  *
- * See: features/phase1/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+ * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
  *
  * @returns 6桁の数字文字列（例: "048293"）
  */
@@ -156,8 +156,8 @@ function generateAuthCode(): string {
  * eddist の参考実装（docs/research/eddist_edge_token_ip_report_2026-03-14.md）に倣い、
  * モバイル回線等の IP 変動時に再認証が発生する問題を解消する。
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  * See: docs/architecture/components/authentication.md §2.1 verifyEdgeToken
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
  *
@@ -177,7 +177,7 @@ export async function verifyEdgeToken(
   }
 
   // is_verified チェック
-  // See: features/phase1/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+  // See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
   // See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
   if (!user.isVerified) {
     return { valid: false, reason: 'not_verified' }
@@ -217,7 +217,7 @@ export async function issueEdgeToken(
   })
 
   // 新規ユーザーに初期通貨 50 を付与する
-  // See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+  // See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
   await initializeBalance(user.id)
 
   return { token, userId: user.id }
@@ -228,7 +228,7 @@ export async function issueEdgeToken(
  * 6桁の数字コードを生成して AuthCodeRepository に保存する。
  * 有効期限は発行から10分（600秒）。
  *
- * See: features/phase1/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+ * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
  * See: docs/architecture/components/authentication.md §2.1 issueAuthCode
  * See: TASK-006 タスク指示書 > 補足・制約 > 認証コードの有効期限: 10分
  *
@@ -270,9 +270,9 @@ export async function issueAuthCode(
  *   6. write_token を生成して auth_codes に保存
  * IP 整合チェックはソフトチェック（不一致でも成功扱い、ログのみ）。
  *
- * See: features/phase1/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/phase1/authentication.feature @Turnstile検証に失敗すると認証に失敗する
- * See: features/phase1/authentication.feature @期限切れ認証コードでは認証できない
+ * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ * See: features/authentication.feature @期限切れ認証コードでは認証できない
  * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  * See: docs/architecture/components/authentication.md §2.1 verifyAuthCode
@@ -393,7 +393,7 @@ export async function verifyWriteToken(
  * 管理者セッショントークンを検証し、セッション情報を返す。
  * Supabase Auth の getUser API をラップする。
  *
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
  * See: docs/architecture/components/authentication.md §2.3 verifyAdminSession
  * See: docs/architecture/architecture.md §5.3 管理者認証
  *

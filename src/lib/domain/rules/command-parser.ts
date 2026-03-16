@@ -1,6 +1,6 @@
 /**
  * ドメインルール: コマンド解析（command-parser）
- * See: features/phase2/command_system.feature @command_parsing
+ * See: features/command_system.feature @command_parsing
  * See: docs/architecture/components/command.md §2.3 コマンド解析仕様
  *
  * 書き込み本文（UTF-8文字列）からゲームコマンドを検出し、ParsedCommand を返す純粋関数。

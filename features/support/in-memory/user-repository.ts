@@ -4,8 +4,8 @@
  * BDD テスト用の Supabase 非依存実装。
  * user-repository.ts と同一シグネチャの関数を提供する。
  *
- * See: features/phase1/authentication.feature
- * See: features/phase1/posting.feature
+ * See: features/authentication.feature
+ * See: features/posting.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
@@ -117,7 +117,7 @@ export async function updateUsername(userId: string, username: string | null): P
 /**
  * ユーザーの有料ステータス（isPremium）を更新する。
  * See: src/lib/infrastructure/repositories/user-repository.ts
- * See: features/phase1/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+ * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
  */
 export async function updateIsPremium(userId: string, isPremium: boolean): Promise<void> {
   const user = store.get(userId)
@@ -132,7 +132,7 @@ export async function updateIsPremium(userId: string, isPremium: boolean): Promi
  * is_verified = true への更新により、書き込み時の認証チェック（G1 是正）が機能する。
  *
  * See: src/lib/infrastructure/repositories/user-repository.ts > updateIsVerified
- * See: features/phase1/authentication.feature @認証フロー是正
+ * See: features/authentication.feature @認証フロー是正
  * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
  */
 export async function updateIsVerified(userId: string, isVerified: boolean): Promise<void> {

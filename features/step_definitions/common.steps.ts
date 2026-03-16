@@ -53,9 +53,9 @@ function getIpHashForUser(name: string): string {
  *
  * 使用feature: authentication, posting, thread, currency, incentive
  *
- * See: features/phase1/thread.feature @ログイン済みユーザーがスレッドを作成する
- * See: features/phase1/currency.feature Background
- * See: features/phase1/incentive.feature Background
+ * See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
+ * See: features/currency.feature Background
+ * See: features/incentive.feature Background
  */
 Given('ユーザーがログイン済みである', async function (this: BattleBoardWorld) {
   const { token, userId } = await AuthService.issueEdgeToken(DEFAULT_IP_HASH)
@@ -64,7 +64,7 @@ Given('ユーザーがログイン済みである', async function (this: Battle
   this.currentIpHash = DEFAULT_IP_HASH
   // isVerified=true に設定して「認証済み」状態にする。
   // TASK-041 で verifyEdgeToken に not_verified チェックが追加されたため必要。
-  // See: features/phase1/authentication.feature @認証フロー是正
+  // See: features/authentication.feature @認証フロー是正
   await InMemoryUserRepo.updateIsVerified(userId, true)
 })
 
@@ -74,7 +74,7 @@ Given('ユーザーが書き込み可能状態である', async function (this: 
   this.currentUserId = userId
   this.currentIpHash = DEFAULT_IP_HASH
   // isVerified=true に設定して「認証済み（書き込み可能）」状態にする。
-  // See: features/phase1/authentication.feature @認証フロー是正
+  // See: features/authentication.feature @認証フロー是正
   await InMemoryUserRepo.updateIsVerified(userId, true)
 })
 
@@ -87,8 +87,8 @@ Given('ユーザーが書き込み可能状態である', async function (this: 
  *
  * 使用feature: currency, incentive
  *
- * See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
- * See: features/phase1/incentive.feature @その日の初回書き込みでログインボーナス
+ * See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
+ * See: features/incentive.feature @その日の初回書き込みでログインボーナス
  */
 Given('通貨残高が {int} である', async function (this: BattleBoardWorld, balance: number) {
   assert(this.currentUserId, '通貨残高設定前にユーザーがログイン済みである必要があります')
@@ -118,7 +118,7 @@ Given('ユーザーの通貨残高が {int} である', async function (this: Ba
  *
  * 使用feature: incentive
  *
- * See: features/phase1/incentive.feature @スレッド成長ボーナス
+ * See: features/incentive.feature @スレッド成長ボーナス
  */
 Given('{string} の通貨残高が {int} である', async function (
   this: BattleBoardWorld,
@@ -143,7 +143,7 @@ Given('{string} の通貨残高が {int} である', async function (
  *
  * 使用feature: thread, incentive
  *
- * See: features/phase1/thread.feature @スレッド一覧にスレッドの基本情報が表示される
+ * See: features/thread.feature @スレッド一覧にスレッドの基本情報が表示される
  */
 Given('スレッド {string} が存在し {int} 件のレスがある', async function (
   this: BattleBoardWorld,
@@ -177,7 +177,7 @@ Given('スレッド {string} が存在し {int} 件のレスがある', async fu
  *
  * 使用feature: posting, incentive
  *
- * See: features/phase1/incentive.feature @書き込みを行っても通貨報酬は発生しない
+ * See: features/incentive.feature @書き込みを行っても通貨報酬は発生しない
  */
 When('スレッドに書き込みを1件行う', async function (this: BattleBoardWorld) {
   assert(this.currentThreadId, '書き込み対象のスレッドが設定されていません')
@@ -205,7 +205,7 @@ When('スレッドに書き込みを1件行う', async function (this: BattleBoa
  *
  * 使用feature: posting, incentive
  *
- * See: features/phase1/posting.feature @無料ユーザーが書き込みを行う
+ * See: features/posting.feature @無料ユーザーが書き込みを行う
  */
 When('本文 {string} を入力して書き込みボタンを押す', async function (
   this: BattleBoardWorld,
@@ -236,7 +236,7 @@ When('本文 {string} を入力して書き込みボタンを押す', async func
  *
  * 使用feature: thread, incentive
  *
- * See: features/phase1/incentive.feature @その日の初回スレッド作成でボーナス
+ * See: features/incentive.feature @その日の初回スレッド作成でボーナス
  */
 When('新規スレッドを作成する', async function (this: BattleBoardWorld) {
   assert(this.currentEdgeToken, 'ユーザーがログイン済みである必要があります')
@@ -279,8 +279,8 @@ When('新規スレッドを作成する', async function (this: BattleBoardWorld
  *
  * 使用feature: currency, incentive
  *
- * See: features/phase1/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
- * See: features/phase1/incentive.feature @書き込みログインボーナスとして +10 が付与される
+ * See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+ * See: features/incentive.feature @書き込みログインボーナスとして +10 が付与される
  */
 Then('通貨残高が {int} になる', async function (this: BattleBoardWorld, expected: number) {
   assert(this.currentUserId, '通貨残高確認のためユーザーIDが必要です')
@@ -293,7 +293,7 @@ Then('通貨残高が {int} になる', async function (this: BattleBoardWorld, 
  *
  * 使用feature: currency, incentive
  *
- * See: features/phase1/incentive.feature @書き込みを行っても通貨報酬は発生しない
+ * See: features/incentive.feature @書き込みを行っても通貨報酬は発生しない
  */
 Then('通貨残高は {int} のまま変化しない', async function (this: BattleBoardWorld, expected: number) {
   assert(this.currentUserId, '通貨残高確認のためユーザーIDが必要です')
@@ -310,8 +310,8 @@ Then('通貨残高は {int} のまま変化しない', async function (this: Bat
  *
  * 使用feature: posting, thread, currency
  *
- * See: features/phase1/posting.feature @本文が空の場合は書き込みが行われない
- * See: features/phase1/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
+ * See: features/posting.feature @本文が空の場合は書き込みが行われない
+ * See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
  */
 Then('エラーメッセージが表示される', function (this: BattleBoardWorld) {
   assert(
@@ -334,7 +334,7 @@ Then('エラーメッセージが表示される', function (this: BattleBoardWo
  *
  * 使用feature: currency
  *
- * See: features/phase1/currency.feature @通貨残高がマイナスになる操作は実行されない
+ * See: features/currency.feature @通貨残高がマイナスになる操作は実行されない
  */
 Then('エラーメッセージ {string} が表示される', function (
   this: BattleBoardWorld,
