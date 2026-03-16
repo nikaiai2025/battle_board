@@ -4,9 +4,9 @@
 
 ## 現在のフェーズ
 
-**Phase 2 準備完了 — 実装着手可能**
+**Phase 2 実装中 — Step 1完了、BDD安定化済み**
 
-Phase 1完了。Phase 2のBDDシナリオ精緻化・ドキュメント不整合（GAP-1〜7）の解消が完了し、コーディングAIが実装に着手できる状態。
+Phase 2 Step 1（コマンド基盤）実装完了。Sprint-25でBDD失敗10件を全修正し、テスト基盤が安定。
 
 ## Phase 1 完了状況
 
@@ -18,7 +18,7 @@ Phase 1完了。Phase 2のBDDシナリオ精緻化・ドキュメント不整合
 ## テスト状況
 
 - vitest: 20ファイル / 672テスト / 全PASS
-- cucumber-js: 106シナリオ (103 passed, 3 pending) / 0 failed
+- cucumber-js: 108シナリオ (105 passed, 3 pending) / 0 failed
   - pending 3件: インフラ制約（HTTP:80直接応答2件 + WAF非ブロック1件）— 意図的Pending
 - playwright E2E: 1テスト / 全PASS（基本機能確認フロー）
 - playwright API: 26テスト / 全PASS（専ブラ互換15 + 認証Cookie11）
@@ -33,16 +33,17 @@ Phase 1完了。Phase 2のBDDシナリオ精緻化・ドキュメント不整合
 | ChMate | Vercel | ❌ | ❌ | HTTP:80→308リダイレクトで接続不可（既知。Vercel仕様） |
 | ChMate | Cloudflare | ✅ | ✅ | 正常動作（Sprint-20でSecure/SameSite除去により解決） |
 
-## 残課題（優先度低）
+## 残課題
 
-- 技術的負債（post-service.ts の Date, >>N ステップ汎用化）
-- Flakyテスト: BDD `スレッド復興ボーナスは付与されない`（incentive.feature）が散発的に失敗
+- Phase 2 Step 2: !tell ハンドラ本実装（AccusationService連携）
+- cucumber.js設定にphase2パスを追加
 - デザイン・レイアウト改善（機能優先のため後回し）
 
 ## スプリント履歴
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-25 | BDD失敗10件修正（incentive二段階評価 + mypage★置換 + admin削除コメント） | completed | `tmp/orchestrator/sprint_25_plan.md` |
 | Sprint-24 | Phase 2 Step 1: コマンド基盤実装（parser+Service+PostService統合） | completed | `tmp/orchestrator/sprint_24_plan.md` |
 | Sprint-23 | Phase 2準備: GAP-1〜7解消（仕様確定・ドキュメント更新） | completed | `tmp/orchestrator/sprint_23_plan.md` |
 | Sprint-22 | Web UI機能整備（マイページ導線 + 認証整合） | completed | アーカイブ参照 |

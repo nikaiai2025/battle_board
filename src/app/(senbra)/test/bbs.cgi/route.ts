@@ -28,14 +28,21 @@
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
 import { BbsCgiParser } from "@/lib/infrastructure/adapters/bbs-cgi-parser";
 import { BbsCgiResponseBuilder } from "@/lib/infrastructure/adapters/bbs-cgi-response";
-import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
-import * as PostService from "@/lib/services/post-service";
-import { hashIp, reduceIp, verifyWriteToken } from "@/lib/services/auth-service";
+import {
+	decodeHtmlNumericReferences,
+	ShiftJisEncoder,
+} from "@/lib/infrastructure/encoding/shift-jis";
 import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
-import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import {
+	hashIp,
+	reduceIp,
+	verifyWriteToken,
+} from "@/lib/services/auth-service";
+import * as PostService from "@/lib/services/post-service";
 
 /**
  * mail欄から write_token を検出・除去するための正規表現。
@@ -58,7 +65,7 @@ const WRITE_TOKEN_PATTERN = /#([0-9a-f]{32})/i;
  * @returns ベースURL文字列（末尾スラッシュなし）
  */
 function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL ?? "https://battleboard.vercel.app";
+	return process.env.NEXT_PUBLIC_BASE_URL ?? "https://battleboard.vercel.app";
 }
 
 /** BbsCgiParserのシングルトンインスタンス */
@@ -78,12 +85,12 @@ const encoder = new ShiftJisEncoder();
  * @returns クライアント IP の SHA-512 ハッシュ
  */
 function getIpHash(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  const ip =
-    forwarded?.split(",")[0].trim() ??
-    req.headers.get("x-real-ip") ??
-    "127.0.0.1";
-  return hashIp(reduceIp(ip));
+	const forwarded = req.headers.get("x-forwarded-for");
+	const ip =
+		forwarded?.split(",")[0].trim() ??
+		req.headers.get("x-real-ip") ??
+		"127.0.0.1";
+	return hashIp(reduceIp(ip));
 }
 
 /**
@@ -102,8 +109,8 @@ function getIpHash(req: NextRequest): string {
  * @returns write_token 文字列（32文字hex）または null
  */
 function extractWriteToken(mail: string): string | null {
-  const match = WRITE_TOKEN_PATTERN.exec(mail);
-  return match ? match[1].toLowerCase() : null;
+	const match = WRITE_TOKEN_PATTERN.exec(mail);
+	return match ? match[1].toLowerCase() : null;
 }
 
 /**
@@ -121,7 +128,7 @@ function extractWriteToken(mail: string): string | null {
  * @returns write_tokenを除去したmail欄文字列
  */
 function removeWriteToken(mail: string): string {
-  return mail.replace(WRITE_TOKEN_PATTERN, "").trim();
+	return mail.replace(WRITE_TOKEN_PATTERN, "").trim();
 }
 
 /**
@@ -132,14 +139,14 @@ function removeWriteToken(mail: string): string {
  * @returns Shift_JISエンコードされたHTMLレスポンス
  */
 function buildShiftJisHtmlResponse(html: string, status = 200): Response {
-  const sjisBuffer = encoder.encode(html);
-  return new Response(new Uint8Array(sjisBuffer), {
-    status,
-    headers: {
-      "Content-Type": "text/html; charset=Shift_JIS",
-      "Content-Length": String(sjisBuffer.length),
-    },
-  });
+	const sjisBuffer = encoder.encode(html);
+	return new Response(new Uint8Array(sjisBuffer), {
+		status,
+		headers: {
+			"Content-Type": "text/html; charset=Shift_JIS",
+			"Content-Length": String(sjisBuffer.length),
+		},
+	});
 }
 
 /**
@@ -156,94 +163,122 @@ function buildShiftJisHtmlResponse(html: string, status = 200): Response {
  * @returns Shift_JISエンコードされたHTMLレスポンス
  */
 export async function POST(req: NextRequest): Promise<Response> {
-  // Step 1: リクエストボディをBufferとして読み取る
-  let bodyBuffer: Buffer;
-  try {
-    const arrayBuffer = await req.arrayBuffer();
-    bodyBuffer = Buffer.from(arrayBuffer);
-  } catch {
-    const errorHtml = responseBuilder.buildError("リクエストの読み取りに失敗しました");
-    return buildShiftJisHtmlResponse(errorHtml, 200);
-  }
+	// Step 1: リクエストボディをBufferとして読み取る
+	let bodyBuffer: Buffer;
+	try {
+		const arrayBuffer = await req.arrayBuffer();
+		bodyBuffer = Buffer.from(arrayBuffer);
+	} catch {
+		const errorHtml = responseBuilder.buildError(
+			"リクエストの読み取りに失敗しました",
+		);
+		return buildShiftJisHtmlResponse(errorHtml, 200);
+	}
 
-  // Step 2-3: URL-エンコード済みShift-JISフォームデータをパースしてUTF-8のURLSearchParamsに変換する
-  //
-  // 専ブラはShift-JISバイトをURLエンコードして送信する（例: テスト → %83e%83X%83g）。
-  // 正しいデコード順序: ASCIIとして読み取り → URLデコードでrawバイト取得 → Shift-JISデコード
-  // NG: encoder.decode(bodyBuffer) → new URLSearchParams() の順では、
-  //   URLSearchParams が %83 をUTF-8バイトとして誤解釈し文字化けが発生する。
-  //
-  // See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
-  // See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界（Inbound）
-  let bodyParams: URLSearchParams;
-  try {
-    bodyParams = encoder.decodeFormData(bodyBuffer);
-  } catch {
-    const errorHtml = responseBuilder.buildError("POSTパラメータのパースに失敗しました");
-    return buildShiftJisHtmlResponse(errorHtml, 200);
-  }
+	// Step 2-3: URL-エンコード済みShift-JISフォームデータをパースしてUTF-8のURLSearchParamsに変換する
+	//
+	// 専ブラはShift-JISバイトをURLエンコードして送信する（例: テスト → %83e%83X%83g）。
+	// 正しいデコード順序: ASCIIとして読み取り → URLデコードでrawバイト取得 → Shift-JISデコード
+	// NG: encoder.decode(bodyBuffer) → new URLSearchParams() の順では、
+	//   URLSearchParams が %83 をUTF-8バイトとして誤解釈し文字化けが発生する。
+	//
+	// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+	// See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界（Inbound）
+	let bodyParams: URLSearchParams;
+	try {
+		bodyParams = encoder.decodeFormData(bodyBuffer);
+	} catch {
+		const errorHtml = responseBuilder.buildError(
+			"POSTパラメータのパースに失敗しました",
+		);
+		return buildShiftJisHtmlResponse(errorHtml, 200);
+	}
 
-  // Step 4: BbsCgiParserでBbsCgiParsedRequestに変換する
-  const cookieHeader = req.headers.get("cookie") ?? "";
-  const parsed = bbsCgiParser.parseRequest(bodyParams, cookieHeader);
+	// Step 4: BbsCgiParserでBbsCgiParsedRequestに変換する
+	const cookieHeader = req.headers.get("cookie") ?? "";
+	const parsedRaw = bbsCgiParser.parseRequest(bodyParams, cookieHeader);
 
-  // Step 5: IP ハッシュを取得する
-  const ipHash = getIpHash(req);
+	// Step 4b: HTML数値参照をUTF-8に逆変換する
+	//
+	// ChMate等の専ブラはShift_JIS非対応文字（絵文字等）をHTML数値参照（&#128512; 等）に
+	// 変換して送信する。ここでUTF-8ネイティブ文字に逆変換することで、DBには常にUTF-8の
+	// 文字が保存される。異体字セレクタ（U+FE0F, U+FE0E）は除去する。
+	//
+	// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+	// See: tmp/workers/bdd-architect_TASK-075/analysis.md §4 修正方針1
+	const parsed = {
+		...parsedRaw,
+		message: decodeHtmlNumericReferences(parsedRaw.message),
+		name: decodeHtmlNumericReferences(parsedRaw.name),
+	};
 
-  // Step 6: mail欄から write_token を検出する
-  // write_token が含まれる場合は検証し、除去した上で後続処理に渡す。
-  // DAT漏洩防止のため write_token は PostService に渡す前に必ず除去する。
-  // See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
-  // See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
-  // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
-  const detectedWriteToken = extractWriteToken(parsed.mail);
+	// Step 5: IP ハッシュを取得する
+	const ipHash = getIpHash(req);
 
-  if (detectedWriteToken !== null) {
-    // write_token を検証する
-    const writeTokenResult = await verifyWriteToken(detectedWriteToken);
+	// Step 6: mail欄から write_token を検出する
+	// write_token が含まれる場合は検証し、除去した上で後続処理に渡す。
+	// DAT漏洩防止のため write_token は PostService に渡す前に必ず除去する。
+	// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+	// See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+	// See: tmp/auth_spec_review_report.md §3.2 write_token 方式
+	const detectedWriteToken = extractWriteToken(parsed.mail);
 
-    if (!writeTokenResult.valid) {
-      // 無効な write_token: エラーレスポンスを返す
-      const errorHtml = responseBuilder.buildError("認証トークンが無効または期限切れです");
-      return buildShiftJisHtmlResponse(errorHtml, 200);
-    }
+	if (detectedWriteToken !== null) {
+		// write_token を検証する
+		const writeTokenResult = await verifyWriteToken(detectedWriteToken);
 
-    // 検証成功: write_token を除去した mail 欄で処理を続行する
-    // edge-token Cookie を verifyWriteToken が返した edgeToken 値で設定する
-    const cleanedMail = removeWriteToken(parsed.mail);
-    const verifiedEdgeToken = writeTokenResult.edgeToken!;
+		if (!writeTokenResult.valid) {
+			// 無効な write_token: エラーレスポンスを返す
+			const errorHtml = responseBuilder.buildError(
+				"認証トークンが無効または期限切れです",
+			);
+			return buildShiftJisHtmlResponse(errorHtml, 200);
+		}
 
-    // edge-token が付与済みの parsed オブジェクトを生成する
-    const parsedWithToken = {
-      ...parsed,
-      mail: cleanedMail,
-      edgeToken: verifiedEdgeToken,
-    };
+		// 検証成功: write_token を除去した mail 欄で処理を続行する
+		// edge-token Cookie を verifyWriteToken が返した edgeToken 値で設定する
+		const cleanedMail = removeWriteToken(parsed.mail);
+		const verifiedEdgeToken = writeTokenResult.edgeToken!;
 
-    // Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
-    const subject = bodyParams.get("subject") ?? "";
-    let finalResponse: Response;
-    if (subject.trim() !== "") {
-      finalResponse = await handleCreateThread(parsedWithToken, subject, ipHash);
-    } else {
-      finalResponse = await handleCreatePost(parsedWithToken, ipHash);
-    }
+		// edge-token が付与済みの parsed オブジェクトを生成する
+		const parsedWithToken = {
+			...parsed,
+			mail: cleanedMail,
+			edgeToken: verifiedEdgeToken,
+		};
 
-    // 書き込み成功時: edge-token Cookie を有効化済みユーザーのトークンで設定する
-    return setEdgeTokenCookie(finalResponse, verifiedEdgeToken);
-  }
+		// Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
+		// subjectもHTML数値参照をUTF-8に逆変換する（専ブラがスレタイの絵文字をHTML数値参照で送る場合への対応）
+		const subject = decodeHtmlNumericReferences(
+			bodyParams.get("subject") ?? "",
+		);
+		let finalResponse: Response;
+		if (subject.trim() !== "") {
+			finalResponse = await handleCreateThread(
+				parsedWithToken,
+				subject,
+				ipHash,
+			);
+		} else {
+			finalResponse = await handleCreatePost(parsedWithToken, ipHash);
+		}
 
-  // write_token なし: 通常フロー
-  // Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
-  const subject = bodyParams.get("subject") ?? "";
+		// 書き込み成功時: edge-token Cookie を有効化済みユーザーのトークンで設定する
+		return setEdgeTokenCookie(finalResponse, verifiedEdgeToken);
+	}
 
-  if (subject.trim() !== "") {
-    // 新規スレッド作成
-    return handleCreateThread(parsed, subject, ipHash);
-  } else {
-    // 既存スレッドへの書き込み
-    return handleCreatePost(parsed, ipHash);
-  }
+	// write_token なし: 通常フロー
+	// Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
+	// subjectもHTML数値参照をUTF-8に逆変換する（専ブラがスレタイの絵文字をHTML数値参照で送る場合への対応）
+	const subject = decodeHtmlNumericReferences(bodyParams.get("subject") ?? "");
+
+	if (subject.trim() !== "") {
+		// 新規スレッド作成
+		return handleCreateThread(parsed, subject, ipHash);
+	} else {
+		// 既存スレッドへの書き込み
+		return handleCreatePost(parsed, ipHash);
+	}
 }
 
 /**
@@ -257,44 +292,54 @@ export async function POST(req: NextRequest): Promise<Response> {
  * @returns Shift_JISエンコードされたHTMLレスポンス
  */
 async function handleCreateThread(
-  parsed: { boardId: string; message: string; name: string; mail: string; edgeToken: string | null },
-  subject: string,
-  ipHash: string
+	parsed: {
+		boardId: string;
+		message: string;
+		name: string;
+		mail: string;
+		edgeToken: string | null;
+	},
+	subject: string,
+	ipHash: string,
 ): Promise<Response> {
-  const result = await PostService.createThread(
-    {
-      boardId: parsed.boardId || "battleboard",
-      title: subject.trim(),
-      firstPostBody: parsed.message,
-    },
-    parsed.edgeToken,
-    ipHash
-  );
+	const result = await PostService.createThread(
+		{
+			boardId: parsed.boardId || "battleboard",
+			title: subject.trim(),
+			firstPostBody: parsed.message,
+		},
+		parsed.edgeToken,
+		ipHash,
+	);
 
-  if (result.authRequired) {
-    // 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
-    const authHtml = responseBuilder.buildAuthRequired(
-      result.authRequired.code,
-      result.authRequired.edgeToken,
-      getBaseUrl()
-    );
-    const response = buildShiftJisHtmlResponse(authHtml, 200);
-    // edge-token Cookie を設定する
-    return setEdgeTokenCookie(response, result.authRequired.edgeToken);
-  }
+	if (result.authRequired) {
+		// 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
+		const authHtml = responseBuilder.buildAuthRequired(
+			result.authRequired.code,
+			result.authRequired.edgeToken,
+			getBaseUrl(),
+		);
+		const response = buildShiftJisHtmlResponse(authHtml, 200);
+		// edge-token Cookie を設定する
+		return setEdgeTokenCookie(response, result.authRequired.edgeToken);
+	}
 
-  if (!result.success) {
-    const errorHtml = responseBuilder.buildError(result.error ?? "スレッドの作成に失敗しました");
-    return buildShiftJisHtmlResponse(errorHtml, 200);
-  }
+	if (!result.success) {
+		const errorHtml = responseBuilder.buildError(
+			result.error ?? "スレッドの作成に失敗しました",
+		);
+		return buildShiftJisHtmlResponse(errorHtml, 200);
+	}
 
-  const threadKey = result.thread?.threadKey ?? "";
-  const boardId = parsed.boardId || "battleboard";
-  const successHtml = responseBuilder.buildSuccess(threadKey, boardId);
-  const response = buildShiftJisHtmlResponse(successHtml, 200);
-  // 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）
-  // parsed.edgeTokenがnullの場合（authRequiredパスで先にreturnされる）、ここには到達しないためnullチェック不要
-  return parsed.edgeToken ? setEdgeTokenCookie(response, parsed.edgeToken) : response;
+	const threadKey = result.thread?.threadKey ?? "";
+	const boardId = parsed.boardId || "battleboard";
+	const successHtml = responseBuilder.buildSuccess(threadKey, boardId);
+	const response = buildShiftJisHtmlResponse(successHtml, 200);
+	// 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）
+	// parsed.edgeTokenがnullの場合（authRequiredパスで先にreturnされる）、ここには到達しないためnullチェック不要
+	return parsed.edgeToken
+		? setEdgeTokenCookie(response, parsed.edgeToken)
+		: response;
 }
 
 /**
@@ -312,51 +357,70 @@ async function handleCreateThread(
  * @returns Shift_JISエンコードされたHTMLレスポンス
  */
 async function handleCreatePost(
-  parsed: { boardId: string; threadKey: string; message: string; name: string; mail: string; edgeToken: string | null },
-  ipHash: string
+	parsed: {
+		boardId: string;
+		threadKey: string;
+		message: string;
+		name: string;
+		mail: string;
+		edgeToken: string | null;
+	},
+	ipHash: string,
 ): Promise<Response> {
-  // threadKey が空の場合はエラー
-  if (!parsed.threadKey) {
-    const errorHtml = responseBuilder.buildError("スレッドキーが指定されていません");
-    return buildShiftJisHtmlResponse(errorHtml, 200);
-  }
+	// threadKey が空の場合はエラー
+	if (!parsed.threadKey) {
+		const errorHtml = responseBuilder.buildError(
+			"スレッドキーが指定されていません",
+		);
+		return buildShiftJisHtmlResponse(errorHtml, 200);
+	}
 
-  // threadKey からスレッド UUID を取得する
-  const thread = await ThreadRepository.findByThreadKey(parsed.threadKey);
-  if (!thread) {
-    const errorHtml = responseBuilder.buildError("指定されたスレッドが存在しません");
-    return buildShiftJisHtmlResponse(errorHtml, 200);
-  }
+	// threadKey からスレッド UUID を取得する
+	const thread = await ThreadRepository.findByThreadKey(parsed.threadKey);
+	if (!thread) {
+		const errorHtml = responseBuilder.buildError(
+			"指定されたスレッドが存在しません",
+		);
+		return buildShiftJisHtmlResponse(errorHtml, 200);
+	}
 
-  // PostServiceで書き込みを実行する
-  const result = await PostService.createPost({
-    threadId: thread.id,
-    body: parsed.message,
-    edgeToken: parsed.edgeToken,
-    ipHash,
-    displayName: parsed.name || undefined,
-    email: parsed.mail || undefined,
-    isBotWrite: false,
-  });
+	// PostServiceで書き込みを実行する
+	const result = await PostService.createPost({
+		threadId: thread.id,
+		body: parsed.message,
+		edgeToken: parsed.edgeToken,
+		ipHash,
+		displayName: parsed.name || undefined,
+		email: parsed.mail || undefined,
+		isBotWrite: false,
+	});
 
-  if ("authRequired" in result) {
-    // 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
-    const authHtml = responseBuilder.buildAuthRequired(result.code, result.edgeToken, getBaseUrl());
-    const response = buildShiftJisHtmlResponse(authHtml, 200);
-    return setEdgeTokenCookie(response, result.edgeToken);
-  }
+	if ("authRequired" in result) {
+		// 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
+		const authHtml = responseBuilder.buildAuthRequired(
+			result.code,
+			result.edgeToken,
+			getBaseUrl(),
+		);
+		const response = buildShiftJisHtmlResponse(authHtml, 200);
+		return setEdgeTokenCookie(response, result.edgeToken);
+	}
 
-  if (!result.success) {
-    const errorHtml = responseBuilder.buildError(result.error ?? "書き込みに失敗しました");
-    return buildShiftJisHtmlResponse(errorHtml, 200);
-  }
+	if (!result.success) {
+		const errorHtml = responseBuilder.buildError(
+			result.error ?? "書き込みに失敗しました",
+		);
+		return buildShiftJisHtmlResponse(errorHtml, 200);
+	}
 
-  const boardId = parsed.boardId || "battleboard";
-  const successHtml = responseBuilder.buildSuccess(parsed.threadKey, boardId);
-  const response = buildShiftJisHtmlResponse(successHtml, 200);
-  // 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）
-  // parsed.edgeTokenがnullの場合（authRequiredパスで先にreturnされる）、ここには到達しないためnullチェック不要
-  return parsed.edgeToken ? setEdgeTokenCookie(response, parsed.edgeToken) : response;
+	const boardId = parsed.boardId || "battleboard";
+	const successHtml = responseBuilder.buildSuccess(parsed.threadKey, boardId);
+	const response = buildShiftJisHtmlResponse(successHtml, 200);
+	// 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）
+	// parsed.edgeTokenがnullの場合（authRequiredパスで先にreturnされる）、ここには到達しないためnullチェック不要
+	return parsed.edgeToken
+		? setEdgeTokenCookie(response, parsed.edgeToken)
+		: response;
 }
 
 /**
@@ -367,17 +431,17 @@ async function handleCreatePost(
  * @returns Cookie が設定されたレスポンス
  */
 function setEdgeTokenCookie(response: Response, edgeToken: string): Response {
-  const headers = new Headers(response.headers);
-  const cookieOptions = [
-    `${EDGE_TOKEN_COOKIE}=${edgeToken}`,
-    "HttpOnly",
-    "Max-Age=31536000", // 365日（eddist準拠）
-    "Path=/",
-  ].join("; ");
-  headers.append("Set-Cookie", cookieOptions);
+	const headers = new Headers(response.headers);
+	const cookieOptions = [
+		`${EDGE_TOKEN_COOKIE}=${edgeToken}`,
+		"HttpOnly",
+		"Max-Age=31536000", // 365日（eddist準拠）
+		"Path=/",
+	].join("; ");
+	headers.append("Set-Cookie", cookieOptions);
 
-  return new Response(response.body, {
-    status: response.status,
-    headers,
-  });
+	return new Response(response.body, {
+		status: response.status,
+		headers,
+	});
 }

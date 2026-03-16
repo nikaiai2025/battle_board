@@ -24,8 +24,21 @@
 | TASK-071 | bdd-coding | mypage ★→☆置換ロジック修正 | なし | completed |
 | TASK-072 | bdd-coding | admin.feature 削除コメント系ステップ定義 + サービス修正 | なし | completed |
 | TASK-073 | bdd-coding | incentive BDD失敗修正（二段階評価） | TASK-070 | completed |
-| TASK-074 | bdd-coding | admin-service.test.ts 期待値修正 | TASK-072 | in_progress |
+| TASK-074 | bdd-coding | admin-service.test.ts 期待値修正 | TASK-072 | completed |
 
 ## 結果
 
-（実行後に記載）
+全タスク completed。
+
+### テスト結果
+- vitest: 20ファイル / 672テスト / 全PASS
+- tsc: エラー0件
+- cucumber-js: 108シナリオ (105 passed, 3 pending, 0 failed)
+  - Sprint-24時点 8 failed + 2 undefined → 全修正
+
+### エスカレーション
+- ESC-TASK-072-1: admin-service.tsフォールバックメッセージ不一致 → 選択肢A（サービス修正）で自律解決
+
+### デプロイ
+- Vercel: ● Ready
+- Cloudflare: デプロイ済み
