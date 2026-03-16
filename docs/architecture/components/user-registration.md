@@ -49,7 +49,7 @@ ALTER TABLE users
 **PAT 平文保存の根拠:**
 - マイページに常時表示する要件があり、ハッシュ（不可逆）では実現不可
 - `users.auth_token`（edge-token）が既に平文保存されており、PAT のみハッシュ化しても全体のセキュリティは向上しない
-- 専ブラは HTTP:80 で通信するため、ネットワーク上も平文送信されている（edge-token, write_token と同条件）
+- ChMate は bbsmenu の https:// 指定を無視して常に HTTP:80 で通信する（senbra_protocol_diagnosis_2026-03-16.md で確定）ため、この経路では edge-token・write_token・PAT が同条件で平文送信される。Siki および Web UI は HTTPS
 - 可逆暗号化（AES 等）は暗号鍵が同一サーバー上に置かれるため、DB 漏洩時の追加防御にならない
 - Supabase RLS により `users` テーブルは「自分のレコードのみ」参照可能であり、他ユーザーの PAT は読めない
 

@@ -34,13 +34,40 @@ ChMateは2つのHTTPクライアントを使い分けている:
 
 ### 確認方法
 
-Android端末にmitmproxyを設定し、ChMateの通信をパケットキャプチャして確定診断した。
+1. **パケットキャプチャ（2026-03-14）**: Android端末にmitmproxyを設定し、ChMateの通信を直接解析して確定診断した
+2. **サーバーサイドログ（2026-03-16）**: ルートハンドラに診断ログを埋め込み、`wrangler tail` でリアルタイム確認。bbsmenu.html に `https://` を記載した状態でもChMateは `http://` で接続することを確認した
+
+詳細: `docs/research/senbra_protocol_diagnosis_2026-03-16.md`
+
+### 補足: bbsmenuのスキーム指定はChMateに効かない
+
+bbsmenu.html で板URLを `https://` で返しても、**ChMateは `http://` にダウングレードする**。サーバー側でChMateをHTTPSに誘導する手段はない。一方、Siki（PC専ブラ）は bbsmenu の `https://` を尊重して HTTPS で接続する。
+
+| 専ブラ | bbsmenuに https:// を記載した場合 |
+|---|---|
+| ChMate (Android) | 無視して http:// で接続 |
+| Siki (PC) | https:// で接続 |
 
 ### 対策
 
 - **Cloudflare Workers/Pagesに移行し、「Always Use HTTPS」をOFFにする**
 - ホスティング選定時に「HTTP:80リクエストに直接応答できるか」を必須要件にする
 - Vercelでは解決不可能。Cloudflare Proxy経由も非推奨構成になるためリスクが高い
+
+### セキュリティ上の影響
+
+ChMateはbbsmenuに `https://` を記載しても `http://` にダウングレードする（senbra_protocol_diagnosis_2026-03-16.md で確定）。Sikiは `https://` をそのまま使用する。
+
+この結果、ChMate経由の通信ではCookie（edge-token）やメール欄のトークン（write_token, PAT）が平文でネットワーク上を流れる。同一ネットワーク上の攻撃者がこれを傍受した場合、なりすまし書き込みが可能になる。
+
+ただし以下の理由から、現時点では受容可能なリスクとして扱う:
+
+- 5ch本家も長年HTTP通信であり、ChMateユーザーにとって新しいリスクではない
+- 被害は匿名掲示板でのなりすまし書き込みに限定され、金銭的被害はない（課金はモック）
+- Siki・WebブラウザのユーザーはすべてHTTPSで通信しており、このリスクの影響を受けない
+- サーバー側でChMateのHTTP強制挙動を回避する手段はない
+
+実課金の導入時にはリスク評価を再実施すること。
 
 ---
 

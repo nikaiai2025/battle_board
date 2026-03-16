@@ -163,15 +163,6 @@ function buildShiftJisHtmlResponse(html: string, status = 200): Response {
  * @returns Shift_JISエンコードされたHTMLレスポンス
  */
 export async function POST(req: NextRequest): Promise<Response> {
-	// [DIAG] プロトコル診断ログ（確認後に削除すること）
-	console.log("[diag:bbs.cgi]", {
-		url: req.url,
-		scheme: new URL(req.url).protocol,
-		xForwardedProto: req.headers.get("x-forwarded-proto"),
-		host: req.headers.get("host"),
-		userAgent: req.headers.get("user-agent"),
-	});
-
 	// Step 1: リクエストボディをBufferとして読み取る
 	let bodyBuffer: Buffer;
 	try {

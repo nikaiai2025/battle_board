@@ -67,14 +67,6 @@ export async function GET(
 	req: NextRequest,
 	{ params }: { params: Promise<{ boardId: string; threadKey: string }> },
 ): Promise<Response> {
-	// [DIAG] プロトコル診断ログ（確認後に削除すること）
-	console.log("[diag:dat]", {
-		url: req.url,
-		scheme: new URL(req.url).protocol,
-		xForwardedProto: req.headers.get("x-forwarded-proto"),
-		host: req.headers.get("host"),
-		userAgent: req.headers.get("user-agent"),
-	});
 	const { threadKey } = await params;
 
 	// スレッドをthreadKeyで取得する
