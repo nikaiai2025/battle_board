@@ -49,6 +49,7 @@ vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 // UserRepository モック
 vi.mock("../../../lib/infrastructure/repositories/user-repository", () => ({
 	findById: vi.fn().mockResolvedValue(null),
+	updateLastIpHash: vi.fn(),
 }));
 
 // AuthService モック
@@ -60,6 +61,10 @@ vi.mock("../../../lib/services/auth-service", () => ({
 		userId: "user-1",
 		authorIdSeed: "seed-1",
 	}),
+	// BAN チェック（TASK-105 で追加）
+	// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+	isIpBanned: vi.fn().mockResolvedValue(false),
+	isUserBanned: vi.fn().mockResolvedValue(false),
 }));
 
 // IncentiveService モック

@@ -61,6 +61,16 @@ vi.mock("@/lib/services/currency-service", () => ({
 	initializeBalance: vi.fn(),
 }));
 
+// ip-ban-repository をモック化する（issueEdgeToken 内で isBanned チェックが呼ばれるため）
+// See: features/admin.feature @BANされたIPからの新規登録が拒否される
+vi.mock("@/lib/infrastructure/repositories/ip-ban-repository", () => ({
+	isBanned: vi.fn().mockResolvedValue(false),
+	create: vi.fn(),
+	deactivate: vi.fn(),
+	listActive: vi.fn().mockResolvedValue([]),
+	findById: vi.fn().mockResolvedValue(null),
+}));
+
 // ---------------------------------------------------------------------------
 // インポート（モック宣言後）
 // ---------------------------------------------------------------------------

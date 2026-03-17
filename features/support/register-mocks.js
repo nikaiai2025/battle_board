@@ -170,6 +170,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/attack-repository.ts",
 		"./in-memory/attack-repository.ts",
 	],
+	// IP BAN リポジトリ（TASK-105 で追加）
+	// See: features/admin.feature @IP BAN シナリオ群
+	[
+		"src/lib/infrastructure/repositories/ip-ban-repository.ts",
+		"./in-memory/ip-ban-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

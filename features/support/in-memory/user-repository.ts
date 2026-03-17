@@ -81,6 +81,8 @@ export async function create(
 		| "patToken"
 		| "patLastUsedAt"
 		| "grassCount"
+		| "isBanned"
+		| "lastIpHash"
 	> & {
 		isVerified?: boolean;
 		supabaseAuthId?: string | null;
@@ -90,6 +92,10 @@ export async function create(
 		patLastUsedAt?: Date | null;
 		/** 草カウント(通算)。省略時は 0。See: features/reactions.feature */
 		grassCount?: number;
+		/** BAN フラグ。省略時は false。See: features/admin.feature */
+		isBanned?: boolean;
+		/** 最終アクセスIPハッシュ。省略時は null。See: features/admin.feature */
+		lastIpHash?: string | null;
 	},
 ): Promise<User> {
 	const newUser: User = {
@@ -109,6 +115,10 @@ export async function create(
 		// Phase 4 フィールド: 草カウント。省略時は 0（新規ユーザーは草ゼロ）
 		// See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
 		grassCount: user.grassCount ?? 0,
+		// Phase 5 フィールド: BAN システム。省略時はデフォルト値
+		// See: features/admin.feature @ユーザーBAN / IP BAN
+		isBanned: user.isBanned ?? false,
+		lastIpHash: user.lastIpHash ?? null,
 	};
 	store.set(newUser.id, newUser);
 	return newUser;
@@ -300,6 +310,44 @@ export async function updatePatLastUsedAt(userId: string): Promise<void> {
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, patLastUsedAt: new Date() });
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: BAN システム関連メソッド（新設）
+// See: features/admin.feature @ユーザーBAN / IP BAN
+// See: src/lib/infrastructure/repositories/user-repository.ts > updateIsBanned
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザーの BAN 状態（isBanned）を更新する。
+ *
+ * See: src/lib/infrastructure/repositories/user-repository.ts > updateIsBanned
+ * See: features/admin.feature @管理者がユーザーをBANする
+ */
+export async function updateIsBanned(
+	userId: string,
+	isBanned: boolean,
+): Promise<void> {
+	const user = store.get(userId);
+	if (user) {
+		store.set(userId, { ...user, isBanned });
+	}
+}
+
+/**
+ * ユーザーの最終アクセスIPハッシュ（lastIpHash）を更新する。
+ *
+ * See: src/lib/infrastructure/repositories/user-repository.ts > updateLastIpHash
+ * See: features/admin.feature @管理者がユーザーのIPをBANする
+ */
+export async function updateLastIpHash(
+	userId: string,
+	lastIpHash: string,
+): Promise<void> {
+	const user = store.get(userId);
+	if (user) {
+		store.set(userId, { ...user, lastIpHash });
 	}
 }
 

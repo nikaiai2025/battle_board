@@ -87,4 +87,28 @@ export interface User {
 	 * See: features/reactions.feature §成長ビジュアル
 	 */
 	grassCount: number;
+
+	// ---------------------------------------------------------------------------
+	// Phase 5: BAN システム関連フィールド（新設）
+	// See: features/admin.feature @ユーザーBAN / IP BAN
+	// See: supabase/migrations/00010_ban_system.sql
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * ユーザーBAN フラグ。
+	 * true の場合、そのアカウントからの書き込みを拒否する。
+	 * See: features/admin.feature @管理者がユーザーをBANする
+	 * See: tmp/feature_plan_admin_expansion.md §2-a BAN の二層構造
+	 */
+	isBanned: boolean;
+
+	/**
+	 * 最終アクセスIPハッシュ。
+	 * 書き込みリクエストのたびに hashIp(reduceIp(現在のIP)) で更新される。
+	 * 管理者が「このIPをBAN」する際の最新IP特定に使用する。
+	 * author_id_seed は登録時固定のため別途このフィールドが必要。
+	 * See: features/admin.feature @管理者がユーザーのIPをBANする
+	 * See: tmp/feature_plan_admin_expansion.md §2-d IP BAN 対象の特定方法
+	 */
+	lastIpHash: string | null;
 }

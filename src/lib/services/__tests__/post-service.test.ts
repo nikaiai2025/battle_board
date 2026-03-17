@@ -47,6 +47,10 @@ vi.mock("@/lib/infrastructure/repositories/user-repository", () => ({
 	updateStreak: vi.fn(),
 	updateUsername: vi.fn(),
 	updateIsVerified: vi.fn(),
+	// BAN システム関連（TASK-105 で追加）
+	// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+	updateIsBanned: vi.fn(),
+	updateLastIpHash: vi.fn(),
 }));
 
 vi.mock("@/lib/services/auth-service", () => ({
@@ -56,6 +60,10 @@ vi.mock("@/lib/services/auth-service", () => ({
 	verifyWriteToken: vi.fn(),
 	hashIp: vi.fn(),
 	reduceIp: vi.fn(),
+	// BAN チェック（TASK-105 で追加）
+	// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+	isIpBanned: vi.fn().mockResolvedValue(false),
+	isUserBanned: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/services/incentive-service", () => ({

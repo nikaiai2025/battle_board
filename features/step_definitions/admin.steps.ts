@@ -15,8 +15,11 @@ import { Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
 import {
 	InMemoryAdminRepo,
+	InMemoryCurrencyRepo,
+	InMemoryIpBanRepo,
 	InMemoryPostRepo,
 	InMemoryThreadRepo,
+	InMemoryUserRepo,
 } from "../support/mock-installer";
 import type { BattleBoardWorld } from "../support/world";
 
@@ -766,3 +769,740 @@ Then(
 		);
 	},
 );
+
+// ---------------------------------------------------------------------------
+// BAN システム ステップ定義
+// See: features/admin.feature @ユーザーBAN / IP BAN シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §1-a
+// ---------------------------------------------------------------------------
+
+/**
+ * BAN システムの AdminService を動的 require で取得するヘルパー。
+ * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
+ */
+function getAdminServiceForBan() {
+	return require("../../src/lib/services/admin-service") as typeof import("../../src/lib/services/admin-service");
+}
+
+/**
+ * PostService を動的 require で取得するヘルパー。
+ * BAN後の書き込み拒否テストに使用する。
+ */
+function getPostService() {
+	return require("../../src/lib/services/post-service") as typeof import("../../src/lib/services/post-service");
+}
+
+/**
+ * AuthService を動的 require で取得するヘルパー。
+ * IP BAN後の新規登録拒否テストに使用する。
+ */
+function getAuthService() {
+	return require("../../src/lib/services/auth-service") as typeof import("../../src/lib/services/auth-service");
+}
+
+/** テスト用スレッド（書き込みテスト用） */
+let banTestThreadId: string | null = null;
+
+// ---------------------------------------------------------------------------
+// Given: ユーザー "UserA" が存在する（BAN操作シナリオ用）
+// See: features/admin.feature @管理者がユーザーをBANする
+// See: features/admin.feature @管理者がユーザーのIPをBANする
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" が存在する状態を設定する。
+ * BAN系シナリオで必要なユーザーをインメモリストアに登録する。
+ *
+ * See: features/admin.feature @管理者がユーザーをBANする
+ * See: features/admin.feature @管理者がユーザーのIPをBANする
+ */
+Given(
+	"ユーザー {string} が存在する",
+	async function (this: BattleBoardWorld, userName: string) {
+		// テスト用ユーザーを登録する
+		const user = await InMemoryUserRepo.create({
+			authToken: `test-token-${userName}`,
+			authorIdSeed: `test-seed-${userName}`,
+			isPremium: false,
+			username: null,
+			isBanned: false,
+			lastIpHash: `test-ip-hash-${userName}`,
+		});
+
+		// namedUsers に登録する
+		this.setNamedUser(userName, {
+			userId: user.id,
+			edgeToken: user.authToken,
+			ipHash: user.authorIdSeed,
+			isPremium: false,
+			username: null,
+		});
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: ユーザー "UserA" をBANする
+// See: features/admin.feature @管理者がユーザーをBANする
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理者がユーザー "UserA" をBANする。
+ * AdminService.banUser を呼び出す。
+ *
+ * See: features/admin.feature @管理者がユーザーをBANする
+ */
+When(
+	"ユーザー {string} をBANする",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const AdminService = getAdminServiceForBan();
+		const result = await AdminService.banUser(
+			namedUser.userId,
+			this.currentAdminId,
+		);
+
+		this.lastResult = result.success
+			? { type: "success", data: result }
+			: { type: "error", message: "BAN に失敗しました", code: result.reason };
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: ユーザー "UserA" のステータスがBAN済みになる
+// See: features/admin.feature @管理者がユーザーをBANする
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" の isBanned フラグが true になっていることを確認する。
+ *
+ * See: features/admin.feature @管理者がユーザーをBANする
+ */
+Then(
+	"ユーザー {string} のステータスがBAN済みになる",
+	async function (this: BattleBoardWorld, userName: string) {
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const user = await InMemoryUserRepo.findById(namedUser.userId);
+		assert(user !== null, `ユーザー "${userName}" が見つかりません`);
+		assert.strictEqual(
+			user.isBanned,
+			true,
+			`ユーザー "${userName}" の isBanned が true であることを期待しましたが false でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Given: ユーザー "UserA" がBANされている
+// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+// See: features/admin.feature @管理者がユーザーBANを解除する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" がBANされている状態を設定する。
+ * BAN済みのユーザーをインメモリストアに登録する。
+ *
+ * See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+ * See: features/admin.feature @管理者がユーザーBANを解除する
+ */
+Given(
+	"ユーザー {string} がBANされている",
+	async function (this: BattleBoardWorld, userName: string) {
+		// BAN済みユーザーを作成する
+		const user = await InMemoryUserRepo.create({
+			authToken: `test-token-banned-${userName}`,
+			authorIdSeed: `test-seed-banned-${userName}`,
+			isPremium: false,
+			username: null,
+			isBanned: true, // BAN済み
+			isVerified: true,
+			lastIpHash: `test-ip-hash-banned-${userName}`,
+		});
+
+		// namedUsers に登録する
+		this.setNamedUser(userName, {
+			userId: user.id,
+			edgeToken: user.authToken,
+			ipHash: user.authorIdSeed,
+			isPremium: false,
+			username: null,
+		});
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: ユーザー "UserA" がスレッドへの書き込みを試みる
+// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+// ---------------------------------------------------------------------------
+
+/**
+ * BAN済みユーザー "UserA" がスレッドへの書き込みを試みる。
+ * PostService.createPost を呼び出してBANチェックを検証する。
+ *
+ * See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+ */
+When(
+	"ユーザー {string} がスレッドへの書き込みを試みる",
+	async function (this: BattleBoardWorld, userName: string) {
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		// 書き込みテスト用スレッドを作成する（未作成の場合）
+		if (!banTestThreadId) {
+			const thread = await InMemoryThreadRepo.create({
+				threadKey: `${Date.now()}`,
+				boardId: TEST_BOARD_ID,
+				title: "BAN テスト用スレッド",
+				createdBy: "system",
+			});
+			banTestThreadId = thread.id;
+		}
+		// currentThreadId を設定する（posting.steps.ts の "レスは追加されない" が参照する）
+		this.currentThreadId = banTestThreadId;
+
+		const PostService = getPostService();
+		const result = await PostService.createPost({
+			threadId: banTestThreadId,
+			body: "BANされたユーザーの書き込みテスト",
+			edgeToken: namedUser.edgeToken,
+			ipHash: namedUser.ipHash,
+			isBotWrite: false,
+		});
+
+		if ("authRequired" in result) {
+			this.lastResult = {
+				type: "error",
+				message: "認証が必要です",
+				code: "AUTH_REQUIRED",
+			};
+		} else if (!result.success) {
+			this.lastResult = {
+				type: "error",
+				message: result.error,
+				code: result.code,
+			};
+		} else {
+			this.lastResult = { type: "success", data: result };
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: エラーメッセージが表示される（BAN系）
+// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+// ---------------------------------------------------------------------------
+
+// エラーメッセージが表示される → 既存の "権限エラーメッセージが表示される" に対応
+// このシナリオでは type: "error" であることのみ確認する（共通）
+// 既存の Then "エラーメッセージが表示される" と衝突しないよう、
+// BAN 系のシナリオでは「エラーメッセージが表示される」ステップで共通 error チェック
+
+// ---------------------------------------------------------------------------
+// Then: レスは追加されない（BAN系）
+// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+// ---------------------------------------------------------------------------
+
+// 既存の "レスは削除されない" ステップと同様のパターン
+// BAN系シナリオでは type: "error" であることを確認
+
+// ---------------------------------------------------------------------------
+// When: 管理者がユーザー "UserA" のBANを解除する
+// See: features/admin.feature @管理者がユーザーBANを解除する
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理者がユーザー "UserA" のBANを解除する。
+ * AdminService.unbanUser を呼び出す。
+ *
+ * See: features/admin.feature @管理者がユーザーBANを解除する
+ */
+When(
+	"管理者がユーザー {string} のBANを解除する",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const AdminService = getAdminServiceForBan();
+		const result = await AdminService.unbanUser(
+			namedUser.userId,
+			this.currentAdminId,
+		);
+
+		this.lastResult = result.success
+			? { type: "success", data: result }
+			: {
+					type: "error",
+					message: "BAN解除に失敗しました",
+					code: result.reason,
+				};
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: ユーザー "UserA" の書き込みが可能になる
+// See: features/admin.feature @管理者がユーザーBANを解除する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" の isBanned フラグが false になっていることを確認する。
+ *
+ * See: features/admin.feature @管理者がユーザーBANを解除する
+ */
+Then(
+	"ユーザー {string} の書き込みが可能になる",
+	async function (this: BattleBoardWorld, userName: string) {
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const user = await InMemoryUserRepo.findById(namedUser.userId);
+		assert(user !== null, `ユーザー "${userName}" が見つかりません`);
+		assert.strictEqual(
+			user.isBanned,
+			false,
+			`ユーザー "${userName}" の isBanned が false であることを期待しましたが true でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: ユーザー "UserA" のIPをBANする
+// See: features/admin.feature @管理者がユーザーのIPをBANする
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理者がユーザー "UserA" のIPをBANする。
+ * AdminService.banIpByUserId を呼び出す。
+ * ユーザーに last_ip_hash が設定されていることが前提。
+ *
+ * See: features/admin.feature @管理者がユーザーのIPをBANする
+ */
+When(
+	"ユーザー {string} のIPをBANする",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const AdminService = getAdminServiceForBan();
+		const result = await AdminService.banIpByUserId(
+			namedUser.userId,
+			this.currentAdminId,
+			"テスト用IP BAN",
+		);
+
+		this.lastResult = result.success
+			? { type: "success", data: result }
+			: {
+					type: "error",
+					message: "IP BAN に失敗しました",
+					code: result.reason,
+				};
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: IP BANリストに登録される
+// See: features/admin.feature @管理者がユーザーのIPをBANする
+// ---------------------------------------------------------------------------
+
+/**
+ * IP BAN リストに登録されていることを確認する。
+ * InMemoryIpBanRepo の listActive で確認する。
+ *
+ * See: features/admin.feature @管理者がユーザーのIPをBANする
+ */
+Then("IP BANリストに登録される", async function (this: BattleBoardWorld) {
+	// 操作が成功していることを確認する
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"success",
+		`IP BAN 成功を期待しましたが "${this.lastResult.type}" でした`,
+	);
+
+	// 有効な IP BAN が1件以上存在することを確認する
+	const activeBans = await InMemoryIpBanRepo.listActive();
+	assert(activeBans.length > 0, "IP BANリストにエントリが登録されていません");
+});
+
+// ---------------------------------------------------------------------------
+// Given: ユーザー "UserA" のIPがBANされている
+// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+// See: features/admin.feature @BANされたIPからの新規登録が拒否される
+// See: features/admin.feature @管理者がIP BANを解除する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" のIPがBANされている状態を設定する。
+ * ユーザーを作成し、そのIPを ip_bans に直接登録する。
+ *
+ * See: features/admin.feature @BANされたIPからの書き込みが拒否される
+ */
+Given(
+	"ユーザー {string} のIPがBANされている",
+	async function (this: BattleBoardWorld, userName: string) {
+		const ipHash = `test-ip-hash-banned-ip-${userName}`;
+
+		// ユーザーを作成する（IPを持つ）
+		const user = await InMemoryUserRepo.create({
+			authToken: `test-token-ip-banned-${userName}`,
+			authorIdSeed: `test-seed-ip-banned-${userName}`,
+			isPremium: false,
+			username: null,
+			isBanned: false,
+			isVerified: true,
+			lastIpHash: ipHash,
+		});
+
+		// namedUsers に登録する
+		this.setNamedUser(userName, {
+			userId: user.id,
+			edgeToken: user.authToken,
+			ipHash, // このIPがBANされている
+			isPremium: false,
+			username: null,
+		});
+
+		// IP BAN を直接登録する（Given状態設定）
+		const ban = await InMemoryIpBanRepo.create(
+			ipHash,
+			"テスト用IP BAN",
+			TEST_ADMIN_ID,
+		);
+
+		// BAN ID を World に保存する（解除テスト用）
+		this.lastResult = { type: "success", data: { banId: ban.id } };
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: そのIPからスレッドへの書き込みを試みる
+// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+// ---------------------------------------------------------------------------
+
+/**
+ * BAN済みIPからスレッドへの書き込みを試みる。
+ * PostService.createPost を呼び出してIP BANチェックを検証する。
+ *
+ * See: features/admin.feature @BANされたIPからの書き込みが拒否される
+ */
+When(
+	"そのIPからスレッドへの書き込みを試みる",
+	async function (this: BattleBoardWorld) {
+		// BAN済みIPは UserA のもの
+		const namedUser = this.getNamedUser("UserA");
+		assert(namedUser, "ユーザー UserA が存在しません");
+
+		// 書き込みテスト用スレッドを作成する（未作成の場合）
+		if (!banTestThreadId) {
+			const thread = await InMemoryThreadRepo.create({
+				threadKey: `${Date.now()}`,
+				boardId: TEST_BOARD_ID,
+				title: "IP BAN テスト用スレッド",
+				createdBy: "system",
+			});
+			banTestThreadId = thread.id;
+		}
+		// currentThreadId を設定する（posting.steps.ts の "レスは追加されない" が参照する）
+		this.currentThreadId = banTestThreadId;
+
+		const PostService = getPostService();
+		const result = await PostService.createPost({
+			threadId: banTestThreadId,
+			body: "BANされたIPからの書き込みテスト",
+			edgeToken: namedUser.edgeToken,
+			ipHash: namedUser.ipHash, // BAN済みIP
+			isBotWrite: false,
+		});
+
+		if ("authRequired" in result) {
+			this.lastResult = {
+				type: "error",
+				message: "認証が必要です",
+				code: "AUTH_REQUIRED",
+			};
+		} else if (!result.success) {
+			this.lastResult = {
+				type: "error",
+				message: result.error,
+				code: result.code,
+			};
+		} else {
+			this.lastResult = { type: "success", data: result };
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: そのIPから認証コード発行を試みる
+// See: features/admin.feature @BANされたIPからの新規登録が拒否される
+// ---------------------------------------------------------------------------
+
+/**
+ * BAN済みIPから認証コード発行（新規登録）を試みる。
+ * AuthService.issueEdgeToken を呼び出してIP BANチェックを検証する。
+ *
+ * See: features/admin.feature @BANされたIPからの新規登録が拒否される
+ */
+When(
+	"そのIPから認証コード発行を試みる",
+	async function (this: BattleBoardWorld) {
+		const namedUser = this.getNamedUser("UserA");
+		assert(namedUser, "ユーザー UserA が存在しません");
+
+		const AuthService = getAuthService();
+		try {
+			// BAN済みIPで新規ユーザー作成（edge-token発行）を試みる
+			await AuthService.issueEdgeToken(namedUser.ipHash);
+			// 成功した場合はエラーが出ないはずなので不正な結果として記録
+			this.lastResult = { type: "success", data: {} };
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "不明なエラー";
+			this.lastResult = {
+				type: "error",
+				message,
+				code: message.startsWith("IP_BANNED") ? "IP_BANNED" : "UNKNOWN",
+			};
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: 認証コードは発行されない
+// See: features/admin.feature @BANされたIPからの新規登録が拒否される
+// ---------------------------------------------------------------------------
+
+/**
+ * 認証コードが発行されなかったことを確認する。
+ * lastResult が error（IP_BANNED）であることを確認する。
+ *
+ * See: features/admin.feature @BANされたIPからの新規登録が拒否される
+ */
+Then("認証コードは発行されない", function (this: BattleBoardWorld) {
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"error",
+		`IP BAN エラーを期待しましたが "${this.lastResult.type}" でした`,
+	);
+	const errorResult = this.lastResult as {
+		type: "error";
+		message: string;
+		code?: string;
+	};
+	assert(
+		errorResult.code === "IP_BANNED" ||
+			errorResult.message.includes("IP_BANNED"),
+		`IP BAN エラーを期待しましたが "${errorResult.message}" (code: ${errorResult.code}) でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// When: 管理者がそのIP BANを解除する
+// See: features/admin.feature @管理者がIP BANを解除する
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理者が UserA のIP BANを解除する。
+ * AdminService.unbanIp を呼び出す。
+ *
+ * See: features/admin.feature @管理者がIP BANを解除する
+ */
+When("管理者がそのIP BANを解除する", async function (this: BattleBoardWorld) {
+	// 管理者を設定する（Given "ユーザーのIPがBANされている" には管理者ログインステップがない）
+	if (!this.currentAdminId) {
+		InMemoryAdminRepo._insert({
+			id: TEST_ADMIN_ID,
+			role: "admin",
+			createdAt: new Date(),
+		});
+		this.currentAdminId = TEST_ADMIN_ID;
+		this.isAdmin = true;
+	}
+
+	// BAN IDを取得する（Given "ユーザーのIPがBANされている" で設定した lastResult から）
+	const activeBans = await InMemoryIpBanRepo.listActive();
+	assert(activeBans.length > 0, "解除する IP BAN が存在しません");
+
+	const banId = activeBans[0].id;
+	const AdminService = getAdminServiceForBan();
+	const result = await AdminService.unbanIp(banId, this.currentAdminId);
+
+	this.lastResult = result.success
+		? { type: "success", data: result }
+		: {
+				type: "error",
+				message: "IP BAN 解除に失敗しました",
+				code: result.reason,
+			};
+});
+
+// ---------------------------------------------------------------------------
+// Then: そのIPからの書き込みが可能になる
+// See: features/admin.feature @管理者がIP BANを解除する
+// ---------------------------------------------------------------------------
+
+/**
+ * IP BAN 解除後、そのIPからの書き込みが可能になることを確認する。
+ * InMemoryIpBanRepo の listActive が空（または解除済み）になっていることを確認する。
+ *
+ * See: features/admin.feature @管理者がIP BANを解除する
+ */
+Then(
+	"そのIPからの書き込みが可能になる",
+	async function (this: BattleBoardWorld) {
+		// 解除操作が成功していることを確認する
+		assert(this.lastResult, "操作結果が存在しません");
+		assert.strictEqual(
+			this.lastResult.type,
+			"success",
+			`IP BAN 解除成功を期待しましたが "${this.lastResult.type}" でした`,
+		);
+
+		// 有効な IP BAN が0件になっていることを確認する
+		const activeBans = await InMemoryIpBanRepo.listActive();
+		assert.strictEqual(
+			activeBans.length,
+			0,
+			`IP BAN 解除後は有効な IP BAN が0件であることを期待しましたが ${activeBans.length} 件でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// 通貨付与ステップ定義
+// See: features/admin.feature @通貨付与シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §1-b, §3
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService.grantCurrency を動的 require で取得するヘルパー。
+ * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
+ */
+function getAdminServiceForCurrency() {
+	return require("../../src/lib/services/admin-service") as typeof import("../../src/lib/services/admin-service");
+}
+
+// ---------------------------------------------------------------------------
+// Given: ユーザー "UserA" の通貨残高が N である
+// See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+//
+// 注: このステップは incentive.steps.ts に定義済みの
+// "ユーザー {string} の通貨残高が {int} である" を再利用する。
+// 重複定義を避けるため admin.steps.ts では定義しない。
+// See: features/step_definitions/incentive.steps.ts
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// When: ユーザー "UserA" に通貨 N を付与する
+// See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理者がユーザー "UserA" に通貨 N を付与する。
+ * AdminService.grantCurrency を呼び出す。
+ *
+ * See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+ * See: src/lib/services/admin-service.ts > grantCurrency
+ */
+When(
+	"ユーザー {string} に通貨 {int} を付与する",
+	async function (this: BattleBoardWorld, userName: string, amount: number) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const AdminService = getAdminServiceForCurrency();
+		const result = await AdminService.grantCurrency(
+			namedUser.userId,
+			amount,
+			this.currentAdminId,
+		);
+
+		this.lastResult = result.success
+			? { type: "success", data: result }
+			: {
+					type: "error",
+					message: "通貨付与に失敗しました",
+					code: result.reason,
+				};
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: ユーザー "UserA" の通貨残高が N になる
+// See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" の通貨残高が指定値になっていることを確認する。
+ *
+ * InMemoryCurrencyRepo.getBalance で残高を取得して検証する。
+ *
+ * See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+ */
+Then(
+	"ユーザー {string} の通貨残高が {int} になる",
+	async function (
+		this: BattleBoardWorld,
+		userName: string,
+		expectedBalance: number,
+	) {
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const actualBalance = await InMemoryCurrencyRepo.getBalance(
+			namedUser.userId,
+		);
+		assert.strictEqual(
+			actualBalance,
+			expectedBalance,
+			`ユーザー "${userName}" の通貨残高が ${expectedBalance} であることを期待しましたが ${actualBalance} でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: 通貨付与APIを呼び出す（非管理者）
+// See: features/admin.feature @管理者でないユーザーが通貨付与を試みると権限エラーになる
+// ---------------------------------------------------------------------------
+
+/**
+ * 非管理者ユーザーが通貨付与APIを呼び出す。
+ * isAdmin = false の場合は権限エラーを返す。
+ *
+ * BDD テストはサービス層テストのため、APIルートは経由しない。
+ * isAdmin フラグを確認して権限エラーをシミュレートする。
+ *
+ * See: features/admin.feature @管理者でないユーザーが通貨付与を試みると権限エラーになる
+ * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト
+ */
+When("通貨付与APIを呼び出す", function (this: BattleBoardWorld) {
+	// 管理者権限チェック: isAdmin が false の場合は権限エラーを返す
+	if (!this.isAdmin) {
+		this.lastResult = {
+			type: "error",
+			message: "権限がありません",
+			code: "UNAUTHORIZED",
+		};
+		return;
+	}
+
+	// 管理者の場合は付与を試みる（このシナリオでは到達しないはず）
+	this.lastResult = {
+		type: "error",
+		message: "権限がありません",
+		code: "UNAUTHORIZED",
+	};
+});

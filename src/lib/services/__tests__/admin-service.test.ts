@@ -33,6 +33,33 @@ vi.mock("@/lib/services/post-service", () => ({
 	createPost: vi.fn(),
 }));
 
+// UserRepository をモック化する（AdminService.banUser/unbanUser が findById/updateIsBanned を呼ぶため）
+// See: features/admin.feature @管理者がユーザーをBANする
+vi.mock("@/lib/infrastructure/repositories/user-repository", () => ({
+	findById: vi.fn(),
+	updateIsBanned: vi.fn(),
+	updateLastIpHash: vi.fn(),
+}));
+
+// IpBanRepository をモック化する（AdminService.banIpByUserId/unbanIp が呼ぶため）
+// See: features/admin.feature @管理者がユーザーのIPをBANする
+vi.mock("@/lib/infrastructure/repositories/ip-ban-repository", () => ({
+	isBanned: vi.fn().mockResolvedValue(false),
+	create: vi.fn(),
+	deactivate: vi.fn(),
+	listActive: vi.fn().mockResolvedValue([]),
+	findById: vi.fn().mockResolvedValue(null),
+}));
+
+// CurrencyService をモック化する（AdminService.grantCurrency が credit/getBalance を呼ぶため）
+// See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+vi.mock("@/lib/services/currency-service", () => ({
+	credit: vi.fn().mockResolvedValue(undefined),
+	getBalance: vi.fn().mockResolvedValue(150),
+	deduct: vi.fn(),
+	initializeBalance: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // インポート（モック宣言後）
 // ---------------------------------------------------------------------------

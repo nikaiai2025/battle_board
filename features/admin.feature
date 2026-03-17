@@ -63,3 +63,71 @@ Feature: 管理者機能
     And レス >>999 は存在しない
     When レス >>999 の削除を実行する
     Then エラーメッセージ "指定されたレスが見つかりません" が表示される
+
+  # ===========================================
+  # ユーザーBAN
+  # See: tmp/feature_plan_admin_expansion.md §1-a
+  # US-013: ユーザーBAN / IP BAN
+  # ===========================================
+
+  Scenario: 管理者がユーザーをBANする
+    Given 管理者がログイン済みである
+    And ユーザー "UserA" が存在する
+    When ユーザー "UserA" をBANする
+    Then ユーザー "UserA" のステータスがBAN済みになる
+
+  Scenario: BANされたユーザーの書き込みが拒否される
+    Given ユーザー "UserA" がBANされている
+    When ユーザー "UserA" がスレッドへの書き込みを試みる
+    Then エラーメッセージが表示される
+    And レスは追加されない
+
+  Scenario: 管理者がユーザーBANを解除する
+    Given 管理者がログイン済みである
+    And ユーザー "UserA" がBANされている
+    When 管理者がユーザー "UserA" のBANを解除する
+    Then ユーザー "UserA" の書き込みが可能になる
+
+  # ===========================================
+  # IP BAN
+  # See: tmp/feature_plan_admin_expansion.md §1-a
+  # ===========================================
+
+  Scenario: 管理者がユーザーのIPをBANする
+    Given 管理者がログイン済みである
+    And ユーザー "UserA" が存在する
+    When ユーザー "UserA" のIPをBANする
+    Then IP BANリストに登録される
+
+  Scenario: BANされたIPからの書き込みが拒否される
+    Given ユーザー "UserA" のIPがBANされている
+    When そのIPからスレッドへの書き込みを試みる
+    Then エラーメッセージが表示される
+    And レスは追加されない
+
+  Scenario: BANされたIPからの新規登録が拒否される
+    Given ユーザー "UserA" のIPがBANされている
+    When そのIPから認証コード発行を試みる
+    Then 認証コードは発行されない
+
+  Scenario: 管理者がIP BANを解除する
+    Given ユーザー "UserA" のIPがBANされている
+    When 管理者がそのIP BANを解除する
+    Then そのIPからの書き込みが可能になる
+
+  # ===========================================
+  # 通貨付与
+  # See: tmp/feature_plan_admin_expansion.md §1-b
+  # US-014: 通貨付与
+  # ===========================================
+
+  Scenario: 管理者が指定ユーザーに通貨を付与する
+    Given 管理者がログイン済みである
+    And ユーザー "UserA" の通貨残高が 50 である
+    When ユーザー "UserA" に通貨 100 を付与する
+    Then ユーザー "UserA" の通貨残高が 150 になる
+
+  Scenario: 管理者でないユーザーが通貨付与を試みると権限エラーになる
+    Given 管理者でないユーザーがログイン済みである
+    When 通貨付与APIを呼び出す
+    Then 権限エラーメッセージが表示される

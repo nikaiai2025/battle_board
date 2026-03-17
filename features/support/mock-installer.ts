@@ -42,6 +42,9 @@ import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
 // See: features/authentication.feature
 import * as InMemoryEdgeTokenRepo from "./in-memory/edge-token-repository";
 import * as InMemoryIncentiveLogRepo from "./in-memory/incentive-log-repository";
+// IP BAN リポジトリ（TASK-105 で追加）
+// See: features/admin.feature @IP BAN シナリオ群
+import * as InMemoryIpBanRepo from "./in-memory/ip-ban-repository";
 import * as InMemoryPostRepo from "./in-memory/post-repository";
 import * as InMemorySupabaseClient from "./in-memory/supabase-client";
 import * as InMemoryThreadRepo from "./in-memory/thread-repository";
@@ -100,6 +103,9 @@ export function resetAllStores(): void {
 	// Supabase Auth ストアのリセット（TASK-097 で追加）
 	// See: features/user_registration.feature
 	InMemorySupabaseClient.reset();
+	// IP BAN リポジトリのリセット（TASK-105 で追加）
+	// See: features/admin.feature @IP BAN シナリオ群
+	InMemoryIpBanRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +127,8 @@ export {
 	// Edge-token リポジトリ（TASK-085 で追加）
 	InMemoryEdgeTokenRepo,
 	InMemoryIncentiveLogRepo,
+	// IP BAN リポジトリ（TASK-105 で追加）
+	InMemoryIpBanRepo,
 	InMemoryPostRepo,
 	InMemorySupabaseClient,
 	InMemoryThreadRepo,

@@ -22,8 +22,12 @@
  * See: docs/architecture/components/admin.md §5 設計上の判断
  */
 
+import type { IpBan } from "../infrastructure/repositories/ip-ban-repository";
+import * as IpBanRepository from "../infrastructure/repositories/ip-ban-repository";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
 import * as ThreadRepository from "../infrastructure/repositories/thread-repository";
+import * as UserRepository from "../infrastructure/repositories/user-repository";
+import { credit, getBalance } from "./currency-service";
 import { createPost } from "./post-service";
 
 // ---------------------------------------------------------------------------
@@ -184,4 +188,220 @@ export async function deleteThread(
 	);
 
 	return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// BAN 操作
+// See: features/admin.feature @ユーザーBAN / IP BAN シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §2 IP BAN
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザーBAN 結果。
+ * See: features/admin.feature @管理者がユーザーをBANする
+ */
+export type BanUserResult =
+	| { success: true }
+	| { success: false; reason: "not_found" };
+
+/**
+ * 指定ユーザーをBANする（users.is_banned = true）。
+ *
+ * See: features/admin.feature @管理者がユーザーをBANする
+ * See: tmp/feature_plan_admin_expansion.md §2-a BAN の二層構造
+ *
+ * @param userId - BANする対象ユーザーの UUID
+ * @param adminId - 操作を行う管理者の UUID（認証済み前提）
+ * @returns BAN 結果
+ */
+export async function banUser(
+	userId: string,
+	adminId: string,
+): Promise<BanUserResult> {
+	const user = await UserRepository.findById(userId);
+	if (!user) {
+		return { success: false, reason: "not_found" };
+	}
+
+	await UserRepository.updateIsBanned(userId, true);
+
+	console.info(`[AdminService] banUser: userId=${userId} adminId=${adminId}`);
+
+	return { success: true };
+}
+
+/**
+ * 指定ユーザーのBANを解除する（users.is_banned = false）。
+ *
+ * See: features/admin.feature @管理者がユーザーBANを解除する
+ *
+ * @param userId - BAN解除する対象ユーザーの UUID
+ * @param adminId - 操作を行う管理者の UUID（認証済み前提）
+ * @returns BAN 解除結果
+ */
+export async function unbanUser(
+	userId: string,
+	adminId: string,
+): Promise<BanUserResult> {
+	const user = await UserRepository.findById(userId);
+	if (!user) {
+		return { success: false, reason: "not_found" };
+	}
+
+	await UserRepository.updateIsBanned(userId, false);
+
+	console.info(`[AdminService] unbanUser: userId=${userId} adminId=${adminId}`);
+
+	return { success: true };
+}
+
+/**
+ * IP BAN 結果。
+ * See: features/admin.feature @管理者がユーザーのIPをBANする
+ */
+export type BanIpResult =
+	| { success: true; ban: IpBan }
+	| { success: false; reason: "not_found" | "no_ip_hash" };
+
+/**
+ * 指定ユーザーの現在のIPをBANする。
+ * ユーザーの last_ip_hash を ip_bans テーブルに登録する。
+ *
+ * See: features/admin.feature @管理者がユーザーのIPをBANする
+ * See: tmp/feature_plan_admin_expansion.md §2-d IP BAN 対象の特定方法
+ *
+ * @param userId - 対象ユーザーの UUID（last_ip_hash でIPを特定）
+ * @param adminId - 操作を行う管理者の UUID（認証済み前提）
+ * @param reason - BAN理由（管理者メモ）。省略可
+ * @returns IP BAN 結果（成功時は作成された IpBan を含む）
+ */
+export async function banIpByUserId(
+	userId: string,
+	adminId: string,
+	reason?: string,
+): Promise<BanIpResult> {
+	const user = await UserRepository.findById(userId);
+	if (!user) {
+		return { success: false, reason: "not_found" };
+	}
+
+	if (!user.lastIpHash) {
+		return { success: false, reason: "no_ip_hash" };
+	}
+
+	const ban = await IpBanRepository.create(
+		user.lastIpHash,
+		reason ?? null,
+		adminId,
+	);
+
+	console.info(
+		`[AdminService] banIpByUserId: userId=${userId} ipHash=***** adminId=${adminId}`,
+	);
+
+	return { success: true, ban };
+}
+
+/**
+ * IP BAN 解除結果。
+ * See: features/admin.feature @管理者がIP BANを解除する
+ */
+export type UnbanIpResult =
+	| { success: true }
+	| { success: false; reason: "not_found" };
+
+/**
+ * 指定 BAN ID の IP BAN を解除する（is_active = false）。
+ *
+ * See: features/admin.feature @管理者がIP BANを解除する
+ * See: tmp/feature_plan_admin_expansion.md §2-e deactivate
+ *
+ * @param banId - 解除する IP BAN レコードの UUID
+ * @param adminId - 操作を行う管理者の UUID（認証済み前提）
+ * @returns IP BAN 解除結果
+ */
+export async function unbanIp(
+	banId: string,
+	adminId: string,
+): Promise<UnbanIpResult> {
+	const ban = await IpBanRepository.findById(banId);
+	if (!ban) {
+		return { success: false, reason: "not_found" };
+	}
+
+	await IpBanRepository.deactivate(banId);
+
+	console.info(`[AdminService] unbanIp: banId=${banId} adminId=${adminId}`);
+
+	return { success: true };
+}
+
+/**
+ * 有効な IP BAN 一覧を取得する（管理画面用）。
+ *
+ * See: tmp/feature_plan_admin_expansion.md §2-g GET /api/admin/ip-bans
+ *
+ * @returns 有効な IpBan の配列
+ */
+export async function listActiveIpBans(): Promise<IpBan[]> {
+	return IpBanRepository.listActive();
+}
+
+// ---------------------------------------------------------------------------
+// 通貨付与
+// See: features/admin.feature @通貨付与シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §3 通貨付与
+// ---------------------------------------------------------------------------
+
+/**
+ * 通貨付与結果。
+ * See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+ */
+export type GrantCurrencyResult =
+	| { success: true; newBalance: number }
+	| { success: false; reason: "not_found" | "invalid_amount" };
+
+/**
+ * 指定ユーザーに通貨を付与する（admin_grant reason）。
+ *
+ * CurrencyService.credit を admin_grant reason で呼び出す。
+ * amount は正の整数であること。
+ *
+ * See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+ * See: tmp/feature_plan_admin_expansion.md §3 通貨付与
+ * See: src/lib/domain/models/currency.ts > CreditReason.admin_grant
+ *
+ * @param userId - 付与対象ユーザーの UUID
+ * @param amount - 付与額（正の整数）
+ * @param adminId - 操作を行う管理者の UUID（認証済み前提）
+ * @returns 通貨付与結果（成功時は付与後残高を含む）
+ */
+export async function grantCurrency(
+	userId: string,
+	amount: number,
+	adminId: string,
+): Promise<GrantCurrencyResult> {
+	// 付与額の検証（正の整数）
+	if (!Number.isInteger(amount) || amount <= 0) {
+		return { success: false, reason: "invalid_amount" };
+	}
+
+	// ユーザーの存在確認
+	const user = await UserRepository.findById(userId);
+	if (!user) {
+		return { success: false, reason: "not_found" };
+	}
+
+	// CurrencyService.credit を admin_grant reason で呼び出す
+	// See: src/lib/services/currency-service.ts > credit
+	await credit(userId, amount, "admin_grant");
+
+	// 付与後残高を取得する
+	const newBalance = await getBalance(userId);
+
+	console.info(
+		`[AdminService] grantCurrency: userId=${userId} amount=${amount} adminId=${adminId} newBalance=${newBalance}`,
+	);
+
+	return { success: true, newBalance };
 }

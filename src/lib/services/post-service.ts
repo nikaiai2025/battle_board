@@ -260,6 +260,22 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		};
 	}
 
+	// Step 0b: IP BAN チェック（認証前）
+	// BANされたIPからの書き込みを認証前に拒否する。
+	// ボット書き込みは IP BAN チェックをスキップする（内部処理）。
+	// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+	// See: tmp/feature_plan_admin_expansion.md §2-c BANチェックフロー ①
+	if (!input.isBotWrite) {
+		const ipBanned = await AuthService.isIpBanned(input.ipHash);
+		if (ipBanned) {
+			return {
+				success: false,
+				error: "このIPアドレスからの書き込みはできません",
+				code: "IP_BANNED",
+			};
+		}
+	}
+
 	// Step 1: 本文バリデーション
 	// See: docs/architecture/architecture.md §7.4 失敗時の方針（バリデーションエラー → 全体中止）
 	const bodyValidation = validatePostBody(input.body);
@@ -287,6 +303,22 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		};
 	}
 
+	// Step 2b: ユーザーBAN チェック（認証後）
+	// BANされたユーザーの書き込みを認証後に拒否する。
+	// ボット書き込みはユーザーBAN チェックをスキップする（内部処理）。
+	// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+	// See: tmp/feature_plan_admin_expansion.md §2-c BANチェックフロー ③
+	if (!input.isBotWrite && authResult.userId) {
+		const userBanned = await AuthService.isUserBanned(authResult.userId);
+		if (userBanned) {
+			return {
+				success: false,
+				error: "このアカウントは書き込みが禁止されています",
+				code: "USER_BANNED",
+			};
+		}
+	}
+
 	// Step 3: ユーザー情報取得（表示名の解決に使用）
 	let resolvedDisplayName = input.displayName ?? DEFAULT_DISPLAY_NAME;
 	let resolvedAuthorId: string | null = null;
@@ -300,6 +332,20 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 			if (!input.displayName && user.isPremium && user.username) {
 				resolvedDisplayName = user.username;
 			}
+		}
+	}
+
+	// Step 3b: last_ip_hash 更新（認証後・書き込み前）
+	// 書き込みリクエストのたびに last_ip_hash を更新する。
+	// 管理者が「このIPをBAN」する際の最新IP特定に使用する。
+	// See: features/admin.feature @管理者がユーザーのIPをBANする
+	// See: tmp/feature_plan_admin_expansion.md §2-c BANチェックフロー ④
+	if (!input.isBotWrite && authResult.userId) {
+		try {
+			await UserRepository.updateLastIpHash(authResult.userId, input.ipHash);
+		} catch (err) {
+			// last_ip_hash 更新失敗は書き込みを巻き戻さない（副作用）
+			console.error("[PostService] updateLastIpHash failed:", err);
 		}
 	}
 

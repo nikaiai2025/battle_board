@@ -55,6 +55,15 @@ interface UserRow {
 	// ---------------------------------------------------------------------------
 	/** 草カウント(通算)。草付与時に +1 される。デフォルト 0 */
 	grass_count: number;
+	// ---------------------------------------------------------------------------
+	// Phase 5: BAN システム関連カラム（新設）
+	// See: supabase/migrations/00010_ban_system.sql
+	// See: features/admin.feature @ユーザーBAN / IP BAN
+	// ---------------------------------------------------------------------------
+	/** ユーザーBAN フラグ。true の場合書き込み不可。デフォルト false */
+	is_banned: boolean;
+	/** 最終アクセスIPハッシュ。hashIp(reduceIp(ip)) 済みの値。未更新は NULL */
+	last_ip_hash: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +97,10 @@ function rowToUser(row: UserRow): User {
 		// Phase 4: 草コマンド(!w) 関連フィールド
 		// See: supabase/migrations/00008_grass_system.sql
 		grassCount: row.grass_count ?? 0,
+		// Phase 5: BAN システム関連フィールド
+		// See: supabase/migrations/00010_ban_system.sql
+		isBanned: row.is_banned ?? false,
+		lastIpHash: row.last_ip_hash ?? null,
 	};
 }
 
@@ -403,6 +416,61 @@ export async function updatePatToken(
 
 	if (error) {
 		throw new Error(`UserRepository.updatePatToken failed: ${error.message}`);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5: BAN システム関連メソッド（新設）
+// See: features/admin.feature @ユーザーBAN / IP BAN
+// See: supabase/migrations/00010_ban_system.sql
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザーの BAN 状態（isBanned）を更新する。
+ * AdminService.banUser / unbanUser から呼び出される。
+ *
+ * See: features/admin.feature @管理者がユーザーをBANする
+ * See: features/admin.feature @管理者がユーザーBANを解除する
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param isBanned - 新しい BAN 状態（true = BAN、false = 解除）
+ */
+export async function updateIsBanned(
+	userId: string,
+	isBanned: boolean,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ is_banned: isBanned })
+		.eq("id", userId);
+
+	if (error) {
+		throw new Error(`UserRepository.updateIsBanned failed: ${error.message}`);
+	}
+}
+
+/**
+ * ユーザーの最終アクセスIPハッシュ（lastIpHash）を更新する。
+ * 書き込みリクエスト完了後に PostService / PostHandler から呼び出される。
+ * 管理者が「このIPをBAN」する際の最新IP特定に使用する。
+ *
+ * See: features/admin.feature @管理者がユーザーのIPをBANする
+ * See: tmp/feature_plan_admin_expansion.md §2-c BANチェックフロー ④ last_ip_hash更新
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param lastIpHash - hashIp(reduceIp(ip)) 済みの値
+ */
+export async function updateLastIpHash(
+	userId: string,
+	lastIpHash: string,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ last_ip_hash: lastIpHash })
+		.eq("id", userId);
+
+	if (error) {
+		throw new Error(`UserRepository.updateLastIpHash failed: ${error.message}`);
 	}
 }
 

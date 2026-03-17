@@ -23,6 +23,7 @@ import { createHash, randomBytes } from "crypto";
 import { verifyTurnstileToken } from "../infrastructure/external/turnstile-client";
 import * as AuthCodeRepository from "../infrastructure/repositories/auth-code-repository";
 import * as EdgeTokenRepository from "../infrastructure/repositories/edge-token-repository";
+import * as IpBanRepository from "../infrastructure/repositories/ip-ban-repository";
 import * as UserRepository from "../infrastructure/repositories/user-repository";
 import { supabaseAdmin } from "../infrastructure/supabase/client";
 import { initializeBalance } from "./currency-service";
@@ -204,16 +205,27 @@ export async function verifyEdgeToken(
 /**
  * 新しい edge-token を発行し、ユーザーを作成する。
  * CSPRNG（crypto.randomUUID）でトークンを生成する。
+ * BANされたIPからの発行を拒否する（新規登録ガード）。
  *
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証 > ②edge-token発行
  * See: TASK-006 タスク指示書 > 補足・制約 > edge-token は CSPRNG で生成
+ * See: features/admin.feature @BANされたIPからの新規登録が拒否される
+ * See: tmp/feature_plan_admin_expansion.md §2-f 新規登録（認証コード発行）でも①を実行
  *
  * @param ipHash - クライアントIP の SHA-512 ハッシュ（author_id_seed として保存）
  * @returns 発行したトークンと新規ユーザーの ID
+ * @throws IP BAN されている場合は Error をスローする
  */
 export async function issueEdgeToken(
 	ipHash: string,
 ): Promise<{ token: string; userId: string }> {
+	// IP BAN チェック（新規登録ガード）
+	// BANされたIPからの新規ユーザー作成を拒否する。
+	// See: features/admin.feature @BANされたIPからの新規登録が拒否される
+	const ipBannedFlag = await IpBanRepository.isBanned(ipHash);
+	if (ipBannedFlag) {
+		throw new Error("IP_BANNED: このIPアドレスからの新規登録はできません");
+	}
 	// CSPRNG でトークンを生成（暗号学的に安全）
 	const token = crypto.randomUUID();
 
@@ -413,6 +425,44 @@ export async function verifyWriteToken(
 	}
 
 	return { valid: true, edgeToken: authCode.tokenId };
+}
+
+// ---------------------------------------------------------------------------
+// BAN チェック
+// See: features/admin.feature @BANされたIPからの書き込みが拒否される
+// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+// See: tmp/feature_plan_admin_expansion.md §2-f Service: BAN チェックの挿入ポイント
+// ---------------------------------------------------------------------------
+
+/**
+ * 指定 IP ハッシュが IP BAN されているか判定する。
+ * 書き込み API（Web + 専ブラ）および認証コード発行時の認証前チェックに使用する。
+ *
+ * BANチェックフロー（書き込み時）: ①IP BAN → ②認証 → ③ユーザーBAN → ④last_ip_hash更新
+ * See: tmp/feature_plan_admin_expansion.md §2-c BANチェックフロー
+ * See: features/admin.feature @BANされたIPからの書き込みが拒否される
+ *
+ * @param ipHash - hashIp(reduceIp(ip)) 済みの値
+ * @returns IP BAN されていれば true
+ */
+export async function isIpBanned(ipHash: string): Promise<boolean> {
+	return IpBanRepository.isBanned(ipHash);
+}
+
+/**
+ * 指定ユーザーが BAN されているか判定する。
+ * 書き込み API での認証後チェックに使用する。
+ *
+ * See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+ * See: tmp/feature_plan_admin_expansion.md §2-f
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @returns ユーザーBAN されていれば true
+ */
+export async function isUserBanned(userId: string): Promise<boolean> {
+	const user = await UserRepository.findById(userId);
+	if (!user) return false;
+	return user.isBanned;
 }
 
 // ---------------------------------------------------------------------------
