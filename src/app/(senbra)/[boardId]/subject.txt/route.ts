@@ -51,9 +51,15 @@ export async function GET(
 		const ifModifiedSince = req.headers.get("if-modified-since");
 		if (ifModifiedSince) {
 			const sinceDate = new Date(ifModifiedSince);
-			// sinceDate が有効かつ latestPostAt が sinceDate 以前の場合は 304 を返す
-			if (!isNaN(sinceDate.getTime()) && latestPostAt <= sinceDate) {
-				return new Response(null, { status: 304 });
+			if (!isNaN(sinceDate.getTime())) {
+				// HTTP Date 形式は秒単位のため、秒単位で比較する（DAT route と同様）
+				// ミリ秒精度のまま比較すると、DB日付(.500ms)が If-Modified-Since(.000ms) より
+				// 大きく見えてしまい、同一秒内の更新を誤って「更新あり（200）」と判定するバグを防ぐ
+				const lastPostAtSec = Math.floor(latestPostAt.getTime() / 1000);
+				const sinceSec = Math.floor(sinceDate.getTime() / 1000);
+				if (lastPostAtSec <= sinceSec) {
+					return new Response(null, { status: 304 });
+				}
 			}
 		}
 	}
@@ -66,6 +72,9 @@ export async function GET(
 	const sjisBuffer = encoder.encode(subjectText);
 
 	// Last-Modified ヘッダ用の日時を設定する
+	// toUTCString() は RFC 7231 形式（"Www, DD Mon YYYY HH:MM:SS GMT"）で秒精度のため、
+	// ミリ秒は自動的に切り捨てられる。これにより Last-Modified → If-Modified-Since の
+	// ラウンドトリップでのミリ秒精度ズレを防ぐことができる
 	const lastModified =
 		threads.length > 0
 			? threads[0].lastPostAt.toUTCString()
