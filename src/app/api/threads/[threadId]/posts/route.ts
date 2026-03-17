@@ -71,108 +71,122 @@ export async function POST(
 	req: NextRequest,
 	{ params }: { params: Promise<{ threadId: string }> },
 ): Promise<NextResponse> {
-	const { threadId } = await params;
-
-	// --- リクエストボディのパース ---
-	let body: { body?: unknown };
 	try {
-		body = (await req.json()) as { body?: unknown };
-	} catch {
-		return NextResponse.json(
-			{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
-			{ status: 400 },
-		);
-	}
+		const { threadId } = await params;
 
-	const { body: postBody } = body;
-
-	// --- バリデーション ---
-	if (!postBody || typeof postBody !== "string" || postBody.trim() === "") {
-		return NextResponse.json(
-			{ error: "VALIDATION_ERROR", message: "本文を入力してください" },
-			{ status: 400 },
-		);
-	}
-
-	// --- Cookie から edge-token を読み取る ---
-	// See: src/lib/constants/cookie-names.ts
-	const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
-
-	// --- IP ハッシュの取得 ---
-	const ipHash = getIpHash(req);
-
-	// --- PostService への委譲 ---
-	const result = await PostService.createPost({
-		threadId,
-		body: postBody.trim(),
-		edgeToken,
-		ipHash,
-		isBotWrite: false,
-	});
-
-	// --- レスポンス整形 ---
-
-	// 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
-	if ("authRequired" in result) {
-		const response = NextResponse.json(
-			{
-				message: "認証コードを入力してください",
-				authCodeUrl: "/auth/auth-code",
-				authCode: result.code,
-			},
-			{ status: 401 },
-		);
-		// edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
-		// See: docs/specs/openapi.yaml > /api/threads/{threadId}/posts > post > 401 > Set-Cookie
-		// See: src/lib/constants/cookie-names.ts
-		response.cookies.set(EDGE_TOKEN_COOKIE, result.edgeToken, {
-			httpOnly: true,
-			secure: process.env.NODE_ENV === "production",
-			sameSite: "lax",
-			maxAge: 60 * 60 * 24 * 365,
-			path: "/",
-		});
-		return response;
-	}
-
-	// 失敗の場合: エラーコードに応じてステータスを判定
-	if (!result.success) {
-		// スレッド不存在エラー
-		if (result.code === "THREAD_NOT_FOUND") {
+		// --- リクエストボディのパース ---
+		let body: { body?: unknown };
+		try {
+			body = (await req.json()) as { body?: unknown };
+		} catch {
 			return NextResponse.json(
-				{
-					error: result.code,
-					message: result.error ?? "スレッドが見つかりません",
-				},
-				{ status: 404 },
+				{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
+				{ status: 400 },
 			);
 		}
-		// その他のバリデーションエラー
+
+		const { body: postBody } = body;
+
+		// --- バリデーション ---
+		if (!postBody || typeof postBody !== "string" || postBody.trim() === "") {
+			return NextResponse.json(
+				{ error: "VALIDATION_ERROR", message: "本文を入力してください" },
+				{ status: 400 },
+			);
+		}
+
+		// --- Cookie から edge-token を読み取る ---
+		// See: src/lib/constants/cookie-names.ts
+		const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
+
+		// --- IP ハッシュの取得 ---
+		const ipHash = getIpHash(req);
+
+		// --- PostService への委譲 ---
+		const result = await PostService.createPost({
+			threadId,
+			body: postBody.trim(),
+			edgeToken,
+			ipHash,
+			isBotWrite: false,
+		});
+
+		// --- レスポンス整形 ---
+
+		// 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
+		if ("authRequired" in result) {
+			const response = NextResponse.json(
+				{
+					message: "認証コードを入力してください",
+					authCodeUrl: "/auth/auth-code",
+					authCode: result.code,
+				},
+				{ status: 401 },
+			);
+			// edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
+			// See: docs/specs/openapi.yaml > /api/threads/{threadId}/posts > post > 401 > Set-Cookie
+			// See: src/lib/constants/cookie-names.ts
+			response.cookies.set(EDGE_TOKEN_COOKIE, result.edgeToken, {
+				httpOnly: true,
+				secure: process.env.NODE_ENV === "production",
+				sameSite: "lax",
+				maxAge: 60 * 60 * 24 * 365,
+				path: "/",
+			});
+			return response;
+		}
+
+		// 失敗の場合: エラーコードに応じてステータスを判定
+		if (!result.success) {
+			// スレッド不存在エラー
+			if (result.code === "THREAD_NOT_FOUND") {
+				return NextResponse.json(
+					{
+						error: result.code,
+						message: result.error ?? "スレッドが見つかりません",
+					},
+					{ status: 404 },
+				);
+			}
+			// その他のバリデーションエラー
+			return NextResponse.json(
+				{
+					error: result.code ?? "VALIDATION_ERROR",
+					message: result.error ?? "エラーが発生しました",
+				},
+				{ status: 400 },
+			);
+		}
+
+		// 成功: 201 + { post: Post }
+		// PostService.createPost は postId と postNumber のみ返すため、
+		// 作成された Post を getPostList 経由で取得してレスポンスを組み立てる。
+		// postNumber で絞り込むことで、直前に作成された Post を取得する。
+		// See: docs/architecture/components/posting.md §2.2 PostResult
+		const posts = await PostService.getPostList(threadId, result.postNumber);
+		const createdPost = posts.find((p) => p.id === result.postId);
+
 		return NextResponse.json(
 			{
-				error: result.code ?? "VALIDATION_ERROR",
-				message: result.error ?? "エラーが発生しました",
+				post: createdPost ?? {
+					id: result.postId,
+					threadId,
+					postNumber: result.postNumber,
+				},
 			},
-			{ status: 400 },
+			{ status: 201 },
+		);
+	} catch (err) {
+		console.error("[POST /api/threads/[threadId]/posts] Unhandled error:", err);
+		return NextResponse.json(
+			{
+				error: "INTERNAL_ERROR",
+				message:
+					err instanceof Error
+						? err.message
+						: "サーバー内部エラーが発生しました",
+			},
+			{ status: 500 },
 		);
 	}
-
-	// 成功: 201 + { post: Post }
-	// PostService.createPost は postId と postNumber のみ返すため、
-	// 作成された Post を getPostList 経由で取得してレスポンスを組み立てる。
-	// postNumber で絞り込むことで、直前に作成された Post を取得する。
-	// See: docs/architecture/components/posting.md §2.2 PostResult
-	const posts = await PostService.getPostList(threadId, result.postNumber);
-	const createdPost = posts.find((p) => p.id === result.postId);
-
-	return NextResponse.json(
-		{
-			post: createdPost ?? {
-				id: result.postId,
-				threadId,
-				postNumber: result.postNumber,
-			},
-		},
-		{ status: 201 },
-	);
 }

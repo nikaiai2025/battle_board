@@ -59,9 +59,22 @@ function getIpHash(req: NextRequest): string {
  *   200: { threads: Thread[] }（最大50件、last_post_at DESC 順）
  */
 export async function GET(_req: NextRequest): Promise<NextResponse> {
-	const threads = await PostService.getThreadList("battleboard", 50);
-
-	return NextResponse.json({ threads }, { status: 200 });
+	try {
+		const threads = await PostService.getThreadList("battleboard", 50);
+		return NextResponse.json({ threads }, { status: 200 });
+	} catch (err) {
+		console.error("[GET /api/threads] Unhandled error:", err);
+		return NextResponse.json(
+			{
+				error: "INTERNAL_ERROR",
+				message:
+					err instanceof Error
+						? err.message
+						: "サーバー内部エラーが発生しました",
+			},
+			{ status: 500 },
+		);
+	}
 }
 
 /**
@@ -82,102 +95,116 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
  *   401: AuthCodeIssuedResponse + Set-Cookie（未認証）
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-	// --- リクエストボディのパース ---
-	let body: { title?: unknown; body?: unknown; boardId?: unknown };
 	try {
-		body = (await req.json()) as {
-			title?: unknown;
-			body?: unknown;
-			boardId?: unknown;
-		};
-	} catch {
-		return NextResponse.json(
-			{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
-			{ status: 400 },
-		);
-	}
+		// --- リクエストボディのパース ---
+		let body: { title?: unknown; body?: unknown; boardId?: unknown };
+		try {
+			body = (await req.json()) as {
+				title?: unknown;
+				body?: unknown;
+				boardId?: unknown;
+			};
+		} catch {
+			return NextResponse.json(
+				{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
+				{ status: 400 },
+			);
+		}
 
-	const { title, body: postBody, boardId } = body;
+		const { title, body: postBody, boardId } = body;
 
-	// --- バリデーション ---
-	if (!title || typeof title !== "string" || title.trim() === "") {
-		return NextResponse.json(
-			{
-				error: "VALIDATION_ERROR",
-				message: "スレッドタイトルを入力してください",
-			},
-			{ status: 400 },
-		);
-	}
+		// --- バリデーション ---
+		if (!title || typeof title !== "string" || title.trim() === "") {
+			return NextResponse.json(
+				{
+					error: "VALIDATION_ERROR",
+					message: "スレッドタイトルを入力してください",
+				},
+				{ status: 400 },
+			);
+		}
 
-	if (!postBody || typeof postBody !== "string" || postBody.trim() === "") {
-		return NextResponse.json(
-			{ error: "VALIDATION_ERROR", message: "本文を入力してください" },
-			{ status: 400 },
-		);
-	}
+		if (!postBody || typeof postBody !== "string" || postBody.trim() === "") {
+			return NextResponse.json(
+				{ error: "VALIDATION_ERROR", message: "本文を入力してください" },
+				{ status: 400 },
+			);
+		}
 
-	// --- Cookie から edge-token を読み取る ---
-	// See: src/lib/constants/cookie-names.ts
-	const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
-
-	// --- IP ハッシュの取得 ---
-	const ipHash = getIpHash(req);
-
-	// --- boardId の決定（未指定・不正時は "battleboard" を使用）---
-	// See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-c 方式A
-	const resolvedBoardId =
-		typeof boardId === "string" && boardId.trim() !== ""
-			? boardId.trim()
-			: "battleboard";
-
-	// --- PostService への委譲 ---
-	const result = await PostService.createThread(
-		{
-			boardId: resolvedBoardId,
-			title: title.trim(),
-			firstPostBody: postBody.trim(),
-		},
-		edgeToken,
-		ipHash,
-	);
-
-	// --- レスポンス整形 ---
-
-	// 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
-	if (result.authRequired) {
-		const response = NextResponse.json(
-			{
-				message: "認証コードを入力してください",
-				authCodeUrl: "/auth/auth-code",
-				authCode: result.authRequired.code,
-			},
-			{ status: 401 },
-		);
-		// edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
-		// See: docs/specs/openapi.yaml > /api/threads > post > 401 > Set-Cookie
+		// --- Cookie から edge-token を読み取る ---
 		// See: src/lib/constants/cookie-names.ts
-		response.cookies.set(EDGE_TOKEN_COOKIE, result.authRequired.edgeToken, {
-			httpOnly: true,
-			secure: process.env.NODE_ENV === "production",
-			sameSite: "lax",
-			maxAge: 60 * 60 * 24 * 365,
-			path: "/",
-		});
-		return response;
-	}
+		const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
 
-	// バリデーションエラー
-	if (!result.success) {
+		// --- IP ハッシュの取得 ---
+		const ipHash = getIpHash(req);
+
+		// --- boardId の決定（未指定・不正時は "battleboard" を使用）---
+		// See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-c 方式A
+		const resolvedBoardId =
+			typeof boardId === "string" && boardId.trim() !== ""
+				? boardId.trim()
+				: "battleboard";
+
+		// --- PostService への委譲 ---
+		const result = await PostService.createThread(
+			{
+				boardId: resolvedBoardId,
+				title: title.trim(),
+				firstPostBody: postBody.trim(),
+			},
+			edgeToken,
+			ipHash,
+		);
+
+		// --- レスポンス整形 ---
+
+		// 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
+		if (result.authRequired) {
+			const response = NextResponse.json(
+				{
+					message: "認証コードを入力してください",
+					authCodeUrl: "/auth/auth-code",
+					authCode: result.authRequired.code,
+				},
+				{ status: 401 },
+			);
+			// edge-token Cookie を設定（HttpOnly, Secure, SameSite=Lax）
+			// See: docs/specs/openapi.yaml > /api/threads > post > 401 > Set-Cookie
+			// See: src/lib/constants/cookie-names.ts
+			response.cookies.set(EDGE_TOKEN_COOKIE, result.authRequired.edgeToken, {
+				httpOnly: true,
+				secure: process.env.NODE_ENV === "production",
+				sameSite: "lax",
+				maxAge: 60 * 60 * 24 * 365,
+				path: "/",
+			});
+			return response;
+		}
+
+		// バリデーションエラー
+		if (!result.success) {
+			return NextResponse.json(
+				{
+					error: result.code ?? "VALIDATION_ERROR",
+					message: result.error ?? "エラーが発生しました",
+				},
+				{ status: 400 },
+			);
+		}
+
+		// 成功: 201 + Thread JSON
+		return NextResponse.json(result.thread, { status: 201 });
+	} catch (err) {
+		console.error("[POST /api/threads] Unhandled error:", err);
 		return NextResponse.json(
 			{
-				error: result.code ?? "VALIDATION_ERROR",
-				message: result.error ?? "エラーが発生しました",
+				error: "INTERNAL_ERROR",
+				message:
+					err instanceof Error
+						? err.message
+						: "サーバー内部エラーが発生しました",
 			},
-			{ status: 400 },
+			{ status: 500 },
 		);
 	}
-
-	// 成功: 201 + Thread JSON
-	return NextResponse.json(result.thread, { status: 201 });
 }

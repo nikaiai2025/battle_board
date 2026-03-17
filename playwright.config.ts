@@ -88,11 +88,12 @@ export default defineConfig({
 	 * - cf-smoke: CF Workers互換性スモークテスト（e2e/cf-smoke/ 配下）
 	 *
 	 * 実行方法:
-	 *   全テスト:       npx playwright test
+	 *   全テスト(ローカル): npx playwright test
 	 *   APIのみ:        npx playwright test --project=api
 	 *   E2Eのみ:        npx playwright test --project=e2e
 	 *   Smokeのみ:      npx playwright test --project=smoke
 	 *   CF Smoke:       npx playwright test --project=cf-smoke
+	 *   本番Smoke:      npx playwright test --config=playwright.prod.config.ts
 	 *
 	 * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
 	 * See: docs/architecture/bdd_test_strategy.md §10.5 ナビゲーションスモークテスト
@@ -136,6 +137,8 @@ export default defineConfig({
 				baseURL: "http://localhost:8788", // wrangler dev のデフォルトポート
 			},
 		},
+		// 本番スモークテストは別 config: playwright.prod.config.ts
+		// 実行: npx playwright test --config=playwright.prod.config.ts
 	],
 
 	/**

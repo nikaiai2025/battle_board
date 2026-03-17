@@ -81,8 +81,14 @@ export default function ThreadCreateForm({
 		}
 
 		// その他のエラー
-		const data = (await res.json()) as { message?: string; error?: string };
-		setError(data.message ?? data.error ?? "エラーが発生しました");
+		let message = "エラーが発生しました";
+		try {
+			const data = (await res.json()) as { message?: string; error?: string };
+			message = data.message ?? data.error ?? message;
+		} catch {
+			// レスポンスボディが空または不正なJSONの場合はデフォルトメッセージを使用
+		}
+		setError(message);
 		return false;
 	}, [title, body, boardId, onCreated, router]);
 
