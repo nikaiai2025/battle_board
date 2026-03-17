@@ -1,0 +1,48 @@
+# 固定スレッド（案内板）upsert ワークフロー
+#
+# 目的: config/commands.yaml またはスクリプト本体の変更時に固定スレッドを自動更新し、
+#       コマンド仕様変更が本番DBに反映されない乖離を防ぐ。
+#       初回投入は workflow_dispatch から手動実行する。
+#
+# 【必要なGitHub Secretsの設定手順】
+# リポジトリの Settings > Secrets and variables > Actions > New repository secret から以下を登録:
+#
+#   1. SUPABASE_URL
+#      - 取得先: Supabase Dashboard > Project Settings > Data API > Project URL
+#      - 用途: Supabase プロジェクトへの接続URL（スクリプト内では NEXT_PUBLIC_SUPABASE_URL にマッピング）
+#
+#   2. SUPABASE_SERVICE_ROLE_KEY
+#      - 取得先: Supabase Dashboard > Project Settings > Data API > service_role (secret)
+#      - 用途: RLS をバイパスして threads/posts テーブルへ書き込むためのサービスロールキー
+
+name: Seed Pinned Thread
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/commands.yaml'
+      - 'scripts/upsert-pinned-thread.ts'
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # config/commands.yaml の内容に基づき固定スレッドを upsert する
+      # upsert のため何度実行しても安全（冪等）
+      - name: Upsert pinned thread
+        run: npx tsx scripts/upsert-pinned-thread.ts
+        env:
+          # スクリプトは NEXT_PUBLIC_SUPABASE_URL を参照するため Secrets からマッピングする
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
