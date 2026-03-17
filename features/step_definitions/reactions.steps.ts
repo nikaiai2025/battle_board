@@ -439,9 +439,15 @@ Before(async function (this: BattleBoardWorld) {
 		const { createAccusationService } =
 			require("../../src/lib/services/accusation-service") as typeof import("../../src/lib/services/accusation-service");
 		const accusationService = createAccusationService();
+		// InMemoryPostRepo を postNumberResolver として渡す（>>N → UUID 解決）
+		// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
 		const commandService = new CommandService(
 			CurrencyService,
 			accusationService,
+			undefined,
+			undefined,
+			undefined,
+			InMemoryPostRepo,
 		);
 		PostService.setCommandService(commandService);
 	} catch {
@@ -711,8 +717,9 @@ async function executeGrassCommand(
 		// GrassHandler.execute は args[0] を postRepository.findById に渡す
 		const postId = await resolvePostId(world, postNumber);
 		if (!postId) {
-			// 対応する postId が存在しない場合は存在しないIDとして渡す
-			args = [`nonexistent-post-${postNumber}`];
+			// 対応する postId が存在しない場合は存在しない UUID を渡す（非UUID文字列はリポジトリバリデーションに弾かれる）
+			// See: features/support/in-memory/assert-uuid.ts
+			args = [crypto.randomUUID()];
 		} else {
 			args = [postId];
 		}

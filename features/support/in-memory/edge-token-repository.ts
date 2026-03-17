@@ -9,6 +9,7 @@
  */
 
 import type { EdgeToken } from "../../../src/lib/infrastructure/repositories/edge-token-repository";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -71,6 +72,7 @@ export async function findByToken(token: string): Promise<EdgeToken | null> {
  * See: src/lib/infrastructure/repositories/edge-token-repository.ts
  */
 export async function findByUserId(userId: string): Promise<EdgeToken[]> {
+	assertUUID(userId, "EdgeTokenRepository.findByUserId.userId");
 	const result: EdgeToken[] = [];
 	for (const edgeToken of store.values()) {
 		if (edgeToken.userId === userId) result.push(edgeToken);

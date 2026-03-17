@@ -151,6 +151,39 @@ export async function findByAuthorId(
 }
 
 /**
+ * スレッドID とレス番号（postNumber）でレスを1件取得する。
+ * コマンドの `>>N` 引数から対応するレスのUUIDを解決するために使用する。
+ *
+ * See: docs/architecture/components/command.md §2.3 解析ルール
+ * See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
+ *
+ * @param threadId - スレッドの UUID
+ * @param postNumber - レス番号（1始まり）
+ * @returns 見つかった Post、存在しない場合は null
+ */
+export async function findByThreadIdAndPostNumber(
+	threadId: string,
+	postNumber: number,
+): Promise<Post | null> {
+	const { data, error } = await supabaseAdmin
+		.from("posts")
+		.select("*")
+		.eq("thread_id", threadId)
+		.eq("post_number", postNumber)
+		.single();
+
+	if (error) {
+		// PGRST116: 行が見つからない場合
+		if (error.code === "PGRST116") return null;
+		throw new Error(
+			`PostRepository.findByThreadIdAndPostNumber failed: ${error.message}`,
+		);
+	}
+
+	return data ? rowToPost(data as PostRow) : null;
+}
+
+/**
  * 次のレス番号（現在の最大 post_number + 1）を取得する。
  * レス番号採番に使用する。UNIQUE 制約（thread_id, post_number）が最終防衛線。
  *

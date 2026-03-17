@@ -9,6 +9,7 @@
  */
 
 import type { Accusation } from "../../../src/lib/domain/models/accusation";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -53,6 +54,14 @@ export async function findByAccuserAndTarget(
 	accuserId: string,
 	targetPostId: string,
 ): Promise<Accusation | null> {
+	assertUUID(
+		accuserId,
+		"AccusationRepository.findByAccuserAndTarget.accuserId",
+	);
+	assertUUID(
+		targetPostId,
+		"AccusationRepository.findByAccuserAndTarget.targetPostId",
+	);
 	return (
 		store.find(
 			(a) => a.accuserId === accuserId && a.targetPostId === targetPostId,
@@ -65,6 +74,7 @@ export async function findByAccuserAndTarget(
  * See: src/lib/infrastructure/repositories/accusation-repository.ts
  */
 export async function findByThreadId(threadId: string): Promise<Accusation[]> {
+	assertUUID(threadId, "AccusationRepository.findByThreadId.threadId");
 	return store
 		.filter((a) => a.threadId === threadId)
 		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());

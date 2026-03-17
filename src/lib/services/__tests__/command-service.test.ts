@@ -7,6 +7,7 @@
  * テスト方針:
  *   - CurrencyService はモック化する（Supabase に依存しない）
  *   - AccusationService はモック化する（TellHandler の依存先）
+ *   - PostNumberResolver はモック化する（>>N → UUID 解決のテスト）
  *   - fs（ファイル読み込み）はモック化し、commands.yaml を仮想データで代替する
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
  *
@@ -19,6 +20,7 @@
  *   - !tell → AccusationService に委譲して結果を返す
  *   - 通貨引き落とし順序（引き落とし → 実行）
  *   - 楽観的ロックによる残高不足（deduct が false を返す場合）
+ *   - >>N → UUID 解決（正常系・存在しないpostNumber・非>>N引数のスルー）
  */
 
 import path from "path";
@@ -40,10 +42,12 @@ vi.mock("fs", () => ({
 // ---------------------------------------------------------------------------
 
 import fs from "fs";
+import type { Post } from "../../domain/models/post";
 import type { AccusationService } from "../accusation-service";
 import type {
 	CommandExecutionInput,
 	ICurrencyService,
+	IPostNumberResolver,
 } from "../command-service";
 import { CommandService } from "../command-service";
 
@@ -80,6 +84,17 @@ commands:
   w:
     description: "指定レスに草を生やす"
     cost: 0
+    targetFormat: ">>postNumber"
+    enabled: true
+    stealth: false
+`;
+
+/** テスト用: !tell のみ有効化（>>N リゾルバテスト用） */
+const COMMANDS_YAML_TELL_ONLY = `
+commands:
+  tell:
+    description: "指定レスをAIだと告発する"
+    cost: 10
     targetFormat: ">>postNumber"
     enabled: true
     stealth: false
@@ -128,6 +143,50 @@ function createMockAccusationService(): AccusationService {
 			alreadyAccused: false,
 		}),
 	} as unknown as AccusationService;
+}
+
+/**
+ * PostNumberResolver のモックを生成する。
+ * threadId と postNumber から Post を返す。
+ * See: features/command_system.feature @>>N → UUID 解決
+ */
+function createMockPostNumberResolver(
+	posts?: Map<string, Post>,
+): IPostNumberResolver {
+	return {
+		findByThreadIdAndPostNumber: vi
+			.fn()
+			.mockImplementation(
+				async (threadId: string, postNumber: number): Promise<Post | null> => {
+					if (!posts) return null;
+					for (const post of posts.values()) {
+						if (post.threadId === threadId && post.postNumber === postNumber) {
+							return post;
+						}
+					}
+					return null;
+				},
+			),
+	};
+}
+
+/**
+ * テスト用の Post を生成する。
+ */
+function createTestPost(overrides: Partial<Post> = {}): Post {
+	return {
+		id: overrides.id ?? crypto.randomUUID(),
+		threadId: overrides.threadId ?? "thread-uuid-001",
+		postNumber: overrides.postNumber ?? 1,
+		authorId: overrides.authorId ?? "other-user-uuid",
+		displayName: overrides.displayName ?? "名無しさん",
+		dailyId: overrides.dailyId ?? "TestDly1",
+		body: overrides.body ?? "テスト本文",
+		inlineSystemInfo: overrides.inlineSystemInfo ?? null,
+		isSystemMessage: overrides.isSystemMessage ?? false,
+		isDeleted: overrides.isDeleted ?? false,
+		createdAt: overrides.createdAt ?? new Date(),
+	};
 }
 
 /** デフォルトのコマンド実行入力を生成する */
@@ -441,6 +500,148 @@ commands:
 			const result = await service.executeCommand(createInput("!W >>3"));
 
 			expect(result).toBeNull();
+		});
+	});
+
+	// =========================================================================
+	// >>N → UUID 解決（PostNumberResolver）
+	// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
+	// =========================================================================
+
+	describe(">>N → UUID 解決", () => {
+		it(">>N 形式の引数がスレッド内のpostNumberに対応するUUIDに置換される", async () => {
+			// tell のみの YAML を使用（grassHandler 不要）
+			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
+			const postId = crypto.randomUUID();
+			const posts = new Map<string, Post>();
+			const post = createTestPost({
+				id: postId,
+				threadId: "thread-uuid-001",
+				postNumber: 5,
+			});
+			posts.set(postId, post);
+
+			const currencyService = createMockCurrencyService(100);
+			const resolver = createMockPostNumberResolver(posts);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				undefined,
+				null,
+				null,
+				resolver,
+			);
+
+			const result = await service.executeCommand(createInput("!tell >>5"));
+
+			expect(result).not.toBeNull();
+			// resolver が呼ばれたことを確認
+			expect(resolver.findByThreadIdAndPostNumber).toHaveBeenCalledWith(
+				"thread-uuid-001",
+				5,
+			);
+			// AccusationService が UUID で呼ばれることを確認
+			expect(accusationService.accuse).toHaveBeenCalledWith(
+				expect.objectContaining({
+					targetPostId: postId,
+				}),
+			);
+		});
+
+		it("存在しないpostNumberの場合はコマンド実行がスキップされエラーメッセージが返される", async () => {
+			// tell のみの YAML を使用（grassHandler 不要）
+			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
+			const currencyService = createMockCurrencyService(100);
+			const resolver = createMockPostNumberResolver(new Map());
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				undefined,
+				null,
+				null,
+				resolver,
+			);
+
+			const result = await service.executeCommand(createInput("!tell >>999"));
+
+			expect(result).not.toBeNull();
+			expect(result!.success).toBe(false);
+			expect(result!.systemMessage).toBe("指定されたレスが見つかりません");
+			// 通貨は消費されない（リゾルバでの失敗は通貨チェック前）
+			expect(result!.currencyCost).toBe(0);
+		});
+
+		it(">>N 形式でない引数はリゾルバを通さずそのままハンドラに渡される", async () => {
+			// tell のみの YAML を使用（grassHandler 不要）
+			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
+			const currencyService = createMockCurrencyService(100);
+			const resolver = createMockPostNumberResolver();
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				undefined,
+				null,
+				null,
+				resolver,
+			);
+
+			// 引数なしの !tell
+			const result = await service.executeCommand(createInput("!tell"));
+
+			expect(result).not.toBeNull();
+			// resolver は呼ばれない（引数がないため）
+			expect(resolver.findByThreadIdAndPostNumber).not.toHaveBeenCalled();
+		});
+
+		it("postNumberResolverが未提供の場合は>>N形式がそのままハンドラに渡される", async () => {
+			const currencyService = createMockCurrencyService();
+			// resolver を渡さない（後方互換性テスト）
+			const service = new CommandService(currencyService, accusationService);
+
+			// フォールバックハンドラが使われるため、>>3 がそのまま渡される
+			const result = await service.executeCommand(createInput("!w >>3"));
+
+			expect(result).not.toBeNull();
+			expect(result!.success).toBe(true);
+			expect(result!.systemMessage).toContain(">>3");
+		});
+
+		it(">>N → UUID 解決後にハンドラが解決済みUUIDを受け取る（!tell）", async () => {
+			// tell のみの YAML を使用（grassHandler 不要）
+			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
+			const postId = crypto.randomUUID();
+			const posts = new Map<string, Post>();
+			const post = createTestPost({
+				id: postId,
+				threadId: "thread-uuid-001",
+				postNumber: 3,
+			});
+			posts.set(postId, post);
+
+			const currencyService = createMockCurrencyService(100);
+			const resolver = createMockPostNumberResolver(posts);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				undefined,
+				null,
+				null,
+				resolver,
+			);
+
+			const result = await service.executeCommand(createInput("!tell >>3"));
+
+			expect(result).not.toBeNull();
+			expect(resolver.findByThreadIdAndPostNumber).toHaveBeenCalledWith(
+				"thread-uuid-001",
+				3,
+			);
+			// AccusationService が UUID（postId）で呼ばれていることを確認
+			expect(accusationService.accuse).toHaveBeenCalledWith(
+				expect.objectContaining({
+					targetPostId: postId,
+				}),
+			);
 		});
 	});
 });

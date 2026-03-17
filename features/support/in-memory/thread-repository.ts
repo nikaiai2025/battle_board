@@ -9,6 +9,7 @@
  */
 
 import type { Thread } from "../../../src/lib/domain/models/thread";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -40,6 +41,7 @@ export function _insert(thread: Thread): void {
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function findById(id: string): Promise<Thread | null> {
+	assertUUID(id, "ThreadRepository.findById.id");
 	return store.get(id) ?? null;
 }
 
@@ -113,6 +115,7 @@ export async function create(
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function incrementPostCount(threadId: string): Promise<void> {
+	assertUUID(threadId, "ThreadRepository.incrementPostCount.threadId");
 	const thread = store.get(threadId);
 	if (thread) {
 		store.set(threadId, { ...thread, postCount: thread.postCount + 1 });
@@ -127,6 +130,7 @@ export async function updateLastPostAt(
 	threadId: string,
 	lastPostAt: Date,
 ): Promise<void> {
+	assertUUID(threadId, "ThreadRepository.updateLastPostAt.threadId");
 	const thread = store.get(threadId);
 	if (thread) {
 		store.set(threadId, { ...thread, lastPostAt });
@@ -141,6 +145,7 @@ export async function updateDatByteSize(
 	threadId: string,
 	datByteSize: number,
 ): Promise<void> {
+	assertUUID(threadId, "ThreadRepository.updateDatByteSize.threadId");
 	const thread = store.get(threadId);
 	if (thread) {
 		store.set(threadId, { ...thread, datByteSize });
@@ -152,6 +157,7 @@ export async function updateDatByteSize(
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function softDelete(threadId: string): Promise<void> {
+	assertUUID(threadId, "ThreadRepository.softDelete.threadId");
 	const thread = store.get(threadId);
 	if (thread) {
 		store.set(threadId, { ...thread, isDeleted: true });

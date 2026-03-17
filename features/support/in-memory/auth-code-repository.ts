@@ -9,6 +9,7 @@
  */
 
 import type { AuthCode } from "../../../src/lib/infrastructure/repositories/auth-code-repository";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -67,6 +68,7 @@ export async function findByCode(code: string): Promise<AuthCode | null> {
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
+	assertUUID(tokenId, "AuthCodeRepository.findByTokenId.tokenId");
 	for (const authCode of store.values()) {
 		if (authCode.tokenId === tokenId) return authCode;
 	}
@@ -78,6 +80,7 @@ export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function markVerified(id: string): Promise<void> {
+	assertUUID(id, "AuthCodeRepository.markVerified.id");
 	const authCode = store.get(id);
 	if (authCode) {
 		store.set(id, { ...authCode, verified: true });
@@ -113,6 +116,7 @@ export async function updateWriteToken(
 	writeToken: string,
 	writeTokenExpiresAt: Date,
 ): Promise<void> {
+	assertUUID(id, "AuthCodeRepository.updateWriteToken.id");
 	const authCode = store.get(id);
 	if (authCode) {
 		store.set(id, { ...authCode, writeToken, writeTokenExpiresAt });
@@ -145,6 +149,7 @@ export async function findByWriteToken(
  * See: tmp/escalations/escalation_ESC-TASK-041-1.md — ESC解決用追加
  */
 export async function clearWriteToken(id: string): Promise<void> {
+	assertUUID(id, "AuthCodeRepository.clearWriteToken.id");
 	const authCode = store.get(id);
 	if (authCode) {
 		store.set(id, { ...authCode, writeToken: null, writeTokenExpiresAt: null });

@@ -183,7 +183,9 @@ export async function executeTellCommand(
 	const accusationService = getAccusationService();
 	const result = await accusationService.accuse({
 		accuserId: world.currentUserId,
-		targetPostId: targetPostId ?? `nonexistent-${postNumber}`,
+		// 対象レスが存在しない場合は存在しない UUID を渡す（非UUID文字列はリポジトリバリデーションに弾かれる）
+		// See: features/support/in-memory/assert-uuid.ts
+		targetPostId: targetPostId ?? crypto.randomUUID(),
 		threadId: world.currentThreadId,
 		accuserDailyId:
 			(world as any)._accuserDailyId ?? world.currentUserId.slice(0, 8),

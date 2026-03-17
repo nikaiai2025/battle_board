@@ -15,6 +15,7 @@ import type {
 	Currency,
 	DeductResult,
 } from "../../../src/lib/domain/models/currency";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -54,6 +55,7 @@ export function _upsert(currency: Currency): void {
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  */
 export async function findByUserId(userId: string): Promise<Currency | null> {
+	assertUUID(userId, "CurrencyRepository.findByUserId.userId");
 	return store.get(userId) ?? null;
 }
 
@@ -65,6 +67,7 @@ export async function create(
 	userId: string,
 	initialBalance: number = 0,
 ): Promise<Currency> {
+	assertUUID(userId, "CurrencyRepository.create.userId");
 	const currency: Currency = {
 		userId,
 		balance: initialBalance,
@@ -79,6 +82,7 @@ export async function create(
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  */
 export async function credit(userId: string, amount: number): Promise<void> {
+	assertUUID(userId, "CurrencyRepository.credit.userId");
 	const currency = store.get(userId);
 	if (currency) {
 		store.set(userId, {
@@ -102,6 +106,7 @@ export async function deduct(
 	userId: string,
 	amount: number,
 ): Promise<DeductResult> {
+	assertUUID(userId, "CurrencyRepository.deduct.userId");
 	// 前の deduct 処理が完了してから次を実行するよう直列化する
 	const prevQueue =
 		deductQueues.get(userId) ??
@@ -131,6 +136,7 @@ export async function deduct(
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  */
 export async function getBalance(userId: string): Promise<number> {
+	assertUUID(userId, "CurrencyRepository.getBalance.userId");
 	return store.get(userId)?.balance ?? 0;
 }
 

@@ -9,6 +9,7 @@
  */
 
 import type { Attack } from "../../../src/lib/infrastructure/repositories/attack-repository";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -70,6 +71,11 @@ export async function findByAttackerAndBotAndDate(
 	botId: string,
 	attackDate: string,
 ): Promise<Attack | null> {
+	assertUUID(
+		attackerId,
+		"AttackRepository.findByAttackerAndBotAndDate.attackerId",
+	);
+	assertUUID(botId, "AttackRepository.findByAttackerAndBotAndDate.botId");
 	return (
 		store.find(
 			(a) =>

@@ -11,6 +11,7 @@
  */
 
 import type { User } from "../../../src/lib/domain/models/user";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -43,6 +44,7 @@ export function _insert(user: User): void {
  * See: src/lib/infrastructure/repositories/user-repository.ts
  */
 export async function findById(id: string): Promise<User | null> {
+	assertUUID(id, "UserRepository.findById.id");
 	return store.get(id) ?? null;
 }
 
@@ -132,6 +134,7 @@ export async function updateAuthToken(
 	userId: string,
 	authToken: string,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateAuthToken.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, authToken });
@@ -147,6 +150,7 @@ export async function updateStreak(
 	streakDays: number,
 	lastPostDate: string,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateStreak.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, streakDays, lastPostDate });
@@ -161,6 +165,7 @@ export async function updateUsername(
 	userId: string,
 	username: string | null,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateUsername.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, username });
@@ -176,6 +181,7 @@ export async function updateIsPremium(
 	userId: string,
 	isPremium: boolean,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateIsPremium.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, isPremium });
@@ -195,6 +201,7 @@ export async function updateIsVerified(
 	userId: string,
 	isVerified: boolean,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateIsVerified.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, isVerified });
@@ -212,6 +219,7 @@ export async function updateRegistrationType(
 	userId: string,
 	registrationType: "email" | "discord" | null,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateRegistrationType.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, {
@@ -259,6 +267,7 @@ export async function updateSupabaseAuthId(
 	supabaseAuthId: string,
 	registrationType: "email" | "discord",
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateSupabaseAuthId.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, {
@@ -281,6 +290,7 @@ export async function updatePatToken(
 	userId: string,
 	patToken: string,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updatePatToken.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, patToken, patLastUsedAt: null });
@@ -309,6 +319,7 @@ export async function findByPatToken(patToken: string): Promise<User | null> {
  * See: features/user_registration.feature @マイページでPATを確認できる
  */
 export async function updatePatLastUsedAt(userId: string): Promise<void> {
+	assertUUID(userId, "UserRepository.updatePatLastUsedAt.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, patLastUsedAt: new Date(Date.now()) });
@@ -371,6 +382,7 @@ export async function updateIsBanned(
 	userId: string,
 	isBanned: boolean,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateIsBanned.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, isBanned });
@@ -387,6 +399,7 @@ export async function updateLastIpHash(
 	userId: string,
 	lastIpHash: string,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateLastIpHash.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, lastIpHash });
@@ -409,6 +422,7 @@ export async function updateGrassCount(
 	userId: string,
 	grassCount: number,
 ): Promise<void> {
+	assertUUID(userId, "UserRepository.updateGrassCount.userId");
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, grassCount });

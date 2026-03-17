@@ -145,6 +145,32 @@ export interface ICurrencyService {
 	getBalance: typeof CurrencyServiceType.getBalance;
 }
 
+/**
+ * PostNumberResolver の依存インターフェース。
+ * `>>N` 形式の引数をスレッド内のpostNumberからUUIDに解決するために使用する。
+ * DI によりテスト時にモックを注入できるようにする。
+ *
+ * See: docs/architecture/components/command.md §2.3 解析ルール
+ */
+export interface IPostNumberResolver {
+	findByThreadIdAndPostNumber(
+		threadId: string,
+		postNumber: number,
+	): Promise<import("../domain/models/post").Post | null>;
+}
+
+// ---------------------------------------------------------------------------
+// >>N パターン検出
+// See: docs/architecture/components/command.md §2.3 解析ルール
+// ---------------------------------------------------------------------------
+
+/**
+ * `>>N` 形式のpostNumber参照パターン。
+ * - `>>5` → postNumber = 5
+ * - `>>999` → postNumber = 999
+ */
+const POST_NUMBER_REF_PATTERN = /^>>(\d+)$/;
+
 // ---------------------------------------------------------------------------
 // DeductReason マッピング
 // ---------------------------------------------------------------------------
@@ -194,6 +220,14 @@ export class CommandService {
 	private readonly skipDebitCommands: Set<string>;
 
 	/**
+	 * `>>N` 形式のpostNumber参照をUUIDに解決するリゾルバ。
+	 * null の場合は `>>N` をそのままハンドラに渡す（後方互換性）。
+	 *
+	 * See: docs/architecture/components/command.md §2.3 解析ルール
+	 */
+	private readonly postNumberResolver: IPostNumberResolver | null;
+
+	/**
 	 * @param currencyService - 通貨操作サービス（DI。テスト時はモックを注入する）
 	 * @param accusationService - AI告発サービス（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
 	 * @param commandsYamlPath - commands.yaml のファイルパス（省略時はデフォルトパス）
@@ -213,6 +247,7 @@ export class CommandService {
 		commandsYamlPath?: string,
 		attackHandler?: AttackHandler | null,
 		grassHandler?: GrassHandler | null,
+		postNumberResolver?: IPostNumberResolver | null,
 	) {
 		// config/commands.yaml を読み込み、Registry を構築する
 		// See: docs/architecture/components/command.md §2.2 設定層
@@ -227,6 +262,10 @@ export class CommandService {
 		// !attack は通貨消費をハンドラ内で行うため、CommandService の共通 debit をスキップする
 		// See: docs/architecture/components/attack.md §3.1
 		this.skipDebitCommands = new Set(["attack"]);
+
+		// PostNumberResolver の設定（>>N → UUID 解決用）
+		// See: docs/architecture/components/command.md §2.3
+		this.postNumberResolver = postNumberResolver ?? null;
 
 		// YAML から tell コマンドの経済パラメータを抽出する
 		// AccusationService が未提供の場合、YAML設定値で内部生成する
@@ -362,6 +401,7 @@ export class CommandService {
 	 *
 	 * 処理フロー（D-08 command.md §5 準拠）:
 	 *   1. rawCommand を parseCommand で解析する
+	 *   1.5. args 内の `>>N` パターンを UUID に解決する（PostNumberResolver）
 	 *   2. コマンドが登録済みか確認する（未登録なら null を返す）
 	 *   3. 通貨残高チェック（不足時はエラー結果を返す）
 	 *   4. 通貨消費（CurrencyService.deduct）
@@ -379,11 +419,43 @@ export class CommandService {
 	): Promise<CommandExecutionResult | null> {
 		// Step 1: rawCommand を解析する
 		// See: docs/architecture/components/command.md §2.3 コマンド解析仕様
-		const parsed = parseCommand(input.rawCommand, this.registeredCommandNames);
+		let parsed = parseCommand(input.rawCommand, this.registeredCommandNames);
 
 		if (!parsed) {
 			// コマンドが存在しない（通常の書き込み）
 			return null;
+		}
+
+		// Step 1.5: >>N → UUID 解決
+		// args 内の `>>N` パターンをスレッド内のpostNumberに対応するUUIDに置換する。
+		// ハンドラは解決済みUUIDを受け取る（ハンドラごとに解決ロジックを重複させない）。
+		// See: docs/architecture/components/command.md §2.3 解析ルール
+		if (this.postNumberResolver) {
+			const resolvedArgs: string[] = [];
+			for (const arg of parsed.args) {
+				const match = POST_NUMBER_REF_PATTERN.exec(arg);
+				if (match) {
+					const postNumber = parseInt(match[1], 10);
+					const post =
+						await this.postNumberResolver.findByThreadIdAndPostNumber(
+							input.threadId,
+							postNumber,
+						);
+					if (!post) {
+						// 存在しないpostNumber → コマンド実行をスキップしエラーメッセージを返す
+						// メッセージはハンドラ（GrassHandler/AttackHandler）と統一する
+						return {
+							success: false,
+							systemMessage: "指定されたレスが見つかりません",
+							currencyCost: 0,
+						};
+					}
+					resolvedArgs.push(post.id);
+				} else {
+					resolvedArgs.push(arg);
+				}
+			}
+			parsed = { ...parsed, args: resolvedArgs };
 		}
 
 		// Step 2: コマンド設定とハンドラを取得する（防御的チェック）

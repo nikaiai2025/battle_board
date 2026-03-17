@@ -9,31 +9,35 @@
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
-import type { AdminUser, AdminLoginResult } from '../../../src/lib/infrastructure/repositories/admin-user-repository'
+import type {
+	AdminLoginResult,
+	AdminUser,
+} from "../../../src/lib/infrastructure/repositories/admin-user-repository";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
 // ---------------------------------------------------------------------------
 
 /** シナリオ間でリセットされる管理者ユーザーストア（id -> AdminUser） */
-const store = new Map<string, AdminUser>()
+const store = new Map<string, AdminUser>();
 
 /** テスト用管理者認証情報ストア（email -> { password, userId }） */
-const credentialStore = new Map<string, { password: string; userId: string }>()
+const credentialStore = new Map<string, { password: string; userId: string }>();
 
 /**
  * ストアを初期化する（Beforeフックから呼び出す）。
  */
 export function reset(): void {
-  store.clear()
-  credentialStore.clear()
+	store.clear();
+	credentialStore.clear();
 }
 
 /**
  * テスト用ヘルパー: 管理者ユーザーを直接ストアに追加する。
  */
 export function _insert(adminUser: AdminUser): void {
-  store.set(adminUser.id, adminUser)
+	store.set(adminUser.id, adminUser);
 }
 
 /**
@@ -44,8 +48,12 @@ export function _insert(adminUser: AdminUser): void {
  * @param password - パスワード
  * @param userId - 対応する AdminUser の ID
  */
-export function _insertCredential(email: string, password: string, userId: string): void {
-  credentialStore.set(email, { password, userId })
+export function _insertCredential(
+	email: string,
+	password: string,
+	userId: string,
+): void {
+	credentialStore.set(email, { password, userId });
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +65,8 @@ export function _insertCredential(email: string, password: string, userId: strin
  * See: src/lib/infrastructure/repositories/admin-user-repository.ts
  */
 export async function findById(id: string): Promise<AdminUser | null> {
-  return store.get(id) ?? null
+	assertUUID(id, "AdminRepository.findById.id");
+	return store.get(id) ?? null;
 }
 
 /**
@@ -69,28 +78,28 @@ export async function findById(id: string): Promise<AdminUser | null> {
  * See: src/lib/infrastructure/repositories/admin-user-repository.ts
  */
 export async function loginWithPassword(
-  email: string,
-  password: string
+	email: string,
+	password: string,
 ): Promise<AdminLoginResult> {
-  const credential = credentialStore.get(email)
+	const credential = credentialStore.get(email);
 
-  // メールアドレスが存在しない or パスワードが一致しない場合は失敗
-  if (!credential || credential.password !== password) {
-    return { success: false, reason: 'invalid_credentials' }
-  }
+	// メールアドレスが存在しない or パスワードが一致しない場合は失敗
+	if (!credential || credential.password !== password) {
+		return { success: false, reason: "invalid_credentials" };
+	}
 
-  // 管理者ロールの確認（admin_users テーブルに存在するか）
-  const adminUser = store.get(credential.userId)
-  if (!adminUser) {
-    return { success: false, reason: 'not_admin' }
-  }
+	// 管理者ロールの確認（admin_users テーブルに存在するか）
+	const adminUser = store.get(credential.userId);
+	if (!adminUser) {
+		return { success: false, reason: "not_admin" };
+	}
 
-  // セッショントークンはテスト用の固定文字列を生成する
-  const sessionToken = `test-admin-session-${credential.userId}`
+	// セッショントークンはテスト用の固定文字列を生成する
+	const sessionToken = `test-admin-session-${credential.userId}`;
 
-  return {
-    success: true,
-    sessionToken,
-    userId: credential.userId,
-  }
+	return {
+		success: true,
+		sessionToken,
+		userId: credential.userId,
+	};
 }

@@ -33,12 +33,15 @@ import type { BattleBoardWorld } from "../support/world";
 const TEST_BOARD_ID = "battleboard";
 
 /** テスト用管理者アカウントの固定値 */
-const TEST_ADMIN_ID = "test-admin-user-id-001";
+// UUID形式でないとInMemoryリポジトリのバリデーションに弾かれるため randomUUID で生成する
+// See: features/support/in-memory/assert-uuid.ts
+const TEST_ADMIN_ID = crypto.randomUUID();
 const TEST_ADMIN_EMAIL = "admin@battleboard.test";
 const TEST_ADMIN_PASSWORD = "admin-secret-password";
 
 /** テスト用一般ユーザー ID */
-const TEST_NON_ADMIN_USER_ID = "test-non-admin-user-id-001";
+// UUID形式でないとInMemoryリポジトリのバリデーションに弾かれるため randomUUID で生成する
+const TEST_NON_ADMIN_USER_ID = crypto.randomUUID();
 
 // ---------------------------------------------------------------------------
 // AdminService の動的 require ヘルパー

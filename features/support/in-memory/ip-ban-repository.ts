@@ -10,6 +10,7 @@
  */
 
 import type { IpBan } from "../../../src/lib/infrastructure/repositories/ip-ban-repository";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -67,6 +68,7 @@ export async function create(
 	reason: string | null,
 	bannedBy: string,
 ): Promise<IpBan> {
+	assertUUID(bannedBy, "IpBanRepository.create.bannedBy");
 	const newBan: IpBan = {
 		id: crypto.randomUUID(),
 		ipHash,
@@ -86,6 +88,7 @@ export async function create(
  * See: src/lib/infrastructure/repositories/ip-ban-repository.ts > deactivate
  */
 export async function deactivate(id: string): Promise<void> {
+	assertUUID(id, "IpBanRepository.deactivate.id");
 	const ban = store.get(id);
 	if (ban) {
 		store.set(id, { ...ban, isActive: false });
@@ -112,5 +115,6 @@ export async function listActive(): Promise<IpBan[]> {
  * See: src/lib/infrastructure/repositories/ip-ban-repository.ts > findById
  */
 export async function findById(id: string): Promise<IpBan | null> {
+	assertUUID(id, "IpBanRepository.findById.id");
 	return store.get(id) ?? null;
 }

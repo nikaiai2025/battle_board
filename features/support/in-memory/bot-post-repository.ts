@@ -8,6 +8,8 @@
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
+import { assertUUID } from "./assert-uuid";
+
 // ---------------------------------------------------------------------------
 // インメモリストア
 // ---------------------------------------------------------------------------
@@ -47,6 +49,8 @@ export function _insert(postId: string, botId: string): void {
  * See: src/lib/infrastructure/repositories/bot-post-repository.ts
  */
 export async function create(postId: string, botId: string): Promise<void> {
+	assertUUID(postId, "BotPostRepository.create.postId");
+	assertUUID(botId, "BotPostRepository.create.botId");
 	store.push({ postId, botId });
 }
 
@@ -58,6 +62,7 @@ export async function create(postId: string, botId: string): Promise<void> {
 export async function findByPostId(
 	postId: string,
 ): Promise<{ postId: string; botId: string } | null> {
+	assertUUID(postId, "BotPostRepository.findByPostId.postId");
 	return store.find((r) => r.postId === postId) ?? null;
 }
 
@@ -68,5 +73,6 @@ export async function findByPostId(
 export async function findByBotId(
 	botId: string,
 ): Promise<{ postId: string; botId: string }[]> {
+	assertUUID(botId, "BotPostRepository.findByBotId.botId");
 	return store.filter((r) => r.botId === botId);
 }

@@ -14,6 +14,7 @@
  */
 
 import type { Post } from "../../../src/lib/domain/models/post";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -57,6 +58,7 @@ export function _insert(post: Post): void {
  * See: src/lib/infrastructure/repositories/post-repository.ts
  */
 export async function findById(id: string): Promise<Post | null> {
+	assertUUID(id, "PostRepository.findById.id");
 	return store.get(id) ?? null;
 }
 
@@ -68,6 +70,7 @@ export async function findByThreadId(
 	threadId: string,
 	options: { fromPostNumber?: number } = {},
 ): Promise<Post[]> {
+	assertUUID(threadId, "PostRepository.findByThreadId.threadId");
 	const posts = Array.from(store.values())
 		.filter((p) => p.threadId === threadId && !p.isDeleted)
 		.sort((a, b) => a.postNumber - b.postNumber);
@@ -90,11 +93,32 @@ export async function findByAuthorId(
 	authorId: string,
 	options: { limit?: number } = {},
 ): Promise<Post[]> {
+	assertUUID(authorId, "PostRepository.findByAuthorId.authorId");
 	const limit = options.limit ?? 50;
 	return Array.from(store.values())
 		.filter((p) => p.authorId === authorId)
 		.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 		.slice(0, limit);
+}
+
+/**
+ * スレッドID とレス番号（postNumber）でレスを1件取得する。
+ * コマンドの `>>N` 引数から対応するレスのUUIDを解決するために使用する。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > findByThreadIdAndPostNumber
+ * See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
+ */
+export async function findByThreadIdAndPostNumber(
+	threadId: string,
+	postNumber: number,
+): Promise<Post | null> {
+	assertUUID(threadId, "PostRepository.findByThreadIdAndPostNumber.threadId");
+	for (const post of store.values()) {
+		if (post.threadId === threadId && post.postNumber === postNumber) {
+			return post;
+		}
+	}
+	return null;
 }
 
 /**
@@ -107,6 +131,7 @@ export async function findByAuthorId(
  * See: features/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
  */
 export async function getNextPostNumber(threadId: string): Promise<number> {
+	assertUUID(threadId, "PostRepository.getNextPostNumber.threadId");
 	// 並行採番を直列化する。
 	// 初回（prevQueue が undefined）: store から現在の最大レス番号を取得して +1 する。
 	// 2回目以降: 前回返した番号に +1 する（store への書き込み完了を待たずに連番を保証）。
@@ -156,6 +181,7 @@ export async function create(
  * See: src/lib/infrastructure/repositories/post-repository.ts
  */
 export async function softDelete(postId: string): Promise<void> {
+	assertUUID(postId, "PostRepository.softDelete.postId");
 	const post = store.get(postId);
 	if (post) {
 		store.set(postId, { ...post, isDeleted: true });
@@ -172,6 +198,7 @@ export async function softDelete(postId: string): Promise<void> {
  * See: features/admin.feature @管理者が指定したスレッドを削除する
  */
 export async function softDeleteByThreadId(threadId: string): Promise<void> {
+	assertUUID(threadId, "PostRepository.softDeleteByThreadId.threadId");
 	for (const [id, post] of store.entries()) {
 		if (post.threadId === threadId) {
 			store.set(id, { ...post, isDeleted: true });

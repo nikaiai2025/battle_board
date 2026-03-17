@@ -270,8 +270,11 @@ async function executeAttackCommand(
 	// postId 引数には "target" として実際のIDを渡す（攻撃対象のレスID）
 	const attackHandler = createAttackHandler();
 	const result = await attackHandler.execute({
-		args: [targetPostId ?? `nonexistent-post-${postNumber}`],
-		postId: `attacker-post-${userId}-${Date.now()}`, // 攻撃レス自身のID（新規レスのID）
+		// 対象レスが存在しない場合は存在しない UUID を渡す（非UUID文字列はリポジトリバリデーションに弾かれる）
+		// See: features/support/in-memory/assert-uuid.ts
+		args: [targetPostId ?? crypto.randomUUID()],
+		// 攻撃レス自身のID（新規レスのID）は UUID 形式でなければならない
+		postId: crypto.randomUUID(),
 		threadId: world.currentThreadId!,
 		userId,
 	});
@@ -295,8 +298,10 @@ async function executeAttackCommand(
 		0,
 	);
 	const attackerPostNumber = maxPostNumber + 1000;
+	// レスIDはUUID形式でなければならない（非UUID文字列はリポジトリバリデーションに弾かれる）
+	// See: features/support/in-memory/assert-uuid.ts
 	InMemoryPostRepo._insert({
-		id: `attacker-post-${userId}-${Date.now()}`,
+		id: crypto.randomUUID(),
 		threadId: world.currentThreadId!,
 		postNumber: attackerPostNumber,
 		authorId: userId,
@@ -827,8 +832,10 @@ When(
 		// See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
 		// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
 		const botService = createBotServiceWithThread();
+		// ボットIDはUUID形式でなければならない（非UUID文字列はリポジトリバリデーションに弾かれる）
+		// See: features/support/in-memory/assert-uuid.ts
 		const selectedId = await botService.selectTargetThread(
-			this.currentBot?.id ?? "bot-dummy",
+			this.currentBot?.id ?? crypto.randomUUID(),
 		);
 		// シナリオスコープの拡張プロパティとして保存する
 		// See: docs/architecture/bdd_test_strategy.md §3 Cucumber World 設計
@@ -1995,7 +2002,9 @@ Given(
 
 Given("ボットが撃破された", async function (this: BattleBoardWorld) {
 	assert(this.currentBot, "ボットが設定されていません");
-	await InMemoryBotRepo.eliminate(this.currentBot.id, "test-attacker");
+	// eliminatedBy はUUID形式でなければならない（非UUID文字列はリポジトリバリデーションに弾かれる）
+	// See: features/support/in-memory/assert-uuid.ts
+	await InMemoryBotRepo.eliminate(this.currentBot.id, crypto.randomUUID());
 	const bot = await InMemoryBotRepo.findById(this.currentBot.id);
 	if (bot) this.currentBot = bot;
 });

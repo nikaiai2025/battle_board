@@ -9,6 +9,7 @@
  */
 
 import type { Bot } from "../../../src/lib/domain/models/bot";
+import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
@@ -48,6 +49,7 @@ export function _insert(bot: Bot): void {
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
 export async function findById(id: string): Promise<Bot | null> {
+	assertUUID(id, "BotRepository.findById.id");
 	const bot = store.find((b) => b.id === id);
 	return bot ? { ...bot } : null;
 }
@@ -106,6 +108,7 @@ export async function create(
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
 export async function updateHp(botId: string, hp: number): Promise<void> {
+	assertUUID(botId, "BotRepository.updateHp.botId");
 	const bot = store.find((b) => b.id === botId);
 	if (bot) {
 		bot.hp = hp;
@@ -117,6 +120,7 @@ export async function updateHp(botId: string, hp: number): Promise<void> {
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
 export async function reveal(botId: string): Promise<void> {
+	assertUUID(botId, "BotRepository.reveal.botId");
 	const bot = store.find((b) => b.id === botId);
 	if (bot) {
 		bot.isRevealed = true;
@@ -129,6 +133,7 @@ export async function reveal(botId: string): Promise<void> {
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
 export async function unreveal(botId: string): Promise<void> {
+	assertUUID(botId, "BotRepository.unreveal.botId");
 	const bot = store.find((b) => b.id === botId);
 	if (bot) {
 		bot.isRevealed = false;
@@ -144,6 +149,8 @@ export async function eliminate(
 	botId: string,
 	eliminatedBy: string,
 ): Promise<void> {
+	assertUUID(botId, "BotRepository.eliminate.botId");
+	assertUUID(eliminatedBy, "BotRepository.eliminate.eliminatedBy");
 	const bot = store.find((b) => b.id === botId);
 	if (bot) {
 		bot.isActive = false;
@@ -157,6 +164,7 @@ export async function eliminate(
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
 export async function incrementTimesAttacked(botId: string): Promise<void> {
+	assertUUID(botId, "BotRepository.incrementTimesAttacked.botId");
 	const bot = store.find((b) => b.id === botId);
 	if (bot) {
 		bot.timesAttacked += 1;
@@ -168,6 +176,7 @@ export async function incrementTimesAttacked(botId: string): Promise<void> {
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
 export async function incrementSurvivalDays(botId: string): Promise<void> {
+	assertUUID(botId, "BotRepository.incrementSurvivalDays.botId");
 	const bot = store.find((b) => b.id === botId);
 	if (bot) {
 		bot.survivalDays += 1;
@@ -183,6 +192,7 @@ export async function updateDailyId(
 	dailyId: string,
 	dailyIdDate: string,
 ): Promise<void> {
+	assertUUID(botId, "BotRepository.updateDailyId.botId");
 	const bot = store.find((b) => b.id === botId);
 	if (bot) {
 		bot.dailyId = dailyId;

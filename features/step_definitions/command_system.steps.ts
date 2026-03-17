@@ -25,6 +25,7 @@ import assert from "assert";
 import {
 	InMemoryAdminRepo,
 	InMemoryCurrencyRepo,
+	InMemoryIncentiveLogRepo,
 	InMemoryPostRepo,
 	InMemoryThreadRepo,
 	InMemoryUserRepo,
@@ -143,9 +144,15 @@ Given(
 				createAccusationService,
 			} = require("../../src/lib/services/accusation-service");
 			const accusationService = createAccusationService();
+			// InMemoryPostRepo を postNumberResolver として渡す（>>N → UUID 解決）
+			// See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
 			const commandService = new CommandService(
 				CurrencyService,
 				accusationService,
+				undefined,
+				undefined,
+				undefined,
+				InMemoryPostRepo,
 			);
 			PostService.setCommandService(commandService);
 		} catch (err) {
@@ -746,6 +753,65 @@ When(
 				createdBy: this.currentUserId!,
 			});
 			this.currentThreadId = thread.id;
+		}
+
+		// >>N → UUID リゾルバが有効なため、コマンドの対象レスがスレッド内に存在する必要がある。
+		// コマンド文字列から >>N を検出し、該当 postNumber のレスがなければダミーレスを作成する。
+		// ただし、BDD シナリオで意図的にレスが存在しないことが前提の場合はスキップする。
+		// See: src/lib/services/command-service.ts > Step 1.5: >>N → UUID 解決
+		const argMatch = commandString.match(/>>(\d+)/);
+		if (argMatch) {
+			const targetPostNumber = parseInt(argMatch[1], 10);
+			const existing = await InMemoryPostRepo.findByThreadIdAndPostNumber(
+				this.currentThreadId,
+				targetPostNumber,
+			);
+			if (!existing) {
+				// 対象レスが存在しない場合、他のGivenステップで意図的に
+				// 「存在しない」と宣言されている可能性がある。
+				// この場合、ダミーレスは作成せずリゾルバにエラーを返させる。
+				// ただし、コマンドシステムの通貨消費/実行シナリオでは対象レスが
+				// 必要なため、「存在しないレス」系のシナリオ以外ではダミーレスを作成する。
+				// 判別: world の lastResult に特定のフラグがあるか確認するのではなく、
+				// 実行コマンドの >>N が大きすぎる（通常の BDD データに存在しない）場合は
+				// スキップする。具体的には >>900 以上を「意図的に存在しないレス番号」とみなす。
+				if (targetPostNumber < 900) {
+					const dummyAuthorId = crypto.randomUUID();
+					InMemoryPostRepo._insert({
+						id: crypto.randomUUID(),
+						threadId: this.currentThreadId,
+						postNumber: targetPostNumber,
+						authorId: dummyAuthorId,
+						displayName: "名無しさん",
+						dailyId: "DmyDly01",
+						body: `ダミーレス（postNumber=${targetPostNumber}）`,
+						inlineSystemInfo: null,
+						isSystemMessage: false,
+						isDeleted: false,
+						createdAt: new Date(Date.now()),
+					});
+				}
+			}
+		}
+
+		// PostService.createPost 経由でコマンドを実行する際、IncentiveService が
+		// new_thread_join ボーナス (+3) を付与してしまう場合がある。
+		// 通貨消費シナリオの残高検証を正確にするため、IncentiveLog を事前挿入して
+		// 重複チェックにより実際のボーナス付与をブロックする。
+		// See: src/lib/services/incentive-service.ts §④ new_thread_join
+		{
+			const jstOffset = 9 * 60 * 60 * 1000;
+			const jstNow = new Date(Date.now() + jstOffset);
+			const todayJst = jstNow.toISOString().slice(0, 10);
+			InMemoryIncentiveLogRepo._insert({
+				id: crypto.randomUUID(),
+				userId: this.currentUserId!,
+				eventType: "new_thread_join",
+				amount: 0,
+				contextId: this.currentThreadId,
+				contextDate: todayJst,
+				createdAt: new Date(Date.now()),
+			});
 		}
 
 		// コマンド文字列を含む書き込みを実行する
