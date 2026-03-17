@@ -10,8 +10,12 @@
  * See: docs/architecture/components/bot.md §2.12.3 RandomThreadBehaviorStrategy
  */
 
-import type { IThreadRepository } from "../../bot-service";
-import type { BehaviorContext, BehaviorStrategy, BotAction } from "../types";
+import type {
+	BehaviorContext,
+	BehaviorStrategy,
+	BotAction,
+	IThreadRepository,
+} from "../types";
 
 /**
  * RandomThreadBehaviorStrategy クラス。

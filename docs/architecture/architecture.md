@@ -250,10 +250,10 @@ AttackHandler
   ├── PostRepository, UserRepository
 
 BotService
-  ├── BotRepository, PostRepository
+  ├── BotRepository, BotPostRepository, AttackRepository
   ├── BotStrategyResolver, ContentStrategy, BehaviorStrategy, SchedulingStrategy
-  ├── AiApiClient (ContentStrategy 実装が依存)
-  ├── CurrencyService, AuthService
+  ├── AiApiClient (ContentStrategy 実装が依存。Phase 3以降の将来依存)
+  ├── createPostFn（PostService.createPost への関数参照として注入）
 
 CurrencyService
   └── CurrencyRepository
@@ -361,10 +361,14 @@ AdminService
 │ total_posts │     │ accuser_id   │     │ user_id (FK) │
 │ accused_    │     │ target_post  │     │ event_type   │
 │   count     │     │   _id (FK)   │     │ amount       │
-│ eliminated  │     │ result       │     │ context_id   │
-│   _at       │     │ thread_id(FK)│     │ created_at   │
-│ eliminated  │     │ created_at   │     └──────────────┘
-│   _by       │     └──────────────┘
+│ times_      │     │ result       │     │ context_id   │
+│   attacked  │     │ thread_id(FK)│     │ created_at   │
+│ bot_profile_│     │ created_at   │     └──────────────┘
+│   key       │     └──────────────┘
+│ eliminated  │
+│   _at       │
+│ eliminated  │
+│   _by       │
 │ created_at  │
 └─────────────┘     ┌──────────────┐
 RLS: service role   │   attacks    │
@@ -491,6 +495,8 @@ RLS: service role   │   attacks    │
 | survival_days | INTEGER | 生存日数 |
 | total_posts | INTEGER | 総書き込み数 |
 | accused_count | INTEGER | 被告発回数 |
+| times_attacked | INTEGER DEFAULT 0 | 被攻撃回数（撃破報酬計算に使用。v5追加） |
+| bot_profile_key | VARCHAR | bot_profiles.yaml 内のプロファイルキー（v5追加） |
 | eliminated_at | TIMESTAMPTZ, NULLABLE | 撃破日時 |
 | eliminated_by | UUID (FK, NULLABLE) | 撃破者の user_id |
 | created_at | TIMESTAMPTZ | 作成日時 |

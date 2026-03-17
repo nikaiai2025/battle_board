@@ -676,6 +676,28 @@ describe("BotService", () => {
 			);
 		});
 
+		it("ボットが見つからない場合でもスレッド選択を継続する（HIGH-003: ファクトリ共通化）", async () => {
+			// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+			// See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+			// Phase 2 では resolveStrategies の Bot 引数は未使用のため、
+			// Bot が見つからない場合は createBotForStrategyResolution でフォールバックして処理を継続する。
+			// ハードコード値を1箇所に集約することで保守性を確保する（HIGH-003 対応）。
+			const botRepo = createMockBotRepository(null);
+			const threads = [{ id: "thread-001" }, { id: "thread-002" }];
+			const threadRepo = createMockThreadRepository(threads);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				threadRepo,
+			);
+
+			// エラーをスローせず、スレッドのいずれかが選択されること
+			const result = await service.selectTargetThread("bot-nonexistent");
+			expect(threads.map((t) => t.id)).toContain(result);
+		});
+
 		it("100回呼び出した場合、複数の異なるスレッドが選択される（ランダム性）", async () => {
 			// 確率論的テスト: 10件のスレッドから100回選んでも毎回同じ確率は (1/10)^99 ≒ 0
 			const threads = Array.from({ length: 10 }, (_, i) => ({

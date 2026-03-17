@@ -10,11 +10,10 @@
  */
 
 import type { Bot } from "../../domain/models/bot";
-import type { IThreadRepository } from "../bot-service";
 import { RandomThreadBehaviorStrategy } from "./behavior/random-thread";
 import { FixedMessageContentStrategy } from "./content/fixed-message";
 import { FixedIntervalSchedulingStrategy } from "./scheduling/fixed-interval";
-import type { BotProfile, BotStrategies } from "./types";
+import type { BotProfile, BotStrategies, IThreadRepository } from "./types";
 
 /**
  * resolveStrategies のオプション引数。

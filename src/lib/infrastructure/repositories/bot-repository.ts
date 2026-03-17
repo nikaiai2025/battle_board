@@ -75,40 +75,34 @@ function rowToBot(row: BotRow): Bot {
 // ---------------------------------------------------------------------------
 
 /**
- * bots テーブルの数値カラムを 1 インクリメントする共通処理。
- * SELECT + UPDATE でアトミック性を保つ（サービス呼び出しは低頻度のため楽観的更新で十分）。
+ * bots テーブルの数値カラムを 1 アトミックにインクリメントする共通処理。
+ * PostgreSQL RPC 関数 `increment_bot_column` を呼び出すことで、
+ * UPDATE bots SET {column} = {column} + 1 をアトミックに実行する。
+ * SELECT + UPDATE の2ステップによるレースコンディション（HIGH-004）を排除する。
+ *
+ * See: supabase/migrations/00014_add_increment_column_rpc.sql
+ * See: docs/architecture/architecture.md §7.2 同時実行制御（楽観的ロック）TDR-003
  *
  * @param botId ボットの UUID
  * @param column インクリメント対象のカラム名
+ * @returns インクリメント後のカラム値
  */
 async function incrementColumn(
 	botId: string,
 	column: "total_posts" | "accused_count" | "survival_days" | "times_attacked",
-): Promise<void> {
-	const { data: row, error: fetchError } = await supabaseAdmin
-		.from("bots")
-		.select(column)
-		.eq("id", botId)
-		.single();
+): Promise<number> {
+	const { data, error } = await supabaseAdmin.rpc("increment_bot_column", {
+		p_bot_id: botId,
+		p_column: column,
+	});
 
-	if (fetchError) {
+	if (error) {
 		throw new Error(
-			`BotRepository.increment(${column}) fetch failed: ${fetchError.message}`,
+			`BotRepository.increment(${column}) failed: ${error.message}`,
 		);
 	}
 
-	const current = (row as Record<string, number>)[column];
-
-	const { error: updateError } = await supabaseAdmin
-		.from("bots")
-		.update({ [column]: current + 1 })
-		.eq("id", botId);
-
-	if (updateError) {
-		throw new Error(
-			`BotRepository.increment(${column}) update failed: ${updateError.message}`,
-		);
-	}
+	return data as number;
 }
 
 // ---------------------------------------------------------------------------

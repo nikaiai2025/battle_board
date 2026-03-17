@@ -154,6 +154,26 @@ export interface SchedulingStrategy {
 }
 
 // ---------------------------------------------------------------------------
+// IThreadRepository — スレッド取得リポジトリ（DI用）
+// ---------------------------------------------------------------------------
+
+/**
+ * ThreadRepository の依存インターフェース（最小）。
+ * selectTargetThread でボット書き込み先スレッド選択に使用する。
+ * Strategy 実装（RandomThreadBehaviorStrategy）が依存するため、
+ * 逆依存を避けるために bot-service.ts ではなく types.ts に配置する。
+ *
+ * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+ * See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
+ */
+export interface IThreadRepository {
+	findByBoardId(
+		boardId: string,
+		options?: { limit?: number },
+	): Promise<{ id: string }[]>;
+}
+
+// ---------------------------------------------------------------------------
 // BotStrategies — 3つの Strategy をまとめる型
 // ---------------------------------------------------------------------------
 

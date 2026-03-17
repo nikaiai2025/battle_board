@@ -36,8 +36,13 @@ import type {
 	BotProfile,
 	BotStrategies,
 	ContentGenerationContext,
+	IThreadRepository,
 	SchedulingContext,
 } from "./bot-strategies/types";
+
+// IThreadRepository は types.ts からインポートし、後方互換のため re-export する
+// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+export type { IThreadRepository };
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -128,19 +133,6 @@ export interface IBotPostRepository {
 }
 
 /**
- * ThreadRepository の依存インターフェース（最小）。
- * selectTargetThread でボット書き込み先スレッド選択に使用する。
- *
- * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
- */
-export interface IThreadRepository {
-	findByBoardId(
-		boardId: string,
-		options?: { limit?: number },
-	): Promise<{ id: string }[]>;
-}
-
-/**
  * PostService.createPost の関数型（DI用）。
  * BotService は PostService モジュール全体に依存せず、関数参照のみ受け取る。
  *
@@ -204,23 +196,12 @@ const BOT_DEFAULT_BOARD_ID = "battleboard";
 // bot_profiles.yaml 型定義
 // ---------------------------------------------------------------------------
 
-/** bot_profiles.yaml の報酬セクション型 */
-interface BotProfileReward {
-	base_reward: number;
-	daily_bonus: number;
-	attack_bonus: number;
-}
-
-/** bot_profiles.yaml の個別プロファイル型（BotService 内部用） */
-interface BotProfileInternal {
-	hp: number;
-	max_hp: number;
-	reward: BotProfileReward;
-	fixed_messages: string[];
-}
-
-/** bot_profiles.yaml のルート型 */
-type BotProfilesYaml = Record<string, BotProfileInternal>;
+/**
+ * bot_profiles.yaml のルート型。
+ * 個別プロファイルの型は bot-strategies/types.ts の BotProfile を使用する。
+ * See: docs/architecture/components/bot.md §2.12.7 bot_profiles.yaml 拡張スキーマ
+ */
+type BotProfilesYaml = Record<string, BotProfile>;
 
 // ---------------------------------------------------------------------------
 // デフォルト報酬パラメータ（bot_profiles.yaml に値がない場合のフォールバック）
@@ -750,34 +731,20 @@ export class BotService {
 		}
 
 		// ボット情報を取得して Strategy を解決する
+		// ボットが見つからない場合は共通ファクトリで最小 Bot を生成して処理を継続する。
+		// Phase 2 時点では resolveStrategies の Bot 引数は未使用のため、
+		// Bot の存在確認はブロッキング要因にならない。
+		// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+		// See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
 		const bot = await this.botRepository.findById(botId);
+		const resolvedBot = bot ?? this.createBotForStrategyResolution(botId, null);
 		const profile = bot
 			? this.getBotProfileForStrategy(bot.botProfileKey)
 			: null;
-		const dummyBot = bot ?? {
-			id: botId,
-			name: "",
-			persona: "",
-			hp: 10,
-			maxHp: 10,
-			dailyId: "",
-			dailyIdDate: "",
-			isActive: true,
-			isRevealed: false,
-			revealedAt: null,
-			survivalDays: 0,
-			totalPosts: 0,
-			accusedCount: 0,
-			timesAttacked: 0,
-			botProfileKey: null,
-			eliminatedAt: null,
-			eliminatedBy: null,
-			createdAt: new Date(),
-		};
 
 		// BehaviorStrategy.decideAction() を呼び出してスレッドIDを取得する
 		// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
-		const strategies = this.resolveStrategiesForBot(dummyBot, profile);
+		const strategies = this.resolveStrategiesForBot(resolvedBot, profile);
 		const behaviorContext: BehaviorContext = {
 			botId,
 			botProfileKey: bot?.botProfileKey ?? null,
@@ -816,33 +783,22 @@ export class BotService {
 	 */
 	getNextPostDelay(botId?: string, botProfileKey?: string | null): number {
 		// Strategy を解決してスケジューリング戦略に委譲する
-		// ダミーの Bot オブジェクト（getNextPostDelay ではボット情報は不要）を使用
-		const dummyBot: Bot = {
-			id: botId ?? "dummy",
-			name: "",
-			persona: "",
-			hp: 10,
-			maxHp: 10,
-			dailyId: "",
-			dailyIdDate: "",
-			isActive: true,
-			isRevealed: false,
-			revealedAt: null,
-			survivalDays: 0,
-			totalPosts: 0,
-			accusedCount: 0,
-			timesAttacked: 0,
-			botProfileKey: botProfileKey ?? null,
-			eliminatedAt: null,
-			eliminatedBy: null,
-			createdAt: new Date(),
-		};
-		const profile = this.getBotProfileForStrategy(botProfileKey ?? null);
-		const strategies = this.resolveStrategiesForBot(dummyBot, profile);
+		// getNextPostDelay はスケジュール計算にボットエンティティの詳細情報を必要としない。
+		// resolveStrategies の第1引数 Bot は Phase 3/4 向けの拡張ポイントであり現時点では未使用。
+		// 呼び出し用の最小 Bot を共通ファクトリで生成する（ハードコード値の散在を防ぐ）。
+		// See: docs/architecture/components/bot.md §2.12.1 SchedulingStrategy
+		const resolvedBotId = botId ?? "scheduling-context";
+		const resolvedProfileKey = botProfileKey ?? null;
+		const contextBot = this.createBotForStrategyResolution(
+			resolvedBotId,
+			resolvedProfileKey,
+		);
+		const profile = this.getBotProfileForStrategy(resolvedProfileKey);
+		const strategies = this.resolveStrategiesForBot(contextBot, profile);
 
 		const schedulingContext: SchedulingContext = {
-			botId: botId ?? "dummy",
-			botProfileKey: botProfileKey ?? null,
+			botId: resolvedBotId,
+			botProfileKey: resolvedProfileKey,
 		};
 
 		// SchedulingStrategy に委譲する
@@ -893,6 +849,9 @@ export class BotService {
 	 * Strategy 解決用に使用する。
 	 * プロファイルが見つからない場合は null を返す。
 	 *
+	 * BotProfilesYaml の型が BotProfile（bot-strategies/types.ts）と同一のため、
+	 * 変換処理なしにそのまま返す（HIGH-002 型重複解消による簡素化）。
+	 *
 	 * See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
 	 * See: config/bot_profiles.yaml
 	 */
@@ -900,20 +859,7 @@ export class BotService {
 		botProfileKey: string | null,
 	): BotProfile | null {
 		if (botProfileKey === null) return null;
-		const internal = this.botProfiles[botProfileKey];
-		if (!internal) return null;
-
-		// bot-strategies/types.ts の BotProfile 型に変換する
-		return {
-			hp: internal.hp,
-			max_hp: internal.max_hp,
-			reward: {
-				base_reward: internal.reward.base_reward,
-				daily_bonus: internal.reward.daily_bonus,
-				attack_bonus: internal.reward.attack_bonus,
-			},
-			fixed_messages: internal.fixed_messages,
-		};
+		return this.botProfiles[botProfileKey] ?? null;
 	}
 
 	/**
@@ -957,6 +903,42 @@ export class BotService {
 					"threadRepository が未注入です。コンストラクタに IThreadRepository を渡してください",
 				);
 			},
+		};
+	}
+
+	/**
+	 * Strategy 解決専用の最小 Bot オブジェクトを生成する共通ファクトリ。
+	 *
+	 * getNextPostDelay のようにボットエンティティ詳細が不要な呼び出しで使用する。
+	 * resolveStrategies の Bot 引数は Phase 3/4 向けの拡張ポイントであり、
+	 * Phase 2 時点では未使用のため、最小限の値で生成する。
+	 * ハードコード値をこの1箇所に集約することで、フィールド追加時の更新漏れを防ぐ。
+	 *
+	 * See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+	 */
+	private createBotForStrategyResolution(
+		botId: string,
+		botProfileKey: string | null,
+	): Bot {
+		return {
+			id: botId,
+			name: "",
+			persona: "",
+			hp: 0,
+			maxHp: 0,
+			dailyId: "",
+			dailyIdDate: "",
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			survivalDays: 0,
+			totalPosts: 0,
+			accusedCount: 0,
+			timesAttacked: 0,
+			botProfileKey,
+			eliminatedAt: null,
+			eliminatedBy: null,
+			createdAt: new Date(),
 		};
 	}
 

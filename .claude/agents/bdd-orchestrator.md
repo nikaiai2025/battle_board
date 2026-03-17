@@ -22,6 +22,7 @@ color: green
 2. `tmp/orchestrator/sprint_current.md` を読み、直近のスプリント状況を把握する。gitコミット状況も確認
 3. `tmp/escalations/` を確認し、未解決のエスカレーションがないか確認する
 4. `features/` 配下のBDDシナリオの現状を確認する。ただし、 `features/ドラフト_実装禁止`は**ドラフトのため実装禁止**
+5. 状況変化について人間にヒアリングを行う
 
 ### ステップ2: スコープ確定
 
