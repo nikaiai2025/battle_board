@@ -107,13 +107,48 @@ export interface IBotRepository {
 
 /**
  * BotPostRepository の依存インターフェース。
- * isBot 判定・ボット情報逆引きに使用する。
+ * isBot 判定・ボット情報逆引き・ボット書き込み紐付け INSERT に使用する。
  */
 export interface IBotPostRepository {
 	findByPostId(
 		postId: string,
 	): Promise<{ postId: string; botId: string } | null>;
+	/** ボット書き込み紐付けレコードを作成する（executeBotPost で使用）。 */
+	create(postId: string, botId: string): Promise<void>;
 }
+
+/**
+ * ThreadRepository の依存インターフェース（最小）。
+ * selectTargetThread でボット書き込み先スレッド選択に使用する。
+ *
+ * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+ */
+export interface IThreadRepository {
+	findByBoardId(
+		boardId: string,
+		options?: { limit?: number },
+	): Promise<{ id: string }[]>;
+}
+
+/**
+ * PostService.createPost の関数型（DI用）。
+ * BotService は PostService モジュール全体に依存せず、関数参照のみ受け取る。
+ *
+ * See: docs/architecture/components/bot.md §2.1 書き込み実行
+ * See: src/lib/services/post-service.ts > createPost
+ */
+export type CreatePostFn = (input: {
+	threadId: string;
+	body: string;
+	edgeToken: string | null;
+	ipHash: string;
+	displayName?: string;
+	isBotWrite: boolean;
+}) => Promise<
+	| { success: true; postId: string; postNumber: number; systemMessages: [] }
+	| { success: false; error: string; code: string }
+	| { authRequired: true; code: string; edgeToken: string }
+>;
 
 /**
  * AttackRepository の依存インターフェース。
@@ -128,6 +163,18 @@ export interface IAttackRepository {
 	create(attack: Omit<Attack, "id" | "createdAt">): Promise<Attack>;
 	deleteByDateBefore(beforeDate: string): Promise<number>;
 }
+
+// ---------------------------------------------------------------------------
+// ボット書き込みデフォルト定数
+// ---------------------------------------------------------------------------
+
+/**
+ * selectTargetThread のデフォルト板ID。
+ * 本番では config や環境変数から取得する想定だが、MVP では固定値を使用する。
+ *
+ * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+ */
+const BOT_DEFAULT_BOARD_ID = "battleboard";
 
 // ---------------------------------------------------------------------------
 // bot_profiles.yaml 型定義
@@ -182,15 +229,19 @@ export class BotService {
 
 	/**
 	 * @param botRepository - ボット情報の CRUD（DI）
-	 * @param botPostRepository - ボット書き込み紐付けの検索（DI）
+	 * @param botPostRepository - ボット書き込み紐付けの検索・INSERT（DI）
 	 * @param attackRepository - 攻撃記録の管理（DI）
 	 * @param botProfilesYamlPath - bot_profiles.yaml のパス（省略時はデフォルトパス）
+	 * @param threadRepository - スレッド一覧取得（DI・省略可）
+	 * @param createPostFn - PostService.createPost の関数参照（DI・省略可）
 	 */
 	constructor(
 		private readonly botRepository: IBotRepository,
 		private readonly botPostRepository: IBotPostRepository,
 		private readonly attackRepository: IAttackRepository,
 		botProfilesYamlPath?: string,
+		private readonly threadRepository?: IThreadRepository,
+		private readonly createPostFn?: CreatePostFn,
 	) {
 		// bot_profiles.yaml を読み込みキャッシュする
 		// See: docs/architecture/components/bot.md §4 隠蔽する実装詳細 > 撃破報酬パラメータのconfig読み込みとキャッシュ戦略
@@ -511,41 +562,150 @@ export class BotService {
 	}
 
 	// ---------------------------------------------------------------------------
-	// §2.1 書き込み実行（スタブ実装 — Phase 3 で完全実装）
+	// §2.1 書き込み実行
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * ボットに書き込みを実行させる（スタブ）。
+	 * ボットに書き込みを実行させる。
 	 *
-	 * Phase 3 の GitHub Actions 連携までスタブ的な実装で可。
+	 * 処理フロー:
+	 *   1. bot_profiles.yaml の fixed_messages からランダムに1件選択
+	 *   2. getDailyId(botId) で偽装IDを取得
+	 *   3. createPostFn を isBotWrite=true で呼び出す
+	 *   4. 成功したら botPostRepository.create(postId, botId) で紐付け INSERT
+	 *   5. { postId, postNumber, dailyId } を返す
+	 *
+	 * See: features/bot_system.feature @荒らし役ボットが書き込みを行う場合本文は固定文リストのいずれかである
 	 * See: docs/architecture/components/bot.md §2.1 書き込み実行
 	 *
-	 * @param _botId - ボットID
-	 * @param _threadId - 書き込み先スレッドID
+	 * @param botId - ボットID
+	 * @param threadId - 書き込み先スレッドID
+	 * @returns 書き込み結果
 	 */
 	async executeBotPost(
-		_botId: string,
-		_threadId: string,
+		botId: string,
+		threadId: string,
 	): Promise<{ postId: string; postNumber: number; dailyId: string }> {
-		// スタブ実装: Phase 3 で PostService.createPost(isBotWrite=true) を呼び出す
-		throw new Error("executeBotPost: Phase 3 で実装予定");
+		if (!this.createPostFn) {
+			throw new Error(
+				"executeBotPost: createPostFn が未注入です。コンストラクタに PostService.createPost を渡してください",
+			);
+		}
+
+		// Step 1: ボットプロファイルの固定文リストからランダムに1件選択
+		// See: docs/architecture/components/bot.md §4 > 荒らし役のAI API不使用
+		const bot = await this.botRepository.findById(botId);
+		if (!bot) {
+			throw new Error(
+				`BotService.executeBotPost: ボットが見つかりません (botId=${botId})`,
+			);
+		}
+		const fixedMessages = this.getFixedMessages(bot.botProfileKey);
+		const body =
+			fixedMessages[Math.floor(Math.random() * fixedMessages.length)];
+
+		// Step 2: 偽装日次リセットIDを取得
+		const dailyId = await this.getDailyId(botId);
+
+		// Step 3: PostService.createPost を isBotWrite=true で呼び出す
+		// See: docs/architecture/components/bot.md §3.1 依存先 > PostService
+		const result = await this.createPostFn({
+			threadId,
+			body,
+			edgeToken: null,
+			ipHash: `bot-${botId}`,
+			displayName: "名無しさん",
+			isBotWrite: true,
+		});
+
+		if (!("success" in result) || result.success !== true) {
+			const errMsg = "error" in result ? result.error : "不明なエラー";
+			throw new Error(
+				`BotService.executeBotPost: PostService.createPost が失敗しました: ${errMsg}`,
+			);
+		}
+
+		// Step 4: bot_posts に { postId, botId } を INSERT
+		// See: docs/architecture/components/bot.md §6.1 bot_posts INSERTのタイミングと失敗時の扱い
+		try {
+			await this.botPostRepository.create(result.postId, botId);
+		} catch (err) {
+			// bot_posts INSERTに失敗してもpostレコードは残る。
+			// この不整合はゲーム上「ボットが人間として扱われる」方向に作用するため、
+			// エラーログに記録するのみで例外は再スローしない。
+			// See: docs/architecture/components/bot.md §6.1 bot_posts INSERTのタイミングと失敗時の扱い
+			console.error(
+				`BotService.executeBotPost: bot_posts INSERT に失敗（postId=${result.postId}, botId=${botId}）`,
+				err,
+			);
+		}
+
+		// Step 5: 結果を返す
+		return {
+			postId: result.postId,
+			postNumber: result.postNumber,
+			dailyId,
+		};
 	}
 
 	// ---------------------------------------------------------------------------
-	// §2.11 書き込み先スレッド選択（スタブ実装 — Phase 3 で完全実装）
+	// §2.11 書き込み先スレッド選択
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * ボットの書き込み先スレッドをランダムに選択する（スタブ）。
+	 * ボットの書き込み先スレッドをランダムに選択する。
 	 *
-	 * Phase 3 の GitHub Actions 連携までスタブ的な実装で可。
+	 * threadRepository.findByBoardId で非削除スレッドを取得し、
+	 * ランダムに1件選択して thread.id を返す。
+	 *
+	 * See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
 	 * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
 	 *
-	 * @param _botId - ボットID
+	 * @param botId - ボットID（将来の重み付け選択拡張のために引数として保持）
+	 * @returns 選択されたスレッドID
 	 */
-	async selectTargetThread(_botId: string): Promise<string> {
-		// スタブ実装: Phase 3 で ThreadRepository からランダム選択
-		throw new Error("selectTargetThread: Phase 3 で実装予定");
+	async selectTargetThread(botId: string): Promise<string> {
+		if (!this.threadRepository) {
+			throw new Error(
+				"selectTargetThread: threadRepository が未注入です。コンストラクタに IThreadRepository を渡してください",
+			);
+		}
+
+		// 既存スレッド一覧を取得（非削除スレッドのみ）
+		// See: docs/architecture/components/bot.md §4 > 書き込み先スレッド選択のランダムアルゴリズム
+		const threads =
+			await this.threadRepository.findByBoardId(BOT_DEFAULT_BOARD_ID);
+
+		if (threads.length === 0) {
+			throw new Error(
+				`BotService.selectTargetThread: 書き込み先スレッドが存在しません (boardId=${BOT_DEFAULT_BOARD_ID}, botId=${botId})`,
+			);
+		}
+
+		// 均等分布でランダムに1件選択
+		const selected = threads[Math.floor(Math.random() * threads.length)];
+		return selected.id;
+	}
+
+	// ---------------------------------------------------------------------------
+	// §2.12 書き込み間隔決定
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * 次回書き込みまでの遅延時間を返す（分単位）。
+	 *
+	 * 一斉書き込みによるBOT発覚を防ぐため、60〜120分のランダムな値を返す。
+	 * GitHub Actions の cron ジョブから参照される。
+	 *
+	 * See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+	 * See: docs/architecture/components/bot.md §2.1 書き込み実行（GitHub Actionsから呼び出し）
+	 *
+	 * @returns 60〜120 の整数（分単位）
+	 */
+	getNextPostDelay(): number {
+		// 60分以上120分以下のランダムな整数を返す
+		// Math.random() は [0, 1) なので、60 + floor(random * 61) は [60, 120] を網羅する
+		return 60 + Math.floor(Math.random() * 61);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -585,6 +745,23 @@ export class BotService {
 	// ---------------------------------------------------------------------------
 	// プライベートメソッド
 	// ---------------------------------------------------------------------------
+
+	/**
+	 * bot_profiles.yaml からプロファイルキーに対応する固定文リストを取得する。
+	 * プロファイルが見つからない場合、または固定文リストが空の場合はフォールバック文字列を返す。
+	 *
+	 * See: docs/architecture/components/bot.md §4 隠蔽する実装詳細 > 固定文リストの管理方法
+	 * See: config/bot_profiles.yaml > fixed_messages
+	 */
+	private getFixedMessages(botProfileKey: string | null): string[] {
+		const fallback = ["..."];
+		if (botProfileKey === null) return fallback;
+
+		const profile = this.botProfiles[botProfileKey];
+		if (!profile?.fixed_messages?.length) return fallback;
+
+		return profile.fixed_messages;
+	}
 
 	/**
 	 * bot_profiles.yaml からプロファイルキーに対応する報酬パラメータを取得する。

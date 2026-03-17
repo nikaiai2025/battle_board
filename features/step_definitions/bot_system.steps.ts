@@ -62,6 +62,25 @@ function createBotService() {
 }
 
 /**
+ * BotService インスタンスを生成する（ThreadRepository と CreatePostFn も注入）。
+ * selectTargetThread / executeBotPost の BDD テストで使用する。
+ *
+ * See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
+ * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+ */
+function createBotServiceWithThread() {
+	const { BotService } =
+		require("../../src/lib/services/bot-service") as typeof import("../../src/lib/services/bot-service");
+	return new BotService(
+		InMemoryBotRepo,
+		InMemoryBotPostRepo,
+		InMemoryAttackRepo,
+		undefined,
+		InMemoryThreadRepo,
+	);
+}
+
+/**
  * AttackHandler インスタンスを生成する（インメモリリポジトリを注入）。
  * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト
  */
@@ -735,16 +754,25 @@ Given("荒らし役ボットが潜伏中である", async function (this: Battle
 });
 
 When("ボットの定期実行が行われる", async function (this: BattleBoardWorld) {
-	// Phase 3 GitHub Actions 連携が未実装のため pending。
 	// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
-	return "pending";
+	// See: docs/architecture/components/bot.md §2.1 書き込み実行（GitHub Actionsから呼び出し）
+	const botService = createBotService();
+	const delay = botService.getNextPostDelay();
+	// シナリオスコープの拡張プロパティとして保存する
+	// See: docs/architecture/bdd_test_strategy.md §3 Cucumber World 設計
+	(this as unknown as Record<string, unknown>).nextPostDelayMinutes = delay;
 });
 
 Then(
 	"各ボットの書き込み間隔は1時間以上2時間以下のランダムな値である",
 	async function (this: BattleBoardWorld) {
-		// Phase 3 GitHub Actions 連携が未実装のため pending。
-		return "pending";
+		// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+		// See: docs/architecture/components/bot.md §2.1 書き込み実行
+		const delay = (this as unknown as Record<string, unknown>)
+			.nextPostDelayMinutes as number | undefined;
+		assert(delay !== undefined, "書き込み間隔が設定されていません");
+		assert(delay >= 60, `書き込み間隔が60分未満です: ${delay}分`);
+		assert(delay <= 120, `書き込み間隔が120分を超えています: ${delay}分`);
 	},
 );
 
@@ -796,16 +824,34 @@ Given(
 When(
 	"荒らし役ボットが書き込み先を決定する",
 	async function (this: BattleBoardWorld) {
-		// selectTargetThread は Phase 3 で ThreadRepository からランダム選択する。
-		return "pending";
+		// See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
+		// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+		const botService = createBotServiceWithThread();
+		const selectedId = await botService.selectTargetThread(
+			this.currentBot?.id ?? "bot-dummy",
+		);
+		// シナリオスコープの拡張プロパティとして保存する
+		// See: docs/architecture/bdd_test_strategy.md §3 Cucumber World 設計
+		(this as unknown as Record<string, unknown>).selectedThreadId = selectedId;
 	},
 );
 
 Then(
 	"表示中の50件の中からランダムに1件が選択される",
 	async function (this: BattleBoardWorld) {
-		// Phase 3 未実装のため pending。
-		return "pending";
+		// See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
+		// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+		const selectedId = (this as unknown as Record<string, unknown>)
+			.selectedThreadId as string | undefined;
+		assert(selectedId !== undefined, "書き込み先スレッドが選択されていません");
+
+		// Given で作成した50件のスレッドを InMemoryThreadRepo から取得して検証する
+		const threads = await InMemoryThreadRepo.findByBoardId(TEST_BOARD_ID);
+		const threadIds = threads.map((t: { id: string }) => t.id);
+		assert(
+			threadIds.includes(selectedId),
+			`選択されたスレッド "${selectedId}" が表示中の50件に含まれていません`,
+		);
 	},
 );
 

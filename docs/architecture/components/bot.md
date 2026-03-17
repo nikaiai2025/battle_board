@@ -1,7 +1,7 @@
 # D-08 コンポーネント境界設計書: Bot（AIボットシステム）
 
-> ステータス: ドラフト v5 / 2026-03-16
-> 関連D-07: SS 3.2 BotService / SS 5.4 ボット認証
+> ステータス: ドラフト v6 / 2026-03-17
+> 関連D-07: SS 3.2 BotService / SS 5.4 ボット認証 / TDR-008
 > 関連D-05: bot_state_transitions.yaml v5
 
 ---
@@ -14,6 +14,8 @@
 
 v5で新設された !attack コマンドの処理フローは AttackHandler（D-08 attack.md）に記載する。BotServiceは AttackHandler から呼び出される「ボット側の操作API」を提供する立場に位置づける。
 
+v6 では Phase 3（ネタ師）・Phase 4（ユーザー作成ボット）に向け、BOT種別ごとに異なる「コンテンツ生成」「行動パターン」「スケジュール」の3つの関心事を Strategy パターンで分離する（TDR-008参照）。BotService は各 Strategy インターフェースを通じて処理を委譲し、BOT種別固有の振る舞いを知らない。既存の §2.2〜§2.10（HP管理・正体判定・撃破報酬等）は全BOT種別で共通のまま変更しない。
+
 ---
 
 ## 2. 公開インターフェース
@@ -21,7 +23,7 @@ v5で新設された !attack コマンドの処理フローは AttackHandler（D
 ### 2.1 書き込み実行（GitHub Actionsから呼び出し）
 
 ```
-executeBotPost(botId: UUID, threadId: UUID): BotPostResult
+executeBotPost(botId: UUID): BotPostResult
 ```
 ```
 BotPostResult {
@@ -31,14 +33,19 @@ BotPostResult {
 }
 ```
 
-内部フロー：
-1. bot_profiles.yaml の固定文リストからランダムに1件選択
-2. PostService.createPost(isBotWrite=true) を呼び出す
-3. 成功したら `bot_posts` に { postId, botId } を INSERT
+内部フロー（Strategy 委譲版 -- v6）：
+1. `resolveStrategies(bot, profile)` で3つの Strategy を解決
+2. `behavior.decideAction(context)` で投稿先を決定（`BotAction` を取得）
+3. `BotAction.type` に応じて分岐:
+   - `post_to_existing`: `content.generateContent(context)` で本文生成 -> `PostService.createPost(isBotWrite=true)`
+   - `create_thread`: BehaviorStrategy が返した title/body を使用 -> `PostService.createThread(isBotWrite=true)`
+4. 成功したら `bot_posts` に { postId, botId } を INSERT
 
 `bot_posts` へのINSERTはこのコンポーネントのみが行う。PostServiceは `bot_posts` を意識しない。
 
-荒らし役はAI API（LLM）を使用せず、固定文リストから選択する。将来のペルソナボット向けにAI API呼び出しの拡張ポイントは残す。
+荒らし役は `FixedMessageContentStrategy` + `RandomThreadBehaviorStrategy` + `FixedIntervalSchedulingStrategy` が解決され、従来と同一の動作を行う。ネタ師以降のBOT種別は対応する Strategy 実装に差し替わる（§2.12 参照）。
+
+> **外部インターフェースの互換性**: GitHub Actions からの呼び出しシグネチャは `executeBotPost(botId)` に簡略化される（投稿先は BehaviorStrategy が内部で決定するため、`threadId` 引数は不要になる）。既存の呼び出し元は移行ステップ中に順次更新する。
 
 ### 2.2 HP更新・ダメージ処理（AttackHandlerから呼び出し）
 
@@ -155,13 +162,292 @@ DailyResetResult {
 4. eliminated -> lurking（HP初期値復帰、survival_days=0、times_attacked=0）
 5. attacks テーブルの前日分レコードをクリーンアップ
 
-### 2.11 書き込み先スレッド選択（GitHub Actionsから呼び出し）
+### 2.11 書き込み先決定（BehaviorStrategy に委譲）
 
 ```
-selectTargetThread(botId: UUID): UUID
+selectTargetThread(botId: UUID): UUID       // 後方互換用ラッパー
 ```
 
-表示中のスレッド一覧からランダムに1件を選択する。荒らし役はスレッドを作成しない。
+v6 以降、投稿先の決定は `BehaviorStrategy.decideAction()` に委譲される。`selectTargetThread()` は後方互換のためラッパーとして残し、内部で `RandomThreadBehaviorStrategy.decideAction()` を呼び出す。
+
+BehaviorStrategy は以下の判別共用体 `BotAction` を返す:
+
+```typescript
+type BotAction =
+  | { type: 'post_to_existing'; threadId: string }
+  | { type: 'create_thread'; title: string; body: string };
+```
+
+`executeBotPost()` は `BotAction.type` に応じて `PostService.createPost()` または `PostService.createThread()` を呼び分ける。
+
+### 2.12 Strategy パターン設計（v6 新設）
+
+#### 2.12.1 Strategy インターフェース
+
+```typescript
+/** コンテンツ生成戦略 -- 「何を書くか」を決定する */
+interface ContentStrategy {
+  generateContent(context: ContentGenerationContext): Promise<string>;
+}
+
+interface ContentGenerationContext {
+  botId: string;
+  botProfileKey: string | null;
+  threadId: string;
+  /** ネタ師用: 収集済みのネタ情報 */
+  collectedTopic?: CollectedTopic;
+  /** AI対話用: スレッドの直近レス（文脈理解に使用） */
+  recentPosts?: RecentPostSummary[];
+  /** ユーザー作成ボット用: サニタイズ済みプロンプト */
+  sanitizedUserPrompt?: string;
+}
+
+/** 行動パターン戦略 -- 「どこに書くか」を決定する */
+interface BehaviorStrategy {
+  decideAction(context: BehaviorContext): Promise<BotAction>;
+}
+
+interface BehaviorContext {
+  botId: string;
+  botProfileKey: string | null;
+  boardId: string;
+}
+
+type BotAction =
+  | { type: 'post_to_existing'; threadId: string }
+  | { type: 'create_thread'; title: string; body: string };
+
+/** スケジュール戦略 -- 「いつ書くか」を決定する */
+interface SchedulingStrategy {
+  getNextPostDelay(context: SchedulingContext): number; // 分単位
+}
+
+interface SchedulingContext {
+  botId: string;
+  botProfileKey: string | null;
+}
+```
+
+#### 2.12.2 Strategy 解決ルール（resolveStrategies）
+
+```typescript
+interface BotStrategies {
+  content: ContentStrategy;
+  behavior: BehaviorStrategy;
+  scheduling: SchedulingStrategy;
+}
+
+function resolveStrategies(
+  bot: Bot,
+  profile: BotProfile | null
+): BotStrategies;
+```
+
+解決の優先順位:
+1. `bot_profiles.yaml` の `content_strategy` / `behavior_type` / `scheduling` フィールドで明示指定
+2. ユーザー作成ボット判定（`owner_id` が存在）-> 専用 Strategy 組（Phase 4）
+3. デフォルト: `FixedMessageContentStrategy` + `RandomThreadBehaviorStrategy` + `FixedIntervalSchedulingStrategy`
+
+#### 2.12.3 Strategy 実装一覧
+
+| Strategy インターフェース | 実装クラス | Phase | 対応BOT種別 |
+|---|---|---|---|
+| ContentStrategy | `FixedMessageContentStrategy` | 2 (既存) | 荒らし役 |
+| ContentStrategy | `AiTopicContentStrategy` | 3 | ネタ師 |
+| ContentStrategy | `AiConversationContentStrategy` | 4 | 常連・火付け役 |
+| ContentStrategy | `UserPromptContentStrategy` | 4 | ユーザー作成ボット |
+| BehaviorStrategy | `RandomThreadBehaviorStrategy` | 2 (既存) | 荒らし役 |
+| BehaviorStrategy | `ThreadCreatorBehaviorStrategy` | 3 | ネタ師 |
+| BehaviorStrategy | `ReplyBehaviorStrategy` | 4 | 常連・火付け役 |
+| BehaviorStrategy | `ConfigurableBehaviorStrategy` | 4 | ユーザー作成ボット |
+| SchedulingStrategy | `FixedIntervalSchedulingStrategy` | 2 (既存) | 荒らし役 |
+| SchedulingStrategy | `TopicDrivenSchedulingStrategy` | 3 | ネタ師 |
+| SchedulingStrategy | `GachaSchedulingStrategy` | 4 | ユーザー作成ボット |
+
+#### 2.12.4 プロバイダー抽象化レイヤー（AiApiClient）
+
+AI API を使用する ContentStrategy（`AiTopicContentStrategy`, `AiConversationContentStrategy`, `UserPromptContentStrategy`）は、サードパーティー API の差異を吸収する `AiApiClient` アダプターを通じて LLM を呼び出す。
+
+```typescript
+/** AI APIプロバイダーの抽象化インターフェース */
+interface AiApiClient {
+  generate(params: AiGenerateParams): Promise<string>;
+}
+
+interface AiGenerateParams {
+  provider: 'google' | 'openai' | 'anthropic';
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  maxTokens: number;
+  temperature: number;
+}
+```
+
+プロバイダーごとのアダプター実装:
+
+| アダプター | プロバイダー | 使用SDK/API |
+|---|---|---|
+| `GoogleAiAdapter` | google | Gemini API (`@google/generative-ai`) |
+| `OpenAiAdapter` | openai | OpenAI API (`openai`) |
+| `AnthropicAdapter` | anthropic | Anthropic API (`@anthropic-ai/sdk`) |
+
+**APIキー管理**: 各プロバイダーのAPIキーは環境変数で管理する（`GOOGLE_AI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`）。GitHub Actions Secrets に格納し、クライアントサイドコードには含めない（CLAUDE.md 横断的制約）。
+
+#### 2.12.5 ネタ師の行動フロー（Phase 3 主要ユースケース）
+
+```
+GitHub Actions (cron)
+  |
+  v
+BotService.executeBotPost(botId)
+  |
+  +-- resolveStrategies(bot, profile)
+  |     -> AiTopicContentStrategy
+  |     -> ThreadCreatorBehaviorStrategy
+  |     -> TopicDrivenSchedulingStrategy
+  |
+  +-- behavior.decideAction(context)
+  |     -> { type: 'create_thread', title: '【悲報】○○...', body: '...' }
+  |
+  +-- content.generateContent() は create_thread の場合スキップ
+  |   （title と body は behavior が決定済み）
+  |
+  +-- PostService.createThread(title, body, isBotWrite=true)
+  |
+  +-- botPostRepository.create(postId, botId)
+```
+
+設計ポイント:
+- ネタ師の `ThreadCreatorBehaviorStrategy` は `{ type: 'create_thread' }` を返す
+- スレッド作成も PostService 経由で行い、DB 直書きは禁止（CLAUDE.md 横断的制約）
+- ネタ収集（Web スクレイピング + AI 要約）は外部の収集ジョブが事前に行い、結果を `collected_topics` テーブルにバッファする
+- 収集と投稿の分離により、外部 API 障害時もバッファ内のネタで投稿を継続可能
+
+#### 2.12.6 ユーザー作成ボットの管理構造（Phase 4）
+
+```
+                  +--------------------+
+                  |   Bot エンティティ  |  <- 共通テーブル: bots
+                  |   (共通フィールド)  |
+                  |   id, hp, maxHp,   |
+                  |   dailyId, ...     |
+                  +--------+-----------+
+                           |
+               +-----------+-----------+
+               |                       |
+     +---------+---------+   +---------+--------+
+     |   運営ボット       |   | ユーザー作成      |
+     |   (YAML定義)       |   | ボット (DB定義)   |
+     |                    |   |                   |
+     | - bot_profiles.yaml|   | - owner_id        |
+     |   から設定読み込み  |   | - user_prompt     |
+     | - owner_id = NULL  |   | - template_id     |
+     +--------------------+   | - gacha_result    |
+                              +-------------------+
+```
+
+統合方針:
+- `bots` テーブルに `owner_id` (NULLABLE FK -> users.id) を追加
+- `owner_id = NULL` は運営ボット、`owner_id != NULL` はユーザー作成ボット
+- Strategy 解決時に `owner_id` の有無で分岐する
+- **プロンプトサニタイズ**: `UserPromptContentStrategy` 内で管理者プロンプト上書き + サニタイズを実行。ユーザー入力を直接 LLM に渡さない（CLAUDE.md 横断的制約）
+
+#### 2.12.7 bot_profiles.yaml 拡張スキーマ
+
+既存フィールド（`hp`, `max_hp`, `reward`, `fixed_messages`）に加え、以下のフィールドを追加する。全て**オプショナル**であり、未指定時は Phase 2 デフォルト値にフォールバックする。
+
+| フィールド | 型 | 説明 | デフォルト値 |
+|---|---|---|---|
+| `content_strategy` | enum (`fixed_message` / `ai_topic` / `ai_conversation`) | コンテンツ生成方式 | `fixed_message` |
+| `behavior_type` | enum (`random_thread` / `create_thread` / `reply`) | 行動パターン | `random_thread` |
+| `scheduling` | object | スケジュール設定 | `{type: fixed_interval, min: 60, max: 120}` |
+| `ai_config` | object | AI API 設定 | `null` |
+| `topic_sources` | array | ネタ収集元 | `null` |
+| `thread_creation` | object | スレッド作成設定 | `null` |
+| `conversation` | object | 会話設定 | `null` |
+
+`ai_config` の構造:
+
+```yaml
+ai_config:
+  provider: google | openai | anthropic   # APIプロバイダー
+  model: gemini-2.0-flash                 # 使用するAIモデル名
+  system_prompt: "..."                    # システムプロンプト（ペルソナ定義）
+  max_tokens: 500                         # 最大トークン数
+  temperature: 0.8                        # 生成温度（0.0-1.0）
+```
+
+ネタ師プロファイルの例:
+
+```yaml
+ネタ師_テクノロジー:
+  hp: 500
+  max_hp: 500
+  reward:
+    base_reward: 500
+    daily_bonus: 200
+    attack_bonus: 50
+  content_strategy: ai_topic
+  behavior_type: create_thread
+  scheduling:
+    type: topic_driven
+    min_interval_minutes: 120
+    max_interval_minutes: 360
+    collection_interval_minutes: 60
+    post_after_collection_minutes: 10
+  ai_config:
+    provider: google
+    model: gemini-2.0-flash
+    system_prompt: |
+      あなたはテクノロジーに詳しい掲示板の常連です。
+      ネット上で話題になっているテクノロジーニュースを5ch風のスレタイに変換してください。
+    max_tokens: 500
+    temperature: 0.8
+  topic_sources:
+    - type: rss
+      url: "https://news.ycombinator.com/rss"
+      genre: テクノロジー
+      priority: 1
+  thread_creation:
+    title_style: 5ch_news
+    max_daily_threads: 5
+  fixed_messages:
+    - "【速報】テクノロジーの話題があるらしい"  # AI API障害時のフォールバック
+```
+
+#### 2.12.8 ファイル配置計画
+
+```
+src/lib/
+  services/
+    bot-service.ts                          # リファクタ（Strategy 委譲に変更）
+    bot-strategies/                         # 新規ディレクトリ
+      types.ts                              # Strategy インターフェース定義
+      strategy-resolver.ts                  # resolveStrategies()
+      ai-api-client.ts                      # AiApiClient インターフェース
+      content/
+        fixed-message.ts                    # Phase 2: 固定文ランダム
+        ai-topic.ts                         # Phase 3: ネタ師用
+        ai-conversation.ts                  # Phase 4: 常連・火付け役用
+        user-prompt.ts                      # Phase 4: ユーザー作成ボット用
+      behavior/
+        random-thread.ts                    # Phase 2: 既存スレッドランダム
+        thread-creator.ts                   # Phase 3: スレッド作成
+        reply.ts                            # Phase 4: 返信型
+      scheduling/
+        fixed-interval.ts                   # Phase 2: 60-120分
+        topic-driven.ts                     # Phase 3: ネタ収集サイクル依存
+        gacha.ts                            # Phase 4: ガチャ結果依存
+  infrastructure/
+    external/
+      ai-adapters/                          # 新規ディレクトリ
+        google-ai-adapter.ts                # Google Gemini
+        openai-adapter.ts                   # OpenAI
+        anthropic-adapter.ts                # Anthropic
+```
+
+依存方向: `bot-service.ts` -> `bot-strategies/types.ts` (インターフェース) <- `bot-strategies/content/*.ts` (実装)
 
 ---
 
@@ -171,11 +457,16 @@ selectTargetThread(botId: UUID): UUID
 
 | コンポーネント | 依存の性質 |
 |---|---|
-| PostService | ボット書き込みの実行（isBotWrite=trueで呼び出し） |
+| PostService | ボット書き込みの実行（isBotWrite=trueで呼び出し。スレッド作成含む） |
 | BotRepository | `bots` テーブルのCRUD（service_roleのみアクセス可） |
 | BotPostRepository | `bot_posts` テーブルのINSERT・SELECT（service_roleのみ） |
 | AttackRepository | `attacks` テーブルのINSERT・SELECT・DELETE（service_roleのみ） |
 | ThreadRepository | スレッド一覧取得（書き込み先選択用） |
+| BotStrategyResolver | bot_profiles.yaml / owner_id から Strategy 組を解決（v6 新規） |
+| ContentStrategy 実装群 | コンテンツ生成の委譲先（v6 新規） |
+| BehaviorStrategy 実装群 | 行動パターンの委譲先（v6 新規） |
+| SchedulingStrategy 実装群 | スケジュールの委譲先（v6 新規） |
+| AiApiClient | AI API 呼び出しの抽象化（ContentStrategy 実装が依存。v6 新規） |
 
 ### 3.2 被依存
 
@@ -189,8 +480,32 @@ AttackHandler       ->  BotService.isBot()
 AccusationService   ->  BotService.isBot()
                         BotService.revealBot()
 GitHub Actions      ->  BotService.executeBotPost()
-                        BotService.selectTargetThread()
+                        BotService.selectTargetThread()  // 後方互換ラッパー
 daily-maintenance   ->  BotService.performDailyReset()
+```
+
+### 3.3 Strategy 実装の依存構造（v6 新規）
+
+```
+bot-service.ts
+  |
+  +-- bot-strategies/types.ts          (インターフェース定義)
+  +-- bot-strategies/strategy-resolver.ts
+  |     +-- bot_profiles.yaml          (プロファイル読み込み)
+  |
+  +-- bot-strategies/content/*.ts      (ContentStrategy 実装群)
+  |     +-- ai-api-client.ts           (AI API を使用する実装のみ)
+  |
+  +-- bot-strategies/behavior/*.ts     (BehaviorStrategy 実装群)
+  |     +-- ThreadRepository           (スレッド一覧取得)
+  |     +-- CollectedTopicRepository   (ネタ師: ネタ取得)
+  |
+  +-- bot-strategies/scheduling/*.ts   (SchedulingStrategy 実装群)
+
+ai-api-client.ts
+  +-- ai-adapters/google-ai-adapter.ts
+  +-- ai-adapters/openai-adapter.ts
+  +-- ai-adapters/anthropic-adapter.ts
 ```
 
 ---
@@ -202,6 +517,9 @@ daily-maintenance   ->  BotService.performDailyReset()
 - 書き込み先スレッド選択のランダムアルゴリズム（均等分布 or 重み付け）
 - 撃破報酬パラメータのconfig読み込みとキャッシュ戦略
 - attacks テーブルのクリーンアップ方式（DELETE or パーティション）
+- Strategy 解決の内部ロジック（resolveStrategies の分岐条件とフォールバック）
+- AI API プロバイダーの切り替えロジック（AiApiClient アダプター選択）
+- ネタ収集ジョブの内部処理（収集頻度・バッファ管理・外部 API エラーハンドリング）
 
 ---
 
@@ -238,13 +556,62 @@ v5で以下のカラムを追加・変更する。
 
 RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。`service_role` のみアクセス可能。
 
-### 5.3 マイグレーション方針
+### 5.3 bots テーブル追加カラム（v6 -- Phase 4 用）
 
+| カラム | 変更種別 | 型 | 説明 | 適用Phase |
+|---|---|---|---|---|
+| `owner_id` | 追加 | UUID (FK -> users.id), NULLABLE | ユーザー作成ボットのオーナー。NULL = 運営ボット | 4 |
+| `bot_type` | 追加 | VARCHAR DEFAULT 'system' | `'system'`(運営) / `'user_created'`(ユーザー作成) | 4 |
+
+### 5.4 新規テーブル: bot_user_configs（Phase 4）
+
+ユーザー作成ボット固有の設定を格納する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `bot_id` | UUID (PK, FK -> bots.id) | 対象ボット |
+| `template_id` | VARCHAR | 人格テンプレートID |
+| `personality_sliders` | JSONB | 性格スライダー値 |
+| `user_prompt` | TEXT | ユーザー記述プロンプト（サニタイズ前の原本） |
+| `sanitized_prompt` | TEXT | サニタイズ済みプロンプト（実際にLLMに渡すもの） |
+| `gacha_result` | JSONB | ガチャ結果（行動頻度、攻撃力、コマンド枠等） |
+| `created_at` | TIMESTAMPTZ | 作成日時 |
+
+RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。`service_role` のみアクセス可能。
+
+### 5.5 新規テーブル: collected_topics（Phase 3）
+
+ネタ師ボットが収集したネタ情報のバッファ。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | UUID (PK) | 内部識別子 |
+| `source_type` | VARCHAR | 収集元種別（`rss`, `api`, etc.） |
+| `source_url` | TEXT | 収集元URL |
+| `original_title` | TEXT | 元タイトル |
+| `generated_title` | TEXT | AI生成した5ch風スレタイ |
+| `generated_body` | TEXT | AI生成した本文 |
+| `genre` | VARCHAR | ジャンル |
+| `used` | BOOLEAN DEFAULT false | 使用済みフラグ |
+| `created_at` | TIMESTAMPTZ | 収集日時 |
+
+RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。`service_role` のみアクセス可能。
+
+### 5.6 マイグレーション方針
+
+v5 マイグレーション（実施済み）:
 1. `bots` テーブルに `times_attacked` カラムを追加（ALTER TABLE ADD COLUMN ... DEFAULT 0）
 2. `bots` テーブルに `bot_profile_key` カラムを追加（ALTER TABLE ADD COLUMN）
 3. `attacks` テーブルを新規作成（CREATE TABLE + RLSポリシー + インデックス）
 4. 既存の荒らし役ボットの hp/max_hp を 10 に更新（UPDATE）
 5. マイグレーションは `supabase migration new bot_v5_attack_system` で作成
+
+v6 マイグレーション（Phase 3 実装時）:
+1. `collected_topics` テーブルを新規作成（CREATE TABLE + RLSポリシー）
+
+v6 マイグレーション（Phase 4 実装時）:
+1. `bots` テーブルに `owner_id`, `bot_type` カラムを追加
+2. `bot_user_configs` テーブルを新規作成（CREATE TABLE + RLSポリシー）
 
 ---
 
@@ -277,3 +644,34 @@ v5で追加された「同一ボット1日1回攻撃制限」の管理のため 
 ### 6.6 不意打ち攻撃時の遷移連鎖
 
 lurking 状態のボットへの !attack 成功時は、lurking -> revealed -> eliminated が1トランザクション内で連鎖しうる（荒らし役はHP:10, ダメージ:10のため必ず即死）。実装上は revealBot() -> applyDamage() の順で呼び出す。
+
+### 6.7 Strategy パターンの採用（v6）
+
+Phase 3（ネタ師）・Phase 4（ユーザー作成ボット）でBOT種別が増加する際、`executeBotPost` 内の if/switch 分岐で対応すると、コンテンツ生成 x 行動パターン x スケジュールの3軸の組み合わせ爆発が起きる。Strategy パターンで3軸を独立のインターフェースとして分離することで、BOT種別追加時に新 Strategy を追加するだけで既存コードの変更を最小限に抑える。
+
+検討した代替案:
+- **サブクラス継承**: 3軸の組み合わせを継承で表現すると菱形継承に陥る。TypeScript には多重継承がない
+- **完全分離（種別ごとに独立 BotService）**: HP管理・BOTマーク・撃破報酬・日次リセットなど共通ロジックの重複が大きい
+
+TDR-008 に正式な意思決定記録を残す。
+
+### 6.8 TASK-122 実装の位置づけ（v6）
+
+現在の固定文ランダム選択ロジックを `FixedMessageContentStrategy`、既存スレッドランダム選択を `RandomThreadBehaviorStrategy`、60-120分間隔を `FixedIntervalSchedulingStrategy` として切り出す。BotService の `executeBotPost()` はこれらの Strategy を呼び出す形にリファクタされるが、外部呼び出しの動作結果は変わらない。
+
+### 6.9 プロバイダー抽象化レイヤーの採用（v6）
+
+Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, Anthropic）を使い分ける可能性があるため、`AiApiClient` インターフェースでプロバイダー差異を吸収する。`bot_profiles.yaml` の `ai_config.provider` フィールドでボットごとにプロバイダーを指定可能とする。
+
+採用理由:
+- ネタ師は Gemini（低コスト・高速）、常連は Claude/GPT（文脈理解力重視）のように使い分けができる
+- 特定プロバイダー障害時に他プロバイダーへの切り替えが容易
+
+### 6.10 ネタ収集と投稿の分離（v6）
+
+ネタ師の「ネタ収集」と「投稿」を分離し、`collected_topics` テーブルをバッファとする。収集ジョブと投稿ジョブは独立した GitHub Actions ジョブとして実行する。
+
+採用理由:
+- 外部 API（RSS等）障害の影響を投稿から隔離
+- 収集頻度と投稿頻度を独立に制御可能
+- バッファにネタがある限り投稿を継続可能

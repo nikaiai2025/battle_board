@@ -16,9 +16,11 @@ import type { Bot } from "../../../lib/domain/models/bot";
 import type { Attack } from "../../../lib/infrastructure/repositories/attack-repository";
 import {
 	BotService,
+	type CreatePostFn,
 	type IAttackRepository,
 	type IBotPostRepository,
 	type IBotRepository,
+	type IThreadRepository,
 } from "../../../lib/services/bot-service";
 
 // ---------------------------------------------------------------------------
@@ -94,7 +96,35 @@ function createMockBotPostRepository(
 ): IBotPostRepository {
 	return {
 		findByPostId: vi.fn().mockResolvedValue(record),
+		create: vi.fn().mockResolvedValue(undefined),
 	};
+}
+
+/**
+ * モック IThreadRepository を生成する
+ * @param threads - findByBoardId の返値となるスレッドリスト
+ */
+function createMockThreadRepository(
+	threads: { id: string }[] = [],
+): IThreadRepository {
+	return {
+		findByBoardId: vi.fn().mockResolvedValue(threads),
+	};
+}
+
+/**
+ * モック CreatePostFn を生成する
+ * @param result - createPostFn が返す結果（デフォルトは成功）
+ */
+function createMockCreatePostFn(
+	result: Awaited<ReturnType<CreatePostFn>> = {
+		success: true,
+		postId: "post-001",
+		postNumber: 1,
+		systemMessages: [],
+	},
+): CreatePostFn {
+	return vi.fn().mockResolvedValue(result) as unknown as CreatePostFn;
 }
 
 /** モック AttackRepository を生成する */
@@ -534,6 +564,309 @@ describe("BotService", () => {
 
 			// デフォルト: base=10, daily=50, attack=5 → 10 + 0 + 0 = 10
 			expect(reward).toBe(10);
+		});
+	});
+
+	// =========================================================================
+	// getNextPostDelay
+	// =========================================================================
+
+	describe("getNextPostDelay()", () => {
+		it("返値が 60 以上 120 以下の整数である", () => {
+			// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+			const service = createService();
+			const delay = service.getNextPostDelay();
+			expect(delay).toBeGreaterThanOrEqual(60);
+			expect(delay).toBeLessThanOrEqual(120);
+			expect(Number.isInteger(delay)).toBe(true);
+		});
+
+		it("100回呼び出しても常に 60〜120 の範囲内である（境界値）", () => {
+			// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+			const service = createService();
+			for (let i = 0; i < 100; i++) {
+				const delay = service.getNextPostDelay();
+				expect(delay).toBeGreaterThanOrEqual(60);
+				expect(delay).toBeLessThanOrEqual(120);
+			}
+		});
+
+		it("複数回呼び出した場合、必ずしも同じ値ではない（ランダム性の確認）", () => {
+			// 確率論的テスト: 100回中すべて同じ値になる確率は約 (1/61)^99 ≒ 0 なので実質安全
+			const service = createService();
+			const values = new Set<number>();
+			for (let i = 0; i < 100; i++) {
+				values.add(service.getNextPostDelay());
+			}
+			// 61種類の値のうち少なくとも2種類は出現するはず
+			expect(values.size).toBeGreaterThan(1);
+		});
+	});
+
+	// =========================================================================
+	// selectTargetThread
+	// =========================================================================
+
+	describe("selectTargetThread()", () => {
+		it("スレッド一覧の中からいずれかの threadId を返す（正常系）", async () => {
+			// See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
+			const threads = [
+				{ id: "thread-001" },
+				{ id: "thread-002" },
+				{ id: "thread-003" },
+			];
+			const threadRepo = createMockThreadRepository(threads);
+			const botRepo = createMockBotRepository();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				threadRepo,
+			);
+
+			const result = await service.selectTargetThread("bot-001");
+
+			expect(threads.map((t) => t.id)).toContain(result);
+		});
+
+		it("50件のスレッドから1件が選択される（BDDシナリオD対応）", async () => {
+			// See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
+			const threads = Array.from({ length: 50 }, (_, i) => ({
+				id: `thread-${String(i + 1).padStart(3, "0")}`,
+			}));
+			const threadRepo = createMockThreadRepository(threads);
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				threadRepo,
+			);
+
+			const result = await service.selectTargetThread("bot-001");
+
+			expect(threads.map((t) => t.id)).toContain(result);
+		});
+
+		it("スレッドが0件の場合はエラーをスローする（異常系）", async () => {
+			// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+			const threadRepo = createMockThreadRepository([]);
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				threadRepo,
+			);
+
+			await expect(service.selectTargetThread("bot-001")).rejects.toThrow();
+		});
+
+		it("threadRepository が未注入の場合はエラーをスローする", async () => {
+			// threadRepository を渡さない場合
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await expect(service.selectTargetThread("bot-001")).rejects.toThrow(
+				"threadRepository が未注入です",
+			);
+		});
+
+		it("100回呼び出した場合、複数の異なるスレッドが選択される（ランダム性）", async () => {
+			// 確率論的テスト: 10件のスレッドから100回選んでも毎回同じ確率は (1/10)^99 ≒ 0
+			const threads = Array.from({ length: 10 }, (_, i) => ({
+				id: `thread-${i + 1}`,
+			}));
+			const threadRepo = createMockThreadRepository(threads);
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				threadRepo,
+			);
+
+			const selected = new Set<string>();
+			for (let i = 0; i < 100; i++) {
+				selected.add(await service.selectTargetThread("bot-001"));
+			}
+			expect(selected.size).toBeGreaterThan(1);
+		});
+	});
+
+	// =========================================================================
+	// executeBotPost
+	// =========================================================================
+
+	describe("executeBotPost()", () => {
+		it("固定文リストの本文で PostService が呼び出される（正常系）", async () => {
+			// See: features/bot_system.feature @荒らし役ボットが書き込みを行う場合本文は固定文リストのいずれかである
+			// See: docs/architecture/components/bot.md §2.1 書き込み実行
+			const bot = createLurkingBot({
+				id: "bot-001",
+				botProfileKey: "荒らし役",
+				dailyId: "FkBot01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(bot);
+			const mockCreatePost = createMockCreatePostFn();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				mockCreatePost,
+			);
+
+			const result = await service.executeBotPost("bot-001", "thread-001");
+
+			expect(result.postId).toBe("post-001");
+			expect(result.postNumber).toBe(1);
+			expect(typeof result.dailyId).toBe("string");
+			expect(mockCreatePost).toHaveBeenCalledWith(
+				expect.objectContaining({
+					threadId: "thread-001",
+					isBotWrite: true,
+					edgeToken: null,
+				}),
+			);
+		});
+
+		it("書き込み本文が荒らし役の固定文リストに含まれる", async () => {
+			// See: features/bot_system.feature @荒らし役ボットが書き込みを行う場合本文は固定文リストのいずれかである
+			const trollFixedMessages = [
+				"なんJほんま覇権やな",
+				"効いてて草",
+				"貧乳なのにめちゃくちゃエロい",
+				"【朗報】ワイ、参上",
+				"ンゴンゴ",
+				"草不可避",
+				"せやな",
+				"はえ〜すっごい",
+				"それな",
+				"ぐう畜",
+				"まあ正直そうだよな",
+				"どういうことだよ（困惑）",
+				"ファ！？",
+				"ンゴ...",
+				"うーんこの",
+			];
+			const bot = createLurkingBot({
+				id: "bot-001",
+				botProfileKey: "荒らし役",
+				dailyId: "FkBot01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(bot);
+			const mockCreatePost = createMockCreatePostFn();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				mockCreatePost,
+			);
+
+			await service.executeBotPost("bot-001", "thread-001");
+
+			const callArg = (mockCreatePost as ReturnType<typeof vi.fn>).mock
+				.calls[0][0];
+			expect(trollFixedMessages).toContain(callArg.body);
+		});
+
+		it("PostService 成功後に botPostRepository.create が呼ばれる", async () => {
+			// See: docs/architecture/components/bot.md §6.1 bot_posts INSERTのタイミングと失敗時の扱い
+			const bot = createLurkingBot({
+				id: "bot-001",
+				botProfileKey: "荒らし役",
+				dailyId: "FkBot01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(bot);
+			const botPostRepo = createMockBotPostRepository();
+			const service = new BotService(
+				botRepo,
+				botPostRepo,
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				createMockCreatePostFn(),
+			);
+
+			await service.executeBotPost("bot-001", "thread-001");
+
+			expect(botPostRepo.create).toHaveBeenCalledWith("post-001", "bot-001");
+		});
+
+		it("PostService が失敗した場合はエラーをスローする（異常系）", async () => {
+			// See: docs/architecture/components/bot.md §2.1 書き込み実行
+			const bot = createLurkingBot({
+				id: "bot-001",
+				botProfileKey: "荒らし役",
+				dailyId: "FkBot01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(bot);
+			const failingCreatePost = createMockCreatePostFn({
+				success: false,
+				error: "スレッドが見つかりません",
+				code: "THREAD_NOT_FOUND",
+			});
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				failingCreatePost,
+			);
+
+			await expect(
+				service.executeBotPost("bot-001", "thread-001"),
+			).rejects.toThrow("PostService.createPost が失敗しました");
+		});
+
+		it("createPostFn が未注入の場合はエラーをスローする", async () => {
+			// createPostFn を渡さない場合
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await expect(
+				service.executeBotPost("bot-001", "thread-001"),
+			).rejects.toThrow("createPostFn が未注入です");
+		});
+
+		it("ボットが存在しない場合はエラーをスローする", async () => {
+			const botRepo = createMockBotRepository(null);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				createMockCreatePostFn(),
+			);
+
+			await expect(
+				service.executeBotPost("bot-999", "thread-001"),
+			).rejects.toThrow();
 		});
 	});
 

@@ -82,7 +82,7 @@ BattleBoard は「5chライクな匿名掲示板 + AIボット混在 + ゲーミ
 | **Supabase Auth** | 管理者認証（メール+パスワード） | 一般ユーザー認証には使わない |
 | **Cloudflare Turnstile** | 一般ユーザーの CAPTCHA 検証 | `/auth-code` 認証コード有効化時のみ |
 | **GitHub Actions** | 運営ボットの定期実行、期限切れデータ掃除 | cron スケジュール |
-| **AI API** | 運営ボットの書き込み文章生成 | GitHub Actions から呼び出し |
+| **AI API** | 運営ボットの書き込み文章生成 | GitHub Actions から呼び出し。AiApiClient を通じて Google Gemini / OpenAI / Anthropic を使い分け（v6） |
 
 ### 2.3 横断的制約（CLAUDE.md より）
 
@@ -251,6 +251,8 @@ AttackHandler
 
 BotService
   ├── BotRepository, PostRepository
+  ├── BotStrategyResolver, ContentStrategy, BehaviorStrategy, SchedulingStrategy
+  ├── AiApiClient (ContentStrategy 実装が依存)
   ├── CurrencyService, AuthService
 
 CurrencyService
@@ -280,7 +282,7 @@ AdminService
 |---|---|
 | **Repository** | Supabase PostgreSQL への CRUD。ドメインモデルとDBレコードの変換 |
 | **Encoding** | Shift_JIS ↔ UTF-8 変換（iconv-lite）。専ブラ互換 Adapter から利用 |
-| **External API Client** | Cloudflare Turnstile 検証 API・AI API（GitHub Actions 経由）|
+| **External API Client** | Cloudflare Turnstile 検証 API・AI API（GitHub Actions 経由。AiApiClient アダプターで抽象化）|
 
 ### 3.4 2経路の統一処理フロー
 
@@ -822,7 +824,14 @@ src/
       accusation-service.ts
       handlers/
         attack-handler.ts             # !attack コマンドハンドラ
-      bot-service.ts
+      bot-service.ts                  # Strategy 委譲に変更（v6）
+      bot-strategies/                 # BOT行動 Strategy（v6 新規）
+        types.ts                      # Strategy インターフェース定義
+        strategy-resolver.ts          # resolveStrategies()
+        ai-api-client.ts              # AiApiClient インターフェース
+        content/                      # ContentStrategy 実装群
+        behavior/                     # BehaviorStrategy 実装群
+        scheduling/                   # SchedulingStrategy 実装群
       currency-service.ts
       incentive-service.ts
       auth-service.ts
@@ -849,6 +858,10 @@ src/
         bbs-cgi-response.ts         # bbs.cgi レスポンスビルダ
       external/
         turnstile-client.ts         # Cloudflare Turnstile API
+        ai-adapters/                # AI API プロバイダーアダプター（v6 新規）
+          google-ai-adapter.ts      # Google Gemini
+          openai-adapter.ts         # OpenAI
+          anthropic-adapter.ts      # Anthropic
       supabase/
         client.ts                   # Supabase クライアント初期化
 
@@ -1036,6 +1049,19 @@ supabase/
   - Cookie 共有の専ブラ（認証後そのまま書き込める場合）では write_token 不要
 - **理由**: Web UI 経由でブラウザ認証を完了させることで Turnstile 要件を満たしつつ、専ブラからの書き込みを可能にする。メール欄方式はプロトコル変更なしで既存専ブラと互換性を保てる
 
+### TDR-008: BOTシステムの Strategy パターン採用
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-17
+- **背景**: Phase 2（荒らし役）の BotService は固定文ランダム選択・既存スレッドランダム選択・60-120分固定間隔がハードコードされている。Phase 3（ネタ師: AI生成 + スレッド作成）・Phase 4（ユーザー作成ボット: ユーザープロンプト + ガチャスケジュール）では、コンテンツ生成・行動パターン・スケジュールの3軸で根本的に異なる振る舞いが必要となり、if/switch 分岐では組み合わせ爆発が起きる
+- **決定**: BOTの行動を `ContentStrategy`（何を書くか）/ `BehaviorStrategy`（どこに書くか）/ `SchedulingStrategy`（いつ書くか）の3軸で Strategy インターフェースとして抽象化する。BotService は Strategy に処理を委譲し、BOT種別固有の振る舞いを知らない
+- **代替案**:
+  - サブクラス継承（BotService の種別ごとサブクラス）: 3軸の組み合わせを継承で表現すると菱形継承に陥る。TypeScript には多重継承がない
+  - if/switch 分岐の追加: Phase 4 でBOT種別が5種以上に増えた時点で保守困難
+  - 完全分離（種別ごとに独立 BotService）: HP管理・BOTマーク・撃破報酬・日次リセットなど共通ロジックの重複が大きい
+- **影響範囲**: `bot-service.ts`（リファクタ）, `bot-strategies/`（新規ディレクトリ）, `ai-adapters/`（新規ディレクトリ）
+- **詳細**: D-08 `docs/architecture/components/bot.md` §2.12
+
 ### TDR-006: 認証不要のSSRページでサービス層を直接インポートする
 
 - **ステータス**: 決定
@@ -1055,7 +1081,7 @@ Phase 3 以降の拡張に備え、以下の拡張ポイントを設計に組み
 | 拡張ポイント | 現在の設計 | 将来の拡張 |
 |---|---|---|
 | コマンド追加 | CommandService にコマンドハンドラを登録する拡張可能な構造 | Phase 4 の 20+ コマンドを個別ハンドラとして追加 |
-| ユーザー作成ボット | bots テーブルに `owner_id` カラムを追加予定 | Phase 4 で作成・管理UIを実装 |
+| ユーザー作成ボット | Strategy パターンによる行動抽象化を導入済み（v6）。`owner_id` カラムと `bot_user_configs` テーブルの設計を D-08 に記載 | Phase 4 で `UserPromptContentStrategy` / `ConfigurableBehaviorStrategy` / `GachaSchedulingStrategy` を実装し、作成・管理UIを構築 |
 | ランキング | incentive_logs に全活動記録を蓄積 | Phase 4 で集計クエリ/マテリアライズドビューを追加 |
 | レート制限 | 拡張ポイントのみ確保（ミドルウェア差し込み可能な構造） | 必要時にIPベース/ユーザーベースのレート制限を導入 |
 | 制限ポリシー層 | 未実装 | 告発スパム・連打攻撃対策として独立したポリシー層を導入（eddist採用レポート #4） |
