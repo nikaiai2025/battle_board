@@ -116,19 +116,72 @@ const THREAD_LIST_MAX_LIMIT = 50;
 
 /**
  * CommandService のシングルトンインスタンス。
+ * getCommandService() で lazy 初期化される。
  * setCommandService() で外部から注入する（テスト時はモックを注入する）。
  * null の場合はコマンド解析をスキップする（Phase 1 互換）。
  */
 let commandServiceInstance: CommandServiceType | null = null;
 
 /**
+ * lazy 初期化の完了フラグ。
+ * true の場合は setCommandService() または getCommandService() による初期化が完了済み。
+ * 初期化失敗時も true に設定し、再試行を防止する。
+ */
+let commandServiceAutoInitDone = false;
+
+/**
+ * CommandService インスタンスを取得する。
+ * 初回呼び出し時に自動生成する（lazy 初期化）。
+ * テスト時は setCommandService() でモックを事前注入することで自動生成をバイパスする。
+ *
+ * 依存モジュール（CommandService, CurrencyService）は動的 require で読み込む。
+ * 静的 import にするとテスト環境でモジュールチェーン経由の Supabase 初期化が起きるため。
+ *
+ * See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
+ * See: tmp/workers/bdd-architect_TASK-147/analysis.md §4.2 Step 3
+ */
+function getCommandService(): CommandServiceType | null {
+	if (!commandServiceAutoInitDone && commandServiceInstance === null) {
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const { CommandService } = require("./command-service");
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const CurrencyService = require("./currency-service");
+			commandServiceInstance = new CommandService(
+				CurrencyService,
+				null, // accusationService: デフォルト（CommandService 内部で生成）
+				undefined, // commandsYamlOverride: デフォルト（config/commands.ts）
+				undefined, // attackHandler: デフォルト（CommandService 内部で生成）
+				undefined, // grassHandler: デフォルト（CommandService 内部で生成）
+				PostRepository, // postNumberResolver: 本番用リゾルバ
+			);
+		} catch (err) {
+			// 初期化失敗はエラーログのみ出力し、再試行しない
+			// See: tmp/workers/bdd-architect_TASK-147/analysis.md §4.2 Step 3
+			console.error("[PostService] CommandService lazy init failed:", err);
+		}
+		// 成功・失敗にかかわらずフラグを立てて再試行を防止する
+		commandServiceAutoInitDone = true;
+	}
+	return commandServiceInstance;
+}
+
+/**
  * CommandService インスタンスを設定する（DI）。
- * アプリ起動時やテストセットアップ時に呼び出す。
+ * テスト時にモックを注入するために使用する。
+ * 本番では getCommandService() による lazy 初期化が使われる。
+ * setCommandService(null) を呼び出した場合も commandServiceAutoInitDone=true とし、
+ * 明示的な null 設定を尊重して lazy 初期化をバイパスする。
+ *
+ * See: features/command_system.feature @書き込み本文中のコマンドが解析され実行される
+ * See: tmp/workers/bdd-architect_TASK-147/analysis.md §4.3 テスト互換性
  *
  * @param service - CommandService インスタンス。null でコマンド機能を無効化する
  */
 export function setCommandService(service: CommandServiceType | null): void {
 	commandServiceInstance = service;
+	// lazy 初期化をバイパスする（null を明示的に設定した場合も含む）
+	commandServiceAutoInitDone = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -363,9 +416,12 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	let commandResult: CommandExecutionResult | null = null;
 	const isSystemMessage = input.isSystemMessage ?? false;
 
-	if (!isSystemMessage && commandServiceInstance) {
+	// getCommandService() による lazy 初期化 (初回呼び出し時に自動生成)
+	// See: tmp/workers/bdd-architect_TASK-147/analysis.md §4.2 Step 3
+	const cmdService = getCommandService();
+	if (!isSystemMessage && cmdService) {
 		try {
-			commandResult = await commandServiceInstance.executeCommand({
+			commandResult = await cmdService.executeCommand({
 				rawCommand: input.body,
 				postId: "", // postId は INSERT 前のためプレースホルダ（コマンド実行には不要）
 				threadId: input.threadId,

@@ -8,7 +8,7 @@
  *   - CurrencyService はモック化する（Supabase に依存しない）
  *   - AccusationService はモック化する（TellHandler の依存先）
  *   - PostNumberResolver はモック化する（>>N → UUID 解決のテスト）
- *   - fs（ファイル読み込み）はモック化し、commands.yaml を仮想データで代替する
+ *   - commandsYamlOverride パラメータでテスト用設定を直接渡す（fs モック不要）
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
  *
  * カバレッジ対象:
@@ -23,82 +23,78 @@
  *   - >>N → UUID 解決（正常系・存在しないpostNumber・非>>N引数のスルー）
  */
 
-import path from "path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// fsモック（commands.yaml 読み込みを仮想データで代替）
+// インポート
 // ---------------------------------------------------------------------------
 
-vi.mock("fs", () => ({
-	default: {
-		readFileSync: vi.fn(),
-	},
-	readFileSync: vi.fn(),
-}));
-
-// ---------------------------------------------------------------------------
-// インポート（モック宣言後）
-// ---------------------------------------------------------------------------
-
-import fs from "fs";
 import type { Post } from "../../domain/models/post";
 import type { AccusationService } from "../accusation-service";
 import type {
 	CommandExecutionInput,
+	CommandsYaml,
 	ICurrencyService,
 	IPostNumberResolver,
 } from "../command-service";
 import { CommandService } from "../command-service";
 
 // ---------------------------------------------------------------------------
-// テスト用 commands.yaml コンテンツ
+// テスト用コマンド設定オブジェクト（YAML の代替）
 // ---------------------------------------------------------------------------
 
 /** テスト用のコマンド設定（!w, !tell を有効化） */
-const COMMANDS_YAML_FULL = `
-commands:
-  tell:
-    description: "指定レスをAIだと告発する"
-    cost: 10
-    targetFormat: ">>postNumber"
-    enabled: true
-    stealth: false
-  w:
-    description: "指定レスに草を生やす"
-    cost: 0
-    targetFormat: ">>postNumber"
-    enabled: true
-    stealth: false
-`;
+const COMMANDS_CONFIG_FULL: CommandsYaml = {
+	commands: {
+		tell: {
+			description: "指定レスをAIだと告発する",
+			cost: 10,
+			targetFormat: ">>postNumber",
+			enabled: true,
+			stealth: false,
+		},
+		w: {
+			description: "指定レスに草を生やす",
+			cost: 0,
+			targetFormat: ">>postNumber",
+			enabled: true,
+			stealth: false,
+		},
+	},
+};
 
 /** テスト用: disabled コマンドを含む設定 */
-const COMMANDS_YAML_WITH_DISABLED = `
-commands:
-  tell:
-    description: "指定レスをAIだと告発する"
-    cost: 10
-    targetFormat: ">>postNumber"
-    enabled: false
-    stealth: false
-  w:
-    description: "指定レスに草を生やす"
-    cost: 0
-    targetFormat: ">>postNumber"
-    enabled: true
-    stealth: false
-`;
+const COMMANDS_CONFIG_WITH_DISABLED: CommandsYaml = {
+	commands: {
+		tell: {
+			description: "指定レスをAIだと告発する",
+			cost: 10,
+			targetFormat: ">>postNumber",
+			enabled: false,
+			stealth: false,
+		},
+		w: {
+			description: "指定レスに草を生やす",
+			cost: 0,
+			targetFormat: ">>postNumber",
+			enabled: true,
+			stealth: false,
+		},
+	},
+};
 
 /** テスト用: !tell のみ有効化（>>N リゾルバテスト用） */
-const COMMANDS_YAML_TELL_ONLY = `
-commands:
-  tell:
-    description: "指定レスをAIだと告発する"
-    cost: 10
-    targetFormat: ">>postNumber"
-    enabled: true
-    stealth: false
-`;
+const COMMANDS_CONFIG_TELL_ONLY: CommandsYaml = {
+	commands: {
+		tell: {
+			description: "指定レスをAIだと告発する",
+			cost: 10,
+			targetFormat: ">>postNumber",
+			enabled: true,
+			stealth: false,
+		},
+	},
+};
 
 // ---------------------------------------------------------------------------
 // テスト用ヘルパー
@@ -208,8 +204,6 @@ describe("CommandService", () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		// デフォルト: FULL YAML を返す
-		vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_FULL);
 		// AccusationService モックを毎テスト生成する
 		accusationService = createMockAccusationService();
 	});
@@ -219,53 +213,70 @@ describe("CommandService", () => {
 	// =========================================================================
 
 	describe("初期化", () => {
-		it("commands.yaml を正常に読み込み、Registryを構築できる", () => {
+		it("コマンド設定を正常に読み込み、Registryを構築できる", () => {
 			const currencyService = createMockCurrencyService();
 			// エラーなしでインスタンスを生成できることを検証する
 			expect(() => {
-				new CommandService(currencyService, accusationService);
+				new CommandService(
+					currencyService,
+					accusationService,
+					COMMANDS_CONFIG_FULL,
+				);
 			}).not.toThrow();
 		});
 
 		it("getRegisteredCommandNames が登録済みコマンド名を返す", () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 			const names = service.getRegisteredCommandNames();
 			expect(names).toContain("tell");
 			expect(names).toContain("w");
 		});
 
 		it("enabled=false のコマンドは Registry に登録されない", () => {
-			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_WITH_DISABLED);
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_WITH_DISABLED,
+			);
 			const names = service.getRegisteredCommandNames();
 			// tell は disabled なので登録されない
 			expect(names).not.toContain("tell");
 			expect(names).toContain("w");
 		});
 
-		it("YAML にあるがハンドラが未実装のコマンドがある場合は起動時エラーになる", () => {
-			// unknown_command を追加した YAML
-			const yamlWithUnknown = `
-commands:
-  w:
-    description: "草を生やす"
-    cost: 0
-    targetFormat: ">>postNumber"
-    enabled: true
-    stealth: false
-  unknown_command:
-    description: "未実装コマンド"
-    cost: 10
-    targetFormat: null
-    enabled: true
-    stealth: false
-`;
-			vi.mocked(fs.readFileSync).mockReturnValue(yamlWithUnknown);
+		it("設定にあるがハンドラが未実装のコマンドがある場合は起動時エラーになる", () => {
+			// unknown_command を追加した設定
+			const configWithUnknown: CommandsYaml = {
+				commands: {
+					w: {
+						description: "草を生やす",
+						cost: 0,
+						targetFormat: ">>postNumber",
+						enabled: true,
+						stealth: false,
+					},
+					unknown_command: {
+						description: "未実装コマンド",
+						cost: 10,
+						targetFormat: null,
+						enabled: true,
+						stealth: false,
+					},
+				},
+			};
 			const currencyService = createMockCurrencyService();
 			expect(() => {
-				new CommandService(currencyService, accusationService);
+				new CommandService(
+					currencyService,
+					accusationService,
+					configWithUnknown,
+				);
 			}).toThrow('ハンドラが未実装のコマンド "unknown_command"');
 		});
 	});
@@ -278,7 +289,11 @@ commands:
 		it(// See: features/command_system.feature @無料コマンドは通貨消費なしで実行できる
 		"無料コマンドは通貨消費なしで実行できる（残高0でも実行可能）", async () => {
 			const currencyService = createMockCurrencyService(0); // 残高0
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!w >>3"));
 
@@ -293,7 +308,11 @@ commands:
 
 		it("!w の systemMessage が返される", async () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!w >>5"));
 
@@ -305,7 +324,11 @@ commands:
 
 		it("本文中の任意の位置に !w が含まれていても実行される", async () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(
 				createInput("なんか笑えるわ !w >>3 ほんとに"),
@@ -324,7 +347,11 @@ commands:
 		it(// See: features/command_system.feature @コマンド実行に通貨コストが必要な場合は通貨が消費される
 		"通貨コストが必要な場合は通貨が消費される", async () => {
 			const currencyService = createMockCurrencyService(100);
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!tell >>5"));
 
@@ -343,7 +370,11 @@ commands:
 		it(// See: features/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
 		"通貨不足の場合はコマンドが実行されずエラーメッセージが返される", async () => {
 			const currencyService = createMockCurrencyService(5); // 残高5、コスト10
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!tell >>5"));
 
@@ -355,7 +386,11 @@ commands:
 
 		it("通貨不足の場合は deduct が呼ばれない", async () => {
 			const currencyService = createMockCurrencyService(5);
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			await service.executeCommand(createInput("!tell >>5"));
 
@@ -373,7 +408,11 @@ commands:
 					reason: "insufficient_balance",
 				}),
 			};
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!tell >>5"));
 
@@ -385,7 +424,11 @@ commands:
 
 		it("!tell は AccusationService に委譲して結果を返す", async () => {
 			const currencyService = createMockCurrencyService(100);
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!tell >>5"));
 
@@ -406,7 +449,11 @@ commands:
 		it(// See: features/command_system.feature @存在しないコマンドは無視され通常の書き込みとして扱われる
 		"存在しないコマンドの場合は null が返される", async () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(
 				createInput("!unknowncommand なんか適当に"),
@@ -417,7 +464,11 @@ commands:
 
 		it("コマンドを含まない通常テキストの場合は null が返される", async () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(
 				createInput("普通の書き込みです"),
@@ -427,9 +478,12 @@ commands:
 		});
 
 		it("disabled コマンドは未登録扱いとなり null が返される", async () => {
-			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_WITH_DISABLED);
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_WITH_DISABLED,
+			);
 
 			// tell は disabled なので null が返される
 			const result = await service.executeCommand(createInput("!tell >>5"));
@@ -445,7 +499,11 @@ commands:
 	describe("エッジケース", () => {
 		it("空文字列の入力の場合は null が返される", async () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput(""));
 
@@ -455,7 +513,11 @@ commands:
 		it("1レスに複数コマンドが含まれる場合は先頭のみ実行される", async () => {
 			// See: features/command_system.feature @1レスに複数のコマンドが含まれる場合は先頭のみ実行される
 			const currencyService = createMockCurrencyService(100);
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			// !tell が先頭なので !tell が実行される（deduct が呼ばれる）
 			const result = await service.executeCommand(
@@ -473,7 +535,11 @@ commands:
 
 		it("引数なしの !w コマンドが実行された場合も成功する", async () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!w"));
 
@@ -484,7 +550,11 @@ commands:
 
 		it("残高がちょうどコストと同額の場合はコマンドが実行される", async () => {
 			const currencyService = createMockCurrencyService(10); // 残高10、コスト10
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			const result = await service.executeCommand(createInput("!tell >>5"));
 
@@ -494,7 +564,11 @@ commands:
 
 		it("コマンドの大文字小文字が混在する場合は認識されない（コマンド名は小文字のみ）", async () => {
 			const currencyService = createMockCurrencyService();
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			// !W は登録されていないので null
 			const result = await service.executeCommand(createInput("!W >>3"));
@@ -510,8 +584,6 @@ commands:
 
 	describe(">>N → UUID 解決", () => {
 		it(">>N 形式の引数がスレッド内のpostNumberに対応するUUIDに置換される", async () => {
-			// tell のみの YAML を使用（grassHandler 不要）
-			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
 			const postId = crypto.randomUUID();
 			const posts = new Map<string, Post>();
 			const post = createTestPost({
@@ -526,7 +598,7 @@ commands:
 			const service = new CommandService(
 				currencyService,
 				accusationService,
-				undefined,
+				COMMANDS_CONFIG_TELL_ONLY,
 				null,
 				null,
 				resolver,
@@ -549,14 +621,12 @@ commands:
 		});
 
 		it("存在しないpostNumberの場合はコマンド実行がスキップされエラーメッセージが返される", async () => {
-			// tell のみの YAML を使用（grassHandler 不要）
-			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
 			const currencyService = createMockCurrencyService(100);
 			const resolver = createMockPostNumberResolver(new Map());
 			const service = new CommandService(
 				currencyService,
 				accusationService,
-				undefined,
+				COMMANDS_CONFIG_TELL_ONLY,
 				null,
 				null,
 				resolver,
@@ -572,14 +642,12 @@ commands:
 		});
 
 		it(">>N 形式でない引数はリゾルバを通さずそのままハンドラに渡される", async () => {
-			// tell のみの YAML を使用（grassHandler 不要）
-			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
 			const currencyService = createMockCurrencyService(100);
 			const resolver = createMockPostNumberResolver();
 			const service = new CommandService(
 				currencyService,
 				accusationService,
-				undefined,
+				COMMANDS_CONFIG_TELL_ONLY,
 				null,
 				null,
 				resolver,
@@ -596,7 +664,11 @@ commands:
 		it("postNumberResolverが未提供の場合は>>N形式がそのままハンドラに渡される", async () => {
 			const currencyService = createMockCurrencyService();
 			// resolver を渡さない（後方互換性テスト）
-			const service = new CommandService(currencyService, accusationService);
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_FULL,
+			);
 
 			// フォールバックハンドラが使われるため、>>3 がそのまま渡される
 			const result = await service.executeCommand(createInput("!w >>3"));
@@ -607,8 +679,6 @@ commands:
 		});
 
 		it(">>N → UUID 解決後にハンドラが解決済みUUIDを受け取る（!tell）", async () => {
-			// tell のみの YAML を使用（grassHandler 不要）
-			vi.mocked(fs.readFileSync).mockReturnValue(COMMANDS_YAML_TELL_ONLY);
 			const postId = crypto.randomUUID();
 			const posts = new Map<string, Post>();
 			const post = createTestPost({
@@ -623,7 +693,7 @@ commands:
 			const service = new CommandService(
 				currencyService,
 				accusationService,
-				undefined,
+				COMMANDS_CONFIG_TELL_ONLY,
 				null,
 				null,
 				resolver,

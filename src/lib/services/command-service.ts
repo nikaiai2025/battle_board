@@ -7,7 +7,7 @@
  * See: docs/architecture/components/command.md §5 設計上の判断 > 通貨引き落としの順序
  *
  * 責務:
- *   - config/commands.yaml からコマンド設定を読み込み、Registry を構築する
+ *   - config/commands.ts からコマンド設定を読み込み、Registry を構築する
  *   - executeCommand でコマンドの解析・通貨チェック・通貨消費・ハンドラ実行を統括する
  *   - システムメッセージの文字列を返す（DB挿入はしない。PostService が担当）
  *
@@ -17,9 +17,7 @@
  *   コマンド実行失敗時の補償処理（通貨の返金）は行わない。
  */
 
-import fs from "fs";
-import path from "path";
-import { parse as parseYaml } from "yaml";
+import { commandsConfig as defaultCommandsConfig } from "../../../config/commands";
 import type { DeductReason } from "../domain/models/currency";
 import { parseCommand } from "../domain/rules/command-parser";
 import {
@@ -114,8 +112,11 @@ export interface CommandHandler {
 // YAML設定型定義
 // ---------------------------------------------------------------------------
 
-/** config/commands.yaml の個別コマンド設定型 */
-interface CommandConfig {
+/**
+ * config/commands.yaml の個別コマンド設定型。
+ * config/commands.ts から参照するため export する。
+ */
+export interface CommandConfig {
 	description: string;
 	cost: number;
 	targetFormat: string | null;
@@ -127,8 +128,11 @@ interface CommandConfig {
 	compensation_multiplier?: number;
 }
 
-/** config/commands.yaml のルート型 */
-interface CommandsYaml {
+/**
+ * config/commands.yaml のルート型。
+ * config/commands.ts から参照するため export する。
+ */
+export interface CommandsYaml {
 	commands: Record<string, CommandConfig>;
 }
 
@@ -230,7 +234,7 @@ export class CommandService {
 	/**
 	 * @param currencyService - 通貨操作サービス（DI。テスト時はモックを注入する）
 	 * @param accusationService - AI告発サービス（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
-	 * @param commandsYamlPath - commands.yaml のファイルパス（省略時はデフォルトパス）
+	 * @param commandsYamlOverride - コマンド設定のオーバーライド（テスト時に使用。省略時は config/commands.ts の定数を使用）
 	 * @param attackHandler - AttackHandler（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
 	 * @param grassHandler - GrassHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
 	 *
@@ -244,17 +248,18 @@ export class CommandService {
 	constructor(
 		private readonly currencyService: ICurrencyService,
 		accusationService?: AccusationService | null,
-		commandsYamlPath?: string,
+		commandsYamlOverride?: CommandsYaml,
 		attackHandler?: AttackHandler | null,
 		grassHandler?: GrassHandler | null,
 		postNumberResolver?: IPostNumberResolver | null,
 	) {
-		// config/commands.yaml を読み込み、Registry を構築する
+		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
+		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
+		// TypeScript 定数（defaultCommandsConfig）を使用する。
+		// テスト時は commandsYamlOverride でカスタム設定を注入できる。
 		// See: docs/architecture/components/command.md §2.2 設定層
-		const yamlPath =
-			commandsYamlPath ?? path.resolve(process.cwd(), "config/commands.yaml");
-		const yamlContent = fs.readFileSync(yamlPath, "utf-8");
-		const parsed: CommandsYaml = parseYaml(yamlContent);
+		// See: tmp/workers/bdd-architect_TASK-147/analysis.md §4.1
+		const parsed: CommandsYaml = commandsYamlOverride ?? defaultCommandsConfig;
 
 		this.configs = new Map();
 		this.registry = new Map();
