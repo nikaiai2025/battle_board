@@ -1,9 +1,9 @@
 /**
  * 単体テスト: POST /test/bbs.cgi — PAT認証統合
  *
- * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
- * See: features/未実装/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
- * See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+ * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
+ * See: features/user_registration.feature @無効な PAT では書き込みが拒否される
  * See: docs/architecture/components/user-registration.md §6 認証判定フロー（改訂版）
  * See: docs/architecture/components/user-registration.md §8.3 専ブラでの使われ方
  *
@@ -228,12 +228,12 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 	// =========================================================================
 	// ② PAT認証フロー（Cookie なし、mail欄に #pat_ あり）
 	// D-08 §6 認証判定フロー ② に対応
-	// See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+	// See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
 	// =========================================================================
 
 	describe("② PAT認証フロー", () => {
 		it("正常: mail欄に #pat_<32hex> を含む場合、loginWithPat が呼ばれ edge-token Cookie が発行される", async () => {
-			// See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+			// See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,
@@ -298,7 +298,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 		});
 
 		it("正常: PAT認証成功時、mail欄からPATが除去されてPostServiceに渡される（DAT漏洩防止）", async () => {
-			// See: features/未実装/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
+			// See: features/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
 			// See: docs/architecture/components/user-registration.md §6 ※ DAT漏洩防止
 			setupDecodeFormData({
 				bbs: BOARD_ID,
@@ -396,7 +396,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 		});
 
 		it("異常: 無効PATの場合、エラーレスポンスが返される", async () => {
-			// See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+			// See: features/user_registration.feature @無効な PAT では書き込みが拒否される
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,
@@ -427,7 +427,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 		});
 
 		it("異常: 無効PATの場合、PostServiceが呼ばれない", async () => {
-			// See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+			// See: features/user_registration.feature @無効な PAT では書き込みが拒否される
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,
@@ -456,13 +456,13 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 	// =========================================================================
 	// ① edge-token Cookie あり + mail欄に PAT がある場合
 	// D-08 §6 ※ Cookie認証成功時でもPATを除去する
-	// See: features/未実装/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
+	// See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
 	// See: docs/architecture/components/user-registration.md §8.3 専ブラでの使われ方（Cookie有効・mail欄PAT）
 	// =========================================================================
 
 	describe("① Cookie有効 + mail欄にPAT（PAT除去のみ）", () => {
 		it("正常: Cookie有効の場合、PATで認証せず loginWithPat は呼ばれない", async () => {
-			// See: features/未実装/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
+			// See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
 			// See: docs/architecture/components/user-registration.md §8.3 Cookie有効・mail欄PAT
 			setupDecodeFormData({
 				bbs: BOARD_ID,

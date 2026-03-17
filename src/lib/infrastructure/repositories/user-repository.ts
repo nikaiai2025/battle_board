@@ -330,7 +330,7 @@ export async function updateIsVerified(
 
 // ---------------------------------------------------------------------------
 // Phase 3: 本登録・PAT 関連メソッド（新設）
-// See: features/未実装/user_registration.feature
+// See: features/user_registration.feature
 // See: docs/architecture/components/user-registration.md §10.1 依存先 > UserRepository
 // ---------------------------------------------------------------------------
 
@@ -399,7 +399,7 @@ export async function updateSupabaseAuthId(
  * 旧 PAT は UNIQUE 制約により即時無効化される。
  *
  * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > regeneratePat
- * See: features/未実装/user_registration.feature @本登録完了時にPATが自動発行される
+ * See: features/user_registration.feature @本登録完了時にPATが自動発行される
  *
  * @param userId - 対象ユーザーの UUID
  * @param patToken - 新しい PAT（32文字の hex 文字列）
@@ -538,7 +538,7 @@ export async function findAll(
  * 専ブラの mail 欄に #pat_<token> が含まれる場合の認証処理に使用する。
  *
  * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > verifyPat
- * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
  *
  * @param patToken - 照合対象の PAT
  * @returns 見つかった User、存在しない場合は null

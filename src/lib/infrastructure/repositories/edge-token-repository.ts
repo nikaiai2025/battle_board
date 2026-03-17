@@ -1,7 +1,7 @@
 /**
  * EdgeTokenRepository — edge-token の永続化・検索を担うリポジトリ
  *
- * See: features/未実装/user_registration.feature
+ * See: features/user_registration.feature
  * See: docs/architecture/components/user-registration.md §10.1 依存先 > EdgeTokenRepository
  * See: supabase/migrations/00006_user_registration.sql
  *

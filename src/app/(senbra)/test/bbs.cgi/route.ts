@@ -27,9 +27,9 @@
  * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
- * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
- * See: features/未実装/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
- * See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+ * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
+ * See: features/user_registration.feature @無効な PAT では書き込みが拒否される
  * See: docs/specs/openapi.yaml > /test/bbs.cgi
  * See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界
  * See: docs/architecture/components/user-registration.md §6 認証判定フロー（改訂版）
@@ -61,8 +61,8 @@ import { loginWithPat } from "@/lib/services/registration-service";
  * 衝突しない根拠: '#pat_a1b2...' の '_' は hex 文字ではないため、
  * /#([0-9a-f]{32})/i（write_token パターン）にはマッチしない。
  *
- * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
- * See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+ * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/user_registration.feature @無効な PAT では書き込みが拒否される
  * See: docs/architecture/components/user-registration.md §6 mail欄パース正規表現
  */
 const PAT_PATTERN = /#pat_([0-9a-f]{32})/i;
@@ -125,7 +125,7 @@ function getIpHash(req: NextRequest): string {
  * 例: "#PAT_A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4" → "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"（lowercase）
  * 例: "sage" → null
  *
- * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
  * See: docs/architecture/components/user-registration.md §6 mail欄パース正規表現
  *
  * @param mail - mail欄の文字列
@@ -144,7 +144,7 @@ function extractPat(mail: string): string | null {
  * 例: "#pat_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4" → ""
  * 例: "sage" → "sage"
  *
- * See: features/未実装/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
+ * See: features/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
  * See: docs/architecture/components/user-registration.md §6 ※ DAT漏洩防止
  *
  * @param mail - mail欄の文字列
@@ -323,7 +323,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
 		if (!patResult.valid) {
 			// 無効なPAT: エラーレスポンスを返す
-			// See: features/未実装/user_registration.feature @無効な PAT では書き込みが拒否される
+			// See: features/user_registration.feature @無効な PAT では書き込みが拒否される
 			const errorHtml = responseBuilder.buildError(
 				"認証トークンが無効または期限切れです",
 			);
@@ -331,7 +331,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 		}
 
 		// PAT認証成功: mail欄からPATを除去してPostServiceに渡す
-		// See: features/未実装/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
+		// See: features/user_registration.feature @メール欄の PAT は書き込みデータに含まれない
 		const cleanedMail = removePat(parsed.mail);
 		const newEdgeToken = patResult.edgeToken;
 
@@ -357,7 +357,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 		}
 
 		// 書き込み完了後: 新たに発行したedge-token CookieをSet-Cookieで返す
-		// See: features/未実装/user_registration.feature @edge-token Cookie が発行される
+		// See: features/user_registration.feature @edge-token Cookie が発行される
 		return setEdgeTokenCookie(finalResponse, newEdgeToken);
 	}
 

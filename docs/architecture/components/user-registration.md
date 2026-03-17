@@ -3,7 +3,7 @@
 > ステータス: 運用中
 > 関連D-07: § 5 認証アーキテクチャ
 > 関連D-08: authentication.md（既存の認証コンポーネント。本書は拡張）
-> 関連BDD: features/未実装/user_registration.feature
+> 関連BDD: features/user_registration.feature
 
 ---
 

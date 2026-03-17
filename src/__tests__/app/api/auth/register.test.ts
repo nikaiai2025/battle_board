@@ -1,8 +1,8 @@
 /**
  * 単体テスト: POST /api/auth/register
  *
- * See: features/未実装/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
- * See: features/未実装/user_registration.feature @既に使用されているメールアドレスでは本登録できない
+ * See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
+ * See: features/user_registration.feature @既に使用されているメールアドレスでは本登録できない
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  *
  * テスト方針:
@@ -83,7 +83,7 @@ describe("POST /api/auth/register", () => {
 	// =========================================================================
 
 	it("正常: 仮ユーザーが本登録申請すると 200 を返す", async () => {
-		// See: features/未実装/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
+		// See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
 		const req = createRequest({ email: VALID_EMAIL, password: VALID_PASSWORD });
 		const res = await POST(req);
 
@@ -203,7 +203,7 @@ describe("POST /api/auth/register", () => {
 	});
 
 	it("重複エラー: メールアドレスが既に使用済みの場合は 409 email_taken を返す", async () => {
-		// See: features/未実装/user_registration.feature @既に使用されているメールアドレスでは本登録できない
+		// See: features/user_registration.feature @既に使用されているメールアドレスでは本登録できない
 		mockRegisterWithEmail.mockResolvedValue({
 			success: false,
 			reason: "email_taken",

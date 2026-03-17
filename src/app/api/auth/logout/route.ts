@@ -1,7 +1,7 @@
 /**
  * POST /api/auth/logout — ログアウト API エンドポイント
  *
- * See: features/未実装/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+ * See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  * See: docs/architecture/components/user-registration.md §5.3 ログアウト
  *

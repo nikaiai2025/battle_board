@@ -1,9 +1,9 @@
 /**
  * 単体テスト: AttackHandler（!attack コマンドハンドラ）
  *
- * See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
- * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
- * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
+ * See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+ * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+ * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
  * See: docs/architecture/components/attack.md §3 処理フロー
  *
  * テスト方針:
@@ -231,7 +231,7 @@ describe("AttackHandler", () => {
 
 	// =========================================================================
 	// エラーケース: 対象レスが存在しない
-	// See: features/未実装/bot_system.feature @存在しないレスへの攻撃はエラーになる
+	// See: features/bot_system.feature @存在しないレスへの攻撃はエラーになる
 	// =========================================================================
 
 	describe("対象レスが存在しない", () => {
@@ -259,7 +259,7 @@ describe("AttackHandler", () => {
 
 	// =========================================================================
 	// エラーケース: 自己攻撃
-	// See: features/未実装/bot_system.feature @自分の書き込みに対して攻撃を試みると拒否される
+	// See: features/bot_system.feature @自分の書き込みに対して攻撃を試みると拒否される
 	// =========================================================================
 
 	describe("自己攻撃", () => {
@@ -275,7 +275,7 @@ describe("AttackHandler", () => {
 
 	// =========================================================================
 	// エラーケース: システムメッセージへの攻撃
-	// See: features/未実装/bot_system.feature @システムメッセージに対して攻撃を試みると拒否される
+	// See: features/bot_system.feature @システムメッセージに対して攻撃を試みると拒否される
 	// =========================================================================
 
 	describe("システムメッセージへの攻撃", () => {
@@ -288,12 +288,12 @@ describe("AttackHandler", () => {
 
 	// =========================================================================
 	// フローB: 対象がBOTの場合
-	// See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+	// See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
 	// =========================================================================
 
 	describe("フローB: 対象がBOT", () => {
 		it("BOT攻撃成功時、success=true を返す", async () => {
-			// See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+			// See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
 			const handler = createHandler({
 				isBot: true,
 				botInfo: createBotInfo({ isActive: true, isRevealed: true }),
@@ -308,7 +308,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("BOT攻撃成功時、システムメッセージにHP変化が含まれる", async () => {
-			// See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+			// See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
 			// "⚔ 名無しさん(ID:Ax8kP2) → 🤖荒らし役 に攻撃！ HP:10→0"
 			const handler = createHandler({
 				isBot: true,
@@ -329,7 +329,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("撃破済みボットへの攻撃は拒否される（コスト消費なし）", async () => {
-			// See: features/未実装/bot_system.feature @撃破済みボットへの攻撃は拒否される
+			// See: features/bot_system.feature @撃破済みボットへの攻撃は拒否される
 			const handler = createHandler({
 				isBot: true,
 				botInfo: createBotInfo({ isActive: false, hp: 0 }),
@@ -344,7 +344,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("同日2回目の攻撃は拒否される（コスト消費なし）", async () => {
-			// See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+			// See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
 			const handler = createHandler({
 				isBot: true,
 				botInfo: createBotInfo({ isActive: true }),
@@ -360,7 +360,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("lurking状態のBOT攻撃時にrevealBotが呼ばれる（不意打ち）", async () => {
-			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+			// See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
 			// See: docs/architecture/components/bot.md §6.6 不意打ち攻撃時の遷移連鎖
 			const botService = createMockBotService({
 				isBot: true,
@@ -401,7 +401,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("BOT撃破時に撃破通知メッセージが含まれる", async () => {
-			// See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 			const handler = createHandler({
 				isBot: true,
 				botInfo: createBotInfo({
@@ -443,12 +443,12 @@ describe("AttackHandler", () => {
 
 	// =========================================================================
 	// フローC: 対象が人間の場合
-	// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
+	// See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
 	// =========================================================================
 
 	describe("フローC: 対象が人間", () => {
 		it("人間攻撃時、攻撃コスト(5)が消費される", async () => {
-			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
+			// See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
 			const currencyService = createMockCurrencyService(100);
 			const handler = new AttackHandler(
 				createMockBotService({ isBot: false }),
@@ -501,7 +501,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("人間攻撃時、賠償金が被攻撃者に支払われる", async () => {
-			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
+			// See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
 			const currencyService = createMockCurrencyService(100);
 			(currencyService.debit as ReturnType<typeof vi.fn>)
 				.mockResolvedValueOnce({ success: true, newBalance: 95 })
@@ -529,7 +529,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("残高不足時は全額支払い（残高 8 の場合: コスト5消費後 3 を賠償金として支払い）", async () => {
-			// See: features/未実装/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
+			// See: features/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
 			// 攻撃者残高: 8 → コスト5消費 → 残高3 → 賠償金として3全額支払い
 			const currencyService = createMockCurrencyService(8);
 			(currencyService.debit as ReturnType<typeof vi.fn>)
@@ -565,7 +565,7 @@ describe("AttackHandler", () => {
 		});
 
 		it("残高不足時の全額支払い時、特殊メッセージが含まれる", async () => {
-			// See: features/未実装/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
+			// See: features/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
 			const currencyService = createMockCurrencyService(8);
 			(currencyService.debit as ReturnType<typeof vi.fn>)
 				.mockResolvedValueOnce({ success: true, newBalance: 3 })

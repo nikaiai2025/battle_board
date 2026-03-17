@@ -44,7 +44,7 @@ export interface Bot {
 	 * 被攻撃回数。撃破報酬計算式に使用する。
 	 * 日次リセット（eliminated -> lurking）時に 0 にリセットされる。
 	 * See: docs/specs/bot_state_transitions.yaml #elimination_reward
-	 * See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+	 * See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
 	 */
 	timesAttacked: number;
 	/**

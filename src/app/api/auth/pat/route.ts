@@ -2,8 +2,8 @@
  * GET /api/auth/pat — PAT取得 API エンドポイント
  * POST /api/auth/pat — PAT再発行 API エンドポイント
  *
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
- * See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる
+ * See: features/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  * See: docs/architecture/components/user-registration.md §5.4 PAT管理
  *

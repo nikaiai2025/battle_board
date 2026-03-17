@@ -5,12 +5,12 @@
  *
  * See: features/mypage.feature
  * See: features/currency.feature @マイページで通貨残高を確認する
- * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
- * See: features/未実装/user_registration.feature @仮ユーザーには PAT が表示されない
- * See: features/未実装/user_registration.feature @仮ユーザーは課金できない
- * See: features/未実装/user_registration.feature @本登録済みの無料ユーザーは課金できる
+ * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @仮ユーザーには PAT が表示されない
+ * See: features/user_registration.feature @仮ユーザーは課金できない
+ * See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
  * See: docs/specs/screens/mypage.yaml @SCR-003（予定）
  * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
  * See: docs/architecture/components/user-registration.md §8.2 マイページ表示
@@ -59,8 +59,8 @@ interface PostHistoryItem {
  *
  * See: features/mypage.feature @マイページに基本情報が表示される
  * See: features/mypage.feature @通知欄が存在する
- * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
  */
 export default function MypagePage() {
 	// ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ export default function MypagePage() {
 	/**
 	 * マイページ基本情報を取得する。
 	 * See: features/mypage.feature @マイページに基本情報が表示される
-	 * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+	 * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
 	 */
 	const fetchMypageInfo = useCallback(async () => {
 		try {
@@ -191,7 +191,7 @@ export default function MypagePage() {
 	 * 本登録済みユーザーのみ有効（仮ユーザーはボタンが無効化されているため呼ばれない）。
 	 *
 	 * See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
-	 * See: features/未実装/user_registration.feature @本登録済みの無料ユーザーは課金できる
+	 * See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
 	 */
 	const handleUpgrade = async () => {
 		setUpgradeError(null);
@@ -222,7 +222,7 @@ export default function MypagePage() {
 	 * PAT をクリップボードにコピーする。
 	 * コピー対象は "#pat_<token>" 形式の文字列。
 	 *
-	 * See: features/未実装/user_registration.feature @マイページでPATを確認できる
+	 * See: features/user_registration.feature @マイページでPATを確認できる
 	 * See: docs/architecture/components/user-registration.md §8.2 マイページ表示
 	 */
 	const handleCopyPat = async () => {
@@ -243,7 +243,7 @@ export default function MypagePage() {
 	 * PAT を再発行する。
 	 * POST /api/auth/pat を呼び出し、新しい PAT をローカル状態に反映する。
 	 *
-	 * See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる
+	 * See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
 	 * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > regeneratePat
 	 */
 	const handleRegeneratePat = async () => {
@@ -327,8 +327,8 @@ export default function MypagePage() {
 			{/* =============================
           アカウント情報セクション
           See: features/mypage.feature @マイページに基本情報が表示される
-          See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
-          See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+          See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+          See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
           ============================= */}
 			<section
 				id="account-info"
@@ -337,11 +337,11 @@ export default function MypagePage() {
 				<h2 className="text-base font-bold text-gray-700">アカウント情報</h2>
 
 				{/* アカウント種別（仮ユーザー / 本登録ユーザー）
-            See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される */}
+            See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される */}
 				<div className="text-sm text-gray-600">
 					<span className="font-medium">アカウント種別: </span>
 					{/* account-type-badge: 仮ユーザー/本登録ユーザー表示
-              See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される */}
+              See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される */}
 					<span
 						data-testid="account-type-badge"
 						className={
@@ -355,7 +355,7 @@ export default function MypagePage() {
 				</div>
 
 				{/* 認証方法（本登録ユーザーのみ表示）
-            See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される */}
+            See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される */}
 				{registrationMethodLabel !== null && (
 					<div className="text-sm text-gray-600">
 						<span className="font-medium">認証方法: </span>
@@ -390,8 +390,8 @@ export default function MypagePage() {
 
 			{/* =============================
           本登録セクション（仮ユーザーのみ表示）
-          See: features/未実装/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
-          See: features/未実装/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+          See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
+          See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
           ============================= */}
 			{isTemporaryUser(mypageInfo) && (
 				<section
@@ -405,7 +405,7 @@ export default function MypagePage() {
 					</p>
 					<div className="flex flex-wrap gap-2">
 						{/* メール認証ボタン
-                See: features/未実装/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する */}
+                See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する */}
 						<a
 							data-testid="register-email-button"
 							href="/register/email"
@@ -414,7 +414,7 @@ export default function MypagePage() {
 							メールアドレスで本登録
 						</a>
 						{/* Discord 登録ボタン
-                See: features/未実装/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する */}
+                See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する */}
 						<a
 							data-testid="register-discord-button"
 							href="/register/discord"
@@ -428,8 +428,8 @@ export default function MypagePage() {
 
 			{/* =============================
           PAT（専ブラ連携トークン）セクション（本登録ユーザーのみ表示）
-          See: features/未実装/user_registration.feature @マイページでPATを確認できる
-          See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる
+          See: features/user_registration.feature @マイページでPATを確認できる
+          See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
           See: docs/architecture/components/user-registration.md §8.2 マイページ表示
           ============================= */}
 			{isPermanentUser(mypageInfo) && (
@@ -442,7 +442,7 @@ export default function MypagePage() {
 					</h2>
 
 					{/* PAT 表示
-              See: features/未実装/user_registration.feature @マイページでPATを確認できる */}
+              See: features/user_registration.feature @マイページでPATを確認できる */}
 					<div
 						data-testid="pat-display"
 						className="bg-gray-50 border border-gray-200 rounded px-3 py-2 font-mono text-sm break-all"
@@ -476,13 +476,13 @@ export default function MypagePage() {
 					</button>
 
 					{/* PAT 最終使用日時
-              See: features/未実装/user_registration.feature @マイページでPATを確認できる */}
+              See: features/user_registration.feature @マイページでPATを確認できる */}
 					<div data-testid="pat-last-used" className="text-xs text-gray-500">
 						最終使用: {patLastUsedLabel}
 					</div>
 
 					{/* PAT 再発行ボタン
-              See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる */}
+              See: features/user_registration.feature @PATを再発行すると旧PATが無効になる */}
 					<button
 						data-testid="pat-regenerate-button"
 						type="button"
@@ -578,8 +578,8 @@ export default function MypagePage() {
           課金セクション（モック）
           See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
           See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
-          See: features/未実装/user_registration.feature @仮ユーザーは課金できない
-          See: features/未実装/user_registration.feature @本登録済みの無料ユーザーは課金できる
+          See: features/user_registration.feature @仮ユーザーは課金できない
+          See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
           ============================= */}
 			<section
 				id="upgrade-section"
@@ -591,7 +591,7 @@ export default function MypagePage() {
 				</p>
 
 				{/* 仮ユーザーへの本登録必要メッセージ
-            See: features/未実装/user_registration.feature @仮ユーザーは課金できない */}
+            See: features/user_registration.feature @仮ユーザーは課金できない */}
 				{isTemporaryUser(mypageInfo) && (
 					<p
 						data-testid="registration-required-message"
@@ -612,7 +612,7 @@ export default function MypagePage() {
             本登録済み無料ユーザーのみ有効。
             有料ユーザーおよび仮ユーザーは disabled。
             See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
-            See: features/未実装/user_registration.feature @仮ユーザーは課金できない */}
+            See: features/user_registration.feature @仮ユーザーは課金できない */}
 				<button
 					data-testid="upgrade-button"
 					id="upgrade-button"

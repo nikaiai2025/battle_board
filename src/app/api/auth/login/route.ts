@@ -1,9 +1,9 @@
 /**
  * POST /api/auth/login — ログイン API エンドポイント
  *
- * See: features/未実装/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
- * See: features/未実装/user_registration.feature @誤ったパスワードではログインできない
- * See: features/未実装/user_registration.feature @ログイン後も旧デバイスのedge-tokenは有効なままである
+ * See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+ * See: features/user_registration.feature @誤ったパスワードではログインできない
+ * See: features/user_registration.feature @ログイン後も旧デバイスのedge-tokenは有効なままである
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  * See: docs/architecture/components/user-registration.md §7.3 ログイン（新デバイス）
  *

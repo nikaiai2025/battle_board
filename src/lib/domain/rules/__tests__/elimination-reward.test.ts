@@ -1,7 +1,7 @@
 /**
  * 単体テスト: elimination-reward（撃破報酬計算）
  *
- * See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+ * See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
  * See: docs/specs/bot_state_transitions.yaml #elimination_reward
  * See: docs/architecture/components/bot.md §2.7 撃破報酬計算
  */
@@ -35,7 +35,7 @@ describe("calculateEliminationReward", () => {
 
 	describe("計算式の検証: base_reward + (survival_days * daily_bonus) + (times_attacked * attack_bonus)", () => {
 		it("初日撃破（生存0日、被攻撃1回）の場合、報酬は 15 である", () => {
-			// See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+			// See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
 			// 計算: 10 + (0 * 50) + (1 * 5) = 15
 			const reward = calculateEliminationReward(
 				{ survivalDays: 0, timesAttacked: 1 },
@@ -45,7 +45,7 @@ describe("calculateEliminationReward", () => {
 		});
 
 		it("5日生存・被攻撃3回の場合、報酬は 275 である", () => {
-			// See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+			// See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
 			// 計算: 10 + (5 * 50) + (3 * 5) = 275
 			const reward = calculateEliminationReward(
 				{ survivalDays: 5, timesAttacked: 3 },
@@ -55,7 +55,7 @@ describe("calculateEliminationReward", () => {
 		});
 
 		it("5日生存・被攻撃1回の場合、報酬は 265 である", () => {
-			// See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 			// 計算: 10 + (5 * 50) + (1 * 5) = 265
 			const reward = calculateEliminationReward(
 				{ survivalDays: 5, timesAttacked: 1 },

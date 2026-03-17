@@ -1,7 +1,7 @@
 /**
  * BotService — AIボットシステムのサービス層
  *
- * See: features/未実装/bot_system.feature
+ * See: features/bot_system.feature
  * See: docs/architecture/components/bot.md §2 公開インターフェース
  * See: docs/specs/bot_state_transitions.yaml
  *
@@ -172,7 +172,7 @@ const DEFAULT_REWARD_PARAMS: RewardParams = {
  * AttackHandler からの呼び出しを受け付ける「ボット側の操作 API」。
  * CurrencyService には依存しない（撃破報酬付与は AttackHandler が行う）。
  *
- * See: features/未実装/bot_system.feature
+ * See: features/bot_system.feature
  * See: docs/architecture/components/bot.md §2 公開インターフェース
  * See: docs/architecture/components/bot.md §6.4 CurrencyService への撃破報酬付与の責務配置
  */
@@ -211,7 +211,7 @@ export class BotService {
 	 * bot_posts に postId のレコードが存在するかを検索する。
 	 * AccusationService・AttackHandler はこのメソッドを通じてのみボット判定を行う。
 	 *
-	 * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+	 * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
 	 * See: docs/architecture/components/bot.md §2.3 正体判定
 	 *
 	 * @param postId - 判定対象のレスID
@@ -268,7 +268,7 @@ export class BotService {
 	 * 既に revealed の場合は何もしない（冪等）。
 	 * !attack による不意打ち成功時、または !tell 成功時に呼ばれる。
 	 *
-	 * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+	 * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
 	 * See: docs/architecture/components/bot.md §2.6 BOTマーク付与
 	 *
 	 * @param botId - ボットID
@@ -297,7 +297,7 @@ export class BotService {
 	 * HP <= 0 になった場合は撃破処理を実行し、撃破報酬を計算して返す。
 	 * CurrencyService への報酬付与は AttackHandler 側で行う（循環依存回避）。
 	 *
-	 * See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+	 * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 	 * See: docs/architecture/components/bot.md §2.2 HP更新・ダメージ処理
 	 * See: docs/architecture/components/bot.md §6.4 CurrencyService への撃破報酬付与の責務配置
 	 *
@@ -369,7 +369,7 @@ export class BotService {
 	 *
 	 * bot_profiles.yaml のプロファイルキーからパラメータを取得して計算する。
 	 * See: docs/architecture/components/bot.md §2.7 撃破報酬計算
-	 * See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+	 * See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
 	 *
 	 * @param botId - ボットID
 	 * @returns 撃破報酬額
@@ -399,7 +399,7 @@ export class BotService {
 	 * attacks テーブルを参照して 1日1回制限をチェックする。
 	 * JST 日付（YYYY-MM-DD）で管理する。
 	 *
-	 * See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+	 * See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
 	 * See: docs/architecture/components/bot.md §2.8 攻撃制限チェック
 	 * See: docs/specs/bot_state_transitions.yaml #attack_limits
 	 *
@@ -462,7 +462,7 @@ export class BotService {
 	 *   4. eliminated -> lurking（HP 初期値復帰、survival_days=0、times_attacked=0）
 	 *   5. attacks テーブルの前日分レコードをクリーンアップ
 	 *
-	 * See: features/未実装/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+	 * See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
 	 * See: docs/architecture/components/bot.md §2.10 日次リセット処理
 	 * See: docs/specs/bot_state_transitions.yaml #daily_reset
 	 *

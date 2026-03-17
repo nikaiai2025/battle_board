@@ -19,7 +19,7 @@ import { supabaseAdmin } from "../supabase/client";
 /**
  * 攻撃記録エンティティ。
  * 同一ユーザーが同一ボットに同日2回以上攻撃することを防ぐための制限管理に使用する。
- * See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+ * See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
  */
 export interface Attack {
 	/** 内部識別子 (UUID) */
@@ -82,7 +82,7 @@ function rowToAttack(row: AttackRow): Attack {
  * (attacker_id, bot_id, attack_date) UNIQUE 制約により同日2回目の攻撃は DB レベルで拒否される。
  *
  * See: docs/architecture/components/bot.md §2.9 攻撃記録
- * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+ * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
  *
  * @param attack 攻撃記録データ（id, createdAt を除く）
  * @returns 作成された攻撃記録
@@ -114,7 +114,7 @@ export async function create(
  * 1日1回攻撃制限のチェックに使用する。
  *
  * See: docs/architecture/components/bot.md §2.8 攻撃制限チェック
- * See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+ * See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
  *
  * @param attackerId 攻撃者の user_id
  * @param botId 攻撃対象ボットの bot_id
@@ -153,7 +153,7 @@ export async function findByAttackerAndBotAndDate(
  *
  * See: docs/architecture/components/bot.md §2.10 日次リセット処理（step 5）
  * See: docs/specs/bot_state_transitions.yaml #daily_reset > attacks テーブル
- * See: features/未実装/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+ * See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
  *
  * @param beforeDate この日付より前の記録を削除する（YYYY-MM-DD）
  * @returns 削除した件数

@@ -1,8 +1,8 @@
 /**
  * 単体テスト: POST /api/auth/login
  *
- * See: features/未実装/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
- * See: features/未実装/user_registration.feature @誤ったパスワードではログインできない
+ * See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+ * See: features/user_registration.feature @誤ったパスワードではログインできない
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  *
  * テスト方針:
@@ -59,7 +59,7 @@ describe("POST /api/auth/login", () => {
 	// =========================================================================
 
 	it("正常: ログイン成功時は 200 を返す", async () => {
-		// See: features/未実装/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+		// See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
 		mockLoginWithEmail.mockResolvedValue({
 			success: true,
 			userId: USER_ID,
@@ -75,7 +75,7 @@ describe("POST /api/auth/login", () => {
 	});
 
 	it("正常: ログイン成功時に edge-token Cookie が設定される", async () => {
-		// See: features/未実装/user_registration.feature @Cookie削除後にログインすると同一ユーザーに復帰する
+		// See: features/user_registration.feature @Cookie削除後にログインすると同一ユーザーに復帰する
 		mockLoginWithEmail.mockResolvedValue({
 			success: true,
 			userId: USER_ID,
@@ -154,7 +154,7 @@ describe("POST /api/auth/login", () => {
 	// =========================================================================
 
 	it("認証エラー: 認証情報が誤っている場合は 401 を返す", async () => {
-		// See: features/未実装/user_registration.feature @誤ったパスワードではログインできない
+		// See: features/user_registration.feature @誤ったパスワードではログインできない
 		mockLoginWithEmail.mockResolvedValue({
 			success: false,
 			reason: "invalid_credentials",

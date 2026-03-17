@@ -1,9 +1,9 @@
 /**
  * 単体テスト: GET /api/auth/pat, POST /api/auth/pat
  *
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
- * See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる
- * See: features/未実装/user_registration.feature @仮ユーザーにはPATが表示されない
+ * See: features/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
+ * See: features/user_registration.feature @仮ユーザーにはPATが表示されない
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  *
  * テスト方針:
@@ -108,7 +108,7 @@ describe("GET /api/auth/pat", () => {
 	// =========================================================================
 
 	it("正常: 本登録ユーザーが PAT を取得できる", async () => {
-		// See: features/未実装/user_registration.feature @マイページでPATを確認できる
+		// See: features/user_registration.feature @マイページでPATを確認できる
 		const req = new NextRequest("http://localhost/api/auth/pat", {
 			method: "GET",
 		});
@@ -177,7 +177,7 @@ describe("GET /api/auth/pat", () => {
 	// =========================================================================
 
 	it("仮ユーザー: PAT が null の場合は 403 を返す", async () => {
-		// See: features/未実装/user_registration.feature @仮ユーザーにはPATが表示されない
+		// See: features/user_registration.feature @仮ユーザーにはPATが表示されない
 		mockFindById.mockResolvedValue(createTemporaryUser());
 
 		const req = new NextRequest("http://localhost/api/auth/pat", {
@@ -207,7 +207,7 @@ describe("POST /api/auth/pat", () => {
 	// =========================================================================
 
 	it("正常: PAT 再発行が成功すると新しい PAT が返される", async () => {
-		// See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる
+		// See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
 		const req = new NextRequest("http://localhost/api/auth/pat", {
 			method: "POST",
 		});
@@ -261,7 +261,7 @@ describe("POST /api/auth/pat", () => {
 	// =========================================================================
 
 	it("仮ユーザー: supabase_auth_id が null の場合は 403 を返す", async () => {
-		// See: features/未実装/user_registration.feature @仮ユーザーにはPATが表示されない
+		// See: features/user_registration.feature @仮ユーザーにはPATが表示されない
 		mockFindById.mockResolvedValue(createTemporaryUser());
 
 		const req = new NextRequest("http://localhost/api/auth/pat", {

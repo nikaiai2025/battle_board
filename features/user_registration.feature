@@ -1,4 +1,4 @@
-# features/未実装/user_registration.feature
+# features/user_registration.feature
 # ステータス: ドラフト v1
 #
 # 設計背景:

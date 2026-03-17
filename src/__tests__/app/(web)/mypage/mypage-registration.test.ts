@@ -1,12 +1,12 @@
 /**
  * 単体テスト: マイページ — 本登録・PAT セクション表示ロジック
  *
- * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
- * See: features/未実装/user_registration.feature @仮ユーザーには PAT が表示されない
- * See: features/未実装/user_registration.feature @仮ユーザーは課金できない
- * See: features/未実装/user_registration.feature @本登録済みの無料ユーザーは課金できる
+ * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @仮ユーザーには PAT が表示されない
+ * See: features/user_registration.feature @仮ユーザーは課金できない
+ * See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
  * See: docs/architecture/components/user-registration.md § 4.2 認証状態, § 8.2 マイページ表示
  *
  * テスト方針:
@@ -76,7 +76,7 @@ function makeRegisteredUserInfo(
 
 describe("isTemporaryUser", () => {
 	it("registrationType が null の場合は仮ユーザーと判定される", () => {
-		// See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+		// See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
 		const info = makeTemporaryUserInfo();
 		expect(isTemporaryUser(info)).toBe(true);
 	});
@@ -98,7 +98,7 @@ describe("isTemporaryUser", () => {
 
 describe("isPermanentUser", () => {
 	it("registrationType が 'email' の場合は本登録ユーザーと判定される", () => {
-		// See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+		// See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
 		const info = makeRegisteredUserInfo({ registrationType: "email" });
 		expect(isPermanentUser(info)).toBe(true);
 	});
@@ -120,13 +120,13 @@ describe("isPermanentUser", () => {
 
 describe("getAccountTypeLabel", () => {
 	it("仮ユーザーのラベルは「仮ユーザー」", () => {
-		// See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+		// See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
 		const info = makeTemporaryUserInfo();
 		expect(getAccountTypeLabel(info)).toBe("仮ユーザー");
 	});
 
 	it("本登録ユーザーのラベルは「本登録ユーザー」", () => {
-		// See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+		// See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
 		const info = makeRegisteredUserInfo();
 		expect(getAccountTypeLabel(info)).toBe("本登録ユーザー");
 	});
@@ -138,13 +138,13 @@ describe("getAccountTypeLabel", () => {
 
 describe("getRegistrationMethodLabel", () => {
 	it("registrationType が 'email' の場合は「メール」を返す", () => {
-		// See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+		// See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
 		const info = makeRegisteredUserInfo({ registrationType: "email" });
 		expect(getRegistrationMethodLabel(info)).toBe("メール");
 	});
 
 	it("registrationType が 'discord' の場合は「Discord」を返す", () => {
-		// See: features/未実装/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+		// See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
 		const info = makeRegisteredUserInfo({ registrationType: "discord" });
 		expect(getRegistrationMethodLabel(info)).toBe("Discord");
 	});
@@ -162,7 +162,7 @@ describe("getRegistrationMethodLabel", () => {
 describe("buildPatCopyValue", () => {
 	it("PAT トークンから #pat_ プレフィックス付きのコピー文字列を生成する", () => {
 		// See: docs/architecture/components/user-registration.md § 8.2
-		// See: features/未実装/user_registration.feature @マイページでPATを確認できる
+		// See: features/user_registration.feature @マイページでPATを確認できる
 		expect(buildPatCopyValue(PAT_TOKEN)).toBe(`#pat_${PAT_TOKEN}`);
 	});
 
@@ -182,7 +182,7 @@ describe("buildPatCopyValue", () => {
 
 describe("formatPatLastUsedAt", () => {
 	it("ISO文字列の場合はロケール形式で返す", () => {
-		// See: features/未実装/user_registration.feature @マイページでPATを確認できる
+		// See: features/user_registration.feature @マイページでPATを確認できる
 		const result = formatPatLastUsedAt("2026-03-15T14:23:00.000Z");
 		// タイムゾーン依存のため「未使用」でないことのみ検証する
 		expect(result).not.toBe("未使用");
@@ -191,7 +191,7 @@ describe("formatPatLastUsedAt", () => {
 	});
 
 	it("null の場合は「未使用」を返す", () => {
-		// See: features/未実装/user_registration.feature @マイページでPATを確認できる
+		// See: features/user_registration.feature @マイページでPATを確認できる
 		expect(formatPatLastUsedAt(null)).toBe("未使用");
 	});
 });
@@ -202,13 +202,13 @@ describe("formatPatLastUsedAt", () => {
 
 describe("canUpgrade", () => {
 	it("本登録済み無料ユーザーは課金ボタンが有効", () => {
-		// See: features/未実装/user_registration.feature @本登録済みの無料ユーザーは課金できる
+		// See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
 		const info = makeRegisteredUserInfo({ isPremium: false });
 		expect(canUpgrade(info)).toBe(true);
 	});
 
 	it("仮ユーザーは課金ボタンが無効", () => {
-		// See: features/未実装/user_registration.feature @仮ユーザーは課金できない
+		// See: features/user_registration.feature @仮ユーザーは課金できない
 		const info = makeTemporaryUserInfo();
 		expect(canUpgrade(info)).toBe(false);
 	});

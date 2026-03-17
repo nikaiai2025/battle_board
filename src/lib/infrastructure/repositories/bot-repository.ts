@@ -260,14 +260,17 @@ export async function updateDailyId(
  * ボットに BOTマークを付与する（is_revealed = true, revealed_at = 現在時刻）。
  * AI告発（!tell）成功時、または !attack による不意打ち成功時に呼ばれる。
  * See: docs/architecture/architecture.md §4.2 > bots.is_revealed
- * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+ * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
  *
  * @param botId ボットの UUID
  */
 export async function reveal(botId: string): Promise<void> {
 	const { error } = await supabaseAdmin
 		.from("bots")
-		.update({ is_revealed: true, revealed_at: new Date(Date.now()).toISOString() })
+		.update({
+			is_revealed: true,
+			revealed_at: new Date(Date.now()).toISOString(),
+		})
 		.eq("id", botId);
 
 	if (error) {
@@ -294,7 +297,7 @@ export async function unreveal(botId: string): Promise<void> {
 
 /**
  * ボットを撃破状態にする（is_active = false, eliminated_at = 現在時刻, eliminated_by = 撃破者ID）。
- * See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+ * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
  *
  * @param botId ボットの UUID
  * @param eliminatedBy 撃破した人間ユーザーの user_id
@@ -347,7 +350,7 @@ export async function incrementSurvivalDays(botId: string): Promise<void> {
  * ボットの被攻撃回数（times_attacked）を 1 インクリメントする。
  * !attack コマンドによるダメージ処理時に呼ばれる。
  * See: docs/architecture/components/bot.md §2.2 HP更新・ダメージ処理
- * See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+ * See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
  *
  * @param botId ボットの UUID
  */
@@ -359,7 +362,7 @@ export async function incrementTimesAttacked(botId: string): Promise<void> {
  * is_revealed = true の全ボットの BOTマークを一括解除する（revealed -> lurking）。
  * 日次リセット処理で使用する。
  * See: docs/specs/bot_state_transitions.yaml #daily_reset > revealed -> lurking
- * See: features/未実装/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+ * See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
  *
  * @returns BOTマーク解除したボット数
  */
@@ -382,7 +385,7 @@ export async function bulkResetRevealed(): Promise<number> {
  * HP を max_hp に戻し、survival_days・times_attacked を 0 にリセットする。
  * 日次リセット処理で使用する。
  * See: docs/specs/bot_state_transitions.yaml #daily_reset > eliminated -> lurking
- * See: features/未実装/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
+ * See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
  *
  * @returns 復活させたボット数
  */

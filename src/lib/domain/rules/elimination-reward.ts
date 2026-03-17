@@ -1,7 +1,7 @@
 /**
  * 撃破報酬計算の純粋関数
  *
- * See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+ * See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
  * See: docs/specs/bot_state_transitions.yaml #elimination_reward
  * See: docs/architecture/components/bot.md §2.7 撃破報酬計算
  *
@@ -48,7 +48,7 @@ export interface RewardInput {
  *
  * 計算式: base_reward + (survival_days * daily_bonus) + (times_attacked * attack_bonus)
  *
- * See: features/未実装/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
+ * See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
  * See: docs/specs/bot_state_transitions.yaml #elimination_reward > formula
  *
  * @param input - 撃破時のボット状態（生存日数・被攻撃回数）

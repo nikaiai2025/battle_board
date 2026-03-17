@@ -1,8 +1,8 @@
 /**
  * POST /api/auth/register — 本登録申請 API エンドポイント
  *
- * See: features/未実装/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
- * See: features/未実装/user_registration.feature @既に使用されているメールアドレスでは本登録できない
+ * See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
+ * See: features/user_registration.feature @既に使用されているメールアドレスでは本登録できない
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  * See: docs/architecture/components/user-registration.md §7.1 メール認証フロー
  *

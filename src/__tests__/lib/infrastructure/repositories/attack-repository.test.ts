@@ -1,7 +1,7 @@
 /**
  * 単体テスト: AttackRepository
  *
- * See: features/未実装/bot_system.feature
+ * See: features/bot_system.feature
  * See: docs/architecture/components/bot.md §5.2 attacks テーブル（新規）
  * See: docs/architecture/components/attack.md §2.2 コマンド設定
  * See: docs/specs/bot_state_transitions.yaml #attack_limits
@@ -153,7 +153,7 @@ describe("AttackRepository", () => {
 
 	describe("create", () => {
 		it("正常: 攻撃記録が作成され Attack が返される", async () => {
-			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+			// See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
 			const row = createAttackRow();
 			setupInsertChain({ data: row, error: null });
 
@@ -249,7 +249,7 @@ describe("AttackRepository", () => {
 
 	describe("findByAttackerAndBotAndDate", () => {
 		it("正常: 一致するレコードが存在する場合は Attack を返す", async () => {
-			// See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+			// See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
 			const row = createAttackRow();
 			setupSelectTripleEqSingleChain({ data: row, error: null });
 
@@ -326,7 +326,7 @@ describe("AttackRepository", () => {
 
 	describe("deleteByDateBefore", () => {
 		it("正常: 古い攻撃記録が削除され削除件数が返される", async () => {
-			// See: features/未実装/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+			// See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
 			setupDeleteLtSelectChain({
 				data: [{ id: "attack-id-001" }, { id: "attack-id-002" }],
 				error: null,

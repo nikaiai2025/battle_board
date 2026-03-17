@@ -1,7 +1,7 @@
 /**
  * RegistrationService — 本登録ビジネスロジック統括サービス
  *
- * See: features/未実装/user_registration.feature
+ * See: features/user_registration.feature
  * See: docs/architecture/components/user-registration.md §5 公開インターフェース
  * See: docs/specs/user_registration_state_transitions.yaml #registration_transitions
  *
@@ -67,8 +67,8 @@ export type VerifyPatResult =
  *   3. Supabase Auth signUp() で確認メール送信
  *   4. メール確認完了は /api/auth/callback コールバックで completeRegistration() が呼ばれる
  *
- * See: features/未実装/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
- * See: features/未実装/user_registration.feature @既に使用されているメールアドレスでは本登録できない
+ * See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
+ * See: features/user_registration.feature @既に使用されているメールアドレスでは本登録できない
  * See: docs/architecture/components/user-registration.md §7.1 メール認証
  *
  * @param userId - 現在の仮ユーザーの user_id
@@ -125,7 +125,7 @@ export async function registerWithEmail(
  * Discord アカウントで本登録するための OAuth URL を返す。
  * Supabase Auth signInWithOAuth({ provider: 'discord' }) の認可 URL を返す。
  *
- * See: features/未実装/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+ * See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
  * See: docs/architecture/components/user-registration.md §7.2 Discord連携
  *
  * @param redirectTo - Discord認可後のコールバックURL
@@ -162,7 +162,7 @@ export async function registerWithDiscord(
  *
  * See: docs/architecture/components/user-registration.md §5.1 本登録 > completeRegistration
  * See: docs/specs/user_registration_state_transitions.yaml #registration_transitions
- * See: features/未実装/user_registration.feature @メール確認リンクをクリックして本登録が完了する
+ * See: features/user_registration.feature @メール確認リンクをクリックして本登録が完了する
  *
  * @param userId - 仮ユーザーの users.id
  * @param supabaseAuthId - Supabase Auth の user.id
@@ -199,7 +199,7 @@ export async function completeRegistration(
  *   3. 新しい edge-token を生成し edge_tokens に INSERT
  *   4. edge-token を返却（呼び出し元が Cookie に設定）
  *
- * See: features/未実装/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+ * See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
  * See: docs/architecture/components/user-registration.md §5.2 ログイン
  * See: docs/specs/user_registration_state_transitions.yaml #login_transitions
  *
@@ -239,7 +239,7 @@ export async function loginWithEmail(
 /**
  * Discord アカウントでのログイン開始。Discord OAuth フロー開始 URL を返す。
  *
- * See: features/未実装/user_registration.feature @本登録ユーザーがDiscordアカウントでログインする
+ * See: features/user_registration.feature @本登録ユーザーがDiscordアカウントでログインする
  * See: docs/architecture/components/user-registration.md §5.2 ログイン > loginWithDiscord
  *
  * @param redirectTo - Discord認可後のコールバックURL
@@ -324,7 +324,7 @@ export async function handleOAuthCallback(
  * ログアウト処理。当該デバイスの edge-token を削除する。
  * 他デバイスの edge-token は影響を受けない。
  *
- * See: features/未実装/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+ * See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
  * See: docs/architecture/components/user-registration.md §5.3 ログアウト
  * See: docs/specs/user_registration_state_transitions.yaml #login_transitions
  *
@@ -348,7 +348,7 @@ export async function logout(edgeToken: string): Promise<void> {
  *   2. 見つかれば pat_last_used_at を更新して返却
  *   3. 見つからなければ { valid: false }
  *
- * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
  * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > verifyPat
  *
  * @param patToken - 照合対象の PAT（32文字 hex）
@@ -372,7 +372,7 @@ export async function verifyPat(patToken: string): Promise<VerifyPatResult> {
  * 新しい PAT を生成して users.pat_token を上書きする。
  * 旧 PAT は UNIQUE 制約により即時無効化される。
  *
- * See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる
+ * See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
  * See: docs/architecture/components/user-registration.md §5.4 PAT管理 > regeneratePat
  * See: docs/specs/user_registration_state_transitions.yaml #pat_transitions
  *
@@ -396,7 +396,7 @@ export async function regeneratePat(
  *   2. 有効な場合は新しい edge-token を生成し edge_tokens に INSERT
  *   3. edge-token を返却（呼び出し元が Cookie に設定）
  *
- * See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+ * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
  * See: docs/architecture/components/user-registration.md §6 認証判定フロー
  *
  * @param patToken - 照合対象の PAT

@@ -1,9 +1,9 @@
 /**
  * CommandHandler 実装: !attack（攻撃）コマンド
  *
- * See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
- * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
- * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
+ * See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+ * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+ * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
  * See: docs/architecture/components/attack.md §3 処理フロー
  * See: docs/architecture/components/attack.md §6 設計上の判断
  *
@@ -94,7 +94,7 @@ export interface IAttackPostRepository {
  *   - フローB: 対象がBOTの場合（BOTマーク付与 + HP減少 + 撃破報酬）
  *   - フローC: 対象が人間の場合（賠償金支払い）
  *
- * See: features/未実装/bot_system.feature
+ * See: features/bot_system.feature
  * See: docs/architecture/components/attack.md §2.1 AttackHandler
  * See: docs/architecture/components/attack.md §6.1 AttackHandlerを独立コンポーネントとした理由
  */
@@ -126,7 +126,7 @@ export class AttackHandler implements CommandHandler {
 	 * CommandService は通貨残高チェック（>=cost）のみ行い、
 	 * 実際のdebitはこのメソッド内で行う（エラーケースでのコスト不消費を保証）。
 	 *
-	 * See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+	 * See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
 	 * See: docs/architecture/components/attack.md §3 処理フロー
 	 *
 	 * @param ctx - コマンド実行コンテキスト
@@ -208,7 +208,7 @@ export class AttackHandler implements CommandHandler {
 	 * B8. 撃破なら撃破報酬付与 + 撃破通知
 	 * B9. インライン・システム情報生成
 	 *
-	 * See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+	 * See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
 	 * See: docs/architecture/components/attack.md §3.3 フローB
 	 */
 	private async executeFlowB(
@@ -225,7 +225,7 @@ export class AttackHandler implements CommandHandler {
 		}
 
 		// B2: 撃破済みチェック（コスト消費なし）
-		// See: features/未実装/bot_system.feature @撃破済みボットへの攻撃は拒否される
+		// See: features/bot_system.feature @撃破済みボットへの攻撃は拒否される
 		// See: docs/architecture/components/attack.md §3.5 エラーケース一覧
 		if (!botInfo.isActive) {
 			return {
@@ -235,7 +235,7 @@ export class AttackHandler implements CommandHandler {
 		}
 
 		// B3: 1日1回制限チェック（コスト消費なし）
-		// See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+		// See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
 		// See: docs/architecture/components/bot.md §2.8 攻撃制限チェック
 		const canAttack = await this.botService.canAttackToday(
 			ctx.userId,
@@ -288,14 +288,14 @@ export class AttackHandler implements CommandHandler {
 		);
 
 		// B9: インライン・システム情報生成
-		// See: features/未実装/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
+		// See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
 		// "⚔ 名無しさん(ID:{attackerDailyId}) → 🤖{botName} に攻撃！ HP:{prev}→{remaining}"
 		const inlineMsg = `⚔ 名無しさん(ID:${ctx.userId}) → 🤖${botInfo.name} に攻撃！ HP:${damageResult.previousHp}→${damageResult.remainingHp}`;
 
 		if (damageResult.eliminated && damageResult.reward !== null) {
 			// B8: 撃破時 → 撃破報酬付与 + 撃破通知
 			// See: docs/architecture/components/attack.md §3.3 B8
-			// See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 			await this.currencyService.credit(
 				ctx.userId,
 				damageResult.reward,
@@ -337,8 +337,8 @@ export class AttackHandler implements CommandHandler {
 	 * C4. 賠償金付与（被攻撃者）
 	 * C5. インライン・システム情報生成（残高不足時は特殊メッセージ）
 	 *
-	 * See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
-	 * See: features/未実装/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
+	 * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
+	 * See: features/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
 	 * See: docs/architecture/components/attack.md §3.4 フローC
 	 * See: docs/architecture/components/attack.md §6.3 賠償金の残高不足時の処理
 	 */
@@ -388,7 +388,7 @@ export class AttackHandler implements CommandHandler {
 
 		// C5: インライン・システム情報生成
 		// See: docs/architecture/components/attack.md §3.4 C5
-		// See: features/未実装/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
+		// See: features/bot_system.feature @人間への攻撃時に賠償金の残高が不足している場合は全額支払い
 		let systemMessage: string;
 		if (isFullPayment) {
 			// 残高不足で全額支払い → 特殊メッセージ

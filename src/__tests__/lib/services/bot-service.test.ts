@@ -1,7 +1,7 @@
 /**
  * 単体テスト: BotService（AIボットシステムサービス）
  *
- * See: features/未実装/bot_system.feature
+ * See: features/bot_system.feature
  * See: docs/architecture/components/bot.md §2 公開インターフェース
  * See: docs/specs/bot_state_transitions.yaml
  *
@@ -151,7 +151,7 @@ describe("BotService", () => {
 
 	describe("isBot()", () => {
 		it("bot_posts にレコードが存在する場合、true を返す", async () => {
-			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+			// See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
 			const service = createService({
 				botPostRecord: { postId: "post-001", botId: "bot-001" },
 			});
@@ -218,7 +218,7 @@ describe("BotService", () => {
 
 	describe("revealBot()", () => {
 		it("lurking 状態のボットに BOTマークを付与する", async () => {
-			// See: features/未実装/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
+			// See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
 			const bot = createLurkingBot({ id: "bot-001" });
 			const botRepo = createMockBotRepository(bot);
 			const service = new BotService(
@@ -265,7 +265,7 @@ describe("BotService", () => {
 
 	describe("canAttackToday()", () => {
 		it("本日まだ攻撃していない場合、true を返す", async () => {
-			// See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+			// See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
 			const service = createService({ existingAttack: null });
 			const result = await service.canAttackToday("attacker-001", "bot-001");
 			expect(result).toBe(true);
@@ -361,7 +361,7 @@ describe("BotService", () => {
 		});
 
 		it("ダメージ後 HP が 0 になった場合、eliminated=true を返す", async () => {
-			// See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 			const bot = createRevealedBot({
 				id: "bot-001",
 				hp: 10,
@@ -387,7 +387,7 @@ describe("BotService", () => {
 		});
 
 		it("撃破時に報酬が正しく計算される（5日生存・被攻撃1回 -> 265）", async () => {
-			// See: features/未実装/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 			// 計算: 10 + (5 * 50) + (1 * 5) = 265 (注: timesAttacked は incrementTimesAttacked 後の値)
 			const bot = createRevealedBot({
 				id: "bot-001",
@@ -543,7 +543,7 @@ describe("BotService", () => {
 
 	describe("performDailyReset()", () => {
 		it("日次リセット結果（revealed解除数・復活数・ID再生成数）を返す", async () => {
-			// See: features/未実装/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+			// See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
 			// See: docs/architecture/components/bot.md §2.10 日次リセット処理
 			const allBots = [
 				createLurkingBot({ id: "bot-001" }),

@@ -1,7 +1,7 @@
 /**
  * 単体テスト: RegistrationService
  *
- * See: features/未実装/user_registration.feature
+ * See: features/user_registration.feature
  * See: docs/architecture/components/user-registration.md §5 公開インターフェース
  * See: docs/specs/user_registration_state_transitions.yaml
  *
@@ -155,7 +155,7 @@ describe("RegistrationService", () => {
 
 	describe("registerWithEmail", () => {
 		it("正常: 仮ユーザーが本登録申請すると success: true を返す", async () => {
-			// See: features/未実装/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
+			// See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
 			mockUserRepository.findById.mockResolvedValue(createTemporaryUser());
 			mockSupabaseAuth.signUp.mockResolvedValue({ error: null });
 
@@ -205,7 +205,7 @@ describe("RegistrationService", () => {
 		});
 
 		it("異常系: 既に本登録済みの場合は already_registered を返す", async () => {
-			// See: features/未実装/user_registration.feature
+			// See: features/user_registration.feature
 			mockUserRepository.findById.mockResolvedValue(createRegisteredUser());
 
 			const result = await RegistrationService.registerWithEmail(
@@ -219,7 +219,7 @@ describe("RegistrationService", () => {
 		});
 
 		it("異常系: メールアドレスが既に使用されている場合は email_taken を返す", async () => {
-			// See: features/未実装/user_registration.feature @既に使用されているメールアドレスでは本登録できない
+			// See: features/user_registration.feature @既に使用されているメールアドレスでは本登録できない
 			mockUserRepository.findById.mockResolvedValue(createTemporaryUser());
 			mockSupabaseAuth.signUp.mockResolvedValue({
 				error: { message: "User already registered", status: 422 },
@@ -295,7 +295,7 @@ describe("RegistrationService", () => {
 
 	describe("completeRegistration", () => {
 		it("正常: supabase_auth_id の更新と PAT 自動生成が呼ばれる", async () => {
-			// See: features/未実装/user_registration.feature @メール確認リンクをクリックして本登録が完了する
+			// See: features/user_registration.feature @メール確認リンクをクリックして本登録が完了する
 			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
 			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
 
@@ -318,7 +318,7 @@ describe("RegistrationService", () => {
 		});
 
 		it("正常: Discord 本登録の場合も PAT が自動生成される", async () => {
-			// See: features/未実装/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+			// See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
 			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
 			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
 
@@ -373,7 +373,7 @@ describe("RegistrationService", () => {
 
 	describe("loginWithEmail", () => {
 		it("正常: 認証成功時は userId と edgeToken を返す", async () => {
-			// See: features/未実装/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+			// See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
 			mockSupabaseAuth.signInWithPassword.mockResolvedValue({
 				data: { user: { id: SUPABASE_AUTH_ID } },
 				error: null,
@@ -401,7 +401,7 @@ describe("RegistrationService", () => {
 		});
 
 		it("正常: 新しい edge-token が edge_tokens テーブルに INSERT される", async () => {
-			// See: features/未実装/user_registration.feature @ログイン後も旧デバイスのedge-tokenは有効なままである
+			// See: features/user_registration.feature @ログイン後も旧デバイスのedge-tokenは有効なままである
 			mockSupabaseAuth.signInWithPassword.mockResolvedValue({
 				data: { user: { id: SUPABASE_AUTH_ID } },
 				error: null,
@@ -420,7 +420,7 @@ describe("RegistrationService", () => {
 		});
 
 		it("異常系: パスワードが誤っている場合は invalid_credentials を返す", async () => {
-			// See: features/未実装/user_registration.feature @誤ったパスワードではログインできない
+			// See: features/user_registration.feature @誤ったパスワードではログインできない
 			mockSupabaseAuth.signInWithPassword.mockResolvedValue({
 				data: { user: null },
 				error: { message: "Invalid login credentials" },
@@ -564,7 +564,7 @@ describe("RegistrationService", () => {
 
 	describe("logout", () => {
 		it("正常: 指定した edge-token が edge_tokens テーブルから削除される", async () => {
-			// See: features/未実装/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+			// See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
 			mockEdgeTokenRepository.deleteByToken.mockResolvedValue(undefined);
 
 			await RegistrationService.logout("some-edge-token");
@@ -597,7 +597,7 @@ describe("RegistrationService", () => {
 
 	describe("verifyPat", () => {
 		it("正常: 有効な PAT でユーザーIDを返す", async () => {
-			// See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+			// See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
 			mockUserRepository.findByPatToken.mockResolvedValue(
 				createRegisteredUser(),
 			);
@@ -623,7 +623,7 @@ describe("RegistrationService", () => {
 		});
 
 		it("異常系: 存在しない PAT の場合は valid: false を返す", async () => {
-			// See: features/未実装/user_registration.feature @無効なPATでは書き込みが拒否される
+			// See: features/user_registration.feature @無効なPATでは書き込みが拒否される
 			mockUserRepository.findByPatToken.mockResolvedValue(null);
 
 			const result = await RegistrationService.verifyPat("invalid-pat");
@@ -647,7 +647,7 @@ describe("RegistrationService", () => {
 
 	describe("regeneratePat", () => {
 		it("正常: 新しい PAT が生成されて返される", async () => {
-			// See: features/未実装/user_registration.feature @PATを再発行すると旧PATが無効になる
+			// See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
 			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
 
 			const result = await RegistrationService.regeneratePat(USER_ID);
@@ -676,7 +676,7 @@ describe("RegistrationService", () => {
 
 	describe("loginWithPat", () => {
 		it("正常: 有効な PAT で userId と edgeToken を返す", async () => {
-			// See: features/未実装/user_registration.feature @Cookie喪失時にmail欄のPATで自動復帰する
+			// See: features/user_registration.feature @Cookie喪失時にmail欄のPATで自動復帰する
 			mockUserRepository.findByPatToken.mockResolvedValue(
 				createRegisteredUser(),
 			);
@@ -714,7 +714,7 @@ describe("RegistrationService", () => {
 		});
 
 		it("異常系: 無効な PAT の場合は valid: false を返す", async () => {
-			// See: features/未実装/user_registration.feature @無効なPATでは書き込みが拒否される
+			// See: features/user_registration.feature @無効なPATでは書き込みが拒否される
 			mockUserRepository.findByPatToken.mockResolvedValue(null);
 
 			const result = await RegistrationService.loginWithPat("invalid-pat");

@@ -7,7 +7,7 @@
 # 「登録状態」軸と「PAT状態」軸を新設する。
 # 既存の「認証状態」「アカウント種別」は user_state_transitions.yaml を参照。
 #
-# 関連BDD: features/未実装/user_registration.feature
+# 関連BDD: features/user_registration.feature
 # 関連D-08: docs/architecture/components/user-registration.md
 
 entity: User (Phase 3 拡張)

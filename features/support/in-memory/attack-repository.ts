@@ -4,7 +4,7 @@
  * BDD テスト用の Supabase 非依存実装。
  * attack-repository.ts と同一シグネチャの関数を提供する。
  *
- * See: features/未実装/bot_system.feature
+ * See: features/bot_system.feature
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
@@ -28,7 +28,7 @@ export function reset(): void {
  * テスト用ヘルパー: 攻撃記録を直接ストアに追加する。
  * BDDステップで「ユーザーXはボットYに本日攻撃済みである」を設定する際に使用する。
  *
- * See: features/未実装/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
+ * See: features/bot_system.feature @同一ボットに同日2回目の攻撃は拒否される
  */
 export function _insert(attack: Omit<Attack, "id" | "createdAt">): void {
 	store.push({

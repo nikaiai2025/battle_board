@@ -1,7 +1,7 @@
 /**
  * 単体テスト: EdgeTokenRepository
  *
- * See: features/未実装/user_registration.feature
+ * See: features/user_registration.feature
  * See: docs/architecture/components/user-registration.md §3.2 新テーブル edge_tokens
  * See: docs/specs/user_registration_state_transitions.yaml #edge_token_lifecycle
  *
@@ -163,7 +163,7 @@ describe("EdgeTokenRepository", () => {
 
 	describe("create", () => {
 		it("正常: userId と token を渡すと EdgeToken が返される", async () => {
-			// See: features/未実装/user_registration.feature
+			// See: features/user_registration.feature
 			const row = createEdgeTokenRow();
 			setupInsertChain({ data: row, error: null });
 
@@ -223,7 +223,7 @@ describe("EdgeTokenRepository", () => {
 
 	describe("findByToken", () => {
 		it("正常: 存在する token で EdgeToken が返される", async () => {
-			// See: features/未実装/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
+			// See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
 			const row = createEdgeTokenRow();
 			setupSelectEqSingleChain({ data: row, error: null });
 
@@ -350,7 +350,7 @@ describe("EdgeTokenRepository", () => {
 
 	describe("deleteByToken", () => {
 		it("正常: 指定した token の行が削除される（エラーなし）", async () => {
-			// See: features/未実装/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+			// See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
 			setupDeleteEqChain({ data: null, error: null });
 
 			await expect(

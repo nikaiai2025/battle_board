@@ -1,12 +1,12 @@
 /**
  * マイページ表示ロジック — 純粋関数
  *
- * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
- * See: features/未実装/user_registration.feature @仮ユーザーには PAT が表示されない
- * See: features/未実装/user_registration.feature @仮ユーザーは課金できない
- * See: features/未実装/user_registration.feature @本登録済みの無料ユーザーは課金できる
+ * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @仮ユーザーには PAT が表示されない
+ * See: features/user_registration.feature @仮ユーザーは課金できない
+ * See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
  * See: docs/architecture/components/user-registration.md § 4.2 認証状態
  * See: docs/architecture/components/user-registration.md § 8.2 マイページ表示
  *
@@ -26,7 +26,7 @@ import type { MypageInfo } from "../../services/mypage-service";
  * 仮ユーザーかどうかを判定する。
  * registrationType が null の場合は本登録未完了（仮ユーザー）と見なす。
  *
- * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+ * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
  * See: docs/architecture/components/user-registration.md §2 用語定義
  *
  * @param info - マイページ基本情報
@@ -40,7 +40,7 @@ export function isTemporaryUser(info: MypageInfo): boolean {
  * 本登録ユーザーかどうかを判定する。
  * registrationType が 'email' または 'discord' の場合は本登録ユーザー。
  *
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
  * See: docs/architecture/components/user-registration.md §2 用語定義
  *
  * @param info - マイページ基本情報
@@ -59,8 +59,8 @@ export function isPermanentUser(info: MypageInfo): boolean {
  * - 仮ユーザー: "仮ユーザー"
  * - 本登録ユーザー: "本登録ユーザー"
  *
- * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
  *
  * @param info - マイページ基本情報
  * @returns アカウント種別ラベル文字列
@@ -75,8 +75,8 @@ export function getAccountTypeLabel(info: MypageInfo): string {
  * - 'discord': "Discord"
  * - null（仮ユーザー）: null
  *
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
- * See: features/未実装/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
  *
  * @param info - マイページ基本情報
  * @returns 認証方法ラベル文字列、仮ユーザーは null
@@ -97,7 +97,7 @@ export function getRegistrationMethodLabel(info: MypageInfo): string | null {
  *
  * See: docs/architecture/components/user-registration.md §8.2 マイページ表示
  * See: docs/architecture/components/user-registration.md §6 認証判定フロー (mail欄パース)
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @マイページでPATを確認できる
  *
  * @param patToken - PAT トークン文字列。null の場合は null を返す（仮ユーザー）
  * @returns "#pat_<token>" 形式の文字列、または null
@@ -111,7 +111,7 @@ export function buildPatCopyValue(patToken: string | null): string | null {
  * PAT 最終使用日時を表示用文字列にフォーマットする。
  * null の場合は「未使用」を返す。
  *
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @マイページでPATを確認できる
  * See: docs/architecture/components/user-registration.md §8.2 マイページ表示
  *
  * @param patLastUsedAt - PAT 最終使用日時（ISO 8601 文字列）または null
@@ -133,8 +133,8 @@ export function formatPatLastUsedAt(patLastUsedAt: string | null): string {
  *   - 本登録済み（supabase_auth_id が非 null に相当する registrationType が非 null）
  *   - かつ 無料ユーザー（isPremium = false）
  *
- * See: features/未実装/user_registration.feature @仮ユーザーは課金できない
- * See: features/未実装/user_registration.feature @本登録済みの無料ユーザーは課金できる
+ * See: features/user_registration.feature @仮ユーザーは課金できない
+ * See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
  * See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
  * See: docs/architecture/components/user-registration.md §4.3 課金制約
  *

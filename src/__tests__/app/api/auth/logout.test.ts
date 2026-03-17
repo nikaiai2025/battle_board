@@ -1,7 +1,7 @@
 /**
  * 単体テスト: POST /api/auth/logout
  *
- * See: features/未実装/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+ * See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  * See: docs/architecture/components/user-registration.md §5.3 ログアウト
  *
@@ -57,7 +57,7 @@ describe("POST /api/auth/logout", () => {
 	// =========================================================================
 
 	it("正常: ログアウト成功時は 200 を返す", async () => {
-		// See: features/未実装/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+		// See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
 		mockCookies.get.mockReturnValue({ value: EDGE_TOKEN });
 
 		const req = new NextRequest("http://localhost/api/auth/logout", {

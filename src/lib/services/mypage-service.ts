@@ -32,9 +32,9 @@ import * as CurrencyService from "./currency-service";
  * マイページ基本情報レスポンス
  * See: features/mypage.feature @マイページに基本情報が表示される
  * See: features/currency.feature @マイページで通貨残高を確認する
- * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
- * See: features/未実装/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
- * See: features/未実装/user_registration.feature @マイページでPATを確認できる
+ * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+ * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @マイページでPATを確認できる
  *
  * NOTE: authToken（edge-token）はセキュリティ上の理由からレスポンスに含めない。
  *   クライアントはCookieを通じて自動送信されるため、JSONレスポンスでの返却は不要。
@@ -60,21 +60,21 @@ export interface MypageInfo {
 	/**
 	 * 本登録方法。'email' | 'discord' のいずれか。
 	 * 仮ユーザー（本登録未完了）の場合は null。
-	 * See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+	 * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
 	 */
 	registrationType: "email" | "discord" | null;
 
 	/**
 	 * PAT（パーソナルアクセストークン）。32文字の hex 文字列。
 	 * 本登録完了時に自動発行される。仮ユーザーは null。
-	 * See: features/未実装/user_registration.feature @マイページでPATを確認できる
+	 * See: features/user_registration.feature @マイページでPATを確認できる
 	 * See: docs/architecture/components/user-registration.md §8 PAT方式の詳細
 	 */
 	patToken: string | null;
 
 	/**
 	 * PAT 最終使用日時（ISO 8601 文字列）。未使用の場合は null。
-	 * See: features/未実装/user_registration.feature @マイページでPATを確認できる
+	 * See: features/user_registration.feature @マイページでPATを確認できる
 	 */
 	patLastUsedAt: string | null;
 
@@ -200,8 +200,8 @@ export async function getMypage(userId: string): Promise<MypageInfo | null> {
 		username: user.username,
 		streakDays: user.streakDays,
 		// Phase 3: 本登録・PAT 関連フィールド
-		// See: features/未実装/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
-		// See: features/未実装/user_registration.feature @マイページでPATを確認できる
+		// See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+		// See: features/user_registration.feature @マイページでPATを確認できる
 		registrationType: user.registrationType,
 		patToken: user.patToken,
 		patLastUsedAt: user.patLastUsedAt?.toISOString() ?? null,

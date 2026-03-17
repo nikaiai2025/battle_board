@@ -36,7 +36,7 @@ export interface User {
 
 	// ---------------------------------------------------------------------------
 	// Phase 3: 本登録・PAT 関連フィールド（新設）
-	// See: features/未実装/user_registration.feature
+	// See: features/user_registration.feature
 	// See: docs/architecture/components/user-registration.md §3.1 users テーブル拡張
 	// ---------------------------------------------------------------------------
 

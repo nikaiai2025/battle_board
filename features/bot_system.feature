@@ -1,4 +1,4 @@
-# features/未実装/bot_system.feature
+# features/bot_system.feature
 # ステータス: ドラフト v5.1
 #
 # ■ 変更履歴
