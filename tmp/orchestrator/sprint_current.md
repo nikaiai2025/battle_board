@@ -78,11 +78,9 @@ Sprint-39で全HIGH修正完了、ドキュメント同期完了、再検証でA
 |---|---|---|---|
 | Sprint-39 | Phase5修正（APIエラーハンドリング+Dateモック統一+ドキュメント同期+再検証） | completed | `tmp/orchestrator/sprint_39_plan.md` |
 | Sprint-38 | Phase 5検証サイクル（bdd-gate+code-reviewer+doc-reviewer） | completed | `tmp/orchestrator/sprint_38_plan.md` |
-| Sprint-37 | 管理機能拡充②（ユーザー管理+ダッシュボード+管理画面UI） | completed | `tmp/orchestrator/sprint_37_plan.md` |
-| Sprint-36 | 管理機能拡充①（BAN+通貨付与） | completed | `tmp/orchestrator/sprint_36_plan.md` |
-| Sprint-35 | 固定スレッド+開発連絡板（dev板） | completed | `tmp/orchestrator/sprint_35_plan.md` |
-| Sprint-34 | 草コマンド !w 本格実装+mypage草カウント | completed | `tmp/orchestrator/sprint_34_plan.md` |
-| Sprint-33以前 | Phase 1完了+Phase 2実装 | completed | アーカイブ参照 |
+| Sprint-30〜37 | 本登録DB〜管理機能拡充② | completed | `archive/sprint_030_037.md` |
+| Sprint-23〜29 | Phase 2準備〜E2Eスモークテスト | completed | `archive/sprint_023_029.md` |
+| Sprint-1〜22 | Phase 1完了+専ブラ互換+各種修正 | completed | `archive/sprint_001_009.md` 〜 `sprint_020_022.md` |
 
 ## 未解決エスカレーション
 
@@ -95,7 +93,11 @@ Sprint-39で全HIGH修正完了、ドキュメント同期完了、再検証でA
 | `tmp/orchestrator/archive/sprint_001_009.md` | Sprint 1〜9 計画書統合 |
 | `tmp/orchestrator/archive/sprint_010_019.md` | Sprint 10〜19 計画書統合 |
 | `tmp/orchestrator/archive/sprint_020_022.md` | Sprint 20〜22 計画書統合 |
-| `tmp/tasks/archive/` | 全タスク指示書 (TASK-002〜062) |
+| `tmp/orchestrator/archive/sprint_023_029.md` | Sprint 23〜29 計画書統合 |
+| `tmp/orchestrator/archive/sprint_030_037.md` | Sprint 30〜37 計画書統合 |
+| `tmp/tasks/archive/` | 全タスク指示書 (TASK-002〜116) |
 | `tmp/escalations/archive/` | 全エスカレーション (13件、全resolved) |
-| `tmp/workers/archive/` | ワーカー作業空間 |
+| `tmp/workers/archive/` | 全ワーカー作業空間 |
 | `tmp/reports/` | Phase 5検証レポート（code_review, doc_review） |
+| `tmp/reports/archive/` | Phase 1検証レポート |
+| `tmp/archive/` | 一時ファイル（feature計画書、監査レポート等） |
