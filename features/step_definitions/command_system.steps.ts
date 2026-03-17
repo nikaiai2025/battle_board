@@ -777,6 +777,53 @@ When(
 );
 
 // ---------------------------------------------------------------------------
+// When: 以下の本文を投稿する（DocString対応）
+// See: features/command_system.feature 「アンカーとコマンドが改行で区切られている場合は前方引数として認識されない」
+// ---------------------------------------------------------------------------
+
+/**
+ * 以下の本文を投稿する（DocString形式）。
+ * 複数行テキストを本文として書き込みを行う。
+ * 前方引数の非認識条件シナリオ（改行区切り）で使用する。
+ *
+ * See: features/command_system.feature @アンカーとコマンドが改行で区切られている場合は前方引数として認識されない
+ * See: docs/architecture/components/command.md §2.3 ルール7
+ */
+When(
+	"以下の本文を投稿する:",
+	async function (this: BattleBoardWorld, docString: string) {
+		const PostService = getPostService();
+
+		assert(this.currentThreadId, "書き込み対象のスレッドが設定されていません");
+		assert(this.currentEdgeToken, "ユーザーがログイン済みである必要があります");
+
+		const result = await PostService.createPost({
+			threadId: this.currentThreadId,
+			body: docString,
+			edgeToken: this.currentEdgeToken,
+			ipHash: this.currentIpHash,
+			isBotWrite: false,
+		});
+
+		if ("success" in result && result.success) {
+			this.lastResult = { type: "success", data: result };
+		} else if ("authRequired" in result) {
+			this.lastResult = {
+				type: "authRequired",
+				code: result.code,
+				edgeToken: result.edgeToken,
+			};
+		} else if ("error" in result) {
+			this.lastResult = {
+				type: "error",
+				message: (result as any).error,
+				code: (result as any).code,
+			};
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
 // When: bbs.cgi の MESSAGE に含めて POST する（専ブラシナリオ）
 // See: features/command_system.feature @専ブラからの書き込みに含まれるコマンドが実行される
 // ---------------------------------------------------------------------------
@@ -1447,6 +1494,37 @@ Then(
 			post.isSystemMessage,
 			true,
 			"レスが isSystemMessage=true であることを確認します",
+		);
+	},
+);
+
+/**
+ * コマンド "{string}" のターゲットが未指定のためエラーがレス末尾にマージ表示される。
+ * 前方引数が認識されないケース（>>N と !cmd の間にテキストや改行がある場合）で、
+ * コマンドのターゲットが解決できないため、inlineSystemInfo にエラーメッセージが入ることを検証する。
+ *
+ * See: features/command_system.feature 「アンカーとコマンドの間にテキストがある場合は前方引数として認識されない」
+ * See: features/command_system.feature 「アンカーとコマンドが改行で区切られている場合は前方引数として認識されない」
+ * See: docs/architecture/components/command.md §2.3 ルール7
+ */
+Then(
+	"コマンド {string} のターゲットが未指定のためエラーがレス末尾にマージ表示される",
+	async function (this: BattleBoardWorld, commandName: string) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+		assert(posts.length > 0, "スレッドに書き込みが存在しません");
+		const lastPost = posts[posts.length - 1];
+
+		// ターゲット未指定エラーが inlineSystemInfo に設定されていることを確認
+		// CommandService/TellHandler はターゲット（>>N）が見つからない場合にエラーを返す
+		assert(
+			lastPost.inlineSystemInfo !== null,
+			`コマンド "${commandName}" のターゲット未指定エラーが inlineSystemInfo に設定されるべきですが null でした`,
+		);
+		// エラーメッセージが空でないことを確認
+		assert(
+			lastPost.inlineSystemInfo.length > 0,
+			"inlineSystemInfo が空文字です",
 		);
 	},
 );

@@ -12,7 +12,8 @@
 
 | TASK_ID | 担当 | 内容 | 依存 | ステータス |
 |---|---|---|---|---|
-| TASK-138 | bdd-coding | 固定スレッド自動デプロイ（GitHub Actions + workflow_dispatch） | なし | assigned |
+| TASK-138 | bdd-coding | 固定スレッド自動デプロイ（GitHub Actions + workflow_dispatch） | なし | completed |
+| TASK-139 | bdd-coding | upsert-pinned-thread.ts バグ修正（created_by UUID + 依存追加） | TASK-138 | completed |
 
 ## 備考: 日次集計cron（aggregate-daily-stats.ts）
 
@@ -31,6 +32,12 @@
 - 環境変数マッピング: `SUPABASE_URL` → `NEXT_PUBLIC_SUPABASE_URL`
 - migrate.yml と同スタイルのコメント・Secret設定手順を記載
 
+### TASK-139 (bdd-coding) — completed
+
+- `scripts/upsert-pinned-thread.ts`: システムユーザー（UUID nil）をupsertし`created_by`に使用
+- `package.json`: `js-yaml`, `tsx` を devDependencies に明示追加（CI環境で必要）
+- vitest: 45ファイル / 1141テスト PASS
+
 ## 判定
 
-全タスク completed。push後、GitHub UI から `workflow_dispatch` で初回実行すること。
+全タスク completed。`workflow_dispatch` で初回実行成功。固定スレッドが本番DBに投入された。

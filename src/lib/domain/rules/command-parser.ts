@@ -8,24 +8,56 @@
  *
  * 解析ルール（D-08 command.md §2.3 準拠）:
  *   1. 本文中から `!` で始まる単語をコマンド候補として検出する
- *   2. コマンド名の後にスペース区切りで引数を取得する
+ *   2. コマンド名の後にスペース区切りで引数を取得する（後方引数）
  *   3. 本文中の任意の位置に出現可能（先頭でなくてもよい）
  *   4. 1レス1コマンド: 複数のコマンド候補がある場合は先頭のみを返す
  *   5. コマンドレジストリに存在しないコマンド名は null を返す（通常の書き込みとして扱う）
+ *   6. `>>N !cmd`（前方引数）と `!cmd >>N`（後方引数）を等価とみなす。後方引数が
+ *      ある場合は後方を優先する
+ *   7. 前方引数の認識条件: `>>N` と `!cmd` の間に半角スペースまたは全角スペースのみが
+ *      存在すること。改行やテキストが挟まる場合は前方引数として認識しない
+ *   8. 後方引数の区切り文字も半角スペース・全角スペースの両方を許容する
  */
 
 import type { ParsedCommand } from "../models/command";
 
 /**
- * コマンドマッチパターン。
+ * 全角スペース（U+3000）を含む空白文字クラス。
+ * コマンドパターンの区切り文字として使用する。
+ * See: docs/architecture/components/command.md §2.3 ルール8
+ */
+const WHITESPACE = "[ \\t\\u3000]";
+
+/**
+ * コマンドマッチパターン。全角スペースを半角スペースと同等に扱う。
  * - 単語境界の前に `!` があり、直後に英数字・アンダースコアからなるコマンド名が続く形式
  * - `!` の前は文字列の先頭か空白（!! や word! などの誤検出を防ぐ）
  * - コマンド名: [a-zA-Z][a-zA-Z0-9_]* （! 単独や !! は除外）
  * - 末尾の空白+残余テキストは引数として取得する
+ * - 区切り文字は半角・全角スペース両方を許容する（ルール8）
  *
  * See: docs/architecture/components/command.md §2.3
  */
-const COMMAND_PATTERN = /(?:^|(?<=\s))!([a-zA-Z][a-zA-Z0-9_]*)((?:\s+\S+)*)/g;
+const COMMAND_PATTERN = new RegExp(
+	`(?:^|(?<=[\\s\\u3000]))!([a-zA-Z][a-zA-Z0-9_]*)((?:${WHITESPACE}+\\S+)*)`,
+	"g",
+);
+
+/**
+ * 前方引数パターン: `>>N` と `!cmd` の間に半角・全角スペースのみが存在するパターン。
+ * - `>>N` の前は行頭か空白（前にテキストがあってはいけない）
+ * - `>>N` と `!cmd` の間は半角・全角スペースのみ（テキスト・改行は不可）
+ *
+ * キャプチャグループ:
+ *   1: postNumber（例: "5"）
+ *   2: コマンド名（"!" を除いた部分、例: "tell"）
+ *
+ * See: docs/architecture/components/command.md §2.3 ルール6, 7
+ */
+const FORWARD_ARG_PATTERN = new RegExp(
+	`(?:^|(?<=[\\s\\u3000]))(>>\\d+)${WHITESPACE}+(![a-zA-Z][a-zA-Z0-9_]*)(?=[\\s\\u3000]|$)`,
+	"gm",
+);
 
 /**
  * 書き込み本文からゲームコマンドを解析する純粋関数。
@@ -50,52 +82,127 @@ const COMMAND_PATTERN = /(?:^|(?<=\s))!([a-zA-Z][a-zA-Z0-9_]*)((?:\s+\S+)*)/g;
  * parseCommand("!tell >>5 あと !w >>3 もよろしく", ["tell", "w"])
  * // => { name: "tell", args: [">>5", "あと", "!w", ">>3", "もよろしく"], raw: "!tell >>5 あと !w >>3 もよろしく" }
  * // （先頭コマンドのみ返す。CommandService 側が args[0] = ">>5" を使用する）
+ *
+ * @example
+ * parseCommand(">>5 !tell", ["tell", "w"])
+ * // => { name: "tell", args: [">>5"], raw: "!tell >>5" }
+ * // （前方引数: >>N !cmd 語順を等価とみなす）
+ *
+ * @example
+ * parseCommand(">>3 !tell >>5", ["tell", "w"])
+ * // => { name: "tell", args: [">>5"], raw: "!tell >>5" }
+ * // （後方引数優先: 両方ある場合は後方引数 >>5 を使用）
  */
 export function parseCommand(
-  body: string,
-  registeredCommands: string[]
+	body: string,
+	registeredCommands: string[],
 ): ParsedCommand | null {
-  // 不正な入力ガード
-  // See: docs/architecture/components/command.md §2.3 入力
-  if (!body || typeof body !== "string") {
-    return null;
-  }
+	// 不正な入力ガード
+	// See: docs/architecture/components/command.md §2.3 入力
+	if (!body || typeof body !== "string") {
+		return null;
+	}
 
-  // registeredCommands を Set に変換して O(1) ルックアップを実現
-  const commandSet = new Set(registeredCommands);
+	// registeredCommands を Set に変換して O(1) ルックアップを実現
+	const commandSet = new Set(registeredCommands);
 
-  // パターンリセット（グローバルフラグ付き正規表現は lastIndex を毎回リセットする必要がある）
-  COMMAND_PATTERN.lastIndex = 0;
+	// 前方引数マップを構築する: commandName => forwardArg
+	// ルール6, 7: >>N と !cmd の間に半角・全角スペースのみが存在する場合のみ前方引数として認識
+	// See: docs/architecture/components/command.md §2.3 ルール7
+	const forwardArgMap = buildForwardArgMap(body, commandSet);
 
-  let match: RegExpExecArray | null;
+	// パターンリセット（グローバルフラグ付き正規表現は lastIndex を毎回リセットする必要がある）
+	COMMAND_PATTERN.lastIndex = 0;
 
-  // 本文を先頭から走査し、最初に見つかった登録済みコマンドを返す（ルール4: 先頭のみ）
-  // See: docs/architecture/components/command.md §2.3 ルール4
-  while ((match = COMMAND_PATTERN.exec(body)) !== null) {
-    const commandName = match[1]; // コマンド名（! を除いた部分）
-    const argsString = match[2].trim(); // コマンド名より後の文字列（空白含む）
+	let match: RegExpExecArray | null;
 
-    // ルール5: 登録済みコマンドのみを有効とする
-    // See: docs/architecture/components/command.md §2.3 ルール5
-    if (!commandSet.has(commandName)) {
-      // 未登録コマンドはスキップして次の候補を探す
-      continue;
-    }
+	// 本文を先頭から走査し、最初に見つかった登録済みコマンドを返す（ルール4: 先頭のみ）
+	// See: docs/architecture/components/command.md §2.3 ルール4
+	while ((match = COMMAND_PATTERN.exec(body)) !== null) {
+		const commandName = match[1]; // コマンド名（! を除いた部分）
+		const argsString = match[2].trim(); // コマンド名より後の文字列（空白含む）
 
-    // 引数をスペース区切りで分割（空引数は除外）
-    // See: docs/architecture/components/command.md §2.3 ルール2
-    const args = argsString.length > 0 ? argsString.split(/\s+/) : [];
+		// ルール5: 登録済みコマンドのみを有効とする
+		// See: docs/architecture/components/command.md §2.3 ルール5
+		if (!commandSet.has(commandName)) {
+			// 未登録コマンドはスキップして次の候補を探す
+			continue;
+		}
 
-    // raw フィールド: "!コマンド名 引数..." の形式
-    const raw = args.length > 0 ? `!${commandName} ${argsString}` : `!${commandName}`;
+		// 後方引数をスペース区切りで分割（全角スペースも区切り文字として扱う）
+		// See: docs/architecture/components/command.md §2.3 ルール8
+		const backwardArgs =
+			argsString.length > 0 ? argsString.split(/[\s\u3000]+/) : [];
 
-    return {
-      name: commandName,
-      args,
-      raw,
-    };
-  }
+		// ルール6: 後方引数がある場合は後方引数を優先する（前方引数は無視）
+		// 後方引数がない場合のみ前方引数を使用する
+		// See: docs/architecture/components/command.md §2.3 ルール6
+		let args: string[];
+		if (backwardArgs.length > 0) {
+			args = backwardArgs;
+		} else {
+			// 前方引数を確認する
+			const forwardArg = forwardArgMap.get(commandName);
+			args = forwardArg ? [forwardArg] : [];
+		}
 
-  // コマンドが見つからなかった場合
-  return null;
+		// raw フィールド: "!コマンド名 引数..." の形式
+		const raw =
+			args.length > 0 ? `!${commandName} ${args.join(" ")}` : `!${commandName}`;
+
+		return {
+			name: commandName,
+			args,
+			raw,
+		};
+	}
+
+	// コマンドが見つからなかった場合
+	return null;
+}
+
+/**
+ * 本文から前方引数マップを構築する。
+ * `>>N !cmd` パターン（間に半角・全角スペースのみ）を検出し、
+ * コマンド名 => アンカー文字列 のマッピングを返す。
+ *
+ * 認識条件（ルール7）:
+ * - `>>N` と `!cmd` の間に半角スペースまたは全角スペースのみが存在する
+ * - 改行やテキストが挟まる場合は前方引数として認識しない
+ * - `>>N` の前は行頭か空白（`>>N` の前にテキストがある場合は認識しない）
+ *
+ * @param body - 書き込み本文
+ * @param commandSet - 登録済みコマンド名の Set
+ * @returns コマンド名 => アンカー文字列 のマップ（例: Map { "tell" => ">>5" }）
+ *
+ * See: docs/architecture/components/command.md §2.3 ルール6, 7
+ */
+function buildForwardArgMap(
+	body: string,
+	commandSet: Set<string>,
+): Map<string, string> {
+	const forwardArgMap = new Map<string, string>();
+
+	// パターンをリセット
+	FORWARD_ARG_PATTERN.lastIndex = 0;
+
+	let match: RegExpExecArray | null;
+
+	while ((match = FORWARD_ARG_PATTERN.exec(body)) !== null) {
+		const anchor = match[1]; // ">>N" の形式
+		const commandWithBang = match[2]; // "!cmd" の形式
+		const commandName = commandWithBang.slice(1); // "!" を除いた部分
+
+		// 登録済みコマンドのみを前方引数として認識する
+		if (!commandSet.has(commandName)) {
+			continue;
+		}
+
+		// 同じコマンドに対して複数の前方引数がある場合は最初のものを使用する
+		if (!forwardArgMap.has(commandName)) {
+			forwardArgMap.set(commandName, anchor);
+		}
+	}
+
+	return forwardArgMap;
 }
