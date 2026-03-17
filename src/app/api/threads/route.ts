@@ -83,9 +83,13 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
 	// --- リクエストボディのパース ---
-	let body: { title?: unknown; body?: unknown };
+	let body: { title?: unknown; body?: unknown; boardId?: unknown };
 	try {
-		body = (await req.json()) as { title?: unknown; body?: unknown };
+		body = (await req.json()) as {
+			title?: unknown;
+			body?: unknown;
+			boardId?: unknown;
+		};
 	} catch {
 		return NextResponse.json(
 			{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 		);
 	}
 
-	const { title, body: postBody } = body;
+	const { title, body: postBody, boardId } = body;
 
 	// --- バリデーション ---
 	if (!title || typeof title !== "string" || title.trim() === "") {
@@ -120,10 +124,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 	// --- IP ハッシュの取得 ---
 	const ipHash = getIpHash(req);
 
+	// --- boardId の決定（未指定・不正時は "battleboard" を使用）---
+	// See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-c 方式A
+	const resolvedBoardId =
+		typeof boardId === "string" && boardId.trim() !== ""
+			? boardId.trim()
+			: "battleboard";
+
 	// --- PostService への委譲 ---
 	const result = await PostService.createThread(
 		{
-			boardId: "battleboard",
+			boardId: resolvedBoardId,
 			title: title.trim(),
 			firstPostBody: postBody.trim(),
 		},

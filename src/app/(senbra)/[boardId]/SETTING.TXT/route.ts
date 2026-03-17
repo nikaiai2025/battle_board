@@ -9,7 +9,7 @@
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 
 /** ShiftJisEncoderのシングルトンインスタンス */
@@ -20,16 +20,21 @@ const encoder = new ShiftJisEncoder();
  * 存在しない板IDが指定された場合は共通デフォルトを使用する。
  */
 const BOARD_SETTINGS: Record<string, { title: string; subtitle: string }> = {
-  battleboard: {
-    title: "BattleBoard総合",
-    subtitle: "AIボットが混入する対戦型匿名掲示板",
-  },
+	battleboard: {
+		title: "BattleBoard総合",
+		subtitle: "AIボットが混入する対戦型匿名掲示板",
+	},
+	// See: tmp/feature_plan_pinned_thread_and_dev_board.md §4
+	dev: {
+		title: "開発連絡板",
+		subtitle: "開発者とユーザーの連絡板",
+	},
 };
 
 /** デフォルト設定（未定義の板ID向け） */
 const DEFAULT_BOARD_SETTINGS = {
-  title: "BattleBoard",
-  subtitle: "対戦型匿名掲示板",
+	title: "BattleBoard",
+	subtitle: "対戦型匿名掲示板",
 };
 
 /**
@@ -44,25 +49,25 @@ const DEFAULT_BOARD_SETTINGS = {
  * @returns Shift_JISエンコードされた板設定テキスト
  */
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ boardId: string }> }
+	_req: NextRequest,
+	{ params }: { params: Promise<{ boardId: string }> },
 ): Promise<Response> {
-  const { boardId } = await params;
-  const settings = BOARD_SETTINGS[boardId] ?? DEFAULT_BOARD_SETTINGS;
+	const { boardId } = await params;
+	const settings = BOARD_SETTINGS[boardId] ?? DEFAULT_BOARD_SETTINGS;
 
-  // 板設定テキストを構築する（UTF-8）
-  const settingText = buildSettingTxt(settings.title, settings.subtitle);
+	// 板設定テキストを構築する（UTF-8）
+	const settingText = buildSettingTxt(settings.title, settings.subtitle);
 
-  // UTF-8 → Shift_JIS に変換
-  const sjisBuffer = encoder.encode(settingText);
+	// UTF-8 → Shift_JIS に変換
+	const sjisBuffer = encoder.encode(settingText);
 
-  return new Response(new Uint8Array(sjisBuffer), {
-    status: 200,
-    headers: {
-      "Content-Type": "text/plain; charset=Shift_JIS",
-      "Content-Length": String(sjisBuffer.length),
-    },
-  });
+	return new Response(new Uint8Array(sjisBuffer), {
+		status: 200,
+		headers: {
+			"Content-Type": "text/plain; charset=Shift_JIS",
+			"Content-Length": String(sjisBuffer.length),
+		},
+	});
 }
 
 /**
@@ -76,16 +81,18 @@ export async function GET(
  * @returns SETTING.TXT形式のUTF-8文字列
  */
 function buildSettingTxt(title: string, subtitle: string): string {
-  return [
-    `BBS_TITLE=${title}`,
-    `BBS_TITLE_ORIG=${title}`,
-    `BBS_SUBTITLE=${subtitle}`,
-    `BBS_NONAME_NAME=名無しさん`,
-    `BBS_THREAD_STOP=1000`,
-    `BBS_MAX_RES=1000`,
-    `BBS_SUBJECT_COUNT=40`,
-    `BBS_UNICODE=pass`,
-    `BBS_DISP_IP=`,
-    `BBS_FORCE_ID=checked`,
-  ].join("\n") + "\n";
+	return (
+		[
+			`BBS_TITLE=${title}`,
+			`BBS_TITLE_ORIG=${title}`,
+			`BBS_SUBTITLE=${subtitle}`,
+			`BBS_NONAME_NAME=名無しさん`,
+			`BBS_THREAD_STOP=1000`,
+			`BBS_MAX_RES=1000`,
+			`BBS_SUBJECT_COUNT=40`,
+			`BBS_UNICODE=pass`,
+			`BBS_DISP_IP=`,
+			`BBS_FORCE_ID=checked`,
+		].join("\n") + "\n"
+	);
 }

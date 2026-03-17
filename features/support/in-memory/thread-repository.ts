@@ -8,27 +8,27 @@
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
-import type { Thread } from '../../../src/lib/domain/models/thread'
+import type { Thread } from "../../../src/lib/domain/models/thread";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
 // ---------------------------------------------------------------------------
 
 /** シナリオ間でリセットされるスレッドストア */
-const store = new Map<string, Thread>()
+const store = new Map<string, Thread>();
 
 /**
  * ストアを初期化する（Beforeフックから呼び出す）。
  */
 export function reset(): void {
-  store.clear()
+	store.clear();
 }
 
 /**
  * テスト用ヘルパー: スレッドを直接ストアに追加する。
  */
 export function _insert(thread: Thread): void {
-  store.set(thread.id, thread)
+	store.set(thread.id, thread);
 }
 
 // ---------------------------------------------------------------------------
@@ -40,18 +40,20 @@ export function _insert(thread: Thread): void {
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function findById(id: string): Promise<Thread | null> {
-  return store.get(id) ?? null
+	return store.get(id) ?? null;
 }
 
 /**
  * スレッドを thread_key で取得する。
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
-export async function findByThreadKey(threadKey: string): Promise<Thread | null> {
-  for (const thread of store.values()) {
-    if (thread.threadKey === threadKey) return thread
-  }
-  return null
+export async function findByThreadKey(
+	threadKey: string,
+): Promise<Thread | null> {
+	for (const thread of store.values()) {
+		if (thread.threadKey === threadKey) return thread;
+	}
+	return null;
 }
 
 /**
@@ -59,20 +61,20 @@ export async function findByThreadKey(threadKey: string): Promise<Thread | null>
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function findByBoardId(
-  boardId: string,
-  options: { limit?: number; cursor?: string } = {}
+	boardId: string,
+	options: { limit?: number; cursor?: string } = {},
 ): Promise<Thread[]> {
-  const limit = options.limit ?? 100
-  let threads = Array.from(store.values())
-    .filter(t => t.boardId === boardId && !t.isDeleted)
-    .sort((a, b) => b.lastPostAt.getTime() - a.lastPostAt.getTime())
+	const limit = options.limit ?? 100;
+	let threads = Array.from(store.values())
+		.filter((t) => t.boardId === boardId && !t.isDeleted)
+		.sort((a, b) => b.lastPostAt.getTime() - a.lastPostAt.getTime());
 
-  if (options.cursor) {
-    const cursorTime = new Date(options.cursor).getTime()
-    threads = threads.filter(t => t.lastPostAt.getTime() < cursorTime)
-  }
+	if (options.cursor) {
+		const cursorTime = new Date(options.cursor).getTime();
+		threads = threads.filter((t) => t.lastPostAt.getTime() < cursorTime);
+	}
 
-  return threads.slice(0, limit)
+	return threads.slice(0, limit);
 }
 
 /**
@@ -80,20 +82,30 @@ export async function findByBoardId(
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function create(
-  thread: Omit<Thread, 'id' | 'createdAt' | 'lastPostAt' | 'postCount' | 'datByteSize' | 'isDeleted'>
+	thread: Omit<
+		Thread,
+		| "id"
+		| "createdAt"
+		| "lastPostAt"
+		| "postCount"
+		| "datByteSize"
+		| "isDeleted"
+	> & { isPinned?: boolean },
 ): Promise<Thread> {
-  const now = new Date()
-  const newThread: Thread = {
-    ...thread,
-    id: crypto.randomUUID(),
-    postCount: 0,
-    datByteSize: 0,
-    isDeleted: false,
-    createdAt: now,
-    lastPostAt: now,
-  }
-  store.set(newThread.id, newThread)
-  return newThread
+	const now = new Date();
+	const newThread: Thread = {
+		...thread,
+		id: crypto.randomUUID(),
+		postCount: 0,
+		datByteSize: 0,
+		isDeleted: false,
+		// isPinned は呼び出し元が設定しなければ false がデフォルト
+		isPinned: thread.isPinned ?? false,
+		createdAt: now,
+		lastPostAt: now,
+	};
+	store.set(newThread.id, newThread);
+	return newThread;
 }
 
 /**
@@ -101,32 +113,38 @@ export async function create(
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function incrementPostCount(threadId: string): Promise<void> {
-  const thread = store.get(threadId)
-  if (thread) {
-    store.set(threadId, { ...thread, postCount: thread.postCount + 1 })
-  }
+	const thread = store.get(threadId);
+	if (thread) {
+		store.set(threadId, { ...thread, postCount: thread.postCount + 1 });
+	}
 }
 
 /**
  * スレッドの last_post_at を更新する。
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
-export async function updateLastPostAt(threadId: string, lastPostAt: Date): Promise<void> {
-  const thread = store.get(threadId)
-  if (thread) {
-    store.set(threadId, { ...thread, lastPostAt })
-  }
+export async function updateLastPostAt(
+	threadId: string,
+	lastPostAt: Date,
+): Promise<void> {
+	const thread = store.get(threadId);
+	if (thread) {
+		store.set(threadId, { ...thread, lastPostAt });
+	}
 }
 
 /**
  * スレッドの dat_byte_size を更新する。
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
-export async function updateDatByteSize(threadId: string, datByteSize: number): Promise<void> {
-  const thread = store.get(threadId)
-  if (thread) {
-    store.set(threadId, { ...thread, datByteSize })
-  }
+export async function updateDatByteSize(
+	threadId: string,
+	datByteSize: number,
+): Promise<void> {
+	const thread = store.get(threadId);
+	if (thread) {
+		store.set(threadId, { ...thread, datByteSize });
+	}
 }
 
 /**
@@ -134,8 +152,8 @@ export async function updateDatByteSize(threadId: string, datByteSize: number): 
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function softDelete(threadId: string): Promise<void> {
-  const thread = store.get(threadId)
-  if (thread) {
-    store.set(threadId, { ...thread, isDeleted: true })
-  }
+	const thread = store.get(threadId);
+	if (thread) {
+		store.set(threadId, { ...thread, isDeleted: true });
+	}
 }

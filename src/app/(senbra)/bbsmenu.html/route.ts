@@ -9,7 +9,7 @@
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 
 /** ShiftJisEncoderのシングルトンインスタンス */
@@ -20,7 +20,7 @@ const encoder = new ShiftJisEncoder();
  * 未設定の場合はデフォルト値を使用する。
  */
 function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL ?? "https://battleboard.vercel.app";
+	return process.env.NEXT_PUBLIC_BASE_URL ?? "https://battleboard.vercel.app";
 }
 
 /**
@@ -34,21 +34,21 @@ function getBaseUrl(): string {
  * @returns Shift_JISエンコードされた板一覧HTML
  */
 export async function GET(_req: NextRequest): Promise<Response> {
-  const baseUrl = getBaseUrl();
+	const baseUrl = getBaseUrl();
 
-  // 板一覧HTMLを構築する（UTF-8）
-  const html = buildBbsMenuHtml(baseUrl);
+	// 板一覧HTMLを構築する（UTF-8）
+	const html = buildBbsMenuHtml(baseUrl);
 
-  // UTF-8 → Shift_JIS に変換
-  const sjisBuffer = encoder.encode(html);
+	// UTF-8 → Shift_JIS に変換
+	const sjisBuffer = encoder.encode(html);
 
-  return new Response(new Uint8Array(sjisBuffer), {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=Shift_JIS",
-      "Content-Length": String(sjisBuffer.length),
-    },
-  });
+	return new Response(new Uint8Array(sjisBuffer), {
+		status: 200,
+		headers: {
+			"Content-Type": "text/html; charset=Shift_JIS",
+			"Content-Length": String(sjisBuffer.length),
+		},
+	});
 }
 
 /**
@@ -61,7 +61,7 @@ export async function GET(_req: NextRequest): Promise<Response> {
  * @returns 板一覧HTMLのUTF-8文字列
  */
 function buildBbsMenuHtml(baseUrl: string): string {
-  return `<!DOCTYPE html>
+	return `<!DOCTYPE html>
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">
@@ -70,6 +70,7 @@ function buildBbsMenuHtml(baseUrl: string): string {
 <body>
 <B>BattleBoard</B><br>
 <A HREF="${baseUrl}/battleboard/">BattleBoard総合</A><br>
+<A HREF="${baseUrl}/dev/">開発連絡板</A><br>
 </body>
 </html>`;
 }

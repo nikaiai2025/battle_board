@@ -11,8 +11,8 @@
  *   - ビジネスロジックを含まない薄いデータアクセス層
  */
 
-import { supabaseAdmin } from '../supabase/client'
-import type { Thread } from '../../domain/models/thread'
+import type { Thread } from "../../domain/models/thread";
+import { supabaseAdmin } from "../supabase/client";
 
 // ---------------------------------------------------------------------------
 // 型定義: threads テーブルの DB 行型
@@ -20,16 +20,18 @@ import type { Thread } from '../../domain/models/thread'
 
 /** threads テーブルの DB レコード（snake_case）*/
 interface ThreadRow {
-  id: string
-  thread_key: string
-  board_id: string
-  title: string
-  post_count: number
-  dat_byte_size: number
-  created_by: string
-  created_at: string
-  last_post_at: string
-  is_deleted: boolean
+	id: string;
+	thread_key: string;
+	board_id: string;
+	title: string;
+	post_count: number;
+	dat_byte_size: number;
+	created_by: string;
+	created_at: string;
+	last_post_at: string;
+	is_deleted: boolean;
+	/** 固定スレッドフラグ。See: supabase/migrations/00009_pinned_thread.sql */
+	is_pinned: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,18 +43,20 @@ interface ThreadRow {
  * Supabase レスポンスの日時フィールドは文字列で返るため Date に変換する。
  */
 function rowToThread(row: ThreadRow): Thread {
-  return {
-    id: row.id,
-    threadKey: row.thread_key,
-    boardId: row.board_id,
-    title: row.title,
-    postCount: row.post_count,
-    datByteSize: row.dat_byte_size,
-    createdBy: row.created_by,
-    createdAt: new Date(row.created_at),
-    lastPostAt: new Date(row.last_post_at),
-    isDeleted: row.is_deleted,
-  }
+	return {
+		id: row.id,
+		threadKey: row.thread_key,
+		boardId: row.board_id,
+		title: row.title,
+		postCount: row.post_count,
+		datByteSize: row.dat_byte_size,
+		createdBy: row.created_by,
+		createdAt: new Date(row.created_at),
+		lastPostAt: new Date(row.last_post_at),
+		isDeleted: row.is_deleted,
+		// is_pinned が未定義（マイグレーション前の行）の場合は false にフォールバック
+		isPinned: row.is_pinned ?? false,
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -65,19 +69,19 @@ function rowToThread(row: ThreadRow): Thread {
  * @returns 見つかった Thread、存在しない場合は null
  */
 export async function findById(id: string): Promise<Thread | null> {
-  const { data, error } = await supabaseAdmin
-    .from('threads')
-    .select('*')
-    .eq('id', id)
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("threads")
+		.select("*")
+		.eq("id", id)
+		.single();
 
-  if (error) {
-    // PGRST116: 行が見つからない場合
-    if (error.code === 'PGRST116') return null
-    throw new Error(`ThreadRepository.findById failed: ${error.message}`)
-  }
+	if (error) {
+		// PGRST116: 行が見つからない場合
+		if (error.code === "PGRST116") return null;
+		throw new Error(`ThreadRepository.findById failed: ${error.message}`);
+	}
 
-  return data ? rowToThread(data as ThreadRow) : null
+	return data ? rowToThread(data as ThreadRow) : null;
 }
 
 /**
@@ -85,19 +89,23 @@ export async function findById(id: string): Promise<Thread | null> {
  * @param threadKey - 専ブラ互換キー
  * @returns 見つかった Thread、存在しない場合は null
  */
-export async function findByThreadKey(threadKey: string): Promise<Thread | null> {
-  const { data, error } = await supabaseAdmin
-    .from('threads')
-    .select('*')
-    .eq('thread_key', threadKey)
-    .single()
+export async function findByThreadKey(
+	threadKey: string,
+): Promise<Thread | null> {
+	const { data, error } = await supabaseAdmin
+		.from("threads")
+		.select("*")
+		.eq("thread_key", threadKey)
+		.single();
 
-  if (error) {
-    if (error.code === 'PGRST116') return null
-    throw new Error(`ThreadRepository.findByThreadKey failed: ${error.message}`)
-  }
+	if (error) {
+		if (error.code === "PGRST116") return null;
+		throw new Error(
+			`ThreadRepository.findByThreadKey failed: ${error.message}`,
+		);
+	}
 
-  return data ? rowToThread(data as ThreadRow) : null
+	return data ? rowToThread(data as ThreadRow) : null;
 }
 
 /**
@@ -112,30 +120,30 @@ export async function findByThreadKey(threadKey: string): Promise<Thread | null>
  * @returns Thread 配列（last_post_at DESC ソート済み）
  */
 export async function findByBoardId(
-  boardId: string,
-  options: { limit?: number; cursor?: string } = {}
+	boardId: string,
+	options: { limit?: number; cursor?: string } = {},
 ): Promise<Thread[]> {
-  const limit = options.limit ?? 100
-  let query = supabaseAdmin
-    .from('threads')
-    .select('*')
-    .eq('board_id', boardId)
-    .eq('is_deleted', false)
-    .order('last_post_at', { ascending: false })
-    .limit(limit)
+	const limit = options.limit ?? 100;
+	let query = supabaseAdmin
+		.from("threads")
+		.select("*")
+		.eq("board_id", boardId)
+		.eq("is_deleted", false)
+		.order("last_post_at", { ascending: false })
+		.limit(limit);
 
-  // カーソルが指定された場合は、その last_post_at より古いものだけを取得する
-  if (options.cursor) {
-    query = query.lt('last_post_at', options.cursor)
-  }
+	// カーソルが指定された場合は、その last_post_at より古いものだけを取得する
+	if (options.cursor) {
+		query = query.lt("last_post_at", options.cursor);
+	}
 
-  const { data, error } = await query
+	const { data, error } = await query;
 
-  if (error) {
-    throw new Error(`ThreadRepository.findByBoardId failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`ThreadRepository.findByBoardId failed: ${error.message}`);
+	}
 
-  return (data as ThreadRow[]).map(rowToThread)
+	return (data as ThreadRow[]).map(rowToThread);
 }
 
 /**
@@ -146,24 +154,35 @@ export async function findByBoardId(
  * @returns 作成された Thread（DB デフォルト値を含む）
  */
 export async function create(
-  thread: Omit<Thread, 'id' | 'createdAt' | 'lastPostAt' | 'postCount' | 'datByteSize' | 'isDeleted'>
+	thread: Omit<
+		Thread,
+		| "id"
+		| "createdAt"
+		| "lastPostAt"
+		| "postCount"
+		| "datByteSize"
+		| "isDeleted"
+	> & { isPinned?: boolean },
 ): Promise<Thread> {
-  const { data, error } = await supabaseAdmin
-    .from('threads')
-    .insert({
-      thread_key: thread.threadKey,
-      board_id: thread.boardId,
-      title: thread.title,
-      created_by: thread.createdBy,
-    })
-    .select()
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("threads")
+		.insert({
+			thread_key: thread.threadKey,
+			board_id: thread.boardId,
+			title: thread.title,
+			created_by: thread.createdBy,
+			// isPinned は通常は false（デフォルト）。固定スレッド生成スクリプトのみ true を設定
+			// See: scripts/upsert-pinned-thread.ts
+			...(thread.isPinned ? { is_pinned: true } : {}),
+		})
+		.select()
+		.single();
 
-  if (error) {
-    throw new Error(`ThreadRepository.create failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`ThreadRepository.create failed: ${error.message}`);
+	}
 
-  return rowToThread(data as ThreadRow)
+	return rowToThread(data as ThreadRow);
 }
 
 /**
@@ -175,19 +194,21 @@ export async function create(
  * @param threadId - 対象スレッドの UUID
  */
 export async function incrementPostCount(threadId: string): Promise<void> {
-  // Supabase JS v2 では式評価を直接記述できないため、
-  // PostgreSQL RPC で atomic インクリメントを実行する。
-  // RPC 定義: CREATE OR REPLACE FUNCTION increment_thread_post_count(p_thread_id UUID)
-  //           RETURNS void AS $$
-  //             UPDATE threads SET post_count = post_count + 1 WHERE id = p_thread_id;
-  //           $$ LANGUAGE sql;
-  const { error } = await supabaseAdmin.rpc('increment_thread_post_count', {
-    p_thread_id: threadId,
-  })
+	// Supabase JS v2 では式評価を直接記述できないため、
+	// PostgreSQL RPC で atomic インクリメントを実行する。
+	// RPC 定義: CREATE OR REPLACE FUNCTION increment_thread_post_count(p_thread_id UUID)
+	//           RETURNS void AS $$
+	//             UPDATE threads SET post_count = post_count + 1 WHERE id = p_thread_id;
+	//           $$ LANGUAGE sql;
+	const { error } = await supabaseAdmin.rpc("increment_thread_post_count", {
+		p_thread_id: threadId,
+	});
 
-  if (error) {
-    throw new Error(`ThreadRepository.incrementPostCount failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(
+			`ThreadRepository.incrementPostCount failed: ${error.message}`,
+		);
+	}
 }
 
 /**
@@ -197,15 +218,20 @@ export async function incrementPostCount(threadId: string): Promise<void> {
  * @param threadId - 対象スレッドの UUID
  * @param lastPostAt - 新しい最終書き込み日時
  */
-export async function updateLastPostAt(threadId: string, lastPostAt: Date): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('threads')
-    .update({ last_post_at: lastPostAt.toISOString() })
-    .eq('id', threadId)
+export async function updateLastPostAt(
+	threadId: string,
+	lastPostAt: Date,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("threads")
+		.update({ last_post_at: lastPostAt.toISOString() })
+		.eq("id", threadId);
 
-  if (error) {
-    throw new Error(`ThreadRepository.updateLastPostAt failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(
+			`ThreadRepository.updateLastPostAt failed: ${error.message}`,
+		);
+	}
 }
 
 /**
@@ -215,15 +241,20 @@ export async function updateLastPostAt(threadId: string, lastPostAt: Date): Prom
  * @param threadId - 対象スレッドの UUID
  * @param datByteSize - 新しい累積バイト数
  */
-export async function updateDatByteSize(threadId: string, datByteSize: number): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('threads')
-    .update({ dat_byte_size: datByteSize })
-    .eq('id', threadId)
+export async function updateDatByteSize(
+	threadId: string,
+	datByteSize: number,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("threads")
+		.update({ dat_byte_size: datByteSize })
+		.eq("id", threadId);
 
-  if (error) {
-    throw new Error(`ThreadRepository.updateDatByteSize failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(
+			`ThreadRepository.updateDatByteSize failed: ${error.message}`,
+		);
+	}
 }
 
 /**
@@ -233,12 +264,12 @@ export async function updateDatByteSize(threadId: string, datByteSize: number): 
  * @param threadId - 対象スレッドの UUID
  */
 export async function softDelete(threadId: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('threads')
-    .update({ is_deleted: true })
-    .eq('id', threadId)
+	const { error } = await supabaseAdmin
+		.from("threads")
+		.update({ is_deleted: true })
+		.eq("id", threadId);
 
-  if (error) {
-    throw new Error(`ThreadRepository.softDelete failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`ThreadRepository.softDelete failed: ${error.message}`);
+	}
 }

@@ -246,6 +246,20 @@ async function resolveAuth(
  * @returns PostResult（成功 / 失敗 / 認証要求）
  */
 export async function createPost(input: PostInput): Promise<PostResult> {
+	// Step 0: 固定スレッドへの書き込みガード
+	// is_pinned=true のスレッドへの書き込みは一般ユーザー・ボットともに禁止する。
+	// UI でフォームを非表示にしても API 直叩きで書き込み可能なため、サービス層でガードする。
+	// See: features/thread.feature @固定スレッドには一般ユーザーが書き込みできない
+	// See: tmp/feature_plan_pinned_thread_and_dev_board.md §2-e
+	const targetThread = await ThreadRepository.findById(input.threadId);
+	if (targetThread?.isPinned) {
+		return {
+			success: false,
+			error: "固定スレッドには書き込みできません",
+			code: "PINNED_THREAD",
+		};
+	}
+
 	// Step 1: 本文バリデーション
 	// See: docs/architecture/architecture.md §7.4 失敗時の方針（バリデーションエラー → 全体中止）
 	const bodyValidation = validatePostBody(input.body);
@@ -533,6 +547,7 @@ export async function createThread(
 		boardId: input.boardId,
 		title: input.title,
 		createdBy,
+		isPinned: false,
 	});
 
 	// Step 5: 1レス目を createPost のロジックで書き込み
