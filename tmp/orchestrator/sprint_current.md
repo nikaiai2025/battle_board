@@ -20,32 +20,73 @@ Sprint-43でbot.md v6 §2.12に基づくStrategy パターン移行のStep 1・2
 - playwright API: 26テスト / 全PASS（専ブラ互換15 + 認証Cookie11）
 - cucumber-js integration: 4シナリオ / 全PASS（Supabase Local実DB）
 
-## 次に対応すべき作業
+## 人間タスク（次回セッション開始時に確認）
 
-### BOT Strategy移行 残ステップ（BOT詳細定義後に着手）
+以下はAI側の開発がブロックされている人間側の準備事項。回答・完了したものからAI開発を再開できる。
+
+### HUMAN-001: 荒らし役BOT本番稼働のための仕様決定（優先度: 高）
+
+荒らし役のロジックは実装済みだが、本番で動かすトリガー（TASK-123）が未実装。以下を決定すればAIが即実装可能:
+
+| 決定事項 | 選択肢例 | 備考 |
+|---|---|---|
+| cron実行間隔 | 30分ごと / 1時間ごと 等 | getNextPostDelayが60-120分を返すのでcron自体は短い間隔でOK |
+| Internal API認証方式 | GitHub Secrets → Bearerトークン 等 | 標準的なパターンで十分 |
+| 日次リセットcronの実行時刻 | 例: 毎日 00:00 UTC | 日次IDリセット・BOT統計集計用 |
+
+**これが決まれば荒らし役BOTが本番稼働する。ネタ師等の詳細定義を待つ必要なし。**
+
+### HUMAN-002: Discord OAuth設定（優先度: 高）
+
+BDDシナリオ2件（本登録・ログイン）がpendingのまま。以下の設定作業が必要:
+
+1. Discord Developer Portal でアプリケーション作成 → Client ID / Client Secret 取得
+2. Supabase Dashboard > Authentication > Providers で Discord を有効化
+3. コールバックURL設定（Supabaseが提供するURLをDiscord側に登録）
+4. 環境変数に Client ID / Secret を設定
+
+### HUMAN-003: ネタ師BOT詳細定義 + BDDシナリオ作成（優先度: 中）
+
+Strategy Step 3・4の着手に必要。`features/` の変更は人間承認必須。
+
+決めるべきこと:
+- ネタの収集元（どのWebソース？ RSS / API？）
+- AIプロンプトの方向性（要約型？煽り型？）
+- スレ立ての頻度・条件
+- HP・報酬パラメータ
+- BDDシナリオ（`features/bot_system.feature` に追加 or 別ファイル）
+
+### HUMAN-004: 設計判断2件（優先度: 低）
+
+| ID | 判断内容 | 状態 |
+|---|---|---|
+| MEDIUM-006 | 管理APIの認証エラーを401/403どちらに統一するか（現状はOpenAPI仕様通り） | 人間承認待ち |
+| MEDIUM-003 | 日次集計のタイムゾーンをUTC/JSTどちらにするか | 設計判断待ち |
+
+## AI側の次アクション（人間タスク完了後）
+
+| 人間タスク完了 | AI側で実行するスプリント |
+|---|---|
+| HUMAN-001 完了 | TASK-123再計画・実装（Internal API + cron → 荒らし役本番稼働） |
+| HUMAN-002 完了 | Discord OAuthステップ定義をpendingから実装に切り替え |
+| HUMAN-003 完了 | Strategy Step 3・4（スキーマ拡張 + ネタ師実装） |
+| HUMAN-004 完了 | 該当コード修正（小規模） |
+
+## BOT Strategy移行 進捗
 
 | Step | 内容 | 状態 |
 |---|---|---|
 | ~~Step 1~~ | ~~Strategy インターフェース定義 + 荒らし役3 Strategy切り出し~~ | **完了（Sprint-43）** |
 | ~~Step 2~~ | ~~BotService を Strategy 委譲にリファクタ~~ | **完了（Sprint-43）** |
-| Step 3 | bot_profiles.yaml スキーマ拡張 | BOT詳細定義後 |
-| Step 4 | ネタ師 Strategy 実装 + collected_topics + 収集ジョブ | BOT詳細定義後（BDDシナリオ新規作成必要） |
-
-### その他の未実装事項
-
-| 項目 | 必要な実装 | 状態 |
-|---|---|---|
-| TASK-123: Internal API + cron | `.github/workflows/` cron + 内部APIルート | Step 2完了 → 再計画可能 |
-| 日次リセットcronジョブ | `.github/workflows/daily-maintenance` cron | 再計画可能 |
-| BOTマーク専ブラ反映 | DAT差分同期問題の解決 | 未着手 |
-| ネタ師BOT | Strategy Step 4 + BDDシナリオ新規作成 | BOT詳細定義後 |
+| Step 3 | bot_profiles.yaml スキーマ拡張 | HUMAN-003 待ち |
+| Step 4 | ネタ師 Strategy 実装 + collected_topics + 収集ジョブ | HUMAN-003 待ち |
 
 ## 残存指摘（人間判断待ち）
 
 | ID | 内容 | リスク | 状態 |
 |---|---|---|---|
-| MEDIUM-006 | 管理API認証ステータス不統一（401 vs 403）— 実装はOpenAPI仕様に一致。仕様変更にはAPI契約変更が必要 | 低 | 人間承認待ち |
-| MEDIUM-003 | aggregate-daily-stats タイムゾーン（UTC vs JST設計判断） | 中 | 設計判断待ち |
+| MEDIUM-006 | 管理API認証ステータス不統一（401 vs 403）— 実装はOpenAPI仕様に一致。仕様変更にはAPI契約変更が必要 | 低 | HUMAN-004 |
+| MEDIUM-003 | aggregate-daily-stats タイムゾーン（UTC vs JST設計判断） | 中 | HUMAN-004 |
 
 ## 専ブラ実機テスト状況
 
@@ -58,10 +99,9 @@ Sprint-43でbot.md v6 §2.12に基づくStrategy パターン移行のStep 1・2
 
 ## 残課題
 
-- BOT Strategy移行 Step 3・4（BOT詳細定義待ち）
-- TASK-123再計画（Internal API + cron）
+- HUMAN-001〜004（上記「人間タスク」参照）
 - デザイン・レイアウト改善（機能優先のため後回し）
-- 残存MEDIUM指摘2件（MEDIUM-006, MEDIUM-003 — 人間判断待ち）
+- BOTマーク専ブラ反映（DAT差分同期問題の解決 — 未着手）
 
 ## スプリント履歴
 
