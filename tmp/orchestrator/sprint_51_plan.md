@@ -18,11 +18,16 @@
 | TASK_ID | 内容 | 担当 | 依存 | 状態 |
 |---|---|---|---|---|
 | TASK-144 | subject.txt 304判定の秒精度修正 + 関連テスト | bdd-coding | なし | **completed** |
-| TASK-145 | 専ブラルートにCache-Control: no-cache追加 | bdd-coding | なし | assigned |
+| TASK-145 | 専ブラルートにCache-Control: no-cache追加 | bdd-coding | なし | **completed** |
+| TASK-146 | 固定スレッドlastPostAt=2099年による永久304問題修正 | bdd-coding | なし | assigned |
 
 ## 結果
 
 - **TASK-144**: 完了
-  - `src/app/(senbra)/[boardId]/subject.txt/route.ts` — If-Modified-Since比較を秒精度に正規化（DAT routeと同一方式）
+  - `src/app/(senbra)/[boardId]/subject.txt/route.ts` — If-Modified-Since比較を秒精度に正規化
+  - `src/lib/infrastructure/adapters/http-cache.ts` — 304判定ロジック共通化
   - `src/__tests__/app/(senbra)/[boardId]/subject.txt/route.test.ts` — 17テスト新規作成
-  - 全テスト: 46ファイル / 1,174テスト / 全PASS
+- **TASK-145**: 完了
+  - subject.txt / DAT route の全レスポンスに `Cache-Control: no-cache` 追加
+  - `src/__tests__/app/(senbra)/[boardId]/dat/[threadKey]/route.test.ts` — 12テスト新規作成
+  - 全テスト: 47ファイル / 1,186テスト / 全PASS

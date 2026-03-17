@@ -14,6 +14,10 @@
  *   Before（バグ）: latestPostAt <= sinceDate でミリ秒精度のまま直接比較
  *   After（修正）: Math.floor(t/1000) で秒精度に正規化してから比較
  *   同一秒内（例: .500ms と .000ms）のDB更新が304誤返却されていた問題を修正
+ *
+ * バグ修正対応: Sprint-51 TASK-146
+ *   Before（バグ）: threads[0].lastPostAt を直接使用 → 固定スレッド(2099年)が先頭になると永久304
+ *   After（修正）: 現在時刻より未来のlastPostAtを除外してから最新時刻を決定
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -528,6 +532,139 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 			);
 
 			// .999Z → sec同一 → 304
+			expect(res.status).toBe(304);
+		});
+	});
+
+	// =========================================================================
+	// 固定スレッド（isPinned=true, lastPostAt=2099年）混在ケース
+	// TASK-146: 永久304バグ修正の検証
+	// =========================================================================
+
+	describe("固定スレッド混在ケース（永久304バグ修正）", () => {
+		/**
+		 * 固定スレッドのlastPostAt（未来日時）を除外し、通常スレッドのlastPostAtで判定する。
+		 * See: sprint-51 TASK-146
+		 */
+
+		it("バグ修正: 固定スレッド（2099年）と通常スレッドが混在する場合、通常スレッドのlastPostAtで304判定する", async () => {
+			// 固定スレッド(isPinned=true): lastPostAt=2099年 → bump順で先頭に来る
+			// 通常スレッド: lastPostAt=2026年（現在時刻より古い）
+			const pinnedThread = {
+				...makeThread(new Date("2099-01-01T00:00:00.000Z")),
+				isPinned: true,
+			};
+			const normalThread = makeThread(new Date("2026-03-10T12:00:00.000Z"));
+
+			// bump順（last_post_at DESC）: pinnedThread が先頭
+			mockFindByBoardId.mockResolvedValue([pinnedThread, normalThread]);
+
+			// If-Modified-Since: 通常スレッドの投稿後（2026-03-10 13:00:00）
+			const sinceDate = "Tue, 10 Mar 2026 13:00:00 GMT";
+			const req = createGetRequest("test", sinceDate);
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			// 固定スレッド(2099年=未来)を除外 → 通常スレッド(2026-03-10 12:00:00) < sinceDate(2026-03-10 13:00:00) → 304
+			expect(res.status).toBe(304);
+		});
+
+		it("バグ修正: 固定スレッド（2099年）と通常スレッドが混在し、通常スレッドに新着投稿がある場合、200を返す", async () => {
+			// 通常スレッドが更新されている場合は200を返すことを確認
+			const pinnedThread = {
+				...makeThread(new Date("2099-01-01T00:00:00.000Z")),
+				isPinned: true,
+			};
+			// 通常スレッドはsinceDate=2026-03-10 12:00:00より新しい
+			const normalThread = makeThread(new Date("2026-03-10T13:00:01.000Z"));
+
+			// bump順: pinnedThread が先頭
+			mockFindByBoardId.mockResolvedValue([pinnedThread, normalThread]);
+
+			// If-Modified-Since: 2026-03-10 13:00:00
+			const sinceDate = "Tue, 10 Mar 2026 13:00:00 GMT";
+			const req = createGetRequest("test", sinceDate);
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			// 固定スレッド(2099年)を除外 → 通常スレッド(13:00:01) > sinceDate(13:00:00) → 200
+			expect(res.status).toBe(200);
+		});
+
+		it("バグ修正: Last-Modifiedヘッダが固定スレッドの2099年ではなく通常スレッドの実際の日時を返す", async () => {
+			// Last-Modifiedが2099年を返すと専ブラが2099年のIf-Modified-Sinceを送り永久304になる
+			const pinnedThread = {
+				...makeThread(new Date("2099-01-01T00:00:00.000Z")),
+				isPinned: true,
+			};
+			const normalThread = makeThread(new Date("2026-03-18T10:00:00.000Z"));
+
+			// bump順: pinnedThread が先頭
+			mockFindByBoardId.mockResolvedValue([pinnedThread, normalThread]);
+
+			const req = createGetRequest("test");
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			expect(res.status).toBe(200);
+			const lastModified = res.headers.get("Last-Modified");
+			// Last-Modifiedは通常スレッドの日時であること（2099年ではない）
+			expect(lastModified).toBe("Wed, 18 Mar 2026 10:00:00 GMT");
+		});
+
+		it("バグ修正: 固定スレッドのみ存在する場合（通常スレッド0件）、200が返される", async () => {
+			// 固定スレッドしかない場合: 未来日時除外後の候補なし → フォールバック
+			const pinnedThread = {
+				...makeThread(new Date("2099-01-01T00:00:00.000Z")),
+				isPinned: true,
+			};
+
+			mockFindByBoardId.mockResolvedValue([pinnedThread]);
+
+			// If-Modified-Since なし
+			const req = createGetRequest("test");
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			expect(res.status).toBe(200);
+		});
+
+		it("バグ修正: 固定スレッドのみで以前のIf-Modified-Sinceが2099年の場合、304が返される（フォールバック動作）", async () => {
+			// 固定スレッドしかない場合: 未来除外後の候補なし → 最後の要素（固定スレッド自身）をフォールバック使用
+			const pinnedThread = {
+				...makeThread(new Date("2099-01-01T00:00:00.000Z")),
+				isPinned: true,
+			};
+
+			mockFindByBoardId.mockResolvedValue([pinnedThread]);
+
+			// If-Modified-Since: 2099-01-01（固定スレッドの日時）
+			const sinceDate = "Thu, 01 Jan 2099 00:00:00 GMT";
+			const req = createGetRequest("test", sinceDate);
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			// 固定スレッドのみ → フォールバック（最後の要素=固定スレッド自身）使用 → sec同一 → 304
 			expect(res.status).toBe(304);
 		});
 	});

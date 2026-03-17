@@ -23,6 +23,35 @@ const subjectFormatter = new SubjectFormatter();
 const encoder = new ShiftJisEncoder();
 
 /**
+ * 304判定・Last-Modifiedヘッダに使う「最終更新時刻」を決定する。
+ *
+ * 固定スレッド（isPinned=true）の lastPostAt が遠未来（例: 2099-01-01）に設定されている場合、
+ * その値をそのまま Last-Modified に使うと専ブラが If-Modified-Since=2099年を送り続け、
+ * 通常スレッドの更新があっても永遠に304が返される（永久304バグ）。
+ *
+ * これを防ぐため、現在時刻より未来の lastPostAt を除外して最終更新時刻を求める。
+ * 未来日時を除外した結果候補がない場合（固定スレッドのみ等）は、
+ * 全スレッド中の最後の要素をフォールバックとして使用する。
+ *
+ * @param threads - スレッド一覧（bump順＝last_post_at DESC）
+ * @returns 304判定・Last-Modifiedに使う日時
+ *
+ * See: sprint-51 TASK-146 固定スレッドlastPostAt=2099年による永久304バグ修正
+ */
+function resolveLatestPostAt(threads: { lastPostAt: Date }[]): Date {
+	if (threads.length === 0) return new Date(0);
+
+	const now = new Date();
+	// 現在時刻以前のlastPostAtを持つスレッドの中で最新のものを使う（bump順先頭）
+	// 未来の日時（固定スレッドの2099年等）を除外することで永久304を防ぐ
+	return (
+		threads.find((t) => t.lastPostAt <= now)?.lastPostAt ??
+		// 全スレッドが未来日時の場合（固定スレッドのみ等）は最後の要素をフォールバック
+		threads[threads.length - 1].lastPostAt
+	);
+}
+
+/**
  * GET /{boardId}/subject.txt — スレッド一覧（専ブラ互換）
  *
  * bump順（last_post_at DESC）でソートされたスレッド一覧を
@@ -45,14 +74,16 @@ export async function GET(
 	// findByBoardId は is_deleted=false かつ last_post_at DESC ソート済みを返す
 	const threads = await ThreadRepository.findByBoardId(boardId, { limit: 100 });
 
+	// 304判定・Last-Modifiedヘッダ用の最終更新時刻を決定する
+	// 固定スレッドのlastPostAt（未来日時）を除外して実際の最新投稿時刻を求める
+	// 詳細は resolveLatestPostAt のJSDocを参照
+	const latestPostAt = resolveLatestPostAt(threads);
+
 	// If-Modified-Since による 304 Not Modified 判定
-	// スレッド一覧の最終更新時刻として最新スレッドの last_post_at を使用する
+	// スレッド一覧の最終更新時刻として resolveLatestPostAt の結果を使用する
 	if (threads.length > 0) {
 		const ifModifiedSince = req.headers.get("if-modified-since");
-		if (
-			ifModifiedSince &&
-			isNotModifiedSince(threads[0].lastPostAt, ifModifiedSince)
-		) {
+		if (ifModifiedSince && isNotModifiedSince(latestPostAt, ifModifiedSince)) {
 			// Cache-Control: no-cache を付与し、専ブラが毎回条件付きリクエストを送るよう強制する
 			// RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止のため
 			return new Response(null, {
@@ -73,10 +104,8 @@ export async function GET(
 	// toUTCString() は RFC 7231 形式（"Www, DD Mon YYYY HH:MM:SS GMT"）で秒精度のため、
 	// ミリ秒は自動的に切り捨てられる。これにより Last-Modified → If-Modified-Since の
 	// ラウンドトリップでのミリ秒精度ズレを防ぐことができる
-	const lastModified =
-		threads.length > 0
-			? threads[0].lastPostAt.toUTCString()
-			: new Date(0).toUTCString();
+	// 未来日時（固定スレッド等）は resolveLatestPostAt で除外済み
+	const lastModified = latestPostAt.toUTCString();
 
 	return new Response(new Uint8Array(sjisBuffer), {
 		status: 200,
