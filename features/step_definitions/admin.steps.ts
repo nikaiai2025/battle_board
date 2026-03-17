@@ -16,6 +16,7 @@ import assert from "assert";
 import {
 	InMemoryAdminRepo,
 	InMemoryCurrencyRepo,
+	InMemoryDailyStatsRepo,
 	InMemoryIpBanRepo,
 	InMemoryPostRepo,
 	InMemoryThreadRepo,
@@ -1505,4 +1506,586 @@ When("通貨付与APIを呼び出す", function (this: BattleBoardWorld) {
 		message: "権限がありません",
 		code: "UNAUTHORIZED",
 	};
+});
+
+// ---------------------------------------------------------------------------
+// ユーザー管理ステップ定義
+// See: features/admin.feature @ユーザー管理シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §1-c, §4
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService を動的 require で取得するヘルパー（ユーザー管理用）。
+ * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
+ */
+function getAdminServiceForUsers() {
+	return require("../../src/lib/services/admin-service") as typeof import("../../src/lib/services/admin-service");
+}
+
+/** ユーザー一覧取得結果（Then ステップでのアサーション用） */
+let userListResult: {
+	users: import("../../src/lib/domain/models/user").User[];
+	total: number;
+} | null = null;
+
+/** ユーザー詳細取得結果（Then ステップでのアサーション用） */
+let userDetailResult:
+	| import("../../src/lib/services/admin-service").UserDetail
+	| null = null;
+
+// ---------------------------------------------------------------------------
+// Given: ユーザーが5人登録されている
+// See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * テスト用ユーザーを5人インメモリストアに登録する。
+ *
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ */
+Given("ユーザーが5人登録されている", async function (this: BattleBoardWorld) {
+	for (let i = 1; i <= 5; i++) {
+		await InMemoryUserRepo.create({
+			authToken: `test-token-user-${i}`,
+			authorIdSeed: `test-seed-user-${i}`,
+			isPremium: false,
+			username: null,
+		});
+	}
+});
+
+// ---------------------------------------------------------------------------
+// When: ユーザー一覧ページを表示する
+// See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService.getUserList を呼び出してユーザー一覧を取得する。
+ *
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ * See: src/lib/services/admin-service.ts > getUserList
+ */
+When("ユーザー一覧ページを表示する", async function (this: BattleBoardWorld) {
+	assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+	const AdminService = getAdminServiceForUsers();
+	userListResult = await AdminService.getUserList({ limit: 50 });
+	this.lastResult = { type: "success", data: userListResult };
+});
+
+// ---------------------------------------------------------------------------
+// Then: ユーザーが一覧表示される
+// See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー一覧が取得できていることを確認する。
+ *
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ */
+Then("ユーザーが一覧表示される", function (this: BattleBoardWorld) {
+	assert(userListResult, "ユーザー一覧取得結果が存在しません");
+	assert(
+		userListResult.users.length > 0,
+		`ユーザーが1人以上一覧表示されることを期待しましたが 0 人でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Then: 各ユーザーのID、登録日時、ステータス、通貨残高が表示される
+// See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー一覧の各エントリに必要なフィールドが含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ */
+Then(
+	"各ユーザーのID、登録日時、ステータス、通貨残高が表示される",
+	function (this: BattleBoardWorld) {
+		assert(userListResult, "ユーザー一覧取得結果が存在しません");
+		assert(
+			userListResult.total >= 5,
+			`総件数が5以上であることを期待しましたが ${userListResult.total} でした`,
+		);
+		for (const user of userListResult.users) {
+			assert(user.id, `ユーザーにIDが存在しません: ${JSON.stringify(user)}`);
+			assert(
+				user.createdAt instanceof Date,
+				`ユーザーに登録日時が存在しません: ${user.id}`,
+			);
+			// ステータス（isPremium / registrationType などの組み合わせ）
+			assert(
+				typeof user.isPremium === "boolean",
+				`ユーザーに isPremium フィールドが存在しません: ${user.id}`,
+			);
+			// 通貨残高は CurrencyService 経由で確認（一覧APIでは別途取得）
+			// ここでは id, createdAt, isPremium の存在確認のみ行う
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Given: ユーザー "UserA" が過去に3件の書き込みを行っている
+// See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" を作成し、3件の書き込みをインメモリストアに直接登録する。
+ *
+ * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ */
+Given(
+	"ユーザー {string} が過去に3件の書き込みを行っている",
+	async function (this: BattleBoardWorld, userName: string) {
+		// ユーザーを作成する
+		const user = await InMemoryUserRepo.create({
+			authToken: `test-token-detail-${userName}`,
+			authorIdSeed: `test-seed-detail-${userName}`,
+			isPremium: false,
+			username: null,
+		});
+
+		// namedUsers に登録する
+		this.setNamedUser(userName, {
+			userId: user.id,
+			edgeToken: user.authToken,
+			ipHash: user.authorIdSeed,
+			isPremium: false,
+			username: null,
+		});
+
+		// テスト用スレッドを作成する
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: `detail-thread-${Date.now()}`,
+			boardId: TEST_BOARD_ID,
+			title: `${userName} のテスト用スレッド`,
+			createdBy: "system",
+		});
+
+		// 3件の書き込みを直接ストアに挿入する
+		for (let i = 1; i <= 3; i++) {
+			InMemoryPostRepo._insert({
+				id: crypto.randomUUID(),
+				threadId: thread.id,
+				postNumber: i,
+				authorId: user.id,
+				displayName: "名無しさん",
+				dailyId: "testdly",
+				body: `${userName} の書き込み ${i}`,
+				inlineSystemInfo: null,
+				isSystemMessage: false,
+				isDeleted: false,
+				createdAt: new Date(Date.now() - (3 - i) * 60 * 1000),
+			});
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: ユーザー "UserA" の詳細ページを表示する
+// See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService.getUserDetail を呼び出してユーザー詳細を取得する。
+ *
+ * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ */
+When(
+	"ユーザー {string} の詳細ページを表示する",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const AdminService = getAdminServiceForUsers();
+		userDetailResult = await AdminService.getUserDetail(namedUser.userId);
+		this.lastResult = userDetailResult
+			? { type: "success", data: userDetailResult }
+			: {
+					type: "error",
+					message: "ユーザーが見つかりません",
+					code: "not_found",
+				};
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: ユーザーの基本情報（ステータス、通貨残高、ストリーク）が表示される
+// See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー詳細に基本情報が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ */
+Then(
+	"ユーザーの基本情報（ステータス、通貨残高、ストリーク）が表示される",
+	function (this: BattleBoardWorld) {
+		assert(userDetailResult, "ユーザー詳細取得結果が存在しません");
+		assert(userDetailResult.id, "ユーザーIDが存在しません");
+		assert(
+			typeof userDetailResult.isPremium === "boolean",
+			"ステータス（isPremium）が存在しません",
+		);
+		assert(
+			typeof userDetailResult.balance === "number",
+			"通貨残高（balance）が存在しません",
+		);
+		assert(
+			typeof userDetailResult.streakDays === "number",
+			"ストリーク（streakDays）が存在しません",
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: 書き込み一覧が表示される
+// See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー詳細に書き込み一覧が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ */
+Then("書き込み一覧が表示される", function (this: BattleBoardWorld) {
+	assert(userDetailResult, "ユーザー詳細取得結果が存在しません");
+	assert(
+		Array.isArray(userDetailResult.posts),
+		"書き込み一覧（posts）が配列でありません",
+	);
+	assert(
+		userDetailResult.posts.length >= 3,
+		`書き込みが3件以上あることを期待しましたが ${userDetailResult.posts.length} 件でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Given: 管理者がユーザー "UserA" の詳細ページを表示している
+// See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" を作成し詳細ページを取得済みの状態にする。
+ * 「管理者が特定ユーザーの詳細を閲覧できる」の Given + When を組み合わせた状態。
+ *
+ * See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
+ */
+Given(
+	"管理者がユーザー {string} の詳細ページを表示している",
+	async function (this: BattleBoardWorld, userName: string) {
+		// 管理者を設定する
+		if (!this.currentAdminId) {
+			InMemoryAdminRepo._insert({
+				id: TEST_ADMIN_ID,
+				role: "admin",
+				createdAt: new Date(),
+			});
+			this.currentAdminId = TEST_ADMIN_ID;
+			this.isAdmin = true;
+		}
+
+		// ユーザーを作成し書き込みを3件登録する
+		const user = await InMemoryUserRepo.create({
+			authToken: `test-token-history-${userName}`,
+			authorIdSeed: `test-seed-history-${userName}`,
+			isPremium: false,
+			username: null,
+		});
+
+		this.setNamedUser(userName, {
+			userId: user.id,
+			edgeToken: user.authToken,
+			ipHash: user.authorIdSeed,
+			isPremium: false,
+			username: null,
+		});
+
+		// テスト用スレッドを作成する
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: `history-thread-${Date.now()}`,
+			boardId: TEST_BOARD_ID,
+			title: `${userName} の履歴テスト用スレッド`,
+			createdBy: "system",
+		});
+
+		// 3件の書き込みを直接ストアに挿入する
+		for (let i = 1; i <= 3; i++) {
+			InMemoryPostRepo._insert({
+				id: crypto.randomUUID(),
+				threadId: thread.id,
+				postNumber: i,
+				authorId: user.id,
+				displayName: "名無しさん",
+				dailyId: "testdly",
+				body: `${userName} の履歴書き込み ${i}（スレッド: ${thread.id}）`,
+				inlineSystemInfo: null,
+				isSystemMessage: false,
+				isDeleted: false,
+				createdAt: new Date(Date.now() - (3 - i) * 60 * 1000),
+			});
+		}
+
+		// 詳細ページを取得する
+		const AdminService = getAdminServiceForUsers();
+		userDetailResult = await AdminService.getUserDetail(user.id);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: 各書き込みのスレッド名、本文、書き込み日時が含まれる
+// See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー詳細の書き込み履歴に必要なフィールドが含まれることを確認する。
+ * threadId（スレッド名の代替）・body・createdAt の存在を確認する。
+ *
+ * See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
+ */
+Then(
+	"管理者画面でも各書き込みのスレッド名、本文、書き込み日時が含まれる",
+	function (this: BattleBoardWorld) {
+		assert(userDetailResult, "ユーザー詳細取得結果が存在しません");
+		assert(
+			Array.isArray(userDetailResult.posts),
+			"書き込み一覧（posts）が配列でありません",
+		);
+		assert(
+			userDetailResult.posts.length >= 3,
+			`書き込みが3件以上あることを期待しましたが ${userDetailResult.posts.length} 件でした`,
+		);
+		for (const post of userDetailResult.posts) {
+			assert(post.threadId, `書き込みに threadId が存在しません: ${post.id}`);
+			assert(post.body, `書き込みに本文が存在しません: ${post.id}`);
+			assert(
+				post.createdAt instanceof Date,
+				`書き込みに日時が存在しません: ${post.id}`,
+			);
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// ダッシュボードステップ定義
+// See: features/admin.feature @ダッシュボードシナリオ群
+// See: tmp/feature_plan_admin_expansion.md §1-d, §5
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService を動的 require で取得するヘルパー（ダッシュボード用）。
+ * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
+ */
+function getAdminServiceForDashboard() {
+	return require("../../src/lib/services/admin-service") as typeof import("../../src/lib/services/admin-service");
+}
+
+/** ダッシュボードサマリー取得結果（Then ステップでのアサーション用） */
+let dashboardResult:
+	| import("../../src/lib/services/admin-service").DashboardSummary
+	| null = null;
+
+/** ダッシュボード推移取得結果（Then ステップでのアサーション用） */
+let dashboardHistoryResult:
+	| import("../../src/lib/infrastructure/repositories/daily-stats-repository").DailyStat[]
+	| null = null;
+
+// ---------------------------------------------------------------------------
+// When: ダッシュボードを表示する
+// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService.getDashboard を呼び出してリアルタイムサマリーを取得する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+When("ダッシュボードを表示する", async function (this: BattleBoardWorld) {
+	assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+	const AdminService = getAdminServiceForDashboard();
+	const today = new Date().toISOString().slice(0, 10);
+	dashboardResult = await AdminService.getDashboard({ today });
+	this.lastResult = { type: "success", data: dashboardResult };
+});
+
+// ---------------------------------------------------------------------------
+// Then: 総ユーザー数が表示される
+// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ダッシュボードサマリーに総ユーザー数が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+Then("総ユーザー数が表示される", function (this: BattleBoardWorld) {
+	assert(dashboardResult, "ダッシュボード取得結果が存在しません");
+	assert(
+		typeof dashboardResult.totalUsers === "number",
+		"総ユーザー数（totalUsers）が数値でありません",
+	);
+	assert(
+		dashboardResult.totalUsers >= 0,
+		`総ユーザー数が0以上であることを期待しましたが ${dashboardResult.totalUsers} でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Then: 本日の書き込み数が表示される
+// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ダッシュボードサマリーに本日の書き込み数が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+Then("本日の書き込み数が表示される", function (this: BattleBoardWorld) {
+	assert(dashboardResult, "ダッシュボード取得結果が存在しません");
+	assert(
+		typeof dashboardResult.todayPosts === "number",
+		"本日の書き込み数（todayPosts）が数値でありません",
+	);
+	assert(
+		dashboardResult.todayPosts >= 0,
+		`本日の書き込み数が0以上であることを期待しましたが ${dashboardResult.todayPosts} でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Then: アクティブスレッド数が表示される
+// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ダッシュボードサマリーにアクティブスレッド数が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+Then("アクティブスレッド数が表示される", function (this: BattleBoardWorld) {
+	assert(dashboardResult, "ダッシュボード取得結果が存在しません");
+	assert(
+		typeof dashboardResult.activeThreads === "number",
+		"アクティブスレッド数（activeThreads）が数値でありません",
+	);
+	assert(
+		dashboardResult.activeThreads >= 0,
+		`アクティブスレッド数が0以上であることを期待しましたが ${dashboardResult.activeThreads} でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Then: 通貨流通量が表示される
+// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * ダッシュボードサマリーに通貨流通量が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+Then("通貨流通量が表示される", function (this: BattleBoardWorld) {
+	assert(dashboardResult, "ダッシュボード取得結果が存在しません");
+	assert(
+		typeof dashboardResult.currencyInCirculation === "number",
+		"通貨流通量（currencyInCirculation）が数値でありません",
+	);
+	assert(
+		dashboardResult.currencyInCirculation >= 0,
+		`通貨流通量が0以上であることを期待しましたが ${dashboardResult.currencyInCirculation} でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Given: 過去7日分の日次統計が記録されている
+// See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * 過去7日分の日次統計をインメモリストアに直接登録する。
+ *
+ * See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+ */
+Given(
+	"過去7日分の日次統計が記録されている",
+	async function (this: BattleBoardWorld) {
+		const today = new Date();
+		for (let i = 7; i >= 1; i--) {
+			const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+			const statDate = date.toISOString().slice(0, 10);
+			await InMemoryDailyStatsRepo.upsert({
+				statDate,
+				totalUsers: 100 + i * 5,
+				newUsers: i,
+				activeUsers: 50 + i * 2,
+				totalPosts: 200 + i * 10,
+				totalThreads: 10 + i,
+				activeThreads: 20 + i * 3,
+				currencyInCirculation: 10000 + i * 500,
+				currencyGranted: i * 100,
+				currencyConsumed: i * 50,
+				totalAccusations: i * 2,
+				totalAttacks: i * 3,
+			});
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: ダッシュボードの推移グラフを表示する
+// See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService.getDashboardHistory を呼び出して日次推移を取得する。
+ *
+ * See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+ */
+When(
+	"ダッシュボードの推移グラフを表示する",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+		const AdminService = getAdminServiceForDashboard();
+		dashboardHistoryResult = await AdminService.getDashboardHistory({
+			days: 7,
+		});
+		this.lastResult = {
+			type: "success",
+			data: dashboardHistoryResult,
+		};
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: 日付ごとの統計推移が確認できる
+// See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+// ---------------------------------------------------------------------------
+
+/**
+ * 日次推移データに日付ごとの統計が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+ */
+Then("日付ごとの統計推移が確認できる", function (this: BattleBoardWorld) {
+	assert(dashboardHistoryResult, "ダッシュボード推移取得結果が存在しません");
+	assert(
+		dashboardHistoryResult.length > 0,
+		`推移データが1件以上あることを期待しましたが 0 件でした`,
+	);
+
+	// 各エントリに必要なフィールドが含まれることを確認する
+	for (const stat of dashboardHistoryResult) {
+		assert(stat.statDate, `推移データに statDate が存在しません`);
+		assert(
+			typeof stat.totalUsers === "number",
+			`推移データに totalUsers が存在しません: ${stat.statDate}`,
+		);
+		assert(
+			typeof stat.totalPosts === "number",
+			`推移データに totalPosts が存在しません: ${stat.statDate}`,
+		);
+	}
 });

@@ -11,35 +11,38 @@
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
-import type { Currency, DeductResult } from '../../../src/lib/domain/models/currency'
+import type {
+	Currency,
+	DeductResult,
+} from "../../../src/lib/domain/models/currency";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
 // ---------------------------------------------------------------------------
 
 /** シナリオ間でリセットされる通貨ストア（key: userId） */
-const store = new Map<string, Currency>()
+const store = new Map<string, Currency>();
 
 /**
  * 楽観的ロックを直列化するための Promise チェーン（ユーザーごと）。
  *
  * See: features/currency.feature @同時操作による通貨の二重消費が発生しない
  */
-const deductQueues = new Map<string, Promise<DeductResult>>()
+const deductQueues = new Map<string, Promise<DeductResult>>();
 
 /**
  * ストアを初期化する（Beforeフックから呼び出す）。
  */
 export function reset(): void {
-  store.clear()
-  deductQueues.clear()
+	store.clear();
+	deductQueues.clear();
 }
 
 /**
  * テスト用ヘルパー: 通貨レコードを直接ストアに設定する。
  */
 export function _upsert(currency: Currency): void {
-  store.set(currency.userId, currency)
+	store.set(currency.userId, currency);
 }
 
 // ---------------------------------------------------------------------------
@@ -51,21 +54,24 @@ export function _upsert(currency: Currency): void {
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  */
 export async function findByUserId(userId: string): Promise<Currency | null> {
-  return store.get(userId) ?? null
+	return store.get(userId) ?? null;
 }
 
 /**
  * ユーザーの通貨レコードを新規作成する。
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  */
-export async function create(userId: string, initialBalance: number = 0): Promise<Currency> {
-  const currency: Currency = {
-    userId,
-    balance: initialBalance,
-    updatedAt: new Date(),
-  }
-  store.set(userId, currency)
-  return currency
+export async function create(
+	userId: string,
+	initialBalance: number = 0,
+): Promise<Currency> {
+	const currency: Currency = {
+		userId,
+		balance: initialBalance,
+		updatedAt: new Date(),
+	};
+	store.set(userId, currency);
+	return currency;
 }
 
 /**
@@ -73,14 +79,14 @@ export async function create(userId: string, initialBalance: number = 0): Promis
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  */
 export async function credit(userId: string, amount: number): Promise<void> {
-  const currency = store.get(userId)
-  if (currency) {
-    store.set(userId, {
-      ...currency,
-      balance: currency.balance + amount,
-      updatedAt: new Date(),
-    })
-  }
+	const currency = store.get(userId);
+	if (currency) {
+		store.set(userId, {
+			...currency,
+			balance: currency.balance + amount,
+			updatedAt: new Date(),
+		});
+	}
 }
 
 /**
@@ -92,27 +98,32 @@ export async function credit(userId: string, amount: number): Promise<void> {
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  * See: features/currency.feature @同時操作による通貨の二重消費が発生しない
  */
-export async function deduct(userId: string, amount: number): Promise<DeductResult> {
-  // 前の deduct 処理が完了してから次を実行するよう直列化する
-  const prevQueue = deductQueues.get(userId) ?? Promise.resolve({ success: true, newBalance: 0 } as DeductResult)
+export async function deduct(
+	userId: string,
+	amount: number,
+): Promise<DeductResult> {
+	// 前の deduct 処理が完了してから次を実行するよう直列化する
+	const prevQueue =
+		deductQueues.get(userId) ??
+		Promise.resolve({ success: true, newBalance: 0 } as DeductResult);
 
-  const nextQueue = prevQueue.then(async (): Promise<DeductResult> => {
-    const currency = store.get(userId)
-    if (!currency || currency.balance < amount) {
-      return { success: false, reason: 'insufficient_balance' }
-    }
+	const nextQueue = prevQueue.then(async (): Promise<DeductResult> => {
+		const currency = store.get(userId);
+		if (!currency || currency.balance < amount) {
+			return { success: false, reason: "insufficient_balance" };
+		}
 
-    const newBalance = currency.balance - amount
-    store.set(userId, {
-      ...currency,
-      balance: newBalance,
-      updatedAt: new Date(),
-    })
-    return { success: true, newBalance }
-  })
+		const newBalance = currency.balance - amount;
+		store.set(userId, {
+			...currency,
+			balance: newBalance,
+			updatedAt: new Date(),
+		});
+		return { success: true, newBalance };
+	});
 
-  deductQueues.set(userId, nextQueue)
-  return nextQueue
+	deductQueues.set(userId, nextQueue);
+	return nextQueue;
 }
 
 /**
@@ -120,5 +131,19 @@ export async function deduct(userId: string, amount: number): Promise<DeductResu
  * See: src/lib/infrastructure/repositories/currency-repository.ts
  */
 export async function getBalance(userId: string): Promise<number> {
-  return store.get(userId)?.balance ?? 0
+	return store.get(userId)?.balance ?? 0;
+}
+
+/**
+ * 全ユーザーの通貨残高合計を集計する。
+ * ダッシュボードの通貨流通量表示に使用する。
+ *
+ * See: src/lib/infrastructure/repositories/currency-repository.ts > sumAllBalances
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+export async function sumAllBalances(): Promise<number> {
+	return Array.from(store.values()).reduce(
+		(sum, c) => sum + (c.balance ?? 0),
+		0,
+	);
 }

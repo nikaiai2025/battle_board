@@ -22,6 +22,9 @@
  * See: docs/architecture/components/admin.md §5 設計上の判断
  */
 
+import * as CurrencyRepository from "../infrastructure/repositories/currency-repository";
+import type { DailyStat } from "../infrastructure/repositories/daily-stats-repository";
+import * as DailyStatsRepository from "../infrastructure/repositories/daily-stats-repository";
 import type { IpBan } from "../infrastructure/repositories/ip-ban-repository";
 import * as IpBanRepository from "../infrastructure/repositories/ip-ban-repository";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
@@ -404,4 +407,195 @@ export async function grantCurrency(
 	);
 
 	return { success: true, newBalance };
+}
+
+// ---------------------------------------------------------------------------
+// ユーザー管理
+// See: features/admin.feature @ユーザー管理シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §4 ユーザー管理
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー詳細情報。
+ * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ */
+export interface UserDetail {
+	/** ユーザー基本情報 */
+	id: string;
+	createdAt: Date;
+	/** BAN状態 */
+	isBanned: boolean;
+	/** 有料ステータス */
+	isPremium: boolean;
+	/** 本登録ステータス */
+	registrationType: "email" | "discord" | null;
+	/** ユーザーネーム */
+	username: string | null;
+	/** 連続書き込み日数 */
+	streakDays: number;
+	/** 草カウント */
+	grassCount: number;
+	/** 通貨残高 */
+	balance: number;
+	/** 書き込み履歴 */
+	posts: import("../domain/models/post").Post[];
+}
+
+/**
+ * ユーザー一覧を取得する（ページネーション付き）。
+ * 管理画面のユーザー一覧ページで使用する。
+ *
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ * See: tmp/feature_plan_admin_expansion.md §4-b AdminService.getUserList
+ *
+ * @param options.limit - 取得件数（デフォルト 50）
+ * @param options.offset - スキップ件数（デフォルト 0）
+ * @returns ユーザー配列と総件数
+ */
+export async function getUserList(
+	options: {
+		limit?: number;
+		offset?: number;
+		orderBy?: "created_at" | "last_post_date";
+	} = {},
+): Promise<{ users: import("../domain/models/user").User[]; total: number }> {
+	return UserRepository.findAll(options);
+}
+
+/**
+ * ユーザー詳細を取得する（基本情報 + 通貨残高 + 書き込み履歴）。
+ * 管理画面のユーザー詳細ページで使用する。
+ *
+ * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ * See: tmp/feature_plan_admin_expansion.md §4-b AdminService.getUserDetail
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @returns ユーザー詳細、存在しない場合は null
+ */
+export async function getUserDetail(
+	userId: string,
+): Promise<UserDetail | null> {
+	const user = await UserRepository.findById(userId);
+	if (!user) return null;
+
+	const balance = await getBalance(userId);
+	const posts = await PostRepository.findByAuthorId(userId, { limit: 50 });
+
+	return {
+		id: user.id,
+		createdAt: user.createdAt,
+		isBanned: user.isBanned,
+		isPremium: user.isPremium,
+		registrationType: user.registrationType,
+		username: user.username,
+		streakDays: user.streakDays,
+		grassCount: user.grassCount,
+		balance,
+		posts,
+	};
+}
+
+/**
+ * ユーザーの書き込み履歴を取得する。
+ * 管理画面のユーザー詳細ページ（書き込み履歴セクション）で使用する。
+ *
+ * See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
+ * See: tmp/feature_plan_admin_expansion.md §4-b AdminService.getUserPosts
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param options.limit - 取得件数（デフォルト 50）
+ * @param options.offset - スキップ件数（デフォルト 0）
+ * @returns Post 配列（created_at DESC ソート済み）
+ */
+export async function getUserPosts(
+	userId: string,
+	options: { limit?: number; offset?: number } = {},
+): Promise<import("../domain/models/post").Post[]> {
+	return PostRepository.findByAuthorId(userId, { limit: options.limit });
+}
+
+// ---------------------------------------------------------------------------
+// ダッシュボード
+// See: features/admin.feature @ダッシュボードシナリオ群
+// See: tmp/feature_plan_admin_expansion.md §5 ダッシュボード
+// ---------------------------------------------------------------------------
+
+/**
+ * ダッシュボードのリアルタイムサマリー。
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+export interface DashboardSummary {
+	/** 総ユーザー数（仮+本登録） */
+	totalUsers: number;
+	/** 本日の書き込み数（非システムメッセージ） */
+	todayPosts: number;
+	/** アクティブスレッド数（本日書き込みがあったスレッド） */
+	activeThreads: number;
+	/** 通貨流通量（全ユーザー残高合計） */
+	currencyInCirculation: number;
+}
+
+/**
+ * ダッシュボードのリアルタイムサマリーを取得する。
+ *
+ * 本日分はリアルタイム集計（UserRepository, PostRepository から直接集計）。
+ * See: tmp/feature_plan_admin_expansion.md §5-e リアルタイム値 vs スナップショット値
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ *
+ * @param options.today - 本日日付（YYYY-MM-DD）。省略時は現在日付
+ * @returns ダッシュボードサマリー
+ */
+export async function getDashboard(
+	options: { today?: string } = {},
+): Promise<DashboardSummary> {
+	// ユーザー総数（リアルタイム）
+	// UserRepository.findAll({ limit: 1 }) で total を取得する
+	const { total: totalUsers } = await UserRepository.findAll({ limit: 1 });
+
+	// 本日の書き込み数・アクティブスレッド数（リアルタイム）
+	// PostRepository 経由で集計するため、BDDテストでも InMemoryPostRepo が使われる
+	// See: tmp/feature_plan_admin_expansion.md §5-e リアルタイム値 vs スナップショット値
+	const today = options.today ?? new Date().toISOString().slice(0, 10);
+	const todayPosts = await PostRepository.countByDate(today);
+	const activeThreads = await PostRepository.countActiveThreadsByDate(today);
+
+	// 通貨流通量（リアルタイム）
+	// CurrencyRepository 経由で集計するため、BDDテストでも InMemoryCurrencyRepo が使われる
+	const currencyInCirculation = await CurrencyRepository.sumAllBalances();
+
+	return {
+		totalUsers,
+		todayPosts,
+		activeThreads,
+		currencyInCirculation,
+	};
+}
+
+/**
+ * ダッシュボードの日次推移を取得する（daily_stats から）。
+ *
+ * See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+ * See: tmp/feature_plan_admin_expansion.md §5-d GET /api/admin/dashboard/history
+ *
+ * @param options.days - 取得日数（デフォルト 7）
+ * @param options.fromDate - 開始日（YYYY-MM-DD）。省略時は今日から days 日前
+ * @param options.toDate - 終了日（YYYY-MM-DD）。省略時は昨日
+ * @returns DailyStat 配列（stat_date ASC ソート済み）
+ */
+export async function getDashboardHistory(
+	options: { days?: number; fromDate?: string; toDate?: string } = {},
+): Promise<DailyStat[]> {
+	const days = options.days ?? 7;
+	const today = new Date();
+	const toDate =
+		options.toDate ??
+		new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+	const fromDate =
+		options.fromDate ??
+		new Date(today.getTime() - days * 24 * 60 * 60 * 1000)
+			.toISOString()
+			.slice(0, 10);
+
+	return DailyStatsRepository.findByDateRange(fromDate, toDate);
 }

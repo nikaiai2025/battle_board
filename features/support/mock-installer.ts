@@ -38,6 +38,9 @@ import * as InMemoryBotPostRepo from "./in-memory/bot-post-repository";
 // See: features/bot_system.feature
 import * as InMemoryBotRepo from "./in-memory/bot-repository";
 import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
+// 日次統計リポジトリ（TASK-107 で追加）
+// See: features/admin.feature @ダッシュボードシナリオ群
+import * as InMemoryDailyStatsRepo from "./in-memory/daily-stats-repository";
 // Edge-token リポジトリ（TASK-085 で追加）
 // See: features/authentication.feature
 import * as InMemoryEdgeTokenRepo from "./in-memory/edge-token-repository";
@@ -106,6 +109,9 @@ export function resetAllStores(): void {
 	// IP BAN リポジトリのリセット（TASK-105 で追加）
 	// See: features/admin.feature @IP BAN シナリオ群
 	InMemoryIpBanRepo.reset();
+	// 日次統計リポジトリのリセット（TASK-107 で追加）
+	// See: features/admin.feature @ダッシュボードシナリオ群
+	InMemoryDailyStatsRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +130,8 @@ export {
 	// ボットリポジトリ（TASK-096 で追加）
 	InMemoryBotRepo,
 	InMemoryCurrencyRepo,
+	// 日次統計リポジトリ（TASK-107 で追加）
+	InMemoryDailyStatsRepo,
 	// Edge-token リポジトリ（TASK-085 で追加）
 	InMemoryEdgeTokenRepo,
 	InMemoryIncentiveLogRepo,

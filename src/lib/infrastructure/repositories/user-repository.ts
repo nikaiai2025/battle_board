@@ -476,6 +476,63 @@ export async function updateLastIpHash(
 	}
 }
 
+// ---------------------------------------------------------------------------
+// ユーザー管理（管理者向け）
+// See: features/admin.feature @ユーザー管理シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §4-a Infrastructure: UserRepository 拡張
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー一覧を取得する（ページネーション付き）。
+ * 管理画面のユーザー一覧ページで使用する。
+ *
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ * See: tmp/feature_plan_admin_expansion.md §4-a UserRepository.findAll
+ *
+ * @param options.limit - 取得件数（デフォルト 50）
+ * @param options.offset - スキップ件数（デフォルト 0）
+ * @param options.orderBy - ソート対象（デフォルト 'created_at'）
+ * @returns ユーザー配列と総件数
+ */
+export async function findAll(
+	options: {
+		limit?: number;
+		offset?: number;
+		orderBy?: "created_at" | "last_post_date";
+	} = {},
+): Promise<{ users: User[]; total: number }> {
+	const limit = options.limit ?? 50;
+	const offset = options.offset ?? 0;
+	const orderBy = options.orderBy ?? "created_at";
+
+	// 総件数取得
+	const { count, error: countError } = await supabaseAdmin
+		.from("users")
+		.select("*", { count: "exact", head: true });
+
+	if (countError) {
+		throw new Error(
+			`UserRepository.findAll (count) failed: ${countError.message}`,
+		);
+	}
+
+	// データ取得
+	const { data, error } = await supabaseAdmin
+		.from("users")
+		.select("*")
+		.order(orderBy, { ascending: false })
+		.range(offset, offset + limit - 1);
+
+	if (error) {
+		throw new Error(`UserRepository.findAll failed: ${error.message}`);
+	}
+
+	return {
+		users: (data as UserRow[]).map(rowToUser),
+		total: count ?? 0,
+	};
+}
+
 /**
  * PAT（パーソナルアクセストークン）でユーザーを取得する。
  * 専ブラの mail 欄に #pat_<token> が含まれる場合の認証処理に使用する。

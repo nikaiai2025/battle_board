@@ -13,8 +13,8 @@
  *   - ビジネスロジックを含まない薄いデータアクセス層
  */
 
-import { supabaseAdmin } from '../supabase/client'
-import type { Currency, DeductResult } from '../../domain/models/currency'
+import type { Currency, DeductResult } from "../../domain/models/currency";
+import { supabaseAdmin } from "../supabase/client";
 
 // ---------------------------------------------------------------------------
 // 型定義: currencies テーブルの DB 行型
@@ -22,9 +22,9 @@ import type { Currency, DeductResult } from '../../domain/models/currency'
 
 /** currencies テーブルの DB レコード（snake_case）*/
 interface CurrencyRow {
-  user_id: string
-  balance: number
-  updated_at: string
+	user_id: string;
+	balance: number;
+	updated_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,11 +36,11 @@ interface CurrencyRow {
  * Supabase レスポンスの日時フィールドは文字列で返るため Date に変換する。
  */
 function rowToCurrency(row: CurrencyRow): Currency {
-  return {
-    userId: row.user_id,
-    balance: row.balance,
-    updatedAt: new Date(row.updated_at),
-  }
+	return {
+		userId: row.user_id,
+		balance: row.balance,
+		updatedAt: new Date(row.updated_at),
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -53,19 +53,19 @@ function rowToCurrency(row: CurrencyRow): Currency {
  * @returns 見つかった Currency、存在しない場合は null
  */
 export async function findByUserId(userId: string): Promise<Currency | null> {
-  const { data, error } = await supabaseAdmin
-    .from('currencies')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("currencies")
+		.select("*")
+		.eq("user_id", userId)
+		.single();
 
-  if (error) {
-    // PGRST116: 行が見つからない場合
-    if (error.code === 'PGRST116') return null
-    throw new Error(`CurrencyRepository.findByUserId failed: ${error.message}`)
-  }
+	if (error) {
+		// PGRST116: 行が見つからない場合
+		if (error.code === "PGRST116") return null;
+		throw new Error(`CurrencyRepository.findByUserId failed: ${error.message}`);
+	}
 
-  return data ? rowToCurrency(data as CurrencyRow) : null
+	return data ? rowToCurrency(data as CurrencyRow) : null;
 }
 
 /**
@@ -76,21 +76,24 @@ export async function findByUserId(userId: string): Promise<Currency | null> {
  * @param initialBalance - 初期残高（デフォルト 0）
  * @returns 作成された Currency
  */
-export async function create(userId: string, initialBalance: number = 0): Promise<Currency> {
-  const { data, error } = await supabaseAdmin
-    .from('currencies')
-    .insert({
-      user_id: userId,
-      balance: initialBalance,
-    })
-    .select()
-    .single()
+export async function create(
+	userId: string,
+	initialBalance: number = 0,
+): Promise<Currency> {
+	const { data, error } = await supabaseAdmin
+		.from("currencies")
+		.insert({
+			user_id: userId,
+			balance: initialBalance,
+		})
+		.select()
+		.single();
 
-  if (error) {
-    throw new Error(`CurrencyRepository.create failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`CurrencyRepository.create failed: ${error.message}`);
+	}
 
-  return rowToCurrency(data as CurrencyRow)
+	return rowToCurrency(data as CurrencyRow);
 }
 
 /**
@@ -104,21 +107,21 @@ export async function create(userId: string, initialBalance: number = 0): Promis
  * @param amount - 加算額（正の整数）
  */
 export async function credit(userId: string, amount: number): Promise<void> {
-  // PostgreSQL の atomic UPDATE で balance を安全にインクリメントする。
-  // RPC 定義: CREATE OR REPLACE FUNCTION credit_currency(p_user_id UUID, p_amount INTEGER)
-  //           RETURNS void AS $$
-  //             UPDATE currencies
-  //             SET balance = balance + p_amount, updated_at = now()
-  //             WHERE user_id = p_user_id;
-  //           $$ LANGUAGE sql;
-  const { error } = await supabaseAdmin.rpc('credit_currency', {
-    p_user_id: userId,
-    p_amount: amount,
-  })
+	// PostgreSQL の atomic UPDATE で balance を安全にインクリメントする。
+	// RPC 定義: CREATE OR REPLACE FUNCTION credit_currency(p_user_id UUID, p_amount INTEGER)
+	//           RETURNS void AS $$
+	//             UPDATE currencies
+	//             SET balance = balance + p_amount, updated_at = now()
+	//             WHERE user_id = p_user_id;
+	//           $$ LANGUAGE sql;
+	const { error } = await supabaseAdmin.rpc("credit_currency", {
+		p_user_id: userId,
+		p_amount: amount,
+	});
 
-  if (error) {
-    throw new Error(`CurrencyRepository.credit failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`CurrencyRepository.credit failed: ${error.message}`);
+	}
 }
 
 /**
@@ -141,37 +144,40 @@ export async function credit(userId: string, amount: number): Promise<void> {
  * @param amount - 差し引く額（正の整数）
  * @returns DeductResult — 成功時は新残高、失敗時は reason: 'insufficient_balance'
  */
-export async function deduct(userId: string, amount: number): Promise<DeductResult> {
-  // PostgreSQL RPC で楽観的ロック付き UPDATE を実行し、影響行数と新残高を返す。
-  // RPC 定義: CREATE OR REPLACE FUNCTION deduct_currency(p_user_id UUID, p_amount INTEGER)
-  //           RETURNS TABLE(affected_rows INTEGER, new_balance INTEGER) AS $$
-  //             WITH updated AS (
-  //               UPDATE currencies
-  //               SET balance = balance - p_amount, updated_at = now()
-  //               WHERE user_id = p_user_id AND balance >= p_amount
-  //               RETURNING balance
-  //             )
-  //             SELECT COUNT(*)::INTEGER, COALESCE((SELECT balance FROM updated), -1)
-  //             FROM updated;
-  //           $$ LANGUAGE sql;
-  const { data, error } = await supabaseAdmin.rpc('deduct_currency', {
-    p_user_id: userId,
-    p_amount: amount,
-  })
+export async function deduct(
+	userId: string,
+	amount: number,
+): Promise<DeductResult> {
+	// PostgreSQL RPC で楽観的ロック付き UPDATE を実行し、影響行数と新残高を返す。
+	// RPC 定義: CREATE OR REPLACE FUNCTION deduct_currency(p_user_id UUID, p_amount INTEGER)
+	//           RETURNS TABLE(affected_rows INTEGER, new_balance INTEGER) AS $$
+	//             WITH updated AS (
+	//               UPDATE currencies
+	//               SET balance = balance - p_amount, updated_at = now()
+	//               WHERE user_id = p_user_id AND balance >= p_amount
+	//               RETURNING balance
+	//             )
+	//             SELECT COUNT(*)::INTEGER, COALESCE((SELECT balance FROM updated), -1)
+	//             FROM updated;
+	//           $$ LANGUAGE sql;
+	const { data, error } = await supabaseAdmin.rpc("deduct_currency", {
+		p_user_id: userId,
+		p_amount: amount,
+	});
 
-  if (error) {
-    throw new Error(`CurrencyRepository.deduct failed: ${error.message}`)
-  }
+	if (error) {
+		throw new Error(`CurrencyRepository.deduct failed: ${error.message}`);
+	}
 
-  // RPC の戻り値: { affected_rows: number, new_balance: number }
-  const result = data as { affected_rows: number; new_balance: number } | null
+	// RPC の戻り値: { affected_rows: number, new_balance: number }
+	const result = data as { affected_rows: number; new_balance: number } | null;
 
-  // affected_rows = 0 → 残高不足（balance < amount）
-  if (!result || result.affected_rows === 0) {
-    return { success: false, reason: 'insufficient_balance' }
-  }
+	// affected_rows = 0 → 残高不足（balance < amount）
+	if (!result || result.affected_rows === 0) {
+		return { success: false, reason: "insufficient_balance" };
+	}
 
-  return { success: true, newBalance: result.new_balance }
+	return { success: true, newBalance: result.new_balance };
 }
 
 /**
@@ -182,16 +188,42 @@ export async function deduct(userId: string, amount: number): Promise<DeductResu
  * @returns 現在の残高（レコードが存在しない場合は 0）
  */
 export async function getBalance(userId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin
-    .from('currencies')
-    .select('balance')
-    .eq('user_id', userId)
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("currencies")
+		.select("balance")
+		.eq("user_id", userId)
+		.single();
 
-  if (error) {
-    if (error.code === 'PGRST116') return 0
-    throw new Error(`CurrencyRepository.getBalance failed: ${error.message}`)
-  }
+	if (error) {
+		if (error.code === "PGRST116") return 0;
+		throw new Error(`CurrencyRepository.getBalance failed: ${error.message}`);
+	}
 
-  return (data as { balance: number }).balance
+	return (data as { balance: number }).balance;
+}
+
+/**
+ * 全ユーザーの通貨残高合計を集計する。
+ * ダッシュボードの通貨流通量表示に使用する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ * See: tmp/feature_plan_admin_expansion.md §5-e リアルタイム集計
+ *
+ * @returns 全ユーザー残高の合計
+ */
+export async function sumAllBalances(): Promise<number> {
+	const { data, error } = await supabaseAdmin
+		.from("currencies")
+		.select("balance");
+
+	if (error) {
+		throw new Error(
+			`CurrencyRepository.sumAllBalances failed: ${error.message}`,
+		);
+	}
+
+	return (data as { balance: number }[]).reduce(
+		(sum, r) => sum + (r.balance ?? 0),
+		0,
+	);
 }

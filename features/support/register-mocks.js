@@ -176,6 +176,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/ip-ban-repository.ts",
 		"./in-memory/ip-ban-repository.ts",
 	],
+	// 日次統計リポジトリ（TASK-107 で追加）
+	// See: features/admin.feature @ダッシュボードシナリオ群
+	[
+		"src/lib/infrastructure/repositories/daily-stats-repository.ts",
+		"./in-memory/daily-stats-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

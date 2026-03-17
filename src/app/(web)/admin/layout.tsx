@@ -1,0 +1,112 @@
+/**
+ * 管理画面共通レイアウト — admin_session ガード付き
+ *
+ * See: features/admin.feature @管理者がログイン済みである
+ * See: tmp/feature_plan_admin_expansion.md §6-b 管理画面レイアウト
+ *
+ * 責務:
+ *   - サーバーサイドで admin_session Cookie を検証する
+ *   - 未認証時は /admin/login へリダイレクトする
+ *   - サイドナビゲーション（ダッシュボード / ユーザー / IP BAN）を表示する
+ *
+ * 設計方針:
+ *   - Server Component として実装し、admin_session を Next.js cookies() API で読む
+ *   - ナビゲーションは Server Component 内に直接記述する（軽量なため別コンポーネント化しない）
+ *   - login ページはこのレイアウトから除外される（Next.js の layout ネスト構造を利用）
+ *
+ * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
+ */
+
+import { cookies } from "next/headers";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ADMIN_SESSION_COOKIE } from "@/lib/constants/cookie-names";
+import { verifyAdminSession } from "@/lib/services/auth-service";
+
+// リクエストごとにSSRを実行する（管理者セッション検証のため）
+export const dynamic = "force-dynamic";
+
+// ---------------------------------------------------------------------------
+// ナビゲーションリンク定義
+// ---------------------------------------------------------------------------
+
+const NAV_LINKS = [
+	{ href: "/admin", label: "ダッシュボード" },
+	{ href: "/admin/users", label: "ユーザー" },
+	{ href: "/admin/ip-bans", label: "IP BAN" },
+] as const;
+
+// ---------------------------------------------------------------------------
+// レイアウトコンポーネント（Server Component）
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理画面共通レイアウト（Server Component）
+ *
+ * login ページはこのレイアウトの外側（/admin/login/page.tsx は独立している前提）。
+ * Next.js App Router では layout.tsx は同階層・子階層の page.tsx に適用される。
+ * ただし /admin/login も /admin の子であるため、login ページでも本レイアウトが適用される。
+ * login 後リダイレクトで /admin に来た際にセッション検証が通ることを前提とする。
+ *
+ * See: features/admin.feature @管理者がログイン済みである
+ * See: tmp/feature_plan_admin_expansion.md §6-a ルーティング構成
+ */
+export default async function AdminLayout({
+	children,
+}: {
+	children: React.ReactNode;
+}) {
+	// ---------------------------------------------------------------------------
+	// admin_session Cookie のサーバーサイド検証
+	// See: src/lib/services/auth-service.ts > verifyAdminSession
+	// ---------------------------------------------------------------------------
+	const cookieStore = await cookies();
+	const sessionToken = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+
+	if (!sessionToken) {
+		redirect("/admin/login");
+	}
+
+	const admin = await verifyAdminSession(sessionToken);
+	if (!admin) {
+		redirect("/admin/login");
+	}
+
+	// ---------------------------------------------------------------------------
+	// レイアウトレンダリング
+	// See: tmp/feature_plan_admin_expansion.md §6-b 管理画面レイアウト図
+	// ---------------------------------------------------------------------------
+	return (
+		<div className="min-h-screen bg-gray-50">
+			{/* ヘッダー */}
+			<header className="bg-gray-800 text-white px-4 py-3 flex items-center justify-between">
+				<h1 className="text-base font-bold">BattleBoard Admin</h1>
+				<span className="text-xs text-gray-400">管理者パネル</span>
+			</header>
+
+			<div className="flex">
+				{/* サイドナビゲーション */}
+				<nav
+					id="admin-nav"
+					className="w-40 min-h-screen bg-gray-700 text-white py-4"
+				>
+					<ul className="space-y-1">
+						{NAV_LINKS.map(({ href, label }) => (
+							<li key={href}>
+								<Link
+									href={href}
+									className="block px-4 py-2 text-sm hover:bg-gray-600 transition-colors"
+								>
+									{label}
+								</Link>
+							</li>
+						))}
+					</ul>
+				</nav>
+
+				{/* コンテンツ領域 */}
+				<main className="flex-1 p-6">{children}</main>
+			</div>
+		</div>
+	);
+}

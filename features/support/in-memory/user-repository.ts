@@ -314,6 +314,46 @@ export async function updatePatLastUsedAt(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// ユーザー管理（管理者向け）
+// See: features/admin.feature @ユーザー管理シナリオ群
+// See: tmp/feature_plan_admin_expansion.md §4-a Infrastructure: UserRepository 拡張
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー一覧を取得する（ページネーション付き）。
+ * 管理画面のユーザー一覧ページで使用する。
+ *
+ * See: src/lib/infrastructure/repositories/user-repository.ts > findAll
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ */
+export async function findAll(
+	options: {
+		limit?: number;
+		offset?: number;
+		orderBy?: "created_at" | "last_post_date";
+	} = {},
+): Promise<{ users: User[]; total: number }> {
+	const limit = options.limit ?? 50;
+	const offset = options.offset ?? 0;
+	const orderBy = options.orderBy ?? "created_at";
+
+	const allUsers = Array.from(store.values()).sort((a, b) => {
+		if (orderBy === "last_post_date") {
+			const aDate = a.lastPostDate ?? "";
+			const bDate = b.lastPostDate ?? "";
+			return bDate.localeCompare(aDate);
+		}
+		// created_at DESC
+		return b.createdAt.getTime() - a.createdAt.getTime();
+	});
+
+	return {
+		users: allUsers.slice(offset, offset + limit),
+		total: allUsers.length,
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Phase 5: BAN システム関連メソッド（新設）
 // See: features/admin.feature @ユーザーBAN / IP BAN
 // See: src/lib/infrastructure/repositories/user-repository.ts > updateIsBanned

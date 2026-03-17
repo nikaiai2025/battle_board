@@ -19,7 +19,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
 	findById: vi.fn(),
 	findByThreadId: vi.fn(),
+	findByAuthorId: vi.fn().mockResolvedValue([]),
 	softDelete: vi.fn(),
+	countByDate: vi.fn().mockResolvedValue(0),
+	countActiveThreadsByDate: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("@/lib/infrastructure/repositories/thread-repository", () => ({
@@ -33,12 +36,14 @@ vi.mock("@/lib/services/post-service", () => ({
 	createPost: vi.fn(),
 }));
 
-// UserRepository をモック化する（AdminService.banUser/unbanUser が findById/updateIsBanned を呼ぶため）
+// UserRepository をモック化する（AdminService.banUser/unbanUser/getUserList が使うため）
 // See: features/admin.feature @管理者がユーザーをBANする
+// See: features/admin.feature @管理者がユーザー一覧を閲覧できる
 vi.mock("@/lib/infrastructure/repositories/user-repository", () => ({
 	findById: vi.fn(),
 	updateIsBanned: vi.fn(),
 	updateLastIpHash: vi.fn(),
+	findAll: vi.fn().mockResolvedValue({ users: [], total: 0 }),
 }));
 
 // IpBanRepository をモック化する（AdminService.banIpByUserId/unbanIp が呼ぶため）
@@ -58,6 +63,26 @@ vi.mock("@/lib/services/currency-service", () => ({
 	getBalance: vi.fn().mockResolvedValue(150),
 	deduct: vi.fn(),
 	initializeBalance: vi.fn(),
+}));
+
+// CurrencyRepository をモック化する（AdminService.getDashboard が sumAllBalances を呼ぶため）
+// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+vi.mock("@/lib/infrastructure/repositories/currency-repository", () => ({
+	findByUserId: vi.fn(),
+	create: vi.fn(),
+	credit: vi.fn(),
+	deduct: vi.fn(),
+	getBalance: vi.fn(),
+	sumAllBalances: vi.fn().mockResolvedValue(0),
+}));
+
+// DailyStatsRepository をモック化する（AdminService.getDashboardHistory が findLatest を呼ぶため）
+// See: features/admin.feature @管理者が統計情報の日次推移を確認できる
+vi.mock("@/lib/infrastructure/repositories/daily-stats-repository", () => ({
+	findByDate: vi.fn().mockResolvedValue(null),
+	findByDateRange: vi.fn().mockResolvedValue([]),
+	findLatest: vi.fn().mockResolvedValue([]),
+	upsert: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------

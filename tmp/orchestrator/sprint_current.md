@@ -4,16 +4,18 @@
 
 ## 現在のフェーズ
 
-**Phase 2 実装中 — Sprint-36 管理機能拡充①(BAN+通貨付与)完了**
+**Phase 2 実装中 — Sprint-37 管理機能拡充②(ユーザー管理+ダッシュボード+管理画面UI)完了**
 
-Phase 2 Step 1〜3完了。本登録・Bot v5・草コマンド・固定スレッド・dev板完了。
-Sprint-36でユーザーBAN / IP BAN / 通貨付与を実装完了。
+Phase 2 Step 1〜3完了。本登録・Bot v5・草コマンド・固定スレッド・dev板・BAN・通貨付与完了。
+Sprint-37でユーザー管理API・ダッシュボードAPI・管理画面UI全5ページを実装完了。
 
 ## テスト状況
 
-- vitest: 38ファイル / 1032テスト / 全PASS
-- cucumber-js: 223シナリオ (214 passed, 9 pending) / 0 failed
+- vitest: 39ファイル / 1047テスト / 全PASS
+- cucumber-js: 228シナリオ (219 passed, 9 pending) / 0 failed
   - pending 9件: インフラ制約3件 + bot_system UI/GitHub Actions 6件 — 意図的Pending
+  - admin.feature ユーザー管理: 3/3 PASS（Sprint-37新規）
+  - admin.feature ダッシュボード: 2/2 PASS（Sprint-37新規）
   - admin.feature BAN: 7/7 PASS（Sprint-36新規）
   - admin.feature 通貨付与: 2/2 PASS（Sprint-36新規）
   - thread.feature @pinned_thread: 3/3 PASS（Sprint-35新規）
@@ -83,7 +85,7 @@ Sprint-32で完了:
 | **Sprint-34（完了）** | 草コマンド !w 本格実装 + mypage草カウント | 中 | `sprint_34_plan.md` |
 | **Sprint-35（完了）** | 固定スレッド + 開発連絡板（dev板） | 小〜中 | `sprint_35_plan.md` |
 | **Sprint-36（完了）** | 管理機能拡充①（BAN + 通貨付与） | 中 | `sprint_36_plan.md` |
-| Sprint-37 | 管理機能拡充②（ユーザー管理 + ダッシュボード + 管理画面UI） | 大 | `tmp/feature_plan_admin_expansion.md` |
+| **Sprint-37（完了）** | 管理機能拡充②（ユーザー管理 + ダッシュボード + 管理画面UI） | 大 | `sprint_37_plan.md` |
 
 ### feature更新状況（人間承認済み）
 
@@ -97,7 +99,7 @@ Sprint-32で完了:
 - ~~Sprint-34: reactions.feature 草コマンド — 完了~~
 - ~~Sprint-35: 固定スレッド + dev板 — 完了~~
 - ~~Sprint-36: BAN + 通貨付与 — 完了~~
-- 管理機能拡充②: ユーザー管理/ダッシュボード/管理画面UI（Sprint-37予定）
+- ~~Sprint-37: ユーザー管理 + ダッシュボード + 管理画面UI — 完了~~
 - デザイン・レイアウト改善（機能優先のため後回し）
 
 ## Phase 3 未実装事項（BDDスコープ外・インフラ層）
@@ -118,6 +120,7 @@ BDDシナリオのうち対応するものは pending 扱いで、Phase 3 のイ
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-37 | 管理機能拡充②（ユーザー管理 + ダッシュボード + 管理画面UI） | completed | `tmp/orchestrator/sprint_37_plan.md` |
 | Sprint-36 | 管理機能拡充①（BAN + 通貨付与） | completed | `tmp/orchestrator/sprint_36_plan.md` |
 | Sprint-35 | 固定スレッド + 開発連絡板（dev板） | completed | `tmp/orchestrator/sprint_35_plan.md` |
 | Sprint-34 | 草コマンド !w 本格実装 + mypage草カウント | completed | `tmp/orchestrator/sprint_34_plan.md` |
