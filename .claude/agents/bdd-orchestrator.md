@@ -19,9 +19,9 @@ color: green
 ### ステップ1: 状況把握
 
 1. `CLAUDE.md` の内容を把握する
-2. `tmp/orchestrator/sprint_current.md` を読み、直近のスプリント状況を把握する
+2. `tmp/orchestrator/sprint_current.md` を読み、直近のスプリント状況を把握する。gitコミット状況も確認
 3. `tmp/escalations/` を確認し、未解決のエスカレーションがないか確認する
-4. 必要に応じて `features/` 配下のBDDシナリオの現状を確認する
+4. `features/` 配下のBDDシナリオの現状を確認する。ただし、 `features/ドラフト_実装禁止`は**ドラフトのため実装禁止**
 
 ### ステップ2: スコープ確定
 
@@ -197,7 +197,7 @@ AIエージェントはセッション間の記憶を持たないため、スプ
 - `sprint_current.md` に記録された全実装タスクが completed
 - 未解決のエスカレーション (`tmp/escalations/` 内の未解決ファイル) が0件
 
-起動時は `bdd-gate`, `bdd-code-reviewer`, `bdd-doc-reviewer` の3エージェントを並行で起動する。
+起動時は `bdd-gate`, `bdd-code-reviewer`, `bdd-doc-reviewer`, `bdd-test-auditor` の4エージェントを並行で起動する。
 各レビューAI用のタスク指示書を作成する。必須記載項目:
 - 対象スプリントで変更されたファイル一覧
 - 対応するスプリント計画 (`sprint_{N}_plan.md`) への参照
@@ -218,3 +218,4 @@ Task toolで以下のsubagent_typeを指定してワーカーを起動する:
 - `bdd-gate`: BDDゲートAI（BDDシナリオ全件実行）
 - `bdd-code-reviewer`: コードレビューAI（コード品質検査）
 - `bdd-doc-reviewer`: ドキュメントレビューAI（ドキュメント整合性検査）
+- `bdd-test-auditor`: テスト監査AI（pending管理・テストピラミッド健全性・トレーサビリティ）

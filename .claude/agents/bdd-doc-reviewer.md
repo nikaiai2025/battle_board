@@ -32,13 +32,11 @@ color: purple
 
 ### テストコードの網羅性
 
-各テスト層の役割と検証基準は `docs/architecture/bdd_test_strategy.md` §7-12 を参照。
+> テスト層ごとの詳細な健全性チェック（pending管理・テストピラミッド・トレーサビリティ）は `bdd-test-auditor` が担当する。
+> doc-reviewer は以下のドキュメント観点のみ確認する。
 
-- **単体テスト (Vitest)**: `src/lib/domain/rules/` 配下の全純粋関数に対応するテストが `src/__tests__/` に存在するか
-- **BDD (Cucumber.js)**: `features/` 配下の全シナリオに対応するステップ定義が `features/step_definitions/` に存在し、実行可能か（スコープ外として明示的に除外されているものを除く）
-- **統合テスト (Cucumber.js --profile integration)**: Supabase Local実DBで実行される統合テストプロファイルが存在し、サービス層経由のシナリオがカバーされているか
-- **APIテスト (Playwright --project=api)**: `e2e/api/` 配下に、サービス層テストではカバーできないHTTPレベルの検証（Shift_JISエンコーディング、Cookie属性、Content-Type等）が存在するか
-- **E2E (Playwright --project=e2e)**: `e2e/` 配下のテストが存在し、D-10 §10.3の選定基準（認証→操作→確認の一連フロー、複数ユーザー操作等）に該当する重要フローをカバーしているか
+- BDDシナリオで参照されるテストデータ・前提条件が、ステップ定義で実装されているか
+- `docs/architecture/bdd_test_strategy.md` の記述と実際のテスト構成（ディレクトリ・ファイル命名）が乖離していないか
 
 
 

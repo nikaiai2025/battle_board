@@ -857,7 +857,10 @@ When(
 // ---------------------------------------------------------------------------
 // When: Discord で本登録ボタンを押す / Discord 認可画面で許可する
 // See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
-// NOTE: Discord OAuth は外部依存のため pending
+// 分類: ブラウザ固有動作（外部OAuth） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+// 代替検証（サービス層）: src/__tests__/lib/services/registration-service.test.ts
+//   — registerWithDiscord / handleOAuthCallback のモックテストで部分カバー
+// 代替検証（E2E）: OAuth フロー全体のE2Eテストは未作成
 // ---------------------------------------------------------------------------
 
 /**
@@ -1047,7 +1050,10 @@ When("デバイスBからログインする", async function (this: BattleBoardW
 // ---------------------------------------------------------------------------
 // Given: 本登録ユーザー（Discord 連携）が新しいデバイスを使用している
 // See: features/user_registration.feature @本登録ユーザーがDiscordアカウントでログインする
-// NOTE: Discord OAuth は外部依存のため pending
+// 分類: ブラウザ固有動作（外部OAuth） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+// 代替検証（サービス層）: src/__tests__/lib/services/registration-service.test.ts
+//   — loginWithDiscord / handleOAuthCallback のモックテストで部分カバー
+// 代替検証（E2E）: OAuth フロー全体のE2Eテストは未作成
 // ---------------------------------------------------------------------------
 
 /**
@@ -1066,7 +1072,7 @@ Given(
 // ---------------------------------------------------------------------------
 // When: Discord アカウントでログインする
 // See: features/user_registration.feature @本登録ユーザーがDiscordアカウントでログインする
-// NOTE: Discord OAuth は外部依存のため pending
+// 分類・代替検証: 上記 Given セクションのコメントを参照
 // ---------------------------------------------------------------------------
 
 /**

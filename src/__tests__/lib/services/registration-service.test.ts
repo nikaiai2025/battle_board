@@ -10,6 +10,14 @@
  *   - 各メソッドの正常系・異常系・エッジケースを網羅する
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
  *
+ * BDDシナリオ代替検証（D-10 §7.3.3）:
+ *   以下のBDDシナリオはDiscord OAuthの外部依存によりCucumberではpending。
+ *   本テストの registerWithDiscord / loginWithDiscord / handleOAuthCallback が
+ *   サービス層レベルで部分的に代替検証する。
+ *   @feature user_registration.feature
+ *   @scenario 仮ユーザーが Discord アカウントで本登録する
+ *   @scenario 本登録ユーザーが Discord アカウントでログインする
+ *
  * カバレッジ対象:
  *   - registerWithEmail: 正常・already_registered・email_taken・not_found
  *   - registerWithDiscord: 正常・エラー
