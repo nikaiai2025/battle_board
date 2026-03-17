@@ -322,7 +322,7 @@ export async function verifyAuthCode(
 	}
 
 	// Step 2: 有効期限チェック
-	if (authCode.expiresAt < new Date()) {
+	if (authCode.expiresAt < new Date(Date.now())) {
 		return { success: false };
 	}
 
@@ -403,7 +403,7 @@ export async function verifyWriteToken(
 	if (!authCode.writeTokenExpiresAt) {
 		return { valid: false };
 	}
-	if (authCode.writeTokenExpiresAt < new Date()) {
+	if (authCode.writeTokenExpiresAt < new Date(Date.now())) {
 		return { valid: false };
 	}
 

@@ -31,6 +31,7 @@ vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
 	findByThreadId: vi.fn(),
 	findByAuthorId: vi.fn().mockResolvedValue([]),
 	softDelete: vi.fn(),
+	softDeleteByThreadId: vi.fn(),
 	countByDate: vi.fn(),
 	countActiveThreadsByDate: vi.fn(),
 }));

@@ -242,6 +242,10 @@ export async function countByDate(date: string): Promise<number> {
  * 指定日に書き込みがあったアクティブスレッド数を集計する。
  * ダッシュボードのリアルタイムサマリーに使用する。
  *
+ * MEDIUM-002: 全行フェッチ+JS Set重複除去をDB側COUNT DISTINCT相当クエリに変更。
+ * threads テーブルを主体に INNER JOIN で当日投稿があったスレッドを絞り込み、
+ * DB側でスレッド単位のカウントを実現する（マイグレーション不要）。
+ *
  * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
  * See: tmp/feature_plan_admin_expansion.md §5-e リアルタイム集計
  *
@@ -249,22 +253,22 @@ export async function countByDate(date: string): Promise<number> {
  * @returns アクティブスレッド数
  */
 export async function countActiveThreadsByDate(date: string): Promise<number> {
-	const { data, error } = await supabaseAdmin
-		.from("posts")
-		.select("thread_id")
-		.gte("created_at", `${date}T00:00:00.000Z`)
-		.lt("created_at", `${date}T23:59:59.999Z`)
-		.eq("is_system_message", false);
+	// threads テーブルを主体に、指定日に posts が存在するスレッドを INNER JOIN でフィルタリングし
+	// DB側でスレッド数をカウントする。全行フェッチを回避する。
+	// `posts!inner(thread_id)` は PostgREST の INNER JOIN 構文。
+	const { count, error } = await supabaseAdmin
+		.from("threads")
+		.select("id, posts!inner(thread_id)", { count: "exact", head: true })
+		.gte("posts.created_at", `${date}T00:00:00.000Z`)
+		.lt("posts.created_at", `${date}T23:59:59.999Z`)
+		.eq("posts.is_system_message", false);
 
 	if (error) {
 		throw new Error(
 			`PostRepository.countActiveThreadsByDate failed: ${error.message}`,
 		);
 	}
-	const uniqueThreadIds = new Set(
-		(data as { thread_id: string }[]).map((r) => r.thread_id),
-	);
-	return uniqueThreadIds.size;
+	return count ?? 0;
 }
 
 /**
@@ -283,5 +287,30 @@ export async function softDelete(postId: string): Promise<void> {
 
 	if (error) {
 		throw new Error(`PostRepository.softDelete failed: ${error.message}`);
+	}
+}
+
+/**
+ * 指定スレッド内の全レスをバッチで論理削除する（is_deleted = true に設定）。
+ * 1回のUPDATE文でスレッド内全レスを一括削除するため、N+1問題を回避する。
+ *
+ * MEDIUM-005: スレッド削除時に個別softDelete×Nを呼び出していたN+1問題を解消。
+ * admin-service.ts の deleteThread から呼び出される。
+ *
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
+ * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > posts > is_deleted
+ *
+ * @param threadId - 論理削除対象のスレッドの UUID
+ */
+export async function softDeleteByThreadId(threadId: string): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("posts")
+		.update({ is_deleted: true })
+		.eq("thread_id", threadId);
+
+	if (error) {
+		throw new Error(
+			`PostRepository.softDeleteByThreadId failed: ${error.message}`,
+		);
 	}
 }

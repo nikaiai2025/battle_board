@@ -21,6 +21,7 @@ vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
 	findByThreadId: vi.fn(),
 	findByAuthorId: vi.fn().mockResolvedValue([]),
 	softDelete: vi.fn(),
+	softDeleteByThreadId: vi.fn(),
 	countByDate: vi.fn().mockResolvedValue(0),
 	countActiveThreadsByDate: vi.fn().mockResolvedValue(0),
 }));
@@ -391,8 +392,9 @@ describe("AdminService", () => {
 				const thread = makeThread({ id: "thread-uuid-001" });
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
-				vi.mocked(PostRepository.findByThreadId).mockResolvedValue([]);
-				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
+				vi.mocked(PostRepository.softDeleteByThreadId).mockResolvedValue(
+					undefined,
+				);
 
 				const result = await deleteThread("thread-uuid-001", "admin-uuid-001");
 
@@ -404,8 +406,9 @@ describe("AdminService", () => {
 				const thread = makeThread({ id: "thread-uuid-001" });
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
-				vi.mocked(PostRepository.findByThreadId).mockResolvedValue([]);
-				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
+				vi.mocked(PostRepository.softDeleteByThreadId).mockResolvedValue(
+					undefined,
+				);
 
 				await deleteThread("thread-uuid-001", "admin-uuid-001");
 
@@ -415,56 +418,53 @@ describe("AdminService", () => {
 				expect(ThreadRepository.softDelete).toHaveBeenCalledTimes(1);
 			});
 
-			it("スレッド内の全レスをソフトデリートする", async () => {
+			it("スレッド内の全レスをバッチソフトデリートする（MEDIUM-005: N+1解消）", async () => {
 				// See: features/admin.feature @スレッドとその中の全レスが削除される
+				// MEDIUM-005: softDeleteByThreadId が1回呼ばれることを確認する（N+1ではなく1回のUPDATE）
 				const thread = makeThread({ id: "thread-uuid-001" });
-				const posts = [
-					makePost({ id: "post-uuid-001", threadId: "thread-uuid-001" }),
-					makePost({
-						id: "post-uuid-002",
-						threadId: "thread-uuid-001",
-						postNumber: 2,
-					}),
-					makePost({
-						id: "post-uuid-003",
-						threadId: "thread-uuid-001",
-						postNumber: 3,
-					}),
-				];
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
-				vi.mocked(PostRepository.findByThreadId).mockResolvedValue(posts);
-				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
+				vi.mocked(PostRepository.softDeleteByThreadId).mockResolvedValue(
+					undefined,
+				);
 
 				await deleteThread("thread-uuid-001", "admin-uuid-001");
 
-				// 全3件のレスがソフトデリートされることを確認する
-				expect(PostRepository.softDelete).toHaveBeenCalledTimes(3);
-				expect(PostRepository.softDelete).toHaveBeenCalledWith("post-uuid-001");
-				expect(PostRepository.softDelete).toHaveBeenCalledWith("post-uuid-002");
-				expect(PostRepository.softDelete).toHaveBeenCalledWith("post-uuid-003");
+				// softDeleteByThreadId が threadId を引数に1回呼ばれることを確認する
+				expect(PostRepository.softDeleteByThreadId).toHaveBeenCalledWith(
+					"thread-uuid-001",
+				);
+				expect(PostRepository.softDeleteByThreadId).toHaveBeenCalledTimes(1);
+				// 個別 softDelete は呼ばれないことを確認する（N+1の解消）
+				expect(PostRepository.softDelete).not.toHaveBeenCalled();
 			});
 
 			it("レスがないスレッドを削除しても成功する", async () => {
 				// エッジケース: 空スレッド（レスが0件）の削除
+				// softDeleteByThreadId は対象行がない場合でも正常に完了する
 				const thread = makeThread({ id: "thread-uuid-001", postCount: 0 });
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
-				vi.mocked(PostRepository.findByThreadId).mockResolvedValue([]);
-				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
+				vi.mocked(PostRepository.softDeleteByThreadId).mockResolvedValue(
+					undefined,
+				);
 
 				const result = await deleteThread("thread-uuid-001", "admin-uuid-001");
 
 				expect(result.success).toBe(true);
-				// レスがない場合は PostRepository.softDelete が呼ばれない
-				expect(PostRepository.softDelete).not.toHaveBeenCalled();
+				// softDeleteByThreadId は必ず1回呼ばれる（対象行がなくても問題ない）
+				expect(PostRepository.softDeleteByThreadId).toHaveBeenCalledWith(
+					"thread-uuid-001",
+				);
 			});
 
 			it("reason 引数を渡しても正常に動作する", async () => {
 				const thread = makeThread();
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
-				vi.mocked(PostRepository.findByThreadId).mockResolvedValue([]);
+				vi.mocked(PostRepository.softDeleteByThreadId).mockResolvedValue(
+					undefined,
+				);
 
 				const result = await deleteThread(
 					"thread-uuid-001",
@@ -495,13 +495,13 @@ describe("AdminService", () => {
 				}
 			});
 
-			it("存在しないスレッドの場合は softDelete を呼び出さない", async () => {
+			it("存在しないスレッドの場合は softDelete 系を呼び出さない", async () => {
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(null);
 
 				await deleteThread("non-existent-thread-uuid", "admin-uuid-001");
 
 				expect(ThreadRepository.softDelete).not.toHaveBeenCalled();
-				expect(PostRepository.softDelete).not.toHaveBeenCalled();
+				expect(PostRepository.softDeleteByThreadId).not.toHaveBeenCalled();
 			});
 		});
 
@@ -532,17 +532,18 @@ describe("AdminService", () => {
 				).rejects.toThrow("DB更新エラー");
 			});
 
-			it("PostRepository.findByThreadId がエラーをスローした場合は伝播する", async () => {
+			it("PostRepository.softDeleteByThreadId がエラーをスローした場合は伝播する", async () => {
+				// See: エッジケース: 異常系パス
 				const thread = makeThread();
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
-				vi.mocked(PostRepository.findByThreadId).mockRejectedValue(
-					new Error("DB検索エラー"),
+				vi.mocked(PostRepository.softDeleteByThreadId).mockRejectedValue(
+					new Error("DB更新エラー"),
 				);
 
 				await expect(
 					deleteThread("thread-uuid-001", "admin-uuid-001"),
-				).rejects.toThrow("DB検索エラー");
+				).rejects.toThrow("DB更新エラー");
 			});
 		});
 
@@ -560,21 +561,24 @@ describe("AdminService", () => {
 				expect(ThreadRepository.findById).toHaveBeenCalledWith("");
 			});
 
-			it("大量のレス（1000件）があるスレッドを削除できる", async () => {
+			it("大量のレス（1000件）があるスレッドを削除できる（MEDIUM-005: バッチで1回のUPDATE）", async () => {
 				// See: エッジケース: 大量データ
+				// MEDIUM-005: N+1解消により、1000件でも softDeleteByThreadId が1回だけ呼ばれる
 				const thread = makeThread({ postCount: 1000 });
-				const posts = Array.from({ length: 1000 }, (_, i) =>
-					makePost({ id: `post-uuid-${i}`, postNumber: i + 1 }),
-				);
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(thread);
 				vi.mocked(ThreadRepository.softDelete).mockResolvedValue(undefined);
-				vi.mocked(PostRepository.findByThreadId).mockResolvedValue(posts);
-				vi.mocked(PostRepository.softDelete).mockResolvedValue(undefined);
+				vi.mocked(PostRepository.softDeleteByThreadId).mockResolvedValue(
+					undefined,
+				);
 
 				const result = await deleteThread("thread-uuid-001", "admin-uuid-001");
 
 				expect(result.success).toBe(true);
-				expect(PostRepository.softDelete).toHaveBeenCalledTimes(1000);
+				// バッチ削除: softDeleteByThreadId が1回だけ呼ばれる（N回ではない）
+				expect(PostRepository.softDeleteByThreadId).toHaveBeenCalledTimes(1);
+				expect(PostRepository.softDeleteByThreadId).toHaveBeenCalledWith(
+					"thread-uuid-001",
+				);
 			});
 		});
 	});

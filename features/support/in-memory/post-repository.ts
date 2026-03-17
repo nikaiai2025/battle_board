@@ -163,6 +163,23 @@ export async function softDelete(postId: string): Promise<void> {
 }
 
 /**
+ * 指定スレッド内の全レスをバッチで論理削除する。
+ * 本番実装の softDeleteByThreadId に対応するインメモリ実装。
+ *
+ * MEDIUM-005: N+1解消のためのバッチ削除に対応する。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > softDeleteByThreadId
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
+ */
+export async function softDeleteByThreadId(threadId: string): Promise<void> {
+	for (const [id, post] of store.entries()) {
+		if (post.threadId === threadId) {
+			store.set(id, { ...post, isDeleted: true });
+		}
+	}
+}
+
+/**
  * 指定日の書き込み数を集計する（非システムメッセージのみ）。
  * ダッシュボードのリアルタイムサマリーに使用する。
  *

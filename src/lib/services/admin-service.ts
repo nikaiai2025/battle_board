@@ -180,14 +180,15 @@ export async function deleteThread(
 	// See: docs/architecture/components/admin.md §3.1 依存先 > ThreadRepository
 	await ThreadRepository.softDelete(threadId);
 
-	// スレッド内の全レスをソフトデリート
+	// スレッド内の全レスをバッチソフトデリート（MEDIUM-005: N+1解消）
+	// 従来: findByThreadId → posts.map(softDelete) でN回UPDATE
+	// 改善: softDeleteByThreadId で1回のUPDATE文に集約
 	// See: features/admin.feature @スレッドとその中の全レスが削除される
-	const posts = await PostRepository.findByThreadId(threadId);
-	await Promise.all(posts.map((post) => PostRepository.softDelete(post.id)));
+	await PostRepository.softDeleteByThreadId(threadId);
 
 	// 将来の監査ログ用（現在は簡易ログのみ）
 	console.info(
-		`[AdminService] deleteThread: threadId=${threadId} adminId=${adminId} reason=${reason ?? "(なし)"} postsDeleted=${posts.length}`,
+		`[AdminService] deleteThread: threadId=${threadId} adminId=${adminId} reason=${reason ?? "(なし)"}`,
 	);
 
 	return { success: true };
