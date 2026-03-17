@@ -4,20 +4,21 @@
 
 ## スプリント目標
 
-専ブラ subject.txt の 304 Not Modified 判定バグを修正し、新規スレッドが即座にスレッド一覧に反映されるようにする。
+専ブラ互換ルートのHTTPキャッシュ不具合を修正し、新規スレッドが即座にスレッド一覧に反映されるようにする。
 
 ## 背景
 
 - 新規スレッドを立てても専ブラのスレッド一覧（subject.txt）に追加されない
 - Webからは見える。専ブラからのスレ立て自体は成功する
-- 原因: subject.txt の If-Modified-Since 比較がミリ秒 vs 秒の精度不一致で、同一秒内の更新を検出できず 304 を返してしまう
-- DAT route は秒精度に正規化して比較しているが、subject.txt route にはその処理がない
+- 原因1: subject.txt の If-Modified-Since 比較がミリ秒 vs 秒の精度不一致（TASK-144で修正済み）
+- 原因2（主因）: Cache-Controlヘッダが未設定のため、専ブラがHTTPヒューリスティックキャッシュを適用し、サーバーに問い合わせずにローカルキャッシュを返す
 
 ## タスク一覧
 
 | TASK_ID | 内容 | 担当 | 依存 | 状態 |
 |---|---|---|---|---|
 | TASK-144 | subject.txt 304判定の秒精度修正 + 関連テスト | bdd-coding | なし | **completed** |
+| TASK-145 | 専ブラルートにCache-Control: no-cache追加 | bdd-coding | なし | assigned |
 
 ## 結果
 

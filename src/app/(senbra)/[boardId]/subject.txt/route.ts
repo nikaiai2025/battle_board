@@ -11,6 +11,7 @@
  */
 
 import type { NextRequest } from "next/server";
+import { isNotModifiedSince } from "@/lib/infrastructure/adapters/http-cache";
 import { SubjectFormatter } from "@/lib/infrastructure/adapters/subject-formatter";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
@@ -47,20 +48,17 @@ export async function GET(
 	// If-Modified-Since による 304 Not Modified 判定
 	// スレッド一覧の最終更新時刻として最新スレッドの last_post_at を使用する
 	if (threads.length > 0) {
-		const latestPostAt = threads[0].lastPostAt;
 		const ifModifiedSince = req.headers.get("if-modified-since");
-		if (ifModifiedSince) {
-			const sinceDate = new Date(ifModifiedSince);
-			if (!isNaN(sinceDate.getTime())) {
-				// HTTP Date 形式は秒単位のため、秒単位で比較する（DAT route と同様）
-				// ミリ秒精度のまま比較すると、DB日付(.500ms)が If-Modified-Since(.000ms) より
-				// 大きく見えてしまい、同一秒内の更新を誤って「更新あり（200）」と判定するバグを防ぐ
-				const lastPostAtSec = Math.floor(latestPostAt.getTime() / 1000);
-				const sinceSec = Math.floor(sinceDate.getTime() / 1000);
-				if (lastPostAtSec <= sinceSec) {
-					return new Response(null, { status: 304 });
-				}
-			}
+		if (
+			ifModifiedSince &&
+			isNotModifiedSince(threads[0].lastPostAt, ifModifiedSince)
+		) {
+			// Cache-Control: no-cache を付与し、専ブラが毎回条件付きリクエストを送るよう強制する
+			// RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止のため
+			return new Response(null, {
+				status: 304,
+				headers: { "Cache-Control": "no-cache" },
+			});
 		}
 	}
 
@@ -86,6 +84,9 @@ export async function GET(
 			"Content-Type": "text/plain; charset=Shift_JIS",
 			"Content-Length": String(sjisBuffer.length),
 			"Last-Modified": lastModified,
+			// Cache-Control: no-cache を付与し、専ブラが毎回条件付きリクエストを送るよう強制する
+			// RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止のため
+			"Cache-Control": "no-cache",
 		},
 	});
 }

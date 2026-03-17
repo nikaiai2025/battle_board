@@ -18,6 +18,7 @@
 
 import type { NextRequest } from "next/server";
 import { DatFormatter } from "@/lib/infrastructure/adapters/dat-formatter";
+import { isNotModifiedSince } from "@/lib/infrastructure/adapters/http-cache";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 import * as PostRepository from "@/lib/infrastructure/repositories/post-repository";
 import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repository";
@@ -78,16 +79,16 @@ export async function GET(
 	// If-Modified-Since による 304 Not Modified 判定
 	// threads.last_post_at と比較する（senbra-adapter.md §6 304 Not Modified の判定）
 	const ifModifiedSince = req.headers.get("if-modified-since");
-	if (ifModifiedSince) {
-		const sinceDate = new Date(ifModifiedSince);
-		if (!isNaN(sinceDate.getTime())) {
-			// HTTP Date 形式は秒単位のため、秒単位で比較する
-			const lastPostAtSec = Math.floor(thread.lastPostAt.getTime() / 1000);
-			const sinceSec = Math.floor(sinceDate.getTime() / 1000);
-			if (lastPostAtSec <= sinceSec) {
-				return new Response(null, { status: 304 });
-			}
-		}
+	if (
+		ifModifiedSince &&
+		isNotModifiedSince(thread.lastPostAt, ifModifiedSince)
+	) {
+		// Cache-Control: no-cache を付与し、専ブラが毎回条件付きリクエストを送るよう強制する
+		// RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止のため
+		return new Response(null, {
+			status: 304,
+			headers: { "Cache-Control": "no-cache" },
+		});
 	}
 
 	// Range ヘッダを解析する
@@ -130,6 +131,9 @@ async function handleFullRequest(thread: {
 			"Content-Type": "text/plain; charset=Shift_JIS",
 			"Content-Length": String(sjisBuffer.length),
 			"Last-Modified": thread.lastPostAt.toUTCString(),
+			// Cache-Control: no-cache を付与し、専ブラが毎回条件付きリクエストを送るよう強制する
+			// RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止のため
+			"Cache-Control": "no-cache",
 		},
 	});
 }
@@ -176,6 +180,9 @@ async function handleRangeRequest(
 				"Content-Range": `bytes ${rangeStart}-${totalBytes - 1}/${totalBytes}`,
 				"Content-Length": "0",
 				"Last-Modified": thread.lastPostAt.toUTCString(),
+				// Cache-Control: no-cache を付与し、専ブラが毎回条件付きリクエストを送るよう強制する
+				// RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止のため
+				"Cache-Control": "no-cache",
 			},
 		});
 	}
@@ -191,6 +198,9 @@ async function handleRangeRequest(
 			"Content-Range": `bytes ${rangeStart}-${diffEnd}/${totalBytes}`,
 			"Content-Length": String(diffBuffer.length),
 			"Last-Modified": thread.lastPostAt.toUTCString(),
+			// Cache-Control: no-cache を付与し、専ブラが毎回条件付きリクエストを送るよう強制する
+			// RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止のため
+			"Cache-Control": "no-cache",
 		},
 	});
 }

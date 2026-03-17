@@ -434,6 +434,65 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 	});
 
 	// =========================================================================
+	// Cache-Control ヘッダの確認（RFC 7234 §4.2.2 ヒューリスティックキャッシュ防止）
+	// =========================================================================
+
+	describe("Cache-Control ヘッダ", () => {
+		it("正常: 200 レスポンスに Cache-Control: no-cache が含まれる", async () => {
+			// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+			// Cache-Control: no-cache により専ブラがヒューリスティックキャッシュを適用しないことを保証する
+			mockFindByBoardId.mockResolvedValue([
+				makeThread(new Date("2025-06-01T12:00:00.000Z")),
+			]);
+
+			const req = createGetRequest("test");
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			expect(res.status).toBe(200);
+			expect(res.headers.get("Cache-Control")).toBe("no-cache");
+		});
+
+		it("正常: スレッドが0件の200レスポンスにも Cache-Control: no-cache が含まれる", async () => {
+			mockFindByBoardId.mockResolvedValue([]);
+
+			const req = createGetRequest("test");
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			expect(res.status).toBe(200);
+			expect(res.headers.get("Cache-Control")).toBe("no-cache");
+		});
+
+		it("正常: 304 レスポンスに Cache-Control: no-cache が含まれる", async () => {
+			// 304 に Cache-Control がないと、専ブラが以降のリクエストでヒューリスティックキャッシュを
+			// 再適用してしまう可能性がある（RFC 7234 §4.3.4）
+			const lastPostAt = new Date("2025-06-01T12:00:00.000Z");
+			const sinceDate = "Sun, 01 Jun 2025 12:00:00 GMT";
+			mockFindByBoardId.mockResolvedValue([makeThread(lastPostAt)]);
+
+			const req = createGetRequest("test", sinceDate);
+			const res = await GET(
+				req as unknown as import("next/server").NextRequest,
+				{
+					params: Promise.resolve({ boardId: "test" }),
+				},
+			);
+
+			expect(res.status).toBe(304);
+			expect(res.headers.get("Cache-Control")).toBe("no-cache");
+		});
+	});
+
+	// =========================================================================
 	// 境界値: 極端な日付
 	// =========================================================================
 
