@@ -47,6 +47,14 @@ const PINNED_THREAD_TITLE = "■ BattleBoard 案内板";
 /** 固定スレッドの board_id */
 const PINNED_THREAD_BOARD_ID = "battleboard";
 
+/**
+ * システムユーザーの well-known UUID（固定値）。
+ * threads.created_by は UUID NOT NULL REFERENCES users(id) であるため、
+ * 文字列 "system" は使用できない。冪等なupsertで事前作成する。
+ * See: features/thread.feature @pinned_thread
+ */
+const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
+
 /** 先頭表示用の未来日時（2099-01-01T00:00:00Z） */
 const PINNED_LAST_POST_AT = new Date("2099-01-01T00:00:00Z");
 
@@ -128,6 +136,30 @@ async function main(): Promise<void> {
 
 	const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+	// システムユーザーを upsert する（冪等）
+	// threads.created_by は UUID NOT NULL REFERENCES users(id) であるため、
+	// "system" 文字列ではなく well-known UUID を使用する。
+	// See: features/thread.feature @pinned_thread
+	console.log(
+		`[upsert-pinned-thread] システムユーザーを upsert 中... (id=${SYSTEM_USER_ID})`,
+	);
+	const { error: userUpsertError } = await supabase.from("users").upsert(
+		{
+			id: SYSTEM_USER_ID,
+			auth_token: "system",
+			author_id_seed: "system",
+		},
+		{ onConflict: "id" },
+	);
+	if (userUpsertError) {
+		throw new Error(
+			`システムユーザー upsert エラー: ${userUpsertError.message}`,
+		);
+	}
+	console.log(
+		"[upsert-pinned-thread] システムユーザーの upsert が完了しました",
+	);
+
 	// コマンド設定を読み込む
 	const configPath = path.resolve(process.cwd(), "config", "commands.yaml");
 	console.log(`[upsert-pinned-thread] コマンド設定を読み込み中: ${configPath}`);
@@ -179,7 +211,7 @@ async function main(): Promise<void> {
 				thread_key: PINNED_THREAD_KEY,
 				board_id: PINNED_THREAD_BOARD_ID,
 				title: PINNED_THREAD_TITLE,
-				created_by: "system",
+				created_by: SYSTEM_USER_ID,
 				last_post_at: PINNED_LAST_POST_AT.toISOString(),
 				is_pinned: true,
 			})

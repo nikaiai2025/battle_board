@@ -44,10 +44,12 @@
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "js-yaml": "^4.1.1",
     "jsdom": "^29.0.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.0.18",
     "wrangler": "^4.73.0"
