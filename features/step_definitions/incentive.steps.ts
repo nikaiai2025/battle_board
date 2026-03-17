@@ -1602,10 +1602,10 @@ When(
 				const revivalPostObj = await InMemoryPostRepo.findById(data.postId);
 				if (revivalPostObj) {
 					// revivalPost の createdAt を 1 秒前に設定して後続書き込みより確実に前にする。
-					// post-service.ts が new Date()（実時刻）で createdAt を設定するため、
-					// followupPost も実時刻で作成される。両者の差が 30分以内になるよう
-					// 実時刻から 1 秒前（new Date()）を使用する。
-					const pastCreatedAt = new Date(new Date().getTime() - 1000);
+					// InMemoryPostRepo.create が new Date(Date.now()) で createdAt を設定するため、
+					// followupPost もモック時刻で作成される。両者の差が 30分以内になるよう
+					// モック時刻から 1 秒前を使用する。
+					const pastCreatedAt = new Date(Date.now() - 1000);
 					InMemoryPostRepo._insert({
 						...revivalPostObj,
 						createdAt: pastCreatedAt,

@@ -92,7 +92,7 @@ export async function create(
 		| "isDeleted"
 	> & { isPinned?: boolean },
 ): Promise<Thread> {
-	const now = new Date();
+	const now = new Date(Date.now());
 	const newThread: Thread = {
 		...thread,
 		id: crypto.randomUUID(),

@@ -145,7 +145,7 @@ export async function create(
 		...post,
 		id: crypto.randomUUID(),
 		isDeleted: false,
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	};
 	store.set(newPost.id, newPost);
 	return newPost;
