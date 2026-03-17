@@ -1,0 +1,47 @@
+# DBマイグレーション自動適用ワークフロー
+#
+# 目的: mainブランチへのpush時にSupabase本番DBへマイグレーションを自動適用し、
+#       コードとDBスキーマの乖離によるデプロイ障害を防ぐ。
+# 背景: docs/operations/incidents/2026-03-17_post_500_missing_migrations.md 参照
+#
+# 【必要なGitHub Secretsの設定手順】
+# リポジトリの Settings > Secrets and variables > Actions > New repository secret から以下を登録:
+#
+#   1. SUPABASE_ACCESS_TOKEN
+#      - 取得先: https://supabase.com/dashboard/account/tokens
+#      - 用途: Supabase CLI の認証トークン
+#
+#   2. SUPABASE_PROJECT_REF
+#      - 取得先: Supabase Dashboard > Project Settings > General > Reference ID
+#      - 用途: リンク先の本番プロジェクトを特定するID（例: abcdefghijklmnopqrst）
+
+name: Apply DB Migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # 本番プロジェクトにリンク
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # 未適用のマイグレーションを本番DBに適用する
+      # supabase db push は適用済みのマイグレーションをスキップするため冪等
+      - name: Apply migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

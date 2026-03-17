@@ -154,12 +154,19 @@ module.exports = {
 	// 統合テストで実行するシナリオ（サービス層経由のみ）:
 	//   - thread.feature: スレッド作成・バリデーション系（InMemory直接操作なし）
 	//   - authentication.feature: 未認証ユーザーの書き込みフロー
+	//   - integration/crud.feature: 主要CRUDパス（TASK-136で追加）
 	//
 	// 注意: ステップ定義はdefaultプロファイルと共有。
 	//       mock-installer.ts のインポートは残るが、register-real-repos.js では
 	//       モック差し替えを行わないため、実リポジトリが使われる。
 	//       ただしステップ定義内で InMemoryXxxRepo.XXXX() を呼ぶ箇所は
 	//       実リポジトリAPIと異なる可能性があり、除外対象に含める。
+	//
+	// TASK-136: integration/crud.feature と integration-setup.steps.ts を追加
+	//   目的: 主要CRUDパスが実DBで動作することを検証する
+	//   See: features/integration/crud.feature
+	//   See: features/step_definitions/integration-setup.steps.ts
+	//   See: docs/operations/incidents/2026-03-17_post_500_missing_migrations.md
 	//
 	// See: docs/architecture/bdd_test_strategy.md §8 統合テスト方針
 	// See: features/support/register-real-repos.js
@@ -169,7 +176,12 @@ module.exports = {
 		// 統合テスト対象 feature ファイル
 		// InMemory直接操作が不要なシナリオを含む feature に限定する
 		// TASK-083: phase1サブディレクトリ廃止によりパス更新
-		paths: ["features/thread.feature", "features/authentication.feature"],
+		// TASK-136: integration/crud.feature を追加（主要CRUDパスの統合テスト）
+		paths: [
+			"features/thread.feature",
+			"features/authentication.feature",
+			"features/integration/crud.feature",
+		],
 
 		// ステップ定義と support ファイルを読み込む
 		// register-real-repos.js を先頭に配置する（register-mocks.js の代わり）
@@ -207,12 +219,17 @@ module.exports = {
 		//     - 管理者ログイン系（InMemoryAdminRepo._insert/_insertCredential）
 		//
 		// 統合テストで実行するシナリオ（InMemory直接操作なし）:
-		//   - 未認証ユーザーが書き込みを行うと認証コードが案内される
-		//   - スレッドタイトルが空の場合はスレッドが作成されない
-		//   - スレッドタイトルが上限文字数を超えている場合はエラーになる
-		//   - スレッドが0件の場合はメッセージが表示される
+		//   既存（thread.feature / authentication.feature）:
+		//     - 未認証ユーザーが書き込みを行うと認証コードが案内される
+		//     - スレッドタイトルが空の場合はスレッドが作成されない
+		//     - スレッドタイトルが上限文字数を超えている場合はエラーになる
+		//     - スレッドが0件の場合はメッセージが表示される
+		//   TASK-136追加（integration/crud.feature）:
+		//     - 統合テスト：スレッドと最初のレスが実DBに保存される
+		//     - 統合テスト：既存スレッドへのレス書き込みが実DBに保存される
+		//     - 統合テスト：スレッド一覧が実DBから正しく取得される
 		name: [
-			"^(未認証ユーザーが書き込みを行うと認証コードが案内される|スレッドタイトルが空の場合はスレッドが作成されない|スレッドタイトルが上限文字数を超えている場合はエラーになる|スレッドが0件の場合はメッセージが表示される)$",
+			"^(未認証ユーザーが書き込みを行うと認証コードが案内される|スレッドタイトルが空の場合はスレッドが作成されない|スレッドタイトルが上限文字数を超えている場合はエラーになる|スレッドが0件の場合はメッセージが表示される|統合テスト：スレッドと最初のレスが実DBに保存される|統合テスト：既存スレッドへのレス書き込みが実DBに保存される|統合テスト：スレッド一覧が実DBから正しく取得される)$",
 		],
 
 		format: ["@cucumber/pretty-formatter", "json:ゴミ箱/bdd_result.json"],
