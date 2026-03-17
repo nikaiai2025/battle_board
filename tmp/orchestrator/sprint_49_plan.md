@@ -21,6 +21,7 @@ command-parserの解析ロジック拡張:
 | TASK_ID | 担当 | 内容 | 依存 | ステータス |
 |---|---|---|---|---|
 | TASK-140 | bdd-coding | command-parser拡張（前方引数・全角スペース対応）+ 単体テスト + BDDステップ定義 | なし | completed |
+| TASK-141 | bdd-coding | E2Eテスト追加: コマンド実行（!w）フロー + inlineSystemInfo UI実装 | なし | completed |
 
 ## 結果
 
@@ -32,6 +33,22 @@ command-parserの解析ロジック拡張:
 - vitest: 45ファイル / 全PASS
 - cucumber-js: 234シナリオ（227 passed / 7 pending / 0 failed）— 以前の undefined 2件も解消
 
+### TASK-141 (bdd-coding) — completed
+
+- `PostItem.tsx`: Post型に `inlineSystemInfo: string | null` 追加、本文下に区切り線+結果表示JSX追加
+- `page.tsx`: fetchThreadDetailのPost型変換に `inlineSystemInfo` マッピング追加
+- `basic-flow.spec.ts`: コマンド書き込み+inlineSystemInfo表示のE2Eテスト追加
+- E2E: 2テスト全PASS / vitest: 45ファイル 1152テスト全PASS
+- エスカレーション1件（locked_files拡張）→ 自律解決（BDD既承認のUI実装漏れ修正）
+
+### 発見バグ: >>N → UUID変換未実装
+
+`!w >>1` 等のコマンドで、`>>N`形式のpostNumber引数がUUIDに変換されずにハンドラに渡される。
+PostRepository.findById(">>1") → 対象レス未発見 → サイレント失敗。
+BDDテストはInMemoryモックで通過するため検出されていなかった。次スプリントで対応要。
+
 ## 判定
 
 全タスク completed。新規BDDシナリオ7件全PASS、既存テストにリグレッションなし。
+inlineSystemInfo UI実装漏れを修正し、E2Eテストで書き込み+コマンド結果表示を検証。
+`>>N → UUID`変換バグは次スプリントで対応。

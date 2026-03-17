@@ -106,6 +106,9 @@ async function fetchThreadDetail(
 				displayName: p.displayName,
 				dailyId: p.dailyId,
 				body: p.body,
+				// レス内マージ型システム情報（コマンド結果・書き込み報酬等）
+				// See: docs/specs/screens/thread-view.yaml > post-inline-system-info
+				inlineSystemInfo: p.inlineSystemInfo ?? null,
 				isSystemMessage: p.isSystemMessage,
 				isDeleted: p.isDeleted,
 				createdAt:

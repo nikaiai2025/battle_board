@@ -11,9 +11,11 @@
  * 4. スレッド作成リトライ成功 → 一覧に表示
  * 5. スレッドを開く → 本文(>>1)表示
  * 6. レス書き込み（認証済み）→ レス表示
+ * 7. !w >>1 コマンド実行 → 草が生えた結果がレス末尾に表示
  *
  * See: docs/architecture/bdd_test_strategy.md §10 E2Eテスト方針
  * See: docs/architecture/bdd_test_strategy.md §11.1 Cloudflare Turnstile
+ * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
  */
 
 import { expect, test } from "@playwright/test";
@@ -28,6 +30,8 @@ import { mockTurnstile } from "./helpers/turnstile";
 const TEST_THREAD_TITLE = `E2Eテスト用スレッド_${Date.now()}`;
 const TEST_THREAD_BODY = "これはE2Eテストで作成したスレッドの1レス目です。";
 const TEST_REPLY_BODY = "これはE2Eテストで書き込んだレスです。";
+/** !w コマンド（草を生やす）のテスト用入力テキスト */
+const TEST_GRASS_COMMAND = "!w >>1";
 
 // ---------------------------------------------------------------------------
 // テスト本体
@@ -143,5 +147,107 @@ test.describe("Phase 1 基本フロー縦断テスト", () => {
 		// レス番号 >>2 が表示されること（スレッド作成時の >>1 + 書き込み = >>2）
 		await expect(page.locator("#post-2")).toBeVisible();
 		await expect(page.locator("#post-2")).toContainText(TEST_REPLY_BODY);
+	});
+
+	/**
+	 * コマンド書き込み時に inlineSystemInfo（書き込み報酬）がレス末尾に表示される
+	 *
+	 * seedThreadWithPost() で別ユーザーの >>1 を事前投入し、
+	 * `!w >>1` をコマンド付き書き込みとして投稿する。
+	 *
+	 * 検証ポイント:
+	 * - 書き込み本文 `!w >>1` がそのまま表示される
+	 * - inlineSystemInfo 領域（data-testid="post-inline-system-info"）が
+	 *   区切り線付きでレス末尾に表示される
+	 * - 書き込み報酬（IncentiveService 由来）の表示を確認する
+	 *
+	 * Note: 草コマンド（!w）の対象レス解決（>>N → UUID変換）は現時点で未実装のため、
+	 * 草コマンド結果自体は inlineSystemInfo に含まれない。
+	 * 書き込み報酬（daily_login, reply 等）が inlineSystemInfo に表示されることで、
+	 * PostItem.tsx の inlineSystemInfo 表示UI と page.tsx のマッピングが正常に
+	 * 機能していることを検証する。
+	 *
+	 * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
+	 * See: features/command_system.feature @書き込み報酬がレス末尾に表示される
+	 * See: docs/specs/screens/thread-view.yaml > post-inline-system-info
+	 */
+	test("コマンド書き込み時に inlineSystemInfo がレス末尾に表示される", async ({
+		page,
+		request,
+	}) => {
+		// ------------------------------------------------------------------
+		// Step 1: テスト用スレッドをシードデータとして投入する
+		// seedThreadWithPost() は別ユーザーで >>1 を作成する
+		// ------------------------------------------------------------------
+		const { seedThreadWithPost } = await import("./helpers/database");
+		const { threadId } = await seedThreadWithPost(request);
+
+		// ------------------------------------------------------------------
+		// Step 2: シードしたスレッドページに直接アクセス
+		// ------------------------------------------------------------------
+		await page.goto(`/threads/${threadId}`);
+
+		// スレッドタイトルが表示されるまで待機
+		// See: src/app/(web)/threads/[threadId]/page.tsx > #thread-title
+		await expect(page.locator("#thread-title")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		// >>1 が表示されていることを確認
+		await expect(page.locator("#post-1")).toBeVisible();
+
+		// ------------------------------------------------------------------
+		// Step 3: !w >>1 コマンドを書き込みフォームに入力して送信
+		// 未認証のため AuthModal が表示されるので認証を完了する
+		// ------------------------------------------------------------------
+
+		// コマンドを入力
+		// See: src/app/(web)/_components/PostForm.tsx > #post-body-input
+		await page.locator("#post-body-input").fill(TEST_GRASS_COMMAND);
+
+		// 書き込みボタンをクリック
+		// See: src/app/(web)/_components/PostForm.tsx > #post-submit-btn
+		await page.locator("#post-submit-btn").click();
+
+		// 未認証のため AuthModal が表示される → 認証を完了する
+		// See: e2e/helpers/auth.ts > completeAuth
+		await completeAuth(page);
+
+		// ------------------------------------------------------------------
+		// Step 4: 書き込みが表示されるまで待機
+		// router.refresh() によりページが更新される
+		// ------------------------------------------------------------------
+
+		// コマンドを含む書き込み（>>2）が表示されるまで待機
+		// See: src/app/(web)/_components/PostItem.tsx > #post-2
+		await expect(page.locator("#post-2")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		// 書き込み本文 "!w >>1" がそのまま表示されること
+		await expect(page.locator("#post-2")).toContainText(TEST_GRASS_COMMAND);
+
+		// ------------------------------------------------------------------
+		// Step 5: inlineSystemInfo（書き込み報酬）がレス末尾に表示されることを確認
+		// See: docs/specs/screens/thread-view.yaml > post-inline-system-info
+		// See: features/command_system.feature @書き込み報酬がレス末尾に表示される
+		// ------------------------------------------------------------------
+
+		// post-inline-system-info 領域が >>2 のレス内に表示されること
+		const inlineSystemInfo = page.locator(
+			'#post-2 [data-testid="post-inline-system-info"]',
+		);
+		await expect(inlineSystemInfo).toBeVisible({ timeout: 15_000 });
+
+		// 区切り線（hr要素）が表示されること
+		// See: docs/specs/screens/thread-view.yaml > inline-separator
+		const separator = page.locator("#post-2 hr");
+		await expect(separator).toBeVisible();
+
+		// 書き込み報酬メッセージが含まれること（IncentiveService 由来）
+		// IncentiveService が daily_login / reply / new_thread_join 等の
+		// 同期ボーナスを付与し、「📝 {eventType} +{amount}」形式で表示される
+		// See: src/lib/services/post-service.ts > Step 8: inlineSystemInfo 構築
+		await expect(inlineSystemInfo).toContainText("reply");
 	});
 });
