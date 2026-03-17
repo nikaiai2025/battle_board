@@ -74,15 +74,13 @@ async function ensureNamedUser(
 
 /**
  * 今日の JST 日付文字列を取得する。
- * new Date() を直接使用することで、post-service.ts の new Date() による createdAt と
- * 同じ時刻基準になり、incentive-service.ts の contextDate との整合性を保つ。
- *
- * Note: post-service.ts が new Date() を使用しているため、Date.now() スタブの恩恵を
- * 受けられない。post-service.ts が new Date(Date.now()) 対応になり次第、
- * こちらも new Date(Date.now()) に統一できる。
+ * post-service.ts は new Date(Date.now()) で createdAt を設定しており（Sprint-39 TASK-114）、
+ * Date.now() スタブが反映される。ステップ定義側も new Date(Date.now()) を使用することで
+ * post-service.ts の createdAt と同じ時刻基準になり、incentive-service.ts の contextDate との
+ * 整合性を保つ。
  * 日付・ストリーク関連テストは日付変わり境界時刻以外では安定して動作する。
  *
- * See: docs/architecture/bdd_test_strategy.md §5.3 サービス層の時刻取得統一（注記）
+ * See: docs/architecture/bdd_test_strategy.md §5.3 サービス層の時刻取得統一
  */
 function getTodayJst(): string {
 	// Date.now() を使用することで、setCurrentTime による時計凍結が反映される。

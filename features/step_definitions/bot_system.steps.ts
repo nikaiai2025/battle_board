@@ -2001,13 +2001,12 @@ Then(
 		assert(this.currentBot, "ボットが設定されていません");
 		assert(this.currentUserId, "ユーザーIDが設定されていません");
 
-		// BotService.canAttackToday / performDailyReset は内部で new Date() を使う
-		// （bot-service.ts の getTodayJst() はまだ未修正のため）。
-		// Date.now スタブは new Date() 単独には影響しないため、
-		// performDailyReset の deleteByDateBefore(today) の today が
-		// 実際の今日（翌日ではない）の場合、当日の攻撃記録は削除されない。
+		// BotService.canAttackToday / performDailyReset は内部で getTodayJst() を使う。
+		// bot-service.ts の getTodayJst() は new Date(Date.now()) に修正済み（Sprint-39）。
+		// Date.now スタブが正しく反映されるため、performDailyReset の
+		// deleteByDateBefore(today) の today はスタブ日付（翌日）になる。
 		//
-		// 回避策: 翌日の日付で攻撃記録を検索し、翌日には攻撃記録がないことを確認する。
+		// 確認方法: 翌日の日付で攻撃記録を検索し、翌日には攻撃記録がないことを確認する。
 		// 翌日は新しい攻撃記録がまだないので canAttack = true と同等。
 		// See: src/lib/services/bot-service.ts > performDailyReset > Step 5
 		// See: features/bot_system.feature @日次リセットで同一ボットへの攻撃制限が解除される
