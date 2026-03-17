@@ -249,7 +249,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 
 		InMemoryBotPostRepo._insert(postId, botId);
@@ -277,7 +277,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: targetUserId,
 			balance: 0,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 
 		accusationState.targetAuthorUserId = targetUserId;
@@ -295,7 +295,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 
 		accusationState.postNumberToId.set(postNumber, postId);
@@ -320,7 +320,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: targetUserId,
 			balance: 0,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 
 		accusationState.targetAuthorUserId = targetUserId;
@@ -348,7 +348,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 
 		accusationState.postNumberToId.set(3, postId);
@@ -375,7 +375,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId,
 			balance: 100,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 
 		await executeTellCommand(this, postNumber);
@@ -413,7 +413,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId,
 			balance: 200,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 
 		const postId = crypto.randomUUID();
@@ -428,7 +428,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 
 		accusationState.postNumberToId.set(postNumber, postId);
@@ -449,7 +449,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId,
 			balance: 200,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 
 		const postId = crypto.randomUUID();
@@ -465,7 +465,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		InMemoryBotPostRepo._insert(postId, botId);
 		accusationState.postNumberToId.set(postNumber, postId);
@@ -479,7 +479,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId,
 			balance: 200,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );

@@ -43,66 +43,75 @@ import { verifyAdminSession } from "@/lib/services/auth-service";
  *   404: ユーザーが存在しない
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
-		return NextResponse.json(
-			{ error: "管理者セッションが必要です" },
-			{ status: 403 },
-		);
-	}
-
-	const adminSession = await verifyAdminSession(sessionToken);
-	if (!adminSession) {
-		return NextResponse.json(
-			{ error: "管理者権限がありません" },
-			{ status: 403 },
-		);
-	}
-
-	let body: { userId?: string; reason?: string };
 	try {
-		body = await req.json();
-	} catch {
-		return NextResponse.json(
-			{ error: "リクエストボディが不正です" },
-			{ status: 400 },
-		);
-	}
-
-	if (!body.userId) {
-		return NextResponse.json({ error: "userId が必要です" }, { status: 400 });
-	}
-
-	const result = await banIpByUserId(
-		body.userId,
-		adminSession.userId,
-		body.reason,
-	);
-
-	if (!result.success) {
-		if (result.reason === "not_found") {
+		// 管理者セッション検証
+		const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
 			return NextResponse.json(
-				{ error: "指定されたユーザーが見つかりません" },
-				{ status: 404 },
+				{ error: "管理者セッションが必要です" },
+				{ status: 403 },
 			);
 		}
-		if (result.reason === "no_ip_hash") {
+
+		const adminSession = await verifyAdminSession(sessionToken);
+		if (!adminSession) {
 			return NextResponse.json(
-				{ error: "このユーザーのIPハッシュが記録されていません" },
+				{ error: "管理者権限がありません" },
+				{ status: 403 },
+			);
+		}
+
+		let body: { userId?: string; reason?: string };
+		try {
+			body = await req.json();
+		} catch {
+			return NextResponse.json(
+				{ error: "リクエストボディが不正です" },
 				{ status: 400 },
 			);
 		}
-	}
 
-	if (!result.success) {
+		if (!body.userId) {
+			return NextResponse.json({ error: "userId が必要です" }, { status: 400 });
+		}
+
+		const result = await banIpByUserId(
+			body.userId,
+			adminSession.userId,
+			body.reason,
+		);
+
+		if (!result.success) {
+			if (result.reason === "not_found") {
+				return NextResponse.json(
+					{ error: "指定されたユーザーが見つかりません" },
+					{ status: 404 },
+				);
+			}
+			if (result.reason === "no_ip_hash") {
+				return NextResponse.json(
+					{ error: "このユーザーのIPハッシュが記録されていません" },
+					{ status: 400 },
+				);
+			}
+		}
+
+		if (!result.success) {
+			return NextResponse.json(
+				{ error: "IP BAN に失敗しました" },
+				{ status: 500 },
+			);
+		}
+
+		return NextResponse.json({ success: true, banId: result.ban.id });
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error("[POST /api/admin/ip-bans] Unhandled error:", err);
 		return NextResponse.json(
-			{ error: "IP BAN に失敗しました" },
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
 			{ status: 500 },
 		);
 	}
-
-	return NextResponse.json({ success: true, banId: result.ban.id });
 }
 
 // ---------------------------------------------------------------------------
@@ -122,33 +131,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  *   403: 管理者権限なし
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
+	try {
+		// 管理者セッション検証
+		const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
+			return NextResponse.json(
+				{ error: "管理者セッションが必要です" },
+				{ status: 403 },
+			);
+		}
+
+		const adminSession = await verifyAdminSession(sessionToken);
+		if (!adminSession) {
+			return NextResponse.json(
+				{ error: "管理者権限がありません" },
+				{ status: 403 },
+			);
+		}
+
+		const bans = await listActiveIpBans();
+
+		// セキュリティ: ipHash は返さない（管理者にハッシュ値を直接扱わせない）
+		// See: tmp/feature_plan_admin_expansion.md §2-g
+		const sanitizedBans = bans.map(({ id, reason, bannedAt, expiresAt }) => ({
+			id,
+			reason,
+			bannedAt,
+			expiresAt,
+		}));
+
+		return NextResponse.json({ bans: sanitizedBans });
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error("[GET /api/admin/ip-bans] Unhandled error:", err);
 		return NextResponse.json(
-			{ error: "管理者セッションが必要です" },
-			{ status: 403 },
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
+			{ status: 500 },
 		);
 	}
-
-	const adminSession = await verifyAdminSession(sessionToken);
-	if (!adminSession) {
-		return NextResponse.json(
-			{ error: "管理者権限がありません" },
-			{ status: 403 },
-		);
-	}
-
-	const bans = await listActiveIpBans();
-
-	// セキュリティ: ipHash は返さない（管理者にハッシュ値を直接扱わせない）
-	// See: tmp/feature_plan_admin_expansion.md §2-g
-	const sanitizedBans = bans.map(({ id, reason, bannedAt, expiresAt }) => ({
-		id,
-		reason,
-		bannedAt,
-		expiresAt,
-	}));
-
-	return NextResponse.json({ bans: sanitizedBans });
 }

@@ -89,7 +89,7 @@ export async function create(
 	const newBot: Bot = {
 		...bot,
 		id: crypto.randomUUID(),
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 		survivalDays: 0,
 		totalPosts: 0,
 		accusedCount: 0,

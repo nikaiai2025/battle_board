@@ -89,7 +89,7 @@ function rowToIpBan(row: IpBanRow): IpBan {
  * @returns BAN されていれば true
  */
 export async function isBanned(ipHash: string): Promise<boolean> {
-	const now = new Date().toISOString();
+	const now = new Date(Date.now()).toISOString();
 
 	const { data, error } = await supabaseAdmin
 		.from("ip_bans")
@@ -169,7 +169,7 @@ export async function deactivate(id: string): Promise<void> {
  * @returns 有効な IpBan の配列（bannedAt 降順）
  */
 export async function listActive(): Promise<IpBan[]> {
-	const now = new Date().toISOString();
+	const now = new Date(Date.now()).toISOString();
 
 	const { data, error } = await supabaseAdmin
 		.from("ip_bans")

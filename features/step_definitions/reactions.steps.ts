@@ -513,7 +513,7 @@ BeforeStep(async function (
 		amount: 0,
 		contextId: this.currentThreadId,
 		contextDate: todayJst,
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	});
 });
 
@@ -761,7 +761,7 @@ async function executeGrassCommand(
 		inlineSystemInfo: result.systemMessage ?? null,
 		isSystemMessage: false,
 		isDeleted: false,
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	});
 }
 
@@ -891,7 +891,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 	},
 );
@@ -931,7 +931,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 	},
 );
@@ -963,11 +963,11 @@ Given(
 			receiverName,
 		);
 
-		// GrassHandler が `new Date().toISOString().split("T")[0]` で計算するのと
-		// 同じ計算式を使い、UTC 今日の日付を取得する。
-		// Date.now スタブは GrassHandler に影響しないため、ここでも new Date() を使う。
+		// GrassHandler が `new Date(Date.now()).toISOString().split("T")[0]` で
+		// 同日判定を行うのと同じ計算式を使い、UTC 今日の日付を取得する。
+		// Date.now スタブにより GrassHandler もテスト側も同一の日付を参照する。
 		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
-		const today = new Date().toISOString().split("T")[0];
+		const today = new Date(Date.now()).toISOString().split("T")[0];
 
 		// 既存の草記録をインメモリストアに直接挿入する
 		grassReactionsStore.push({
@@ -1005,9 +1005,9 @@ Given(
 			receiverName,
 		);
 
-		// GrassHandler と同じ計算式（new Date() を使う）
+		// GrassHandler と同じ計算式（new Date(Date.now()) で UTC 今日の日付を取得）
 		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
-		const today = new Date().toISOString().split("T")[0];
+		const today = new Date(Date.now()).toISOString().split("T")[0];
 
 		grassReactionsStore.push({
 			id: crypto.randomUUID(),
@@ -1044,10 +1044,10 @@ Given(
 			receiverName,
 		);
 
-		// 昨日の UTC 日付を計算する（実際の new Date() ベース）
-		// GrassHandler が new Date() を使うため、ここでも同じ基準を使う
+		// 昨日の UTC 日付を計算する（Date.now() ベース）
+		// GrassHandler が new Date(Date.now()) を使うため、ここでも同じ基準を使う
 		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
-		const todayMs = new Date().getTime();
+		const todayMs = Date.now();
 		const yesterdayMs = todayMs - 24 * 60 * 60 * 1000;
 		const yesterday = new Date(yesterdayMs).toISOString().split("T")[0];
 
@@ -1111,7 +1111,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 
 		// bot_posts に紐付ける
@@ -1150,7 +1150,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: true, // 削除済みフラグ
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1269,8 +1269,8 @@ When(
 		await ensureCurrentUserAndThread(this);
 
 		// 「昨日の草記録」の Given ステップで昨日の日付を設定済み。
-		// GrassHandler は new Date() で今日の UTC 日付を計算する。
-		// Date.now スタブは GrassHandler に影響しないため、時刻変更は不要。
+		// GrassHandler は new Date(Date.now()) で今日の UTC 日付を計算する。
+		// Date.now スタブにより GrassHandler もテスト側も同一の日付を参照する。
 		// 昨日 != 今日 のため重複チェックを通過し草が付与される。
 		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
 

@@ -976,7 +976,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId!,
 			balance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1175,7 +1175,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId!,
 			balance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1196,7 +1196,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: victimUserId,
 			balance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1335,7 +1335,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId!,
 			balance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1357,7 +1357,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: userBId,
 			balance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1717,7 +1717,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId!,
 			balance: 100,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 		const today = getTodayJst();
 		InMemoryAttackRepo._insert({
@@ -1982,7 +1982,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId!,
 			balance: 100,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 		const today = getTodayJst();
 		InMemoryAttackRepo._insert({
@@ -2001,9 +2001,9 @@ Then(
 		assert(this.currentBot, "ボットが設定されていません");
 		assert(this.currentUserId, "ユーザーIDが設定されていません");
 
-		// BotService.canAttackToday / performDailyReset は内部で new Date() を使う。
-		// Node.js v24 では Date.now のオーバーライドが new Date() に反映されないため、
-		// BotService.getTodayJst() は常に実際の日付を返す。
+		// BotService.canAttackToday / performDailyReset は内部で new Date() を使う
+		// （bot-service.ts の getTodayJst() はまだ未修正のため）。
+		// Date.now スタブは new Date() 単独には影響しないため、
 		// performDailyReset の deleteByDateBefore(today) の today が
 		// 実際の今日（翌日ではない）の場合、当日の攻撃記録は削除されない。
 		//

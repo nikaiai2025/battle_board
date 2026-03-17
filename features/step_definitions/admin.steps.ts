@@ -84,7 +84,7 @@ Given("管理者がログイン済みである", async function (this: BattleBoa
 	InMemoryAdminRepo._insert({
 		id: TEST_ADMIN_ID,
 		role: "admin",
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	});
 	// World に管理者 ID とセッション状態を保持する
 	this.currentAdminId = TEST_ADMIN_ID;
@@ -149,7 +149,7 @@ async function createThreadWithPost(
 		body: `テスト書き込み本文（>>${postNumber}）`,
 		isSystemMessage: false,
 		isDeleted: false,
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	});
 
 	// postNumber -> postId のマッピングを登録する
@@ -456,7 +456,7 @@ Given(
 			body: "このスレッドのレスです",
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1325,7 +1325,7 @@ When("管理者がそのIP BANを解除する", async function (this: BattleBoar
 		InMemoryAdminRepo._insert({
 			id: TEST_ADMIN_ID,
 			role: "admin",
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		this.currentAdminId = TEST_ADMIN_ID;
 		this.isAdmin = true;
@@ -1782,7 +1782,7 @@ Given(
 			InMemoryAdminRepo._insert({
 				id: TEST_ADMIN_ID,
 				role: "admin",
-				createdAt: new Date(),
+				createdAt: new Date(Date.now()),
 			});
 			this.currentAdminId = TEST_ADMIN_ID;
 			this.isAdmin = true;
@@ -1906,7 +1906,7 @@ let dashboardHistoryResult:
 When("ダッシュボードを表示する", async function (this: BattleBoardWorld) {
 	assert(this.currentAdminId, "管理者がログイン済みである必要があります");
 	const AdminService = getAdminServiceForDashboard();
-	const today = new Date().toISOString().slice(0, 10);
+	const today = new Date(Date.now()).toISOString().slice(0, 10);
 	dashboardResult = await AdminService.getDashboard({ today });
 	this.lastResult = { type: "success", data: dashboardResult };
 });
@@ -2012,7 +2012,7 @@ Then("通貨流通量が表示される", function (this: BattleBoardWorld) {
 Given(
 	"過去7日分の日次統計が記録されている",
 	async function (this: BattleBoardWorld) {
-		const today = new Date();
+		const today = new Date(Date.now());
 		for (let i = 7; i >= 1; i--) {
 			const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
 			const statDate = date.toISOString().slice(0, 10);

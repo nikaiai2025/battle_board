@@ -63,14 +63,12 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
 		const threads = await PostService.getThreadList("battleboard", 50);
 		return NextResponse.json({ threads }, { status: 200 });
 	} catch (err) {
+		// HIGH-002: err.message をクライアントに漏洩させない（固定メッセージのみ返す）
 		console.error("[GET /api/threads] Unhandled error:", err);
 		return NextResponse.json(
 			{
 				error: "INTERNAL_ERROR",
-				message:
-					err instanceof Error
-						? err.message
-						: "サーバー内部エラーが発生しました",
+				message: "サーバー内部エラーが発生しました",
 			},
 			{ status: 500 },
 		);
@@ -195,14 +193,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 		// 成功: 201 + Thread JSON
 		return NextResponse.json(result.thread, { status: 201 });
 	} catch (err) {
+		// HIGH-002: err.message をクライアントに漏洩させない（固定メッセージのみ返す）
 		console.error("[POST /api/threads] Unhandled error:", err);
 		return NextResponse.json(
 			{
 				error: "INTERNAL_ERROR",
-				message:
-					err instanceof Error
-						? err.message
-						: "サーバー内部エラーが発生しました",
+				message: "サーバー内部エラーが発生しました",
 			},
 			{ status: 500 },
 		);

@@ -291,7 +291,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId!,
 			balance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );
@@ -358,7 +358,7 @@ Given(
 		await InMemoryUserRepo.updateStreak(
 			this.currentUserId!,
 			streakDays,
-			new Date().toISOString().slice(0, 10),
+			new Date(Date.now()).toISOString().slice(0, 10),
 		);
 	},
 );

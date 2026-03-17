@@ -480,7 +480,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// Step 10: スレッド更新
 	// See: docs/architecture/architecture.md §7.1 Step 2
 	await ThreadRepository.incrementPostCount(input.threadId);
-	await ThreadRepository.updateLastPostAt(input.threadId, new Date());
+	await ThreadRepository.updateLastPostAt(input.threadId, new Date(Date.now()));
 
 	// Step 11: IncentiveService 遅延評価ボーナス（Phase 2: INSERT + incrementPostCount後）
 	// 対象: hot_post, thread_revival, thread_growth
@@ -630,7 +630,7 @@ export async function createThread(
 	// PostRepository に findById があるが、createPost の戻り値から postNumber を取得済み
 	// firstPost を返すために postId から Post を復元する
 	// 簡易実装: createPost が返した情報でミニマルな Post オブジェクトを構築する
-	const firstPostCreatedAt = new Date();
+	const firstPostCreatedAt = new Date(Date.now());
 	const firstPost: Post = {
 		id: postResult.postId,
 		threadId: thread.id,

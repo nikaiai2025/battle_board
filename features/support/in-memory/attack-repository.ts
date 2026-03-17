@@ -34,7 +34,7 @@ export function _insert(attack: Omit<Attack, "id" | "createdAt">): void {
 	store.push({
 		...attack,
 		id: crypto.randomUUID(),
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	});
 }
 
@@ -54,7 +54,7 @@ export async function create(
 	const newAttack: Attack = {
 		...attack,
 		id: crypto.randomUUID(),
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	};
 	store.push(newAttack);
 	return newAttack;

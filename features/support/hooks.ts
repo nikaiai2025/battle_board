@@ -79,7 +79,7 @@ Before(async function (this: BattleBoardWorld, scenario: any) {
 		InMemoryCurrencyRepo._upsert({
 			userId,
 			balance: 200,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	}
 });

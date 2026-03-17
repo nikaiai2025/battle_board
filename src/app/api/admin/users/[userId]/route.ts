@@ -25,26 +25,38 @@ export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ userId: string }> },
 ): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
+	try {
+		// 管理者セッション検証
+		const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-	const admin = await verifyAdminSession(sessionToken);
-	if (!admin) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
+		const admin = await verifyAdminSession(sessionToken);
+		if (!admin) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-	const { userId } = await params;
-	if (!userId) {
-		return NextResponse.json({ error: "userId is required" }, { status: 400 });
-	}
+		const { userId } = await params;
+		if (!userId) {
+			return NextResponse.json(
+				{ error: "userId is required" },
+				{ status: 400 },
+			);
+		}
 
-	const detail = await getUserDetail(userId);
-	if (!detail) {
-		return NextResponse.json({ error: "User not found" }, { status: 404 });
-	}
+		const detail = await getUserDetail(userId);
+		if (!detail) {
+			return NextResponse.json({ error: "User not found" }, { status: 404 });
+		}
 
-	return NextResponse.json(detail);
+		return NextResponse.json(detail);
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error("[GET /api/admin/users/[userId]] Unhandled error:", err);
+		return NextResponse.json(
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
+			{ status: 500 },
+		);
+	}
 }

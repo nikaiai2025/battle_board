@@ -511,7 +511,11 @@ export async function getUserPosts(
 	userId: string,
 	options: { limit?: number; offset?: number } = {},
 ): Promise<import("../domain/models/post").Post[]> {
-	return PostRepository.findByAuthorId(userId, { limit: options.limit });
+	// HIGH-003: offset をリポジトリに伝播してページネーションを機能させる
+	return PostRepository.findByAuthorId(userId, {
+		limit: options.limit,
+		offset: options.offset,
+	});
 }
 
 // ---------------------------------------------------------------------------
@@ -556,7 +560,8 @@ export async function getDashboard(
 	// 本日の書き込み数・アクティブスレッド数（リアルタイム）
 	// PostRepository 経由で集計するため、BDDテストでも InMemoryPostRepo が使われる
 	// See: tmp/feature_plan_admin_expansion.md §5-e リアルタイム値 vs スナップショット値
-	const today = options.today ?? new Date().toISOString().slice(0, 10);
+	const today =
+		options.today ?? new Date(Date.now()).toISOString().slice(0, 10);
 	const todayPosts = await PostRepository.countByDate(today);
 	const activeThreads = await PostRepository.countActiveThreadsByDate(today);
 
@@ -587,7 +592,7 @@ export async function getDashboardHistory(
 	options: { days?: number; fromDate?: string; toDate?: string } = {},
 ): Promise<DailyStat[]> {
 	const days = options.days ?? 7;
-	const today = new Date();
+	const today = new Date(Date.now());
 	const toDate =
 		options.toDate ??
 		new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);

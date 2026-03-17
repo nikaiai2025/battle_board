@@ -104,7 +104,7 @@ export async function create(
 		id: crypto.randomUUID(),
 		streakDays: 0,
 		lastPostDate: null,
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 		// Phase 3 フィールド: 省略時は NULL（仮ユーザー）
 		// See: features/user_registration.feature
 		supabaseAuthId: user.supabaseAuthId ?? null,
@@ -218,7 +218,9 @@ export async function updateRegistrationType(
 			...user,
 			registrationType,
 			registeredAt:
-				registrationType !== null ? (user.registeredAt ?? new Date()) : null,
+				registrationType !== null
+					? (user.registeredAt ?? new Date(Date.now()))
+					: null,
 		});
 	}
 }
@@ -263,7 +265,7 @@ export async function updateSupabaseAuthId(
 			...user,
 			supabaseAuthId,
 			registrationType,
-			registeredAt: new Date(),
+			registeredAt: new Date(Date.now()),
 		});
 	}
 }
@@ -309,7 +311,7 @@ export async function findByPatToken(patToken: string): Promise<User | null> {
 export async function updatePatLastUsedAt(userId: string): Promise<void> {
 	const user = store.get(userId);
 	if (user) {
-		store.set(userId, { ...user, patLastUsedAt: new Date() });
+		store.set(userId, { ...user, patLastUsedAt: new Date(Date.now()) });
 	}
 }
 

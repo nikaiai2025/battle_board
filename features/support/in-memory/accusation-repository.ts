@@ -38,7 +38,7 @@ export async function create(
 	const newAccusation: Accusation = {
 		...accusation,
 		id: crypto.randomUUID(),
-		createdAt: new Date(),
+		createdAt: new Date(Date.now()),
 	};
 	store.push(newAccusation);
 	return newAccusation;

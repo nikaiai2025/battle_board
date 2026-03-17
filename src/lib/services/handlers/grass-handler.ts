@@ -206,7 +206,7 @@ export class GrassHandler implements CommandHandler {
 
 		// ステップ6: 同日重複チェック
 		// See: features/reactions.feature @同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
-		const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+		const today = new Date(Date.now()).toISOString().split("T")[0]; // YYYY-MM-DD
 		const alreadyGiven = await this.grassRepository.existsForToday(
 			ctx.userId,
 			receiverId,

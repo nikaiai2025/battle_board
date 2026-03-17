@@ -340,7 +340,7 @@ Given(
 		InMemoryAdminRepo._insert({
 			id: TEST_ADMIN_ID,
 			role: "admin",
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		this.currentAdminId = TEST_ADMIN_ID;
 		this.isAdmin = true;
@@ -373,7 +373,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		postNumberToId.set(7, postId);
 
@@ -406,7 +406,7 @@ Given(
 		InMemoryAdminRepo._insert({
 			id: TEST_ADMIN_ID,
 			role: "admin",
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		this.currentAdminId = TEST_ADMIN_ID;
 		this.isAdmin = true;
@@ -439,7 +439,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		postNumberToId.set(3, postId);
 
@@ -597,7 +597,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: true,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		postNumberToId.set(10, postId);
 		// AI告発シナリオでも使用されるため accusationState にも登録する（TASK-079）

@@ -252,7 +252,7 @@ Then("スレッドは作成されない", function (this: BattleBoardWorld) {
 Given(
 	"スレッド {string} が存在し {int}件のレスがある",
 	async function (this: BattleBoardWorld, title: string, postCount: number) {
-		const now = new Date();
+		const now = new Date(Date.now());
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: Math.floor(now.getTime() / 1000).toString(),
 			boardId: TEST_BOARD_ID,

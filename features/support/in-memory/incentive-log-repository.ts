@@ -14,27 +14,27 @@
  * See: task_TASK-016.md §補足・制約 > incentive-log-repository の一意制約
  */
 
-import type { IncentiveLog } from '../../../src/lib/domain/models/incentive'
+import type { IncentiveLog } from "../../../src/lib/domain/models/incentive";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
 // ---------------------------------------------------------------------------
 
 /** シナリオ間でリセットされるインセンティブログストア */
-const store = new Map<string, IncentiveLog>()
+const store = new Map<string, IncentiveLog>();
 
 /**
  * ストアを初期化する（Beforeフックから呼び出す）。
  */
 export function reset(): void {
-  store.clear()
+	store.clear();
 }
 
 /**
  * テスト用ヘルパー: インセンティブログを直接ストアに追加する。
  */
 export function _insert(log: IncentiveLog): void {
-  store.set(log.id, log)
+	store.set(log.id, log);
 }
 
 // ---------------------------------------------------------------------------
@@ -50,22 +50,22 @@ export function _insert(log: IncentiveLog): void {
  * See: src/lib/infrastructure/repositories/incentive-log-repository.ts
  */
 function isDuplicate(
-  userId: string,
-  eventType: string,
-  contextId: string | null,
-  contextDate: string
+	userId: string,
+	eventType: string,
+	contextId: string | null,
+	contextDate: string,
 ): boolean {
-  for (const log of store.values()) {
-    if (
-      log.userId === userId &&
-      log.eventType === eventType &&
-      log.contextId === contextId &&
-      log.contextDate === contextDate
-    ) {
-      return true
-    }
-  }
-  return false
+	for (const log of store.values()) {
+		if (
+			log.userId === userId &&
+			log.eventType === eventType &&
+			log.contextId === contextId &&
+			log.contextDate === contextDate
+		) {
+			return true;
+		}
+	}
+	return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,20 +81,20 @@ function isDuplicate(
  * See: src/lib/infrastructure/repositories/incentive-log-repository.ts
  */
 export async function create(
-  log: Omit<IncentiveLog, 'id' | 'createdAt'>
+	log: Omit<IncentiveLog, "id" | "createdAt">,
 ): Promise<IncentiveLog | null> {
-  // 一意制約チェック
-  if (isDuplicate(log.userId, log.eventType, log.contextId, log.contextDate)) {
-    return null
-  }
+	// 一意制約チェック
+	if (isDuplicate(log.userId, log.eventType, log.contextId, log.contextDate)) {
+		return null;
+	}
 
-  const newLog: IncentiveLog = {
-    ...log,
-    id: crypto.randomUUID(),
-    createdAt: new Date(),
-  }
-  store.set(newLog.id, newLog)
-  return newLog
+	const newLog: IncentiveLog = {
+		...log,
+		id: crypto.randomUUID(),
+		createdAt: new Date(Date.now()),
+	};
+	store.set(newLog.id, newLog);
+	return newLog;
 }
 
 /**
@@ -102,12 +102,12 @@ export async function create(
  * See: src/lib/infrastructure/repositories/incentive-log-repository.ts
  */
 export async function findByUserIdAndDate(
-  userId: string,
-  contextDate: string
+	userId: string,
+	contextDate: string,
 ): Promise<IncentiveLog[]> {
-  return Array.from(store.values())
-    .filter(log => log.userId === userId && log.contextDate === contextDate)
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+	return Array.from(store.values())
+		.filter((log) => log.userId === userId && log.contextDate === contextDate)
+		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
 /**
@@ -115,16 +115,16 @@ export async function findByUserIdAndDate(
  * See: src/lib/infrastructure/repositories/incentive-log-repository.ts
  */
 export async function findByUserId(
-  userId: string,
-  options?: { limit?: number }
+	userId: string,
+	options?: { limit?: number },
 ): Promise<IncentiveLog[]> {
-  let logs = Array.from(store.values())
-    .filter(log => log.userId === userId)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+	let logs = Array.from(store.values())
+		.filter((log) => log.userId === userId)
+		.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-  if (options?.limit !== undefined) {
-    logs = logs.slice(0, options.limit)
-  }
+	if (options?.limit !== undefined) {
+		logs = logs.slice(0, options.limit);
+	}
 
-  return logs
+	return logs;
 }

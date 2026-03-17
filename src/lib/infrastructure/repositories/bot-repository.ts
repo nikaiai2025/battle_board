@@ -267,7 +267,7 @@ export async function updateDailyId(
 export async function reveal(botId: string): Promise<void> {
 	const { error } = await supabaseAdmin
 		.from("bots")
-		.update({ is_revealed: true, revealed_at: new Date().toISOString() })
+		.update({ is_revealed: true, revealed_at: new Date(Date.now()).toISOString() })
 		.eq("id", botId);
 
 	if (error) {
@@ -307,7 +307,7 @@ export async function eliminate(
 		.from("bots")
 		.update({
 			is_active: false,
-			eliminated_at: new Date().toISOString(),
+			eliminated_at: new Date(Date.now()).toISOString(),
 			eliminated_by: eliminatedBy,
 		})
 		.eq("id", botId);

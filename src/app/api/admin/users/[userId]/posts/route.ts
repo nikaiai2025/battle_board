@@ -29,31 +29,46 @@ export async function GET(
 	request: NextRequest,
 	{ params }: { params: Promise<{ userId: string }> },
 ): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	try {
+		// 管理者セッション検証
+		const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const admin = await verifyAdminSession(sessionToken);
+		if (!admin) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const { userId } = await params;
+		if (!userId) {
+			return NextResponse.json(
+				{ error: "userId is required" },
+				{ status: 400 },
+			);
+		}
+
+		// クエリパラメータ解釈
+		const { searchParams } = new URL(request.url);
+		const limit = Math.min(
+			Number.parseInt(searchParams.get("limit") ?? "50", 10),
+			200,
+		);
+		const offset = Number.parseInt(searchParams.get("offset") ?? "0", 10);
+
+		const posts = await getUserPosts(userId, { limit, offset });
+
+		return NextResponse.json({ posts, limit, offset });
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error(
+			"[GET /api/admin/users/[userId]/posts] Unhandled error:",
+			err,
+		);
+		return NextResponse.json(
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
+			{ status: 500 },
+		);
 	}
-
-	const admin = await verifyAdminSession(sessionToken);
-	if (!admin) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
-
-	const { userId } = await params;
-	if (!userId) {
-		return NextResponse.json({ error: "userId is required" }, { status: 400 });
-	}
-
-	// クエリパラメータ解釈
-	const { searchParams } = new URL(request.url);
-	const limit = Math.min(
-		Number.parseInt(searchParams.get("limit") ?? "50", 10),
-		200,
-	);
-	const offset = Number.parseInt(searchParams.get("offset") ?? "0", 10);
-
-	const posts = await getUserPosts(userId, { limit, offset });
-
-	return NextResponse.json({ posts, limit, offset });
 }

@@ -329,7 +329,7 @@ Given(
 			amount: 10,
 			contextId: this.currentThreadId ?? "dummy-thread",
 			contextDate: todayJst,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 	},
 );
@@ -365,7 +365,7 @@ Given(
 			amount: 10,
 			contextId: "dummy-thread-id",
 			contextDate: todayJst,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 		// daily_login もセット（スレッド作成後の書き込みとして）
 		const user = await InMemoryUserRepo.findById(this.currentUserId);
@@ -576,7 +576,7 @@ Given(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 	},
 );
@@ -621,7 +621,7 @@ Given(
 				inlineSystemInfo: null,
 				isSystemMessage: false,
 				isDeleted: false,
-				createdAt: new Date(),
+				createdAt: new Date(Date.now()),
 			});
 		}
 	},
@@ -649,7 +649,7 @@ Given(
 			amount: 5,
 			contextId: replyUserCtx.userId,
 			contextDate: todayJst,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		});
 	},
 );
@@ -785,7 +785,7 @@ Given(
 				amount: 3,
 				contextId: `dummy-thread-${i}`,
 				contextDate: todayJst,
-				createdAt: new Date(),
+				createdAt: new Date(Date.now()),
 			});
 		}
 	},
@@ -1028,7 +1028,7 @@ Given(
 		InMemoryCurrencyRepo._upsert({
 			userId: ctx.userId,
 			balance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	},
 );
@@ -1075,7 +1075,7 @@ When(
 			InMemoryCurrencyRepo._upsert({
 				userId: otherCtx.userId,
 				balance: 0,
-				updatedAt: new Date(),
+				updatedAt: new Date(Date.now()),
 			});
 		}
 
@@ -1136,7 +1136,7 @@ When(
 			inlineSystemInfo: null,
 			isSystemMessage: false,
 			isDeleted: false,
-			createdAt: new Date(),
+			createdAt: new Date(Date.now()),
 		};
 		InMemoryPostRepo._insert(newPost);
 		await InMemoryThreadRepo.incrementPostCount(this.currentThreadId);
@@ -1190,7 +1190,7 @@ When(
 			InMemoryCurrencyRepo._upsert({
 				userId: ctx.userId,
 				balance: 0,
-				updatedAt: new Date(),
+				updatedAt: new Date(Date.now()),
 			});
 		}
 
@@ -1254,7 +1254,7 @@ When(
 				InMemoryCurrencyRepo._upsert({
 					userId: ctx.userId,
 					balance: 0,
-					updatedAt: new Date(),
+					updatedAt: new Date(Date.now()),
 				});
 			}
 			// reply ボーナスの誤発火を防ぐため、対象レス作者への reply ログを事前挿入
@@ -1266,7 +1266,7 @@ When(
 					amount: 5,
 					contextId: ctx.userId, // 返信元ユーザーID（重複チェック用）
 					contextDate: todayJst,
-					createdAt: new Date(),
+					createdAt: new Date(Date.now()),
 				});
 			}
 			await PostService.createPost({
@@ -1318,7 +1318,7 @@ When(
 				InMemoryCurrencyRepo._upsert({
 					userId: ctx.userId,
 					balance: 0,
-					updatedAt: new Date(),
+					updatedAt: new Date(Date.now()),
 				});
 			}
 			// reply ボーナスの誤発火を防ぐため、対象レス作者への reply ログを事前挿入
@@ -1330,7 +1330,7 @@ When(
 					amount: 5,
 					contextId: ctx.userId,
 					contextDate: todayJst2,
-					createdAt: new Date(),
+					createdAt: new Date(Date.now()),
 				});
 			}
 			await PostService.createPost({
@@ -1379,7 +1379,7 @@ When(
 				InMemoryCurrencyRepo._upsert({
 					userId: ctx.userId,
 					balance: 0,
-					updatedAt: new Date(),
+					updatedAt: new Date(Date.now()),
 				});
 			}
 			// reply ボーナスの誤発火を防ぐため、対象レス作者への reply ログを事前挿入
@@ -1391,7 +1391,7 @@ When(
 					amount: 5,
 					contextId: ctx.userId,
 					contextDate: todayJstLate,
-					createdAt: new Date(),
+					createdAt: new Date(Date.now()),
 				});
 			}
 			await PostService.createPost({
@@ -1412,7 +1412,7 @@ When(
 			InMemoryCurrencyRepo._upsert({
 				userId: user3Ctx.userId,
 				balance: 0,
-				updatedAt: new Date(),
+				updatedAt: new Date(Date.now()),
 			});
 		}
 		// 3人目の reply ログも事前挿入
@@ -1424,7 +1424,7 @@ When(
 				amount: 5,
 				contextId: user3Ctx.userId,
 				contextDate: todayJstLate,
-				createdAt: new Date(),
+				createdAt: new Date(Date.now()),
 			});
 		}
 		const result = await PostService.createPost({
@@ -1515,7 +1515,7 @@ When(
 			InMemoryCurrencyRepo._upsert({
 				userId: ctx.userId,
 				balance: 0,
-				updatedAt: new Date(),
+				updatedAt: new Date(Date.now()),
 			});
 		}
 
@@ -1633,7 +1633,7 @@ When(
 			InMemoryCurrencyRepo._upsert({
 				userId: otherCtx.userId,
 				balance: 0,
-				updatedAt: new Date(),
+				updatedAt: new Date(Date.now()),
 			});
 		}
 

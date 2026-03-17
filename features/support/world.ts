@@ -357,7 +357,7 @@ export class BattleBoardWorld extends World {
 	 * @param minutes - 進める分数
 	 */
 	advanceTimeByMinutes(minutes: number): void {
-		const base = this.currentTime ?? new Date();
+		const base = this.currentTime ?? new Date(Date.now());
 		this.setCurrentTime(new Date(base.getTime() + minutes * 60 * 1000));
 	}
 

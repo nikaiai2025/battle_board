@@ -27,34 +27,43 @@ import { verifyAdminSession } from "@/lib/services/auth-service";
  * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	try {
+		// 管理者セッション検証
+		const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const admin = await verifyAdminSession(sessionToken);
+		if (!admin) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		// クエリパラメータ解釈
+		const { searchParams } = new URL(request.url);
+		const limit = Math.min(
+			Number.parseInt(searchParams.get("limit") ?? "50", 10),
+			200,
+		);
+		const offset = Number.parseInt(searchParams.get("offset") ?? "0", 10);
+		const orderByRaw = searchParams.get("orderBy");
+		const orderBy =
+			orderByRaw === "last_post_date" ? "last_post_date" : "created_at";
+
+		const result = await getUserList({ limit, offset, orderBy });
+
+		return NextResponse.json({
+			users: result.users,
+			total: result.total,
+			limit,
+			offset,
+		});
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error("[GET /api/admin/users] Unhandled error:", err);
+		return NextResponse.json(
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
+			{ status: 500 },
+		);
 	}
-
-	const admin = await verifyAdminSession(sessionToken);
-	if (!admin) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
-
-	// クエリパラメータ解釈
-	const { searchParams } = new URL(request.url);
-	const limit = Math.min(
-		Number.parseInt(searchParams.get("limit") ?? "50", 10),
-		200,
-	);
-	const offset = Number.parseInt(searchParams.get("offset") ?? "0", 10);
-	const orderByRaw = searchParams.get("orderBy");
-	const orderBy =
-		orderByRaw === "last_post_date" ? "last_post_date" : "created_at";
-
-	const result = await getUserList({ limit, offset, orderBy });
-
-	return NextResponse.json({
-		users: result.users,
-		total: result.total,
-		limit,
-		offset,
-	});
 }

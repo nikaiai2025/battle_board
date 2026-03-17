@@ -617,7 +617,7 @@ export class BotService {
 	 */
 	private getTodayJst(): string {
 		// JST = UTC+9 のため 9*60 分を加算する
-		const now = new Date();
+		const now = new Date(Date.now());
 		const jstOffset = 9 * 60 * 60 * 1000;
 		const jstDate = new Date(now.getTime() + jstOffset);
 		return jstDate.toISOString().slice(0, 10);

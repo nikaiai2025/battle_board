@@ -78,7 +78,7 @@ export async function upsert(
 	const existing = store.get(stat.statDate);
 	const newStat: DailyStat = {
 		...stat,
-		createdAt: existing?.createdAt ?? new Date(),
+		createdAt: existing?.createdAt ?? new Date(Date.now()),
 	};
 	store.set(stat.statDate, newStat);
 	return newStat;

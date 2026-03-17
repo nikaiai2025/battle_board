@@ -181,7 +181,7 @@ export async function deleteByToken(token: string): Promise<void> {
 export async function updateLastUsedAt(token: string): Promise<void> {
 	const { error } = await supabaseAdmin
 		.from("edge_tokens")
-		.update({ last_used_at: new Date().toISOString() })
+		.update({ last_used_at: new Date(Date.now()).toISOString() })
 		.eq("token", token);
 
 	if (error) {

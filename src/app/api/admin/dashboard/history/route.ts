@@ -32,27 +32,36 @@ import { verifyAdminSession } from "@/lib/services/auth-service";
  * See: features/admin.feature @管理者が統計情報の日次推移を確認できる
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	try {
+		// 管理者セッション検証
+		const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const admin = await verifyAdminSession(sessionToken);
+		if (!admin) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		// クエリパラメータ解釈
+		const { searchParams } = new URL(request.url);
+		const days = Math.min(
+			Number.parseInt(searchParams.get("days") ?? "7", 10),
+			90,
+		);
+		const fromDate = searchParams.get("fromDate") ?? undefined;
+		const toDate = searchParams.get("toDate") ?? undefined;
+
+		const history = await getDashboardHistory({ days, fromDate, toDate });
+
+		return NextResponse.json({ history, days });
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error("[GET /api/admin/dashboard/history] Unhandled error:", err);
+		return NextResponse.json(
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
+			{ status: 500 },
+		);
 	}
-
-	const admin = await verifyAdminSession(sessionToken);
-	if (!admin) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
-
-	// クエリパラメータ解釈
-	const { searchParams } = new URL(request.url);
-	const days = Math.min(
-		Number.parseInt(searchParams.get("days") ?? "7", 10),
-		90,
-	);
-	const fromDate = searchParams.get("fromDate") ?? undefined;
-	const toDate = searchParams.get("toDate") ?? undefined;
-
-	const history = await getDashboardHistory({ days, fromDate, toDate });
-
-	return NextResponse.json({ history, days });
 }

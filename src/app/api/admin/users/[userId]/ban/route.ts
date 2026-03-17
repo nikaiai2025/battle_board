@@ -40,37 +40,46 @@ export async function POST(
 	req: NextRequest,
 	{ params }: { params: Promise<{ userId: string }> },
 ): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
-		return NextResponse.json(
-			{ error: "管理者セッションが必要です" },
-			{ status: 403 },
-		);
-	}
-
-	const adminSession = await verifyAdminSession(sessionToken);
-	if (!adminSession) {
-		return NextResponse.json(
-			{ error: "管理者権限がありません" },
-			{ status: 403 },
-		);
-	}
-
-	const { userId } = await params;
-
-	const result = await banUser(userId, adminSession.userId);
-
-	if (!result.success) {
-		if (result.reason === "not_found") {
+	try {
+		// 管理者セッション検証
+		const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
 			return NextResponse.json(
-				{ error: "指定されたユーザーが見つかりません" },
-				{ status: 404 },
+				{ error: "管理者セッションが必要です" },
+				{ status: 403 },
 			);
 		}
-	}
 
-	return NextResponse.json({ success: true });
+		const adminSession = await verifyAdminSession(sessionToken);
+		if (!adminSession) {
+			return NextResponse.json(
+				{ error: "管理者権限がありません" },
+				{ status: 403 },
+			);
+		}
+
+		const { userId } = await params;
+
+		const result = await banUser(userId, adminSession.userId);
+
+		if (!result.success) {
+			if (result.reason === "not_found") {
+				return NextResponse.json(
+					{ error: "指定されたユーザーが見つかりません" },
+					{ status: 404 },
+				);
+			}
+		}
+
+		return NextResponse.json({ success: true });
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error("[POST /api/admin/users/[userId]/ban] Unhandled error:", err);
+		return NextResponse.json(
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
+			{ status: 500 },
+		);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -95,35 +104,47 @@ export async function DELETE(
 	req: NextRequest,
 	{ params }: { params: Promise<{ userId: string }> },
 ): Promise<NextResponse> {
-	// 管理者セッション検証
-	const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-	if (!sessionToken) {
-		return NextResponse.json(
-			{ error: "管理者セッションが必要です" },
-			{ status: 403 },
-		);
-	}
-
-	const adminSession = await verifyAdminSession(sessionToken);
-	if (!adminSession) {
-		return NextResponse.json(
-			{ error: "管理者権限がありません" },
-			{ status: 403 },
-		);
-	}
-
-	const { userId } = await params;
-
-	const result = await unbanUser(userId, adminSession.userId);
-
-	if (!result.success) {
-		if (result.reason === "not_found") {
+	try {
+		// 管理者セッション検証
+		const sessionToken = req.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+		if (!sessionToken) {
 			return NextResponse.json(
-				{ error: "指定されたユーザーが見つかりません" },
-				{ status: 404 },
+				{ error: "管理者セッションが必要です" },
+				{ status: 403 },
 			);
 		}
-	}
 
-	return NextResponse.json({ success: true });
+		const adminSession = await verifyAdminSession(sessionToken);
+		if (!adminSession) {
+			return NextResponse.json(
+				{ error: "管理者権限がありません" },
+				{ status: 403 },
+			);
+		}
+
+		const { userId } = await params;
+
+		const result = await unbanUser(userId, adminSession.userId);
+
+		if (!result.success) {
+			if (result.reason === "not_found") {
+				return NextResponse.json(
+					{ error: "指定されたユーザーが見つかりません" },
+					{ status: 404 },
+				);
+			}
+		}
+
+		return NextResponse.json({ success: true });
+	} catch (err) {
+		// HIGH-001: 未処理例外を500レスポンスに変換する
+		console.error(
+			"[DELETE /api/admin/users/[userId]/ban] Unhandled error:",
+			err,
+		);
+		return NextResponse.json(
+			{ error: "INTERNAL_ERROR", message: "サーバー内部エラーが発生しました" },
+			{ status: 500 },
+		);
+	}
 }

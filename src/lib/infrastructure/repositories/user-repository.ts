@@ -382,7 +382,7 @@ export async function updateSupabaseAuthId(
 		.update({
 			supabase_auth_id: supabaseAuthId,
 			registration_type: registrationType,
-			registered_at: new Date().toISOString(),
+			registered_at: new Date(Date.now()).toISOString(),
 		})
 		.eq("id", userId);
 
@@ -569,7 +569,7 @@ export async function findByPatToken(patToken: string): Promise<User | null> {
 export async function updatePatLastUsedAt(userId: string): Promise<void> {
 	const { error } = await supabaseAdmin
 		.from("users")
-		.update({ pat_last_used_at: new Date().toISOString() })
+		.update({ pat_last_used_at: new Date(Date.now()).toISOString() })
 		.eq("id", userId);
 
 	if (error) {

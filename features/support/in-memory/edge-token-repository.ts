@@ -43,7 +43,7 @@ export async function create(
 	userId: string,
 	token: string,
 ): Promise<EdgeToken> {
-	const now = new Date();
+	const now = new Date(Date.now());
 	const newEdgeToken: EdgeToken = {
 		id: crypto.randomUUID(),
 		userId,
@@ -100,7 +100,7 @@ export async function deleteByToken(token: string): Promise<void> {
 export async function updateLastUsedAt(token: string): Promise<void> {
 	for (const [id, edgeToken] of store.entries()) {
 		if (edgeToken.token === token) {
-			store.set(id, { ...edgeToken, lastUsedAt: new Date() });
+			store.set(id, { ...edgeToken, lastUsedAt: new Date(Date.now()) });
 			return;
 		}
 	}

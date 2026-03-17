@@ -44,7 +44,7 @@ export function _insert(ban: IpBan): void {
  * See: src/lib/infrastructure/repositories/ip-ban-repository.ts > isBanned
  */
 export async function isBanned(ipHash: string): Promise<boolean> {
-	const now = new Date();
+	const now = new Date(Date.now());
 	for (const ban of store.values()) {
 		if (
 			ban.ipHash === ipHash &&
@@ -72,7 +72,7 @@ export async function create(
 		ipHash,
 		reason,
 		bannedBy,
-		bannedAt: new Date(),
+		bannedAt: new Date(Date.now()),
 		expiresAt: null,
 		isActive: true,
 	};
@@ -98,7 +98,7 @@ export async function deactivate(id: string): Promise<void> {
  * See: src/lib/infrastructure/repositories/ip-ban-repository.ts > listActive
  */
 export async function listActive(): Promise<IpBan[]> {
-	const now = new Date();
+	const now = new Date(Date.now());
 	return Array.from(store.values())
 		.filter(
 			(ban) => ban.isActive && (ban.expiresAt === null || ban.expiresAt > now),

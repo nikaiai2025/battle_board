@@ -8,27 +8,27 @@
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
 
-import type { AuthCode } from '../../../src/lib/infrastructure/repositories/auth-code-repository'
+import type { AuthCode } from "../../../src/lib/infrastructure/repositories/auth-code-repository";
 
 // ---------------------------------------------------------------------------
 // インメモリストア
 // ---------------------------------------------------------------------------
 
 /** シナリオ間でリセットされる認証コードストア */
-const store = new Map<string, AuthCode>()
+const store = new Map<string, AuthCode>();
 
 /**
  * ストアを初期化する（Beforeフックから呼び出す）。
  */
 export function reset(): void {
-  store.clear()
+	store.clear();
 }
 
 /**
  * テスト用ヘルパー: 認証コードを直接ストアに追加する。
  */
 export function _insert(authCode: AuthCode): void {
-  store.set(authCode.id, authCode)
+	store.set(authCode.id, authCode);
 }
 
 // ---------------------------------------------------------------------------
@@ -40,15 +40,15 @@ export function _insert(authCode: AuthCode): void {
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function create(
-  authCode: Omit<AuthCode, 'id' | 'createdAt'>
+	authCode: Omit<AuthCode, "id" | "createdAt">,
 ): Promise<AuthCode> {
-  const newCode: AuthCode = {
-    ...authCode,
-    id: crypto.randomUUID(),
-    createdAt: new Date(),
-  }
-  store.set(newCode.id, newCode)
-  return newCode
+	const newCode: AuthCode = {
+		...authCode,
+		id: crypto.randomUUID(),
+		createdAt: new Date(Date.now()),
+	};
+	store.set(newCode.id, newCode);
+	return newCode;
 }
 
 /**
@@ -56,10 +56,10 @@ export async function create(
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function findByCode(code: string): Promise<AuthCode | null> {
-  for (const authCode of store.values()) {
-    if (authCode.code === code) return authCode
-  }
-  return null
+	for (const authCode of store.values()) {
+		if (authCode.code === code) return authCode;
+	}
+	return null;
 }
 
 /**
@@ -67,10 +67,10 @@ export async function findByCode(code: string): Promise<AuthCode | null> {
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
-  for (const authCode of store.values()) {
-    if (authCode.tokenId === tokenId) return authCode
-  }
-  return null
+	for (const authCode of store.values()) {
+		if (authCode.tokenId === tokenId) return authCode;
+	}
+	return null;
 }
 
 /**
@@ -78,10 +78,10 @@ export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function markVerified(id: string): Promise<void> {
-  const authCode = store.get(id)
-  if (authCode) {
-    store.set(id, { ...authCode, verified: true })
-  }
+	const authCode = store.get(id);
+	if (authCode) {
+		store.set(id, { ...authCode, verified: true });
+	}
 }
 
 /**
@@ -89,15 +89,15 @@ export async function markVerified(id: string): Promise<void> {
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function deleteExpired(): Promise<number> {
-  const now = new Date()
-  let count = 0
-  for (const [id, authCode] of store.entries()) {
-    if (authCode.expiresAt < now) {
-      store.delete(id)
-      count++
-    }
-  }
-  return count
+	const now = new Date(Date.now());
+	let count = 0;
+	for (const [id, authCode] of store.entries()) {
+		if (authCode.expiresAt < now) {
+			store.delete(id);
+			count++;
+		}
+	}
+	return count;
 }
 
 /**
@@ -109,14 +109,14 @@ export async function deleteExpired(): Promise<number> {
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 export async function updateWriteToken(
-  id: string,
-  writeToken: string,
-  writeTokenExpiresAt: Date
+	id: string,
+	writeToken: string,
+	writeTokenExpiresAt: Date,
 ): Promise<void> {
-  const authCode = store.get(id)
-  if (authCode) {
-    store.set(id, { ...authCode, writeToken, writeTokenExpiresAt })
-  }
+	const authCode = store.get(id);
+	if (authCode) {
+		store.set(id, { ...authCode, writeToken, writeTokenExpiresAt });
+	}
 }
 
 /**
@@ -127,11 +127,13 @@ export async function updateWriteToken(
  * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: tmp/escalations/escalation_ESC-TASK-041-1.md — ESC解決用追加
  */
-export async function findByWriteToken(writeToken: string): Promise<AuthCode | null> {
-  for (const authCode of store.values()) {
-    if (authCode.writeToken === writeToken) return authCode
-  }
-  return null
+export async function findByWriteToken(
+	writeToken: string,
+): Promise<AuthCode | null> {
+	for (const authCode of store.values()) {
+		if (authCode.writeToken === writeToken) return authCode;
+	}
+	return null;
 }
 
 /**
@@ -143,8 +145,8 @@ export async function findByWriteToken(writeToken: string): Promise<AuthCode | n
  * See: tmp/escalations/escalation_ESC-TASK-041-1.md — ESC解決用追加
  */
 export async function clearWriteToken(id: string): Promise<void> {
-  const authCode = store.get(id)
-  if (authCode) {
-    store.set(id, { ...authCode, writeToken: null, writeTokenExpiresAt: null })
-  }
+	const authCode = store.get(id);
+	if (authCode) {
+		store.set(id, { ...authCode, writeToken: null, writeTokenExpiresAt: null });
+	}
 }

@@ -119,24 +119,29 @@ export async function findByThreadId(
 
 /**
  * 著者 ID（author_id）に紐づくレス一覧を created_at DESC で取得する。
- * マイページの書き込み履歴表示などに使用する。
+ * マイページの書き込み履歴表示や管理画面のユーザー書き込み履歴に使用する。
+ *
+ * HIGH-003: offset パラメータを追加し、ページネーションに対応する。
+ * Supabase の .range() を使用して offset/limit を実現する。
  *
  * @param authorId - 著者ユーザーの UUID
  * @param options.limit - 取得件数（デフォルト 50）
+ * @param options.offset - スキップ件数（デフォルト 0）
  * @returns Post 配列（created_at DESC ソート済み）
  */
 export async function findByAuthorId(
 	authorId: string,
-	options: { limit?: number } = {},
+	options: { limit?: number; offset?: number } = {},
 ): Promise<Post[]> {
 	const limit = options.limit ?? 50;
+	const offset = options.offset ?? 0;
 
 	const { data, error } = await supabaseAdmin
 		.from("posts")
 		.select("*")
 		.eq("author_id", authorId)
 		.order("created_at", { ascending: false })
-		.limit(limit);
+		.range(offset, offset + limit - 1);
 
 	if (error) {
 		throw new Error(`PostRepository.findByAuthorId failed: ${error.message}`);
@@ -178,6 +183,9 @@ export async function getNextPostNumber(threadId: string): Promise<number> {
  * 新しいレスを作成する。
  * id / createdAt / isDeleted は DB のデフォルト値を使用する。
  *
+ * LOW-002: inline_system_info を INSERT オブジェクトに追加。
+ * コマンド結果やインセンティブ情報がレスに正しく保存されるようにする。
+ *
  * @param post - 作成するレスのデータ（自動設定フィールドを除く）
  * @returns 作成された Post（DB デフォルト値を含む）
  */
@@ -193,6 +201,7 @@ export async function create(
 			display_name: post.displayName,
 			daily_id: post.dailyId,
 			body: post.body,
+			inline_system_info: post.inlineSystemInfo,
 			is_system_message: post.isSystemMessage,
 		})
 		.select()

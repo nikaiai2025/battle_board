@@ -68,7 +68,7 @@ export async function create(
 	const currency: Currency = {
 		userId,
 		balance: initialBalance,
-		updatedAt: new Date(),
+		updatedAt: new Date(Date.now()),
 	};
 	store.set(userId, currency);
 	return currency;
@@ -84,7 +84,7 @@ export async function credit(userId: string, amount: number): Promise<void> {
 		store.set(userId, {
 			...currency,
 			balance: currency.balance + amount,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 	}
 }
@@ -117,7 +117,7 @@ export async function deduct(
 		store.set(userId, {
 			...currency,
 			balance: newBalance,
-			updatedAt: new Date(),
+			updatedAt: new Date(Date.now()),
 		});
 		return { success: true, newBalance };
 	});

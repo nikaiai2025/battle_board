@@ -177,14 +177,12 @@ export async function POST(
 			{ status: 201 },
 		);
 	} catch (err) {
+		// HIGH-002: err.message をクライアントに漏洩させない（固定メッセージのみ返す）
 		console.error("[POST /api/threads/[threadId]/posts] Unhandled error:", err);
 		return NextResponse.json(
 			{
 				error: "INTERNAL_ERROR",
-				message:
-					err instanceof Error
-						? err.message
-						: "サーバー内部エラーが発生しました",
+				message: "サーバー内部エラーが発生しました",
 			},
 			{ status: 500 },
 		);
