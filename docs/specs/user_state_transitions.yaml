@@ -98,6 +98,44 @@ account_transitions:
   # MVP期は有料→無料への戻しは未定義
 
 # =============================================
+# BAN状態
+# =============================================
+ban_states:
+  - name: active
+    label: 通常
+    description: BANされていない通常の状態。書き込みが可能
+    initial: true
+
+  - name: banned
+    label: BAN済み
+    description: >
+      管理者によりBANされた状態（users.is_banned = true）。
+      書き込みが拒否される。認証・閲覧は可能。
+
+ban_transitions:
+  - from: active
+    to: banned
+    trigger: 管理者がユーザーをBANする
+    action:
+      - users.is_banned = true に更新
+    feature_ref: admin.feature#管理者がユーザーをBANする
+
+  - from: banned
+    to: active
+    trigger: 管理者がユーザーBANを解除する
+    action:
+      - users.is_banned = false に更新
+    feature_ref: admin.feature#管理者がユーザーBANを解除する
+
+ban_constraints:
+  - name: banned_user_write_denied
+    description: BANされたユーザーの書き込みは拒否される
+    enforcement: >
+      書き込みAPI（PostService.createPost）で users.is_banned を確認し、
+      true の場合は書き込みを拒否する
+    feature_ref: admin.feature#BANされたユーザーが書き込みを試みると拒否される
+
+# =============================================
 # 日次リセットID
 # =============================================
 daily_id_lifecycle:

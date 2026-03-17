@@ -751,6 +751,605 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
   # -----------------------------------------
+  # 管理者: ユーザーBAN
+  # -----------------------------------------
+  /api/admin/users/{userId}/ban:
+    post:
+      operationId: adminBanUser
+      summary: ユーザーBAN（管理者）
+      description: |
+        指定ユーザーをBANする（users.is_banned = true）。
+        BANされたユーザーは書き込みが拒否される。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: BAN理由（管理者メモ）
+      responses:
+        "200":
+          description: BAN成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ユーザーが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: adminUnbanUser
+      summary: ユーザーBAN解除（管理者）
+      description: |
+        指定ユーザーのBANを解除する（users.is_banned = false）。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: BAN解除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ユーザーが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # 管理者: IP BAN
+  # -----------------------------------------
+  /api/admin/ip-bans:
+    post:
+      operationId: adminBanIp
+      summary: IP BAN追加（管理者）
+      description: |
+        指定ユーザーの現在のIPをBANする。
+        ユーザーの last_ip_hash を ip_bans テーブルに登録する。
+        管理者に IP ハッシュを直接扱わせず、userId で間接指定する。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                  description: 対象ユーザーの UUID（last_ip_hash でIPを特定）
+                reason:
+                  type: string
+                  description: BAN理由（管理者メモ）
+              required: [userId]
+      responses:
+        "200":
+          description: IP BAN成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  banId:
+                    type: string
+                    format: uuid
+                    description: 作成された IP BAN レコードのID
+        "400":
+          description: userId未指定、または対象ユーザーのIPハッシュが未記録
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ユーザーが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      operationId: adminListIpBans
+      summary: IP BAN一覧取得（管理者）
+      description: |
+        有効な IP BAN 一覧を取得する。
+        セキュリティ上、ipHash は返さない。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      responses:
+        "200":
+          description: IP BAN一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bans:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        reason:
+                          type: string
+                          nullable: true
+                        bannedAt:
+                          type: string
+                          format: date-time
+                        expiresAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/ip-bans/{banId}:
+    delete:
+      operationId: adminUnbanIp
+      summary: IP BAN解除（管理者）
+      description: |
+        指定 BAN ID の IP BAN を解除する（is_active = false）。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: banId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: IP BAN解除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 指定された IP BAN が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # 管理者: 通貨付与
+  # -----------------------------------------
+  /api/admin/users/{userId}/currency:
+    post:
+      operationId: adminGrantCurrency
+      summary: 通貨付与（管理者）
+      description: |
+        指定ユーザーに通貨を付与する（admin_grant reason）。
+        amount は正の整数であること。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: integer
+                  minimum: 1
+                  description: 付与額（正の整数）
+              required: [amount]
+      responses:
+        "200":
+          description: 付与成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  newBalance:
+                    type: integer
+                    description: 付与後の残高
+        "400":
+          description: amount が不正（0以下、非整数）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ユーザーが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # 管理者: ユーザー管理
+  # -----------------------------------------
+  /api/admin/users:
+    get:
+      operationId: adminListUsers
+      summary: ユーザー一覧取得（管理者）
+      description: |
+        ユーザー一覧をページネーション付きで取得する。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [created_at, last_post_date]
+            default: created_at
+      responses:
+        "200":
+          description: ユーザー一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      description: User エンティティ
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/users/{userId}:
+    get:
+      operationId: adminGetUserDetail
+      summary: ユーザー詳細取得（管理者）
+      description: |
+        指定ユーザーの詳細情報（基本情報・通貨残高・書き込み履歴最新50件）を取得する。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: ユーザー詳細
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  createdAt:
+                    type: string
+                    format: date-time
+                  isBanned:
+                    type: boolean
+                  isPremium:
+                    type: boolean
+                  registrationType:
+                    type: string
+                    nullable: true
+                    enum: [email, discord, null]
+                  username:
+                    type: string
+                    nullable: true
+                  streakDays:
+                    type: integer
+                  grassCount:
+                    type: integer
+                  balance:
+                    type: integer
+                  posts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+        "401":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ユーザーが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/users/{userId}/posts:
+    get:
+      operationId: adminGetUserPosts
+      summary: ユーザー書き込み履歴取得（管理者）
+      description: |
+        指定ユーザーの書き込み履歴をページネーション付きで取得する（created_at DESC）。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: 書き込み履歴
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        "401":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # 管理者: ダッシュボード
+  # -----------------------------------------
+  /api/admin/dashboard:
+    get:
+      operationId: adminGetDashboard
+      summary: ダッシュボード統計情報取得（管理者）
+      description: |
+        ダッシュボードのリアルタイムサマリーを取得する。
+        本日分はリアルタイム集計（UserRepository, PostRepository, CurrencyRepository から直接集計）。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: today
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: 本日日付（YYYY-MM-DD）。省略時はサーバー現在日付
+      responses:
+        "200":
+          description: ダッシュボードサマリー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUsers:
+                    type: integer
+                    description: 総ユーザー数（仮+本登録）
+                  todayPosts:
+                    type: integer
+                    description: 本日の書き込み数（非システムメッセージ）
+                  activeThreads:
+                    type: integer
+                    description: アクティブスレッド数（本日書き込みがあったスレッド）
+                  currencyInCirculation:
+                    type: integer
+                    description: 通貨流通量（全ユーザー残高合計）
+                required: [totalUsers, todayPosts, activeThreads, currencyInCirculation]
+        "401":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/admin/dashboard/history:
+    get:
+      operationId: adminGetDashboardHistory
+      summary: ダッシュボード日次推移取得（管理者）
+      description: |
+        ダッシュボードの日次推移を daily_stats テーブルから取得する。
+        本日分はリアルタイム集計のため /dashboard を参照する。
+      tags: [管理者]
+      security:
+        - adminSessionCookie: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+            maximum: 90
+          description: 取得日数
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: 開始日（YYYY-MM-DD）。省略時は today - days
+        - name: toDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: 終了日（YYYY-MM-DD）。省略時は昨日
+      responses:
+        "200":
+          description: 日次推移データ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        statDate:
+                          type: string
+                          format: date
+                        totalUsers:
+                          type: integer
+                        newUsers:
+                          type: integer
+                        activeUsers:
+                          type: integer
+                        totalPosts:
+                          type: integer
+                        totalThreads:
+                          type: integer
+                        activeThreads:
+                          type: integer
+                        currencyInCirculation:
+                          type: integer
+                        currencyGranted:
+                          type: integer
+                        currencyConsumed:
+                          type: integer
+                        totalAccusations:
+                          type: integer
+                        totalAttacks:
+                          type: integer
+                  days:
+                    type: integer
+        "401":
+          description: 管理者権限なし
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
   # 5ch専ブラ互換 API
   # -----------------------------------------
   /bbsmenu.html:

@@ -95,7 +95,6 @@ transitions:
     action:
       - accusations レコードを INSERT（result='hit'）
       - 対象ボットの is_revealed = true に更新
-      - 告発成功ボーナスを告発者に付与
       - システムメッセージをスレッドに追加
     feature_ref: ai_accusation.feature#AI告発に成功すると結果がスレッド全体に公開される
 
@@ -117,7 +116,6 @@ accusation_flow:
       result: hit（成功）
       effects:
         - 告発コスト消費
-        - 告発成功ボーナスを告発者に付与
         - 対象ボットに BOTマーク付与
         - HP状況を公開
         - システムメッセージ: ">>N は… AIでした！🤖"
@@ -127,9 +125,9 @@ accusation_flow:
       result: miss（失敗）
       effects:
         - 告発コスト消費
-        - 被告発者（人間）に冤罪ボーナス付与
         - システムメッセージ: ">>N は… 人間でした！"
-      feature_ref: ai_accusation.feature#AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+      feature_ref: ai_accusation.feature#AI告発に失敗するとコストのみ消費される
+      note: v4で冤罪ボーナスは廃止。コスト消費のみ
 
 # =============================================
 # コマンド解析フロー

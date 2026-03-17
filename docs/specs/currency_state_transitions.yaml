@@ -123,20 +123,22 @@ increase_events:
     feature_ref: incentive.feature#レス番号 >>1000 を踏むと +100 ボーナスが付与される
 
 # =============================================
+# 通貨増加イベント（管理者操作）
+# =============================================
+  - event: admin_grant
+    label: 管理者通貨付与
+    amount: 任意（正の整数。管理者が指定）
+    condition: 管理者が管理画面から通貨付与を実行
+    recipient: 指定ユーザー
+    note: CurrencyService.credit を admin_grant reason で呼び出す
+    feature_ref: admin.feature#管理者が指定ユーザーに通貨を付与する
+
+# =============================================
 # 通貨増加イベント（Phase 2: ゲーム報酬）
 # =============================================
-  - event: accusation_success_bonus
-    label: AI告発成功ボーナス
-    amount: TBD
-    condition: "!tell で対象がAIボットだった"
-    feature_ref: ai_accusation.feature#AI告発に成功すると結果がスレッド全体に公開される
-
-  - event: false_accusation_bonus
-    label: 冤罪ボーナス
-    amount: TBD
-    recipient: 被告発者（人間）
-    condition: "!tell で対象が人間だった"
-    feature_ref: ai_accusation.feature#AI告発に失敗すると冤罪ボーナスが被告発者に付与される
+  # NOTE: accusation_success_bonus（AI告発成功ボーナス）および
+  #        false_accusation_bonus（冤罪ボーナス）は v4 で廃止済み。
+  #        See: ubiquitous_language.yaml > AI告発、冤罪ボーナス
 
   - event: elimination_reward
     label: 撃破報酬

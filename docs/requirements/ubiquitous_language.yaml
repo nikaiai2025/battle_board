@@ -225,12 +225,50 @@ ubiquitous_language:
     definition: >
       掲示板の運営・管理を行う特権ユーザー。
       メールアドレス + パスワードでログインする（一般ユーザーの認証とは完全分離）。
-      レスやスレッドの削除権限を持つ。運営ボットの管理も行う。
+      レスやスレッドの削除、ユーザーBAN、IP BAN、通貨付与、
+      ユーザー管理、ダッシュボード閲覧の権限を持つ。運営ボットの管理も行う。
     forbidden_alias:
       - モデレーター
       - 運営
       - オペレーター
-    notes: "MVPでは管理者機能はレス・スレッド削除のみ。管理者認証は Supabase Auth を使用"
+    notes: "管理者認証は Supabase Auth を使用。admin_session Cookie でセッション管理"
+
+  - term: ユーザーBAN
+    english: user_ban
+    definition: >
+      管理者がユーザーを書き込み禁止にする管理操作。
+      users.is_banned フラグで制御する。BANされたユーザーは
+      書き込みが拒否されるが、閲覧は可能。管理者がBAN解除することで復帰する。
+      ゲームコマンド !mute（書き込み禁止）とは異なる概念であり、
+      ユーザーBANは管理者権限による永続的な制限、!mute はプレイヤー間の一時的な制限。
+    forbidden_alias:
+      - アカウントBAN
+      - アカウント停止
+    notes: "!mute（書き込み禁止）はゲームコマンド。ユーザーBANは管理者操作。両者は別概念"
+
+  - term: IP BAN
+    english: ip_ban
+    definition: >
+      管理者が特定のIPアドレス（のハッシュ値）からの書き込みを禁止する管理操作。
+      ユーザーの last_ip_hash を ip_bans テーブルに登録することで実現する。
+      管理者はIPハッシュを直接扱わず、userId を指定して間接的にBANする。
+      ユーザーBANとの併用により、アカウント乗り換えによるBAN回避を抑止する。
+    forbidden_alias:
+      - IPブロック
+      - IP制限
+    notes: "生IPは保存しない（SHA-512ハッシュ値のみ）。is_active フラグで論理削除"
+
+  - term: ダッシュボード
+    english: dashboard
+    definition: >
+      管理者が掲示板の運営状況を俯瞰するための統計情報画面。
+      リアルタイムサマリー（総ユーザー数・本日書き込み数・アクティブスレッド数・
+      通貨流通量）と日次推移（daily_stats テーブルのスナップショット）を提供する。
+      本日分はリアルタイム集計、過去分はスナップショット値を使用する。
+    forbidden_alias:
+      - 管理画面トップ
+      - 統計ページ
+    notes: "daily_stats テーブルは日次集計スクリプトで更新される"
 
   # --- AIボット ---
 
