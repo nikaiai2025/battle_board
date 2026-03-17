@@ -15,8 +15,10 @@
  *
  * 設計方針:
  *   - AttackHandler からの呼び出しを想定した「ボット側の操作 API」として設計する
- *   - CurrencyService への撃破報酬付与は AttackHandler 側で行う（循環依存回避）
+ *   - CurrencyService には依存しない（撃破報酬付与は AttackHandler が行う）
  *   - bot_profiles.yaml の読み込みはコンストラクタで行い、キャッシュする
+ *   - v6: executeBotPost / selectTargetThread / getNextPostDelay を Strategy 委譲に変更
+ *         See: docs/architecture/components/bot.md §2.12 Strategy パターン設計
  */
 
 import fs from "fs";
@@ -28,6 +30,14 @@ import {
 	type RewardParams,
 } from "../domain/rules/elimination-reward";
 import type { Attack } from "../infrastructure/repositories/attack-repository";
+import { resolveStrategies as defaultResolveStrategies } from "./bot-strategies/strategy-resolver";
+import type {
+	BehaviorContext,
+	BotProfile,
+	BotStrategies,
+	ContentGenerationContext,
+	SchedulingContext,
+} from "./bot-strategies/types";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -164,6 +174,20 @@ export interface IAttackRepository {
 	deleteByDateBefore(beforeDate: string): Promise<number>;
 }
 
+/**
+ * Strategy 解決関数の型（DI用）。
+ * テスト時にモックの Strategy を注入するために使用する。
+ * See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+ */
+export type ResolveStrategiesFn = (
+	bot: Bot,
+	profile: BotProfile | null,
+	options: {
+		threadRepository: IThreadRepository;
+		botProfilesYamlPath?: string;
+	},
+) => BotStrategies;
+
 // ---------------------------------------------------------------------------
 // ボット書き込みデフォルト定数
 // ---------------------------------------------------------------------------
@@ -187,8 +211,8 @@ interface BotProfileReward {
 	attack_bonus: number;
 }
 
-/** bot_profiles.yaml の個別プロファイル型 */
-interface BotProfile {
+/** bot_profiles.yaml の個別プロファイル型（BotService 内部用） */
+interface BotProfileInternal {
 	hp: number;
 	max_hp: number;
 	reward: BotProfileReward;
@@ -196,7 +220,7 @@ interface BotProfile {
 }
 
 /** bot_profiles.yaml のルート型 */
-type BotProfilesYaml = Record<string, BotProfile>;
+type BotProfilesYaml = Record<string, BotProfileInternal>;
 
 // ---------------------------------------------------------------------------
 // デフォルト報酬パラメータ（bot_profiles.yaml に値がない場合のフォールバック）
@@ -219,9 +243,13 @@ const DEFAULT_REWARD_PARAMS: RewardParams = {
  * AttackHandler からの呼び出しを受け付ける「ボット側の操作 API」。
  * CurrencyService には依存しない（撃破報酬付与は AttackHandler が行う）。
  *
+ * v6 以降、executeBotPost / selectTargetThread / getNextPostDelay は
+ * Strategy パターンに委譲する（TDR-008）。
+ *
  * See: features/bot_system.feature
  * See: docs/architecture/components/bot.md §2 公開インターフェース
  * See: docs/architecture/components/bot.md §6.4 CurrencyService への撃破報酬付与の責務配置
+ * See: docs/architecture/components/bot.md §2.12 Strategy パターン設計
  */
 export class BotService {
 	/** bot_profiles.yaml の解析済みデータ（キャッシュ） */
@@ -234,14 +262,18 @@ export class BotService {
 	 * @param botProfilesYamlPath - bot_profiles.yaml のパス（省略時はデフォルトパス）
 	 * @param threadRepository - スレッド一覧取得（DI・省略可）
 	 * @param createPostFn - PostService.createPost の関数参照（DI・省略可）
+	 * @param resolveStrategiesFn - Strategy 解決関数（DI・省略時はデフォルト resolveStrategies）
+	 *   テスト時にモックの Strategy を注入するために使用する。
+	 *   See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
 	 */
 	constructor(
 		private readonly botRepository: IBotRepository,
 		private readonly botPostRepository: IBotPostRepository,
 		private readonly attackRepository: IAttackRepository,
-		botProfilesYamlPath?: string,
+		private readonly botProfilesYamlPath?: string,
 		private readonly threadRepository?: IThreadRepository,
 		private readonly createPostFn?: CreatePostFn,
+		private readonly resolveStrategiesFn?: ResolveStrategiesFn,
 	) {
 		// bot_profiles.yaml を読み込みキャッシュする
 		// See: docs/architecture/components/bot.md §4 隠蔽する実装詳細 > 撃破報酬パラメータのconfig読み込みとキャッシュ戦略
@@ -510,7 +542,7 @@ export class BotService {
 	 *   1. 全ボットの偽装 ID を再生成
 	 *   2. revealed -> lurking（BOTマーク解除）
 	 *   3. lurking/revealed ボットの survival_days +1
-	 *   4. eliminated -> lurking（HP 初期値復帰、survival_days=0、times_attacked=0）
+	 *   4. eliminated -> lurking（HP 復帰・survival_days=0・times_attacked=0）
 	 *   5. attacks テーブルの前日分レコードをクリーンアップ
 	 *
 	 * See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
@@ -566,25 +598,29 @@ export class BotService {
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * ボットに書き込みを実行させる。
+	 * ボットに書き込みを実行させる（Strategy 委譲版 v6）。
 	 *
-	 * 処理フロー:
-	 *   1. bot_profiles.yaml の fixed_messages からランダムに1件選択
-	 *   2. getDailyId(botId) で偽装IDを取得
-	 *   3. createPostFn を isBotWrite=true で呼び出す
+	 * 処理フロー（Strategy 委譲版）:
+	 *   1. resolveStrategies() で3つの Strategy を解決
+	 *   2. behavior.decideAction(context) で投稿先を決定（BotAction を取得）
+	 *      - threadId 引数が渡された場合は後方互換として post_to_existing に固定
+	 *   3. BotAction.type に応じて分岐:
+	 *      - post_to_existing: content.generateContent(context) で本文生成 -> PostService.createPost
+	 *      - create_thread: BehaviorStrategy が返した title/body を使用 -> PostService.createThread（Phase 3以降）
 	 *   4. 成功したら botPostRepository.create(postId, botId) で紐付け INSERT
 	 *   5. { postId, postNumber, dailyId } を返す
 	 *
 	 * See: features/bot_system.feature @荒らし役ボットが書き込みを行う場合本文は固定文リストのいずれかである
-	 * See: docs/architecture/components/bot.md §2.1 書き込み実行
+	 * See: docs/architecture/components/bot.md §2.1 書き込み実行（Strategy 委譲版）
+	 * See: docs/architecture/components/bot.md §2.12 Strategy パターン設計
 	 *
 	 * @param botId - ボットID
-	 * @param threadId - 書き込み先スレッドID
+	 * @param threadId - 書き込み先スレッドID（省略時は BehaviorStrategy が決定）
 	 * @returns 書き込み結果
 	 */
 	async executeBotPost(
 		botId: string,
-		threadId: string,
+		threadId?: string,
 	): Promise<{ postId: string; postNumber: number; dailyId: string }> {
 		if (!this.createPostFn) {
 			throw new Error(
@@ -592,25 +628,66 @@ export class BotService {
 			);
 		}
 
-		// Step 1: ボットプロファイルの固定文リストからランダムに1件選択
-		// See: docs/architecture/components/bot.md §4 > 荒らし役のAI API不使用
+		// Step 1: ボット情報取得
 		const bot = await this.botRepository.findById(botId);
 		if (!bot) {
 			throw new Error(
 				`BotService.executeBotPost: ボットが見つかりません (botId=${botId})`,
 			);
 		}
-		const fixedMessages = this.getFixedMessages(bot.botProfileKey);
-		const body =
-			fixedMessages[Math.floor(Math.random() * fixedMessages.length)];
 
-		// Step 2: 偽装日次リセットIDを取得
+		// Step 2: bot_profiles.yaml からプロファイルを取得
+		const profile = this.getBotProfileForStrategy(bot.botProfileKey);
+
+		// Step 3: resolveStrategies() で3つの Strategy を解決
+		// See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+		const strategies = this.resolveStrategiesForBot(bot, profile);
+
+		// Step 4: BehaviorStrategy で投稿先を決定
+		// threadId 引数が渡された場合は後方互換として post_to_existing に固定する
+		// See: docs/architecture/components/bot.md §2.1 > 外部インターフェースの互換性
+		let resolvedThreadId: string;
+
+		if (threadId !== undefined) {
+			// 後方互換: 呼び出し元が threadId を指定した場合はそちらを優先
+			resolvedThreadId = threadId;
+		} else {
+			// v6 新規フロー: BehaviorStrategy に投稿先を委譲する
+			// See: docs/architecture/components/bot.md §2.1 Strategy 委譲版フロー
+			const behaviorContext: BehaviorContext = {
+				botId,
+				botProfileKey: bot.botProfileKey,
+				boardId: BOT_DEFAULT_BOARD_ID,
+			};
+			const action = await strategies.behavior.decideAction(behaviorContext);
+
+			if (action.type === "create_thread") {
+				// Phase 3 以降: スレッド作成処理（現時点では未実装）
+				// See: docs/architecture/components/bot.md §2.12.5 ネタ師の行動フロー
+				throw new Error(
+					"BotService.executeBotPost: create_thread アクションは Phase 3 以降に対応予定です",
+				);
+			}
+
+			resolvedThreadId = action.threadId;
+		}
+
+		// Step 5: ContentStrategy で本文生成
+		// See: docs/architecture/components/bot.md §2.1 Strategy 委譲版フロー Step 3
+		const contentContext: ContentGenerationContext = {
+			botId,
+			botProfileKey: bot.botProfileKey,
+			threadId: resolvedThreadId,
+		};
+		const body = await strategies.content.generateContent(contentContext);
+
+		// Step 6: 偽装日次リセットIDを取得
 		const dailyId = await this.getDailyId(botId);
 
-		// Step 3: PostService.createPost を isBotWrite=true で呼び出す
+		// Step 7: PostService.createPost を isBotWrite=true で呼び出す
 		// See: docs/architecture/components/bot.md §3.1 依存先 > PostService
 		const result = await this.createPostFn({
-			threadId,
+			threadId: resolvedThreadId,
 			body,
 			edgeToken: null,
 			ipHash: `bot-${botId}`,
@@ -625,7 +702,7 @@ export class BotService {
 			);
 		}
 
-		// Step 4: bot_posts に { postId, botId } を INSERT
+		// Step 8: bot_posts に { postId, botId } を INSERT
 		// See: docs/architecture/components/bot.md §6.1 bot_posts INSERTのタイミングと失敗時の扱い
 		try {
 			await this.botPostRepository.create(result.postId, botId);
@@ -640,7 +717,7 @@ export class BotService {
 			);
 		}
 
-		// Step 5: 結果を返す
+		// Step 9: 結果を返す
 		return {
 			postId: result.postId,
 			postNumber: result.postNumber,
@@ -649,19 +726,20 @@ export class BotService {
 	}
 
 	// ---------------------------------------------------------------------------
-	// §2.11 書き込み先スレッド選択
+	// §2.11 書き込み先スレッド選択（後方互換ラッパー）
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * ボットの書き込み先スレッドをランダムに選択する。
+	 * ボットの書き込み先スレッドをランダムに選択する（後方互換ラッパー）。
 	 *
-	 * threadRepository.findByBoardId で非削除スレッドを取得し、
-	 * ランダムに1件選択して thread.id を返す。
+	 * v6 以降、投稿先の決定は BehaviorStrategy.decideAction() に委譲される。
+	 * このメソッドは後方互換のためラッパーとして残し、
+	 * 内部で RandomThreadBehaviorStrategy.decideAction() を呼び出す。
 	 *
 	 * See: features/bot_system.feature @荒らし役ボットは表示中のスレッドからランダムに書き込み先を選ぶ
-	 * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+	 * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択（後方互換ラッパー）
 	 *
-	 * @param botId - ボットID（将来の重み付け選択拡張のために引数として保持）
+	 * @param botId - ボットID
 	 * @returns 選択されたスレッドID
 	 */
 	async selectTargetThread(botId: string): Promise<string> {
@@ -671,41 +749,105 @@ export class BotService {
 			);
 		}
 
-		// 既存スレッド一覧を取得（非削除スレッドのみ）
-		// See: docs/architecture/components/bot.md §4 > 書き込み先スレッド選択のランダムアルゴリズム
-		const threads =
-			await this.threadRepository.findByBoardId(BOT_DEFAULT_BOARD_ID);
+		// ボット情報を取得して Strategy を解決する
+		const bot = await this.botRepository.findById(botId);
+		const profile = bot
+			? this.getBotProfileForStrategy(bot.botProfileKey)
+			: null;
+		const dummyBot = bot ?? {
+			id: botId,
+			name: "",
+			persona: "",
+			hp: 10,
+			maxHp: 10,
+			dailyId: "",
+			dailyIdDate: "",
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			survivalDays: 0,
+			totalPosts: 0,
+			accusedCount: 0,
+			timesAttacked: 0,
+			botProfileKey: null,
+			eliminatedAt: null,
+			eliminatedBy: null,
+			createdAt: new Date(),
+		};
 
-		if (threads.length === 0) {
+		// BehaviorStrategy.decideAction() を呼び出してスレッドIDを取得する
+		// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+		const strategies = this.resolveStrategiesForBot(dummyBot, profile);
+		const behaviorContext: BehaviorContext = {
+			botId,
+			botProfileKey: bot?.botProfileKey ?? null,
+			boardId: BOT_DEFAULT_BOARD_ID,
+		};
+
+		const action = await strategies.behavior.decideAction(behaviorContext);
+
+		if (action.type !== "post_to_existing") {
 			throw new Error(
-				`BotService.selectTargetThread: 書き込み先スレッドが存在しません (boardId=${BOT_DEFAULT_BOARD_ID}, botId=${botId})`,
+				`BotService.selectTargetThread: post_to_existing 以外のアクションは対応していません (type=${action.type})`,
 			);
 		}
 
-		// 均等分布でランダムに1件選択
-		const selected = threads[Math.floor(Math.random() * threads.length)];
-		return selected.id;
+		return action.threadId;
 	}
 
 	// ---------------------------------------------------------------------------
-	// §2.12 書き込み間隔決定
+	// §2.12 書き込み間隔決定（Strategy 委譲版）
 	// ---------------------------------------------------------------------------
 
 	/**
 	 * 次回書き込みまでの遅延時間を返す（分単位）。
 	 *
-	 * 一斉書き込みによるBOT発覚を防ぐため、60〜120分のランダムな値を返す。
+	 * v6 以降、SchedulingStrategy.getNextPostDelay() に委譲する。
+	 * 荒らし役は FixedIntervalSchedulingStrategy（60〜120分）が適用される。
 	 * GitHub Actions の cron ジョブから参照される。
 	 *
 	 * See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
 	 * See: docs/architecture/components/bot.md §2.1 書き込み実行（GitHub Actionsから呼び出し）
+	 * See: docs/architecture/components/bot.md §2.12.3 FixedIntervalSchedulingStrategy
 	 *
-	 * @returns 60〜120 の整数（分単位）
+	 * @param botId - ボットID（将来の種別別スケジューリング拡張のために引数として保持）
+	 * @param botProfileKey - プロファイルキー（省略時は null）
+	 * @returns 次回書き込みまでの遅延時間（分単位）
 	 */
-	getNextPostDelay(): number {
-		// 60分以上120分以下のランダムな整数を返す
-		// Math.random() は [0, 1) なので、60 + floor(random * 61) は [60, 120] を網羅する
-		return 60 + Math.floor(Math.random() * 61);
+	getNextPostDelay(botId?: string, botProfileKey?: string | null): number {
+		// Strategy を解決してスケジューリング戦略に委譲する
+		// ダミーの Bot オブジェクト（getNextPostDelay ではボット情報は不要）を使用
+		const dummyBot: Bot = {
+			id: botId ?? "dummy",
+			name: "",
+			persona: "",
+			hp: 10,
+			maxHp: 10,
+			dailyId: "",
+			dailyIdDate: "",
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			survivalDays: 0,
+			totalPosts: 0,
+			accusedCount: 0,
+			timesAttacked: 0,
+			botProfileKey: botProfileKey ?? null,
+			eliminatedAt: null,
+			eliminatedBy: null,
+			createdAt: new Date(),
+		};
+		const profile = this.getBotProfileForStrategy(botProfileKey ?? null);
+		const strategies = this.resolveStrategiesForBot(dummyBot, profile);
+
+		const schedulingContext: SchedulingContext = {
+			botId: botId ?? "dummy",
+			botProfileKey: botProfileKey ?? null,
+		};
+
+		// SchedulingStrategy に委譲する
+		// See: docs/architecture/components/bot.md §2.12.1 SchedulingStrategy
+		return strategies.scheduling.getNextPostDelay(schedulingContext);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -747,20 +889,75 @@ export class BotService {
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * bot_profiles.yaml からプロファイルキーに対応する固定文リストを取得する。
-	 * プロファイルが見つからない場合、または固定文リストが空の場合はフォールバック文字列を返す。
+	 * bot_profiles.yaml からプロファイルキーに対応する BotProfile を取得する。
+	 * Strategy 解決用に使用する。
+	 * プロファイルが見つからない場合は null を返す。
 	 *
-	 * See: docs/architecture/components/bot.md §4 隠蔽する実装詳細 > 固定文リストの管理方法
-	 * See: config/bot_profiles.yaml > fixed_messages
+	 * See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+	 * See: config/bot_profiles.yaml
 	 */
-	private getFixedMessages(botProfileKey: string | null): string[] {
-		const fallback = ["..."];
-		if (botProfileKey === null) return fallback;
+	private getBotProfileForStrategy(
+		botProfileKey: string | null,
+	): BotProfile | null {
+		if (botProfileKey === null) return null;
+		const internal = this.botProfiles[botProfileKey];
+		if (!internal) return null;
 
-		const profile = this.botProfiles[botProfileKey];
-		if (!profile?.fixed_messages?.length) return fallback;
+		// bot-strategies/types.ts の BotProfile 型に変換する
+		return {
+			hp: internal.hp,
+			max_hp: internal.max_hp,
+			reward: {
+				base_reward: internal.reward.base_reward,
+				daily_bonus: internal.reward.daily_bonus,
+				attack_bonus: internal.reward.attack_bonus,
+			},
+			fixed_messages: internal.fixed_messages,
+		};
+	}
 
-		return profile.fixed_messages;
+	/**
+	 * ボットに適用する3つの Strategy を解決する。
+	 *
+	 * resolveStrategiesFn が注入されている場合はそちらを使用する（テスト用）。
+	 * 未注入の場合は bot-strategies/strategy-resolver.ts の resolveStrategies を使用する。
+	 *
+	 * See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+	 */
+	private resolveStrategiesForBot(
+		bot: Bot,
+		profile: BotProfile | null,
+	): BotStrategies {
+		if (this.resolveStrategiesFn) {
+			// テスト用モック関数が注入されている場合はそちらを使用する
+			return this.resolveStrategiesFn(bot, profile, {
+				threadRepository:
+					this.threadRepository ?? this.createFallbackThreadRepository(),
+				botProfilesYamlPath: this.botProfilesYamlPath,
+			});
+		}
+
+		// デフォルト: strategy-resolver.ts の resolveStrategies を使用する
+		// See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+		return defaultResolveStrategies(bot, profile, {
+			threadRepository:
+				this.threadRepository ?? this.createFallbackThreadRepository(),
+			botProfilesYamlPath: this.botProfilesYamlPath,
+		});
+	}
+
+	/**
+	 * threadRepository が未注入の場合のフォールバック。
+	 * 常にエラーをスローする空のリポジトリを返す。
+	 */
+	private createFallbackThreadRepository(): IThreadRepository {
+		return {
+			findByBoardId: async (_boardId: string) => {
+				throw new Error(
+					"threadRepository が未注入です。コンストラクタに IThreadRepository を渡してください",
+				);
+			},
+		};
 	}
 
 	/**
