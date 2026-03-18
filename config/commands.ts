@@ -45,5 +45,13 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: false,
 		},
+		abeshinzo: {
+			description: "意味のないコマンド",
+			cost: 0,
+			targetFormat: null,
+			enabled: true,
+			stealth: false,
+			hidden: true,
+		},
 	},
 };

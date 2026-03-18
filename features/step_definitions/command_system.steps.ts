@@ -1666,3 +1666,109 @@ Then(
 		}
 	},
 );
+
+// ---------------------------------------------------------------------------
+// 隠しコマンド（裏技）
+// See: features/command_system.feature @hidden_command
+// ---------------------------------------------------------------------------
+
+/**
+ * コマンドレジストリに隠しコマンドが登録されている。
+ * CommandService を生成し、getRegisteredCommandNames() で公開コマンド一覧を取得する。
+ * hidden=true のコマンドは公開一覧に含まれないことを後続の Then ステップで検証する。
+ */
+Given(
+	/^コマンドレジストリに隠しコマンド "([^"]+)" が登録されている$/,
+	async function (this: BattleBoardWorld, commandName: string) {
+		const CurrencyService = getCurrencyService();
+		const {
+			CommandService,
+		} = require("../../src/lib/services/command-service");
+		const {
+			createAccusationService,
+		} = require("../../src/lib/services/accusation-service");
+
+		// attack/w ハンドラの動的 require を回避するため、
+		// 隠しコマンドを含む最小限の設定でインスタンス化する
+		const testConfig = {
+			commands: {
+				tell: {
+					description: "指定レスをAIだと告発する",
+					cost: 10,
+					targetFormat: ">>postNumber",
+					enabled: true,
+					stealth: false,
+				},
+				abeshinzo: {
+					description: "意味のないコマンド",
+					cost: 0,
+					targetFormat: null,
+					enabled: true,
+					stealth: false,
+					hidden: true,
+				},
+			},
+		};
+
+		const commandService = new CommandService(
+			CurrencyService,
+			createAccusationService(),
+			testConfig,
+			null, // attackHandler
+			null, // grassHandler
+		);
+
+		// 公開コマンド一覧を commandRegistry に上書きする
+		// （Background の DataTable 由来の値を上書き）
+		const publicNames = commandService.getRegisteredCommandNames();
+		(this as any).commandRegistry = publicNames.map((name: string) => ({
+			name: `!${name}`,
+			cost: 0,
+			description: "",
+		}));
+	},
+);
+
+/**
+ * 指定コマンドがコマンド一覧に表示されない。
+ * hidden=true のコマンドが getRegisteredCommandNames() から除外されていることを検証する。
+ */
+Then(
+	"{string} はコマンド一覧に表示されない",
+	function (this: BattleBoardWorld, commandName: string) {
+		assert(this.lastResult, "操作結果が存在しません");
+		const data = this.lastResult.data as any;
+		const commands = data?.commands ?? [];
+		const found = commands.some((c: any) => c.name === commandName);
+		assert(
+			!found,
+			`"${commandName}" がコマンド一覧に表示されないことを期待しましたが、表示されています`,
+		);
+	},
+);
+
+/**
+ * 「★システム」名義の独立レスで指定メッセージが表示される。
+ * eliminationNotice パターンで投稿されたシステムレスの本文を検証する。
+ */
+Then(
+	/^「★システム」名義の独立レスで "([^"]+)" と表示される$/,
+	async function (this: BattleBoardWorld, expectedBody: string) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+
+		const systemPosts = posts.filter(
+			(p) => p.displayName === "★システム" && p.isSystemMessage === true,
+		);
+		assert(
+			systemPosts.length > 0,
+			"「★システム」名義の独立レスが追加されていません",
+		);
+
+		const matchingPost = systemPosts.find((p) => p.body === expectedBody);
+		assert(
+			matchingPost,
+			`「★システム」名義のレスに "${expectedBody}" が見つかりません。実際: ${systemPosts.map((p) => `"${p.body}"`).join(", ")}`,
+		);
+	},
+);

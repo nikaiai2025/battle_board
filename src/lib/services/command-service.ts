@@ -26,6 +26,7 @@ import {
 	createAccusationService,
 } from "./accusation-service";
 import type * as CurrencyServiceType from "./currency-service";
+import { AbeshinzoHandler } from "./handlers/abeshinzo-handler";
 import { AttackHandler } from "./handlers/attack-handler";
 import {
 	GrassHandler,
@@ -133,6 +134,8 @@ export interface CommandConfig {
 	targetFormat: string | null;
 	enabled: boolean;
 	stealth: boolean;
+	/** コマンドヘルプに表示しない隠しコマンドフラグ */
+	hidden?: boolean;
 	/** !attack 専用: ダメージ量 */
 	damage?: number;
 	/** !attack 専用: 賠償金倍率 */
@@ -375,6 +378,7 @@ export class CommandService {
 			...(resolvedGrassHandler ? [resolvedGrassHandler] : []),
 			new TellHandler(resolvedAccusationService),
 			...(resolvedAttackHandler ? [resolvedAttackHandler] : []),
+			new AbeshinzoHandler(),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();
@@ -409,7 +413,9 @@ export class CommandService {
 	 * See: features/command_system.feature @ユーザーがコマンド一覧を確認できる
 	 */
 	getRegisteredCommandNames(): string[] {
-		return [...this.registeredCommandNames];
+		return this.registeredCommandNames.filter(
+			(name) => !this.configs.get(name)?.hidden,
+		);
 	}
 
 	/**

@@ -493,6 +493,60 @@ describe("CommandService", () => {
 	});
 
 	// =========================================================================
+	// 隠しコマンド（hidden）
+	// =========================================================================
+
+	describe("隠しコマンド（hidden）", () => {
+		/** hidden: true を含むテスト用設定 */
+		const COMMANDS_CONFIG_WITH_HIDDEN: CommandsYaml = {
+			commands: {
+				w: {
+					description: "指定レスに草を生やす",
+					cost: 0,
+					targetFormat: ">>postNumber",
+					enabled: true,
+					stealth: false,
+				},
+				abeshinzo: {
+					description: "意味のないコマンド",
+					cost: 0,
+					targetFormat: null,
+					enabled: true,
+					stealth: false,
+					hidden: true,
+				},
+			},
+		};
+
+		it("hidden=true のコマンドは getRegisteredCommandNames に含まれない", () => {
+			const currencyService = createMockCurrencyService();
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_WITH_HIDDEN,
+			);
+			const names = service.getRegisteredCommandNames();
+			expect(names).toContain("w");
+			expect(names).not.toContain("abeshinzo");
+		});
+
+		it("hidden=true のコマンドでも実行はできる", async () => {
+			const currencyService = createMockCurrencyService();
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_WITH_HIDDEN,
+			);
+
+			const result = await service.executeCommand(createInput("!abeshinzo"));
+
+			expect(result).not.toBeNull();
+			expect(result!.success).toBe(true);
+			expect(result!.eliminationNotice).toBe("意味のないコマンドだよ");
+		});
+	});
+
+	// =========================================================================
 	// エッジケース
 	// =========================================================================
 
