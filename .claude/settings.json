@@ -43,6 +43,10 @@
           {
             "type": "command",
             "command": "FILE=$(jq -r '.tool_input.file_path') && [[ $FILE == *.ts || $FILE == *.tsx || $FILE == *.js || $FILE == *.jsx ]] && biome format --write $FILE && biome check --fix $FILE || true"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-cucumber-slash.sh"
           }
         ]
       }

@@ -143,7 +143,7 @@ If you did not mean to use an alternative you can use '\/' to escape the '/'
   - (1) @anchor_popup: "スレッドに3件のレスが存在する"(固定文字列) と "スレッドに{int}件のレスが存在する"(パラメータ付き) のambiguous
   - (2) @anchor_popup/@post_number_display: pending用ステップの引数不一致（Linterで自動修正済み）
 - [修正] thread.steps.ts L1856: "スレッドに3件のレスが存在する" の固定文字列ステップ定義を削除し、"{int}件" 版に統合。ambiguous解消
-- [確認] 全完了条件を達成
+- [確認] 全完了条件を達成（3rdワーカーで最終確認済み）
 
 ### テスト結果サマリー
 - `npx cucumber-js --tags @url_structure`: 5 scenarios (5 passed), 14 steps (14 passed)

@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useAnchorPopupContext } from "./AnchorPopupContext";
 import PostItem, { type Post } from "./PostItem";
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,12 @@ export default function PostListLiveWrapper({
 	const [newPosts, setNewPosts] = useState<Post[]>([]);
 	const [lastPostNumber, setLastPostNumber] = useState(initialLastPostNumber);
 
+	// AnchorPopupContext から registerPosts を取得し、
+	// ポーリングで取得した新着レスを allPosts キャッシュに追加する。
+	// See: features/thread.feature @anchor_popup
+	// See: docs/architecture/components/web-ui.md §3.2 スレッドページ
+	const { registerPosts } = useAnchorPopupContext();
+
 	/**
 	 * 新着レスをフェッチして状態に追加する。
 	 * GET /api/threads/{threadId} でスレッド全体のレス一覧を取得し、
@@ -102,6 +109,11 @@ export default function PostListLiveWrapper({
 			const freshPosts = allPosts.filter((p) => p.postNumber > lastPostNumber);
 
 			if (freshPosts.length > 0) {
+				// 新着レスを AnchorPopupContext の allPosts キャッシュに追加する。
+				// ポーリングで取得したレスもアンカーポップアップの参照対象にする。
+				// See: features/thread.feature @anchor_popup
+				registerPosts(freshPosts);
+
 				setNewPosts((prev) => {
 					// 既に表示済みのレスとの重複を排除（idで判定）
 					const existingIds = new Set(prev.map((p) => p.id));
@@ -118,7 +130,7 @@ export default function PostListLiveWrapper({
 		} catch {
 			// ネットワークエラー等はサイレントに失敗
 		}
-	}, [threadId, lastPostNumber]);
+	}, [threadId, lastPostNumber, registerPosts]);
 
 	/**
 	 * router.refresh() 後のSSRプロップ更新をstateに同期する。

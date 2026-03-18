@@ -6,9 +6,10 @@
  *
  * 対象ページ:
  * 1. トップページ /
- * 2. スレッド詳細 /threads/[threadId]
- * 3. マイページ /mypage（認証必須）
- * 4. 認証コード検証ページ /auth/verify
+ * 2. 板トップページ /battleboard/
+ * 3. スレッドページ /battleboard/{threadKey}/
+ * 4. マイページ /mypage（認証必須）
+ * 5. 認証コード検証ページ /auth/verify
  *
  * See: docs/architecture/bdd_test_strategy.md §10.5 ナビゲーションスモークテスト
  */
@@ -32,6 +33,46 @@ test.beforeEach(async ({ page, request }) => {
 	await mockTurnstile(page);
 	await cleanupDatabase(request);
 });
+
+// ---------------------------------------------------------------------------
+// ローカルヘルパー
+// ---------------------------------------------------------------------------
+
+/**
+ * threadId から threadKey を Supabase REST API 経由で取得する。
+ *
+ * seedThreadWithPost が threadId のみ返すため、スレッドページ（新URL構造）の
+ * スモークテストで必要な threadKey をこのヘルパーで補完する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.5.7 動的ルートの扱い
+ * See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx
+ *
+ * @param request - Playwright の APIRequestContext オブジェクト
+ * @param threadId - スレッドの UUID
+ * @returns threadKey（専ブラ互換キー、10桁 UNIX タイムスタンプ文字列）
+ */
+async function getThreadKey(
+	request: import("@playwright/test").APIRequestContext,
+	threadId: string,
+): Promise<string> {
+	const supabaseUrl = process.env.SUPABASE_URL ?? "http://127.0.0.1:54321";
+	const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+	const res = await request.get(
+		`${supabaseUrl}/rest/v1/threads?id=eq.${threadId}&select=thread_key`,
+		{
+			headers: {
+				apikey: serviceRoleKey,
+				Authorization: `Bearer ${serviceRoleKey}`,
+			},
+		},
+	);
+	const rows = (await res.json()) as Array<{ thread_key: string }>;
+	if (!rows[0]?.thread_key) {
+		throw new Error(`threadKey not found for threadId=${threadId}`);
+	}
+	return rows[0].thread_key;
+}
 
 // ---------------------------------------------------------------------------
 // (1) トップページ /
@@ -102,18 +143,86 @@ test.describe("トップページ /", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (2) スレッド詳細 /threads/[threadId]
+// (2) 板トップページ /battleboard/
 // ---------------------------------------------------------------------------
 
 /**
- * スレッド詳細ページの到達性・UI要素・ナビゲーションを検証する。
+ * 板トップページの到達性・UI要素を検証する。
  *
- * テスト前にシードデータを投入し、実在する threadId でアクセスする。
+ * Sprint-59〜63 で追加された /{boardId}/ 形式の板トップページ。
+ * スレッド一覧（ThreadList）が表示されることを確認する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.5.3 各ページでの検証項目
+ * See: src/app/(web)/[boardId]/page.tsx
+ * See: features/thread.feature @url_structure
+ */
+test.describe("板トップページ /battleboard/", () => {
+	test("HTTPステータス200で応答し、スレッド一覧が表示される", async ({
+		page,
+	}) => {
+		// JSエラー収集用配列
+		const jsErrors: string[] = [];
+		// See: docs/architecture/bdd_test_strategy.md §10.5.3 > JSエラーなし
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// 板トップページにアクセス（HTTPステータス200を確認）
+		const response = await page.goto("/battleboard/");
+		expect(response?.status()).toBe(200);
+
+		// main コンテンツ領域が表示される
+		// See: src/app/(web)/[boardId]/page.tsx > <main>
+		await expect(page.locator("main")).toBeVisible();
+
+		// スレッド作成フォームが表示される
+		// See: src/app/(web)/[boardId]/page.tsx > ThreadCreateForm
+		// See: src/app/(web)/_components/ThreadCreateForm.tsx > #thread-create-form
+		await expect(page.locator("#thread-create-form")).toBeVisible();
+
+		// JSエラーがないことを確認
+		expect(jsErrors).toHaveLength(0);
+	});
+
+	test("板トップページからサイトタイトルリンクが操作可能", async ({ page }) => {
+		// JSエラー収集用配列
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		await page.goto("/battleboard/");
+		await expect(page.locator("main")).toBeVisible();
+
+		// ヘッダーのサイトタイトルリンクが存在する
+		// See: src/app/(web)/_components/Header.tsx > #site-title
+		await expect(page.locator("#site-title")).toBeVisible();
+
+		// JSエラーがないことを確認
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (3) スレッドページ /battleboard/{threadKey}/
+// ---------------------------------------------------------------------------
+
+/**
+ * スレッドページ（新URL構造）の到達性・UI要素・ナビゲーションを検証する。
+ *
+ * Sprint-59〜63 で追加された /{boardId}/{threadKey}/ 形式のスレッドページ。
+ * テスト前にシードデータを投入し、実在する threadKey でアクセスする。
+ *
+ * HIGH-02 対応: 旧 /threads/{threadId} URL への参照を新URL構造に更新する。
+ * /threads/{threadId} は 307 リダイレクトになっており、新ページの構造
+ * （#thread-title, #back-to-list, #post-body-input 等）の検証を確実にするため
+ * 新URLを直接参照する方式に変更する。
  *
  * See: docs/architecture/bdd_test_strategy.md §10.5.7 動的ルートの扱い
- * See: src/app/(web)/threads/[threadId]/page.tsx
+ * See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx
+ * See: features/thread.feature @url_structure
  */
-test.describe("スレッド詳細 /threads/[threadId]", () => {
+test.describe("スレッドページ /battleboard/{threadKey}/", () => {
 	test("シードデータのスレッドにアクセスでき、主要UI要素が表示される", async ({
 		page,
 		request,
@@ -128,12 +237,17 @@ test.describe("スレッド詳細 /threads/[threadId]", () => {
 		// See: docs/architecture/bdd_test_strategy.md §10.5.7 動的ルートの扱い
 		const { threadId } = await seedThreadWithPost(request);
 
-		// スレッド詳細ページにアクセス（HTTPステータス200を確認）
-		const response = await page.goto(`/threads/${threadId}`);
+		// threadId から threadKey を取得して新URL構造でアクセスする
+		// HIGH-02: /threads/{threadId} の旧URL参照を /{boardId}/{threadKey}/ に更新
+		// See: src/app/(web)/threads/[threadId]/page.tsx — 307 リダイレクト（旧URLは動作するが直接参照に変更）
+		const threadKey = await getThreadKey(request, threadId);
+
+		// スレッドページにアクセス（HTTPステータス200を確認）
+		const response = await page.goto(`/battleboard/${threadKey}/`);
 		expect(response?.status()).toBe(200);
 
 		// スレッドタイトルが表示される
-		// See: src/app/(web)/threads/[threadId]/page.tsx > #thread-title
+		// See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx > #thread-title
 		await expect(page.locator("#thread-title")).toBeVisible();
 		await expect(page.locator("#thread-title")).toHaveText(
 			"スモークテスト用スレッド",
@@ -151,10 +265,7 @@ test.describe("スレッド詳細 /threads/[threadId]", () => {
 		expect(jsErrors).toHaveLength(0);
 	});
 
-	test("トップへの戻りリンクが存在しクリック可能", async ({
-		page,
-		request,
-	}) => {
+	test("一覧に戻るリンクが存在しクリック可能", async ({ page, request }) => {
 		// JSエラー収集用配列
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
@@ -163,17 +274,19 @@ test.describe("スレッド詳細 /threads/[threadId]", () => {
 
 		// シードデータを投入
 		const { threadId } = await seedThreadWithPost(request);
-		await page.goto(`/threads/${threadId}`);
+		const threadKey = await getThreadKey(request, threadId);
+		await page.goto(`/battleboard/${threadKey}/`);
 
 		// 「← 一覧に戻る」リンクが存在する
-		// See: src/app/(web)/threads/[threadId]/page.tsx > #back-to-list
+		// See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx > #back-to-list
 		const backLink = page.locator("#back-to-list");
 		await expect(backLink).toBeVisible();
 
-		// リンクをクリックしてトップに遷移する
+		// リンクをクリックして板トップに遷移する
+		// See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx > href=`/${boardId}/`
 		await backLink.click();
-		await page.waitForURL("/");
-		expect(page.url()).toContain("/");
+		await page.waitForURL("/battleboard/");
+		expect(page.url()).toContain("/battleboard/");
 
 		// JSエラーがないことを確認
 		expect(jsErrors).toHaveLength(0);
@@ -181,7 +294,7 @@ test.describe("スレッド詳細 /threads/[threadId]", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (3) マイページ /mypage（認証必須）
+// (4) マイページ /mypage（認証必須）
 // ---------------------------------------------------------------------------
 
 /**
@@ -270,7 +383,7 @@ test.describe("マイページ /mypage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (4) 認証コード検証ページ /auth/verify
+// (5) 認証コード検証ページ /auth/verify
 // ---------------------------------------------------------------------------
 
 /**

@@ -97,7 +97,7 @@ export default function ThreadCard({
 				<Link
 					href={`/${boardId}/${threadKey}/`}
 					className="text-blue-700 hover:underline hover:text-blue-900 text-sm"
-					id="thread-title"
+					data-testid="thread-title"
 				>
 					{title}
 				</Link>
@@ -105,7 +105,7 @@ export default function ThreadCard({
 				{/* thread-post-count: レス数 */}
 				<span
 					className="text-gray-600 text-xs whitespace-nowrap"
-					id="thread-post-count"
+					data-testid="thread-post-count"
 				>
 					({postCount})
 				</span>
@@ -113,7 +113,7 @@ export default function ThreadCard({
 				{/* thread-last-post-at: 最終書き込み日時（相対表示） */}
 				<span
 					className="text-gray-400 text-xs whitespace-nowrap"
-					id="thread-last-post-at"
+					data-testid="thread-last-post-at"
 					title={lastPostAt}
 				>
 					{relativeTime}

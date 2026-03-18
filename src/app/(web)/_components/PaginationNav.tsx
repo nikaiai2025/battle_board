@@ -147,9 +147,11 @@ export default function PaginationNav({
 
 	return (
 		// pagination-nav: ページネーションナビゲーション
+		// id属性はページ内に同じコンポーネントが上下2箇所に配置されるため、
+		// HTML仕様違反（id重複）を避けて data-testid に変更。
 		// See: features/thread.feature @pagination
 		<nav
-			id="pagination-nav"
+			data-testid="pagination-nav"
 			aria-label="ページナビゲーション"
 			className="flex flex-wrap gap-1 py-1 text-xs"
 		>

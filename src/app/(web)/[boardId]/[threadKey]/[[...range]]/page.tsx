@@ -24,6 +24,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { parsePaginationRange } from "@/lib/domain/rules/pagination-parser";
 import * as PostService from "@/lib/services/post-service";
+import AnchorPopup from "../../../_components/AnchorPopup";
+import { AnchorPopupProvider } from "../../../_components/AnchorPopupContext";
 import PaginationNav from "../../../_components/PaginationNav";
 import PostForm from "../../../_components/PostForm";
 import { PostFormContextProvider } from "../../../_components/PostFormContext";
@@ -292,32 +294,45 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 				postCount={thread.postCount}
 			/>
 
-			{/* PostFormContextProvider: PostItem のレス番号クリック時に PostForm にテキスト挿入する
-			    設計書 §6.2 の通り、PostForm と PostList をまとめてラップする。
-			    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ
-			    See: features/thread.feature @post_number_display */}
-			<PostFormContextProvider>
-				{/* post-form: 書き込みフォーム（Client Component）
-				    未認証時に401レスポンスを受けると AuthModal が表示される。
-				    See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点） */}
-				<PostForm threadId={thread.id} />
+			{/* AnchorPopupProvider: アンカーポップアップのスタック管理Context
+			    設計書 §3.2 の通り、PostFormContextProvider の外側にラップする。
+			    initialPosts に SSR で取得したレス一覧を渡して allPosts キャッシュを初期化する。
+			    See: features/thread.feature @anchor_popup
+			    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
+			<AnchorPopupProvider initialPosts={posts}>
+				{/* PostFormContextProvider: PostItem のレス番号クリック時に PostForm にテキスト挿入する
+				    設計書 §6.2 の通り、PostForm と PostList をまとめてラップする。
+				    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ
+				    See: features/thread.feature @post_number_display */}
+				<PostFormContextProvider>
+					{/* post-form: 書き込みフォーム（Client Component）
+					    未認証時に401レスポンスを受けると AuthModal が表示される。
+					    See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点） */}
+					<PostForm threadId={thread.id} />
 
-				{/* post-list: レス一覧（初期表示はSSR）
-				    See: docs/specs/screens/thread-view.yaml > post-list
+					{/* post-list: レス一覧（初期表示はSSR）
+					    See: docs/specs/screens/thread-view.yaml > post-list
+					    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
+					<PostList posts={posts} />
+
+					{/* PostListLiveWrapper: ポーリングで新着レスを追加表示（Client Component）
+					    SSRで表示済みのレス番号より大きいものだけを表示することで重複を防ぐ。
+					    pollingEnabled: 過去ページ表示時はポーリング無効。
+					    See: docs/architecture/components/web-ui.md §3.2 スレッドページ > ポーリング方式
+					    See: tmp/workers/bdd-architect_TASK-162/design.md §2.7 ポーリングとの共存 */}
+					<PostListLiveWrapper
+						threadId={thread.id}
+						initialLastPostNumber={lastPostNumber}
+						pollingEnabled={pollingEnabled}
+					/>
+				</PostFormContextProvider>
+
+				{/* AnchorPopup: アンカーポップアップ表示コンポーネント
+				    AnchorPopupProvider 内に1つだけ配置（ツリー末尾）。
+				    See: features/thread.feature @anchor_popup
 				    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
-				<PostList posts={posts} />
-
-				{/* PostListLiveWrapper: ポーリングで新着レスを追加表示（Client Component）
-				    SSRで表示済みのレス番号より大きいものだけを表示することで重複を防ぐ。
-				    pollingEnabled: 過去ページ表示時はポーリング無効。
-				    See: docs/architecture/components/web-ui.md §3.2 スレッドページ > ポーリング方式
-				    See: tmp/workers/bdd-architect_TASK-162/design.md §2.7 ポーリングとの共存 */}
-				<PostListLiveWrapper
-					threadId={thread.id}
-					initialLastPostNumber={lastPostNumber}
-					pollingEnabled={pollingEnabled}
-				/>
-			</PostFormContextProvider>
+				<AnchorPopup />
+			</AnchorPopupProvider>
 
 			{/* pagination-nav (下部): レス一覧直後のページナビゲーション（5ch慣習: 上下両方に表示）
 			    See: features/thread.feature @pagination
