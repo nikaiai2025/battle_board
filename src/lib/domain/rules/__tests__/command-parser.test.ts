@@ -390,6 +390,62 @@ describe("parseCommand", () => {
 		});
 	});
 
+	// ===========================================
+	// 新ルール: スペースなし（ルール9）
+	// See: features/command_system.feature 「コマンドとアンカーがスペースなしで直結しても認識される」
+	// See: docs/architecture/components/command.md §2.3 ルール9
+	// ===========================================
+
+	describe("新ルール: スペースなし（ルール9）", () => {
+		/**
+		 * BDDシナリオ「コマンドとアンカーがスペースなしで直結しても認識される」に対応
+		 * See: features/command_system.feature
+		 * When 本文に "!w>>5" を含めて投稿する
+		 */
+		it("後方引数がスペースなしで直結しても解析できる (!w>>5)", () => {
+			const result = parseCommand("!w>>5", REGISTERED_COMMANDS);
+			expect(result).not.toBeNull();
+			expect(result?.name).toBe("w");
+			expect(result?.args).toContain(">>5");
+		});
+
+		it("後方引数がスペースなしで直結しても解析できる (!tell>>3)", () => {
+			const result = parseCommand("!tell>>3", REGISTERED_COMMANDS);
+			expect(result?.name).toBe("tell");
+			expect(result?.args).toContain(">>3");
+		});
+
+		/**
+		 * BDDシナリオ「アンカーとコマンドがスペースなしで直結しても認識される」に対応
+		 * See: features/command_system.feature
+		 * When 本文に ">>5!w" を含めて投稿する
+		 */
+		it("前方引数がスペースなしで直結しても解析できる (>>5!w)", () => {
+			const result = parseCommand(">>5!w", REGISTERED_COMMANDS);
+			expect(result).not.toBeNull();
+			expect(result?.name).toBe("w");
+			expect(result?.args).toContain(">>5");
+		});
+
+		it("前方引数がスペースなしで直結しても解析できる (>>3!tell)", () => {
+			const result = parseCommand(">>3!tell", REGISTERED_COMMANDS);
+			expect(result?.name).toBe("tell");
+			expect(result?.args).toContain(">>3");
+		});
+
+		it("テキスト中のスペースなし後方引数も解析できる (これ !w>>5)", () => {
+			const result = parseCommand("これ !w>>5", REGISTERED_COMMANDS);
+			expect(result?.name).toBe("w");
+			expect(result?.args).toContain(">>5");
+		});
+
+		it("スペースなし後方引数がある場合はスペースなし前方引数より優先される (>>3!tell>>5)", () => {
+			const result = parseCommand(">>3 !tell>>5", REGISTERED_COMMANDS);
+			expect(result?.name).toBe("tell");
+			expect(result?.args[0]).toBe(">>5");
+		});
+	});
+
 	describe("新ルール: 前方引数の非認識条件（ルール7）", () => {
 		/**
 		 * BDDシナリオ「アンカーとコマンドの間にテキストがある場合は前方引数として認識されない」

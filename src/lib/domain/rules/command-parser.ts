@@ -17,6 +17,8 @@
  *   7. 前方引数の認識条件: `>>N` と `!cmd` の間に半角スペースまたは全角スペースのみが
  *      存在すること。改行やテキストが挟まる場合は前方引数として認識しない
  *   8. 後方引数の区切り文字も半角スペース・全角スペースの両方を許容する
+ *   9. アンカー引数（`>>N`）とコマンド名の間のスペースは省略可能。
+ *      `!cmd>>N` と `!cmd >>N`、`>>N!cmd` と `>>N !cmd` はそれぞれ等価とする
  */
 
 import type { ParsedCommand } from "../models/command";
@@ -32,14 +34,16 @@ const WHITESPACE = "[ \\t\\u3000]";
  * コマンドマッチパターン。全角スペースを半角スペースと同等に扱う。
  * - 単語境界の前に `!` があり、直後に英数字・アンダースコアからなるコマンド名が続く形式
  * - `!` の前は文字列の先頭か空白（!! や word! などの誤検出を防ぐ）
+ * - ルール9: `>>N!cmd` 形式のスペースなし前方引数のため、`>>N` の末尾（数字の直後）も許容する
  * - コマンド名: [a-zA-Z][a-zA-Z0-9_]* （! 単独や !! は除外）
  * - 末尾の空白+残余テキストは引数として取得する
  * - 区切り文字は半角・全角スペース両方を許容する（ルール8）
+ * - `>>N` 形式のアンカー引数はスペースなしでも認識する（ルール9）
  *
  * See: docs/architecture/components/command.md §2.3
  */
 const COMMAND_PATTERN = new RegExp(
-	`(?:^|(?<=[\\s\\u3000]))!([a-zA-Z][a-zA-Z0-9_]*)((?:${WHITESPACE}+\\S+)*)`,
+	`(?:^|(?<=[\\s\\u3000])|(?<=>>\\d+))!([a-zA-Z][a-zA-Z0-9_]*)((?:${WHITESPACE}+\\S+|>>\\d+)*)`,
 	"g",
 );
 
@@ -47,15 +51,16 @@ const COMMAND_PATTERN = new RegExp(
  * 前方引数パターン: `>>N` と `!cmd` の間に半角・全角スペースのみが存在するパターン。
  * - `>>N` の前は行頭か空白（前にテキストがあってはいけない）
  * - `>>N` と `!cmd` の間は半角・全角スペースのみ（テキスト・改行は不可）
+ * - スペースなし（`>>N!cmd`）も許容する（ルール9）
  *
  * キャプチャグループ:
  *   1: postNumber（例: "5"）
  *   2: コマンド名（"!" を除いた部分、例: "tell"）
  *
- * See: docs/architecture/components/command.md §2.3 ルール6, 7
+ * See: docs/architecture/components/command.md §2.3 ルール6, 7, 9
  */
 const FORWARD_ARG_PATTERN = new RegExp(
-	`(?:^|(?<=[\\s\\u3000]))(>>\\d+)${WHITESPACE}+(![a-zA-Z][a-zA-Z0-9_]*)(?=[\\s\\u3000]|$)`,
+	`(?:^|(?<=[\\s\\u3000]))(>>\\d+)${WHITESPACE}*(![a-zA-Z][a-zA-Z0-9_]*)(?=[\\s\\u3000]|$)`,
 	"gm",
 );
 
@@ -92,6 +97,16 @@ const FORWARD_ARG_PATTERN = new RegExp(
  * parseCommand(">>3 !tell >>5", ["tell", "w"])
  * // => { name: "tell", args: [">>5"], raw: "!tell >>5" }
  * // （後方引数優先: 両方ある場合は後方引数 >>5 を使用）
+ *
+ * @example
+ * parseCommand("!w>>5", ["tell", "w"])
+ * // => { name: "w", args: [">>5"], raw: "!w >>5" }
+ * // （ルール9: スペースなしでもアンカー引数を認識）
+ *
+ * @example
+ * parseCommand(">>5!w", ["tell", "w"])
+ * // => { name: "w", args: [">>5"], raw: "!w >>5" }
+ * // （ルール9: 前方引数もスペースなしで認識）
  */
 export function parseCommand(
 	body: string,
