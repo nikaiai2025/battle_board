@@ -1700,7 +1700,7 @@ describe("PostService", () => {
 					{ ...mockPost, postNumber: 5 },
 				]);
 
-				await getPostList("thread-001", 5);
+				await getPostList("thread-001", { fromPostNumber: 5 });
 
 				expect(PostRepository.findByThreadId).toHaveBeenCalledWith(
 					"thread-001",

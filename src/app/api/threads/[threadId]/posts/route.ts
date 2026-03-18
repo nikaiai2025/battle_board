@@ -163,7 +163,9 @@ export async function POST(
 		// 作成された Post を getPostList 経由で取得してレスポンスを組み立てる。
 		// postNumber で絞り込むことで、直前に作成された Post を取得する。
 		// See: docs/architecture/components/posting.md §2.2 PostResult
-		const posts = await PostService.getPostList(threadId, result.postNumber);
+		const posts = await PostService.getPostList(threadId, {
+			fromPostNumber: result.postNumber,
+		});
 		const createdPost = posts.find((p) => p.id === result.postId);
 
 		return NextResponse.json(

@@ -1,5 +1,7 @@
+"use client";
+
 /**
- * PostItem — 1レスの表示コンポーネント（共用コンポーネント）
+ * PostItem — 1レスの表示コンポーネント（Client Component）
  *
  * - レス番号、表示名、日次ID、書き込み日時、本文を表示
  * - 削除済みレスは「このレスは削除されました」と表示
@@ -7,9 +9,11 @@
  * - inlineSystemInfo が存在する場合、本文の下に区切り線付きでシステム情報を表示
  * - dangerouslySetInnerHTML 禁止（白スペース表示は white-space: pre-wrap で対応）
  * - 日時フォーマット: YYYY/MM/DD(ddd) HH:mm:ss
+ * - レス番号はクリック可能なボタン（>>なし、数字のみ）。クリックでフォームに >>N を挿入
  *
  * See: features/thread.feature @スレッドのレスが書き込み順に表示される
  * See: features/thread.feature @レス内のアンカーで他のレスを参照できる
+ * See: features/thread.feature @post_number_display
  * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
  * See: docs/specs/screens/thread-view.yaml > elements > post-list > itemTemplate
  * See: docs/specs/screens/thread-view.yaml > post-inline-system-info
@@ -17,6 +21,7 @@
  */
 
 import Link from "next/link";
+import { usePostFormContext } from "./PostFormContext";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -127,6 +132,7 @@ interface PostItemProps {
  * 1レスの表示コンポーネント（PostList・PostListLiveWrapper の両方から使用）
  *
  * See: docs/specs/screens/thread-view.yaml > elements > post-list > itemTemplate
+ * See: features/thread.feature @post_number_display
  */
 export default function PostItem({ post }: PostItemProps) {
 	// 削除済みレスの場合は代替テキストを表示
@@ -136,6 +142,20 @@ export default function PostItem({ post }: PostItemProps) {
 	// システムメッセージの場合は背景色を変える
 	// See: docs/specs/screens/thread-view.yaml > post-display-name > style > system_message
 	const isSystemMessage = post.isSystemMessage;
+
+	// PostFormContext からテキスト挿入コールバックを取得する
+	// See: features/thread.feature @post_number_display
+	const { insertText } = usePostFormContext();
+
+	/**
+	 * レス番号クリック時のハンドラ
+	 * フォームに ">>N" 形式のアンカーテキストを挿入する
+	 *
+	 * See: features/thread.feature @post_number_display
+	 */
+	const handlePostNumberClick = () => {
+		insertText(`>>${post.postNumber}`);
+	};
 
 	return (
 		<article
@@ -147,11 +167,17 @@ export default function PostItem({ post }: PostItemProps) {
 			{/* レスヘッダー行: レス番号・表示名・日次ID・日時
           See: docs/specs/screens/thread-view.yaml > post-header */}
 			<div className="flex flex-wrap items-center gap-2 mb-1">
-				{/* post-number: レス番号（>>N 形式、太字）
-            See: docs/specs/screens/thread-view.yaml > post-number */}
-				<span className="font-bold text-gray-700">
-					&gt;&gt;{post.postNumber}
-				</span>
+				{/* post-number: レス番号（数字のみ、クリックでフォームに >>N を挿入）
+            See: docs/specs/screens/thread-view.yaml > post-number
+            See: features/thread.feature @post_number_display */}
+				<button
+					type="button"
+					className="font-bold text-gray-700 hover:text-blue-600 cursor-pointer"
+					onClick={handlePostNumberClick}
+					data-testid={`post-number-btn-${post.postNumber}`}
+				>
+					{post.postNumber}
+				</button>
 
 				{/* post-display-name: 表示名
             See: docs/specs/screens/thread-view.yaml > post-display-name */}

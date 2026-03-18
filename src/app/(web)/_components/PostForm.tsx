@@ -7,6 +7,8 @@
  * - 未認証時（401レスポンス）は AuthModal を表示する
  * - 認証成功後に書き込みをリトライする
  * - 投稿成功後はページをリロードして最新レスを表示する
+ * - PostFormContextProvider の子孫として配置することで、
+ *   兄弟コンポーネントの PostItem（レス番号ボタン）から insertText を呼び出せる
  *
  * 認証フロー:
  * 1. POST /api/threads/{threadId}/posts → 401 レスポンス
@@ -16,13 +18,15 @@
  *
  * See: features/posting.feature @無料ユーザーが書き込みを行う
  * See: features/posting.feature @本文が空の場合は書き込みが行われない
+ * See: features/thread.feature @post_number_display
  * See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
  * See: docs/specs/screens/thread-view.yaml > post-form
  */
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AuthModal from "./AuthModal";
+import { usePostFormRegister } from "./PostFormContext";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -45,7 +49,12 @@ interface PostFormProps {
 /**
  * 書き込みフォームコンポーネント（Client Component）
  *
+ * PostFormContextProvider の子孫として配置し、mount 時に insertText を
+ * Context に登録することで、兄弟の PostList 内の PostItem からの
+ * レス番号クリックを受け付けられる。
+ *
  * See: docs/specs/screens/thread-view.yaml > post-form
+ * See: features/thread.feature @post_number_display
  */
 export default function PostForm({ threadId }: PostFormProps) {
 	const router = useRouter();
@@ -170,6 +179,30 @@ export default function PostForm({ threadId }: PostFormProps) {
 		setAuthCode(undefined);
 		setPendingBody(null);
 	}, []);
+
+	/**
+	 * テキストをフォームに挿入する（PostFormContext経由でPostItemから呼ばれる）
+	 *
+	 * - フォームが空: テキストをそのまま挿入
+	 * - フォームが非空: 改行 + テキストを追記
+	 *
+	 * See: features/thread.feature @post_number_display
+	 * See: tmp/workers/bdd-architect_TASK-162/design.md §4.3
+	 */
+	const insertText = useCallback((text: string) => {
+		setBody((prev) => {
+			if (prev.trim() === "") return text;
+			return `${prev}\n${text}`;
+		});
+	}, []);
+
+	// PostFormContextProvider（親）に insertText を登録する
+	// PostItem のレス番号クリック時に、この関数が PostFormContext 経由で呼ばれる
+	// See: features/thread.feature @post_number_display
+	const { register } = usePostFormRegister();
+	useEffect(() => {
+		register(insertText);
+	}, [register, insertText]);
 
 	return (
 		<>

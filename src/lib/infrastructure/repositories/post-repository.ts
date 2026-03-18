@@ -84,19 +84,45 @@ export async function findById(id: string): Promise<Post | null> {
 
 /**
  * スレッド ID に属するレス一覧を post_number ASC で取得する。
- * fromPostNumber を指定することで差分取得（Range 応答）に対応する。
+ * fromPostNumber / range / latestCount を指定することで絞り込みに対応する。
  *
  * See: docs/architecture/components/posting.md §2.3 getPostList
  * See: docs/architecture/architecture.md §11.3 Range 差分応答の実装方針
+ * See: features/thread.feature @pagination
+ * See: tmp/workers/bdd-architect_TASK-162/design.md §2.4 PostService改修
  *
  * @param threadId - スレッドの UUID
- * @param options.fromPostNumber - この番号以降のレスを取得（省略時は全件）
+ * @param options.fromPostNumber - この番号以降のレスを取得（省略時は全件）。ポーリング差分取得用
+ * @param options.range - 範囲指定（start 〜 end）。@pagination のレス範囲指定用
+ * @param options.latestCount - 最新N件を取得。@pagination のl表示用
  * @returns Post 配列（post_number ASC ソート済み）
  */
 export async function findByThreadId(
 	threadId: string,
-	options: { fromPostNumber?: number } = {},
+	options: {
+		fromPostNumber?: number;
+		range?: { start: number; end: number };
+		latestCount?: number;
+	} = {},
 ): Promise<Post[]> {
+	// latestCount 指定時: post_number DESC で limit を取得してから反転する
+	// See: tmp/workers/bdd-architect_TASK-162/design.md §2.4
+	if (options.latestCount !== undefined) {
+		const { data, error } = await supabaseAdmin
+			.from("posts")
+			.select("*")
+			.eq("thread_id", threadId)
+			.order("post_number", { ascending: false })
+			.limit(options.latestCount);
+
+		if (error) {
+			throw new Error(`PostRepository.findByThreadId failed: ${error.message}`);
+		}
+
+		// DESC で取得したものを ASC に反転する
+		return (data as PostRow[]).map(rowToPost).reverse();
+	}
+
 	let query = supabaseAdmin
 		.from("posts")
 		.select("*")
@@ -106,6 +132,14 @@ export async function findByThreadId(
 	// fromPostNumber が指定された場合は、その番号以降のレスだけを取得する
 	if (options.fromPostNumber !== undefined) {
 		query = query.gte("post_number", options.fromPostNumber);
+	}
+
+	// range 指定時: start 〜 end の範囲のレスだけを取得する
+	// See: features/thread.feature @pagination - "1-100" → レス1〜100
+	if (options.range !== undefined) {
+		query = query
+			.gte("post_number", options.range.start)
+			.lte("post_number", options.range.end);
 	}
 
 	const { data, error } = await query;

@@ -755,21 +755,38 @@ export async function getThreadList(
 }
 
 /**
+ * レス一覧取得オプション型。
+ *
+ * See: features/thread.feature @pagination
+ * See: tmp/workers/bdd-architect_TASK-162/design.md §2.4 PostService改修
+ */
+export interface PostListOptions {
+	/** ポーリング用差分取得: この番号以降のレスを取得する */
+	fromPostNumber?: number;
+	/** 範囲指定: start 〜 end のレスを取得する */
+	range?: { start: number; end: number };
+	/** 最新N件: 最新 latestCount 件を取得する */
+	latestCount?: number;
+}
+
+/**
  * スレッド内のレス一覧を取得する（post_number ASC）。
+ * range / latestCount オプションによりページネーション範囲指定に対応する。
  *
  * See: features/thread.feature @スレッドのレスが書き込み順に表示される
+ * See: features/thread.feature @pagination
  * See: docs/architecture/components/posting.md §2.3 getPostList
+ * See: tmp/workers/bdd-architect_TASK-162/design.md §2.4
  *
  * @param threadId - スレッドの UUID
- * @param fromPostNumber - この番号以降のレスを取得（省略時は全件）
+ * @param options - 取得オプション（fromPostNumber / range / latestCount）
  * @returns Post 配列（post_number ASC ソート済み）
  */
 export async function getPostList(
 	threadId: string,
-	fromPostNumber?: number,
+	options?: PostListOptions,
 ): Promise<Post[]> {
-	const options = fromPostNumber !== undefined ? { fromPostNumber } : {};
-	return PostRepository.findByThreadId(threadId, options);
+	return PostRepository.findByThreadId(threadId, options ?? {});
 }
 
 /**
@@ -783,4 +800,20 @@ export async function getPostList(
  */
 export async function getThread(threadId: string): Promise<Thread | null> {
 	return ThreadRepository.findById(threadId);
+}
+
+/**
+ * スレッドを threadKey で取得する。
+ * 新URL形式 /{boardId}/{threadKey}/ でのスレッド閲覧に使用する。
+ *
+ * See: features/thread.feature @url_structure
+ * See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.4
+ *
+ * @param threadKey - 専ブラ互換キー（10桁 UNIX タイムスタンプ）
+ * @returns Thread、存在しない場合は null
+ */
+export async function getThreadByThreadKey(
+	threadKey: string,
+): Promise<Thread | null> {
+	return ThreadRepository.findByThreadKey(threadKey);
 }
