@@ -1624,8 +1624,8 @@ Then(
 // 撃破: Webブラウザ表示（Web限定シナリオ — pending）
 // See: features/bot_system.feature @撃破済みボットのレスはWebブラウザで目立たない表示になる
 // 分類: DOM/CSS表示 — Cucumberサービス層では検証不可（D-10 §7.3.1）
-// 代替検証: UIコンポーネント実装後に Vitest コンポーネントテストで検証予定
-//   → src/__tests__/app/(web)/thread/eliminated-bot-display.test.tsx（作成予定）
+// 代替検証: UI未実装のため代替テスト未作成。UIコンポーネント実装時に
+//   src/__tests__/app/(web)/thread/eliminated-bot-display.test.tsx を作成すること
 // ---------------------------------------------------------------------------
 
 Given(
@@ -1657,8 +1657,8 @@ Then(
 // 撃破: トグル表示切り替え（Web限定シナリオ — pending）
 // See: features/bot_system.feature @撃破済みボットのレス表示をトグルで切り替えられる
 // 分類: DOM/CSS表示 — Cucumberサービス層では検証不可（D-10 §7.3.1）
-// 代替検証: UIコンポーネント実装後に Vitest コンポーネントテストで検証予定
-//   → src/__tests__/app/(web)/thread/eliminated-bot-display.test.tsx（作成予定）
+// 代替検証: UI未実装のため代替テスト未作成。UIコンポーネント実装時に
+//   src/__tests__/app/(web)/thread/eliminated-bot-display.test.tsx を作成すること
 // ---------------------------------------------------------------------------
 
 When(

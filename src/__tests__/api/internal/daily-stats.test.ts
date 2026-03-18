@@ -2,43 +2,38 @@
  * 単体テスト: POST /api/internal/daily-stats
  *
  * 日次統計集計 Internal API のルートハンドラをテストする。
- * supabaseAdmin と認証ミドルウェアをモック化し、正常系・異常系を検証する。
+ * DailyStatsService と認証ミドルウェアをモック化し、正常系・異常系を検証する。
  *
  * See: features/admin.feature @管理者が統計情報の日次推移を確認できる
  * See: src/app/api/internal/daily-stats/route.ts
- * See: scripts/aggregate-daily-stats.ts
+ * See: src/lib/services/daily-stats-service.ts
  *
  * テスト方針:
- *   - supabaseAdmin のクエリをモック化して DB 依存を排除する
+ *   - DailyStatsService をモック化してルートハンドラの責務のみ検証する
  *   - verifyInternalApiKey もモック化する
  *   - 日付の指定あり/なし/不正形式のケースを検証する
+ *   - ルートは「認証 -> Service委譲 -> レスポンス返却」の薄いラッパーであること
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DailyStat } from "../../../lib/services/daily-stats-service";
 
 // ---------------------------------------------------------------------------
 // モック定義
 // ---------------------------------------------------------------------------
 
 const mockVerifyInternalApiKey = vi.fn();
-
-/**
- * supabaseAdmin のクエリチェーンをモック化する。
- * 各テーブルのクエリ結果を一括で制御する。
- */
-const mockFrom = vi.fn();
-const mockSelect = vi.fn();
-const mockUpsert = vi.fn();
+const mockAggregateAndUpsert = vi.fn();
+const mockGetYesterdayJst = vi.fn();
 
 vi.mock("@/lib/middleware/internal-api-auth", () => ({
 	verifyInternalApiKey: (...args: unknown[]) =>
 		mockVerifyInternalApiKey(...args),
 }));
 
-vi.mock("@/lib/infrastructure/supabase/client", () => ({
-	supabaseAdmin: {
-		from: (...args: unknown[]) => mockFrom(...args),
-	},
+vi.mock("@/lib/services/daily-stats-service", () => ({
+	aggregateAndUpsert: (...args: unknown[]) => mockAggregateAndUpsert(...args),
+	getYesterdayJst: () => mockGetYesterdayJst(),
 }));
 
 import { POST } from "../../../app/api/internal/daily-stats/route";
@@ -64,41 +59,22 @@ function createUnauthenticatedRequest(): Request {
 	});
 }
 
-/**
- * supabaseAdmin.from() のクエリチェーンをセットアップする。
- * 全てのクエリが成功する状態にする。
- */
-function setupSuccessfulQueries() {
-	// from() は各テーブルに対して呼ばれる。
-	// 簡易的に全テーブルで同じモックチェーンを返す。
-	const countResult = { count: 5, error: null };
-	const dataResult = { data: [], error: null };
-
-	const chainMock = {
-		select: vi.fn().mockReturnValue({
-			gte: vi.fn().mockReturnValue({
-				lt: vi.fn().mockReturnValue({
-					eq: vi.fn().mockReturnValue({
-						not: vi.fn().mockResolvedValue(dataResult),
-						...countResult,
-					}),
-					gt: vi.fn().mockResolvedValue(dataResult),
-					lt: vi.fn().mockResolvedValue(dataResult),
-					...countResult,
-				}),
-				eq: vi.fn().mockReturnValue({
-					not: vi.fn().mockResolvedValue(dataResult),
-					...countResult,
-				}),
-				...countResult,
-			}),
-			...countResult,
-		}),
-		upsert: vi.fn().mockResolvedValue({ error: null }),
+/** テスト用の DailyStat データ */
+function createMockStat(targetDate: string): DailyStat {
+	return {
+		stat_date: targetDate,
+		total_users: 100,
+		new_users: 5,
+		active_users: 30,
+		total_posts: 200,
+		total_threads: 10,
+		active_threads: 8,
+		currency_in_circulation: 50000,
+		currency_granted: 1000,
+		currency_consumed: 500,
+		total_accusations: 3,
+		total_attacks: 2,
 	};
-
-	mockFrom.mockReturnValue(chainMock);
-	return chainMock;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +84,7 @@ function setupSuccessfulQueries() {
 describe("POST /api/internal/daily-stats", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockGetYesterdayJst.mockReturnValue("2026-03-18");
 	});
 
 	// =========================================================================
@@ -131,7 +108,8 @@ describe("POST /api/internal/daily-stats", () => {
 
 	it("日付指定ありの場合、指定日の統計を集計する", async () => {
 		mockVerifyInternalApiKey.mockReturnValue(true);
-		setupSuccessfulQueries();
+		const mockStat = createMockStat("2026-03-15");
+		mockAggregateAndUpsert.mockResolvedValue(mockStat);
 
 		const request = createAuthenticatedRequest({ date: "2026-03-15" });
 		const response = await POST(request);
@@ -140,11 +118,15 @@ describe("POST /api/internal/daily-stats", () => {
 		const body = await response.json();
 		expect(body.success).toBe(true);
 		expect(body.targetDate).toBe("2026-03-15");
+		expect(body.stats).toEqual(mockStat);
+		// Service層に正しい日付が渡されたことを検証
+		expect(mockAggregateAndUpsert).toHaveBeenCalledWith("2026-03-15");
 	});
 
 	it("日付指定なしの場合、昨日の統計を集計する", async () => {
 		mockVerifyInternalApiKey.mockReturnValue(true);
-		setupSuccessfulQueries();
+		const mockStat = createMockStat("2026-03-18");
+		mockAggregateAndUpsert.mockResolvedValue(mockStat);
 
 		const request = createAuthenticatedRequest({});
 		const response = await POST(request);
@@ -154,6 +136,19 @@ describe("POST /api/internal/daily-stats", () => {
 		expect(body.success).toBe(true);
 		// targetDate が YYYY-MM-DD 形式であること
 		expect(body.targetDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+	});
+
+	it("Service層にルートから正しく委譲されている（supabaseAdmin直接参照なし）", async () => {
+		mockVerifyInternalApiKey.mockReturnValue(true);
+		const mockStat = createMockStat("2026-03-15");
+		mockAggregateAndUpsert.mockResolvedValue(mockStat);
+
+		const request = createAuthenticatedRequest({ date: "2026-03-15" });
+		await POST(request);
+
+		// aggregateAndUpsert が呼ばれたことを検証（委譲の証明）
+		expect(mockAggregateAndUpsert).toHaveBeenCalledTimes(1);
+		expect(mockAggregateAndUpsert).toHaveBeenCalledWith("2026-03-15");
 	});
 
 	// =========================================================================
@@ -173,13 +168,11 @@ describe("POST /api/internal/daily-stats", () => {
 		expect(body.error).toBe("INVALID_DATE");
 	});
 
-	it("UPSERT が失敗した場合、500 を返す", async () => {
+	it("Service層が例外をスローした場合、500 を返す", async () => {
 		mockVerifyInternalApiKey.mockReturnValue(true);
-		const chainMock = setupSuccessfulQueries();
-		// upsert を失敗させる
-		chainMock.upsert.mockResolvedValue({
-			error: { message: "UPSERT failed" },
-		});
+		mockAggregateAndUpsert.mockRejectedValue(
+			new Error("UPSERT 失敗: DB error"),
+		);
 
 		const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 

@@ -15,14 +15,13 @@
 # リポジトリの Settings > Secrets and variables > Actions > New repository secret から以下を登録:
 #
 #   1. BOT_API_KEY
-#      - 値: Cloudflare Workers 環境変数 BOT_API_KEY と同じ値
+#      - 値: デプロイ先環境変数 BOT_API_KEY と同じ値
 #      - 用途: Internal API の Bearer 認証トークン
 #
 #   2. DEPLOY_URL
-#      - 例: https://battle-board.xxx.workers.dev
-#      - 用途: Cloudflare Workers のデプロイURL（末尾スラッシュなし）
-#      - 注意: Cloudflare Workers を使用する（Vercelではない）。
-#              専ブラ互換APIのメインホストが Cloudflare であるため。
+#      - 用途: デプロイURL（末尾スラッシュなし）
+#      - TDR-010: Vercel を選択。Cloudflare Workers は通常ユーザー（専ブラ含む）の
+#                 リクエストに専念させ、BOT cron の負荷を分離する。
 
 name: Bot Scheduler
 

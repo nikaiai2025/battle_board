@@ -36,16 +36,24 @@ import * as RegistrationService from "@/lib/services/registration-service";
  *   500: { success: false; error: string }（サービスエラー）
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-	// --- Discord OAuth URL の取得 ---
-	// redirectTo: コールバック URL に flow=login を付与する
-	// See: docs/architecture/components/user-registration.md §7.3 ログイン（新デバイス）
-	const origin = req.nextUrl.origin;
-	const redirectTo = `${origin}/api/auth/callback?flow=login`;
+	try {
+		// --- Discord OAuth URL の取得 ---
+		// redirectTo: コールバック URL に flow=login を付与する
+		// See: docs/architecture/components/user-registration.md §7.3 ログイン（新デバイス）
+		const origin = req.nextUrl.origin;
+		const redirectTo = `${origin}/api/auth/callback?flow=login`;
 
-	const result = await RegistrationService.loginWithDiscord(redirectTo);
+		const result = await RegistrationService.loginWithDiscord(redirectTo);
 
-	return NextResponse.json(
-		{ success: true, redirectUrl: result.redirectUrl },
-		{ status: 200 },
-	);
+		return NextResponse.json(
+			{ success: true, redirectUrl: result.redirectUrl },
+			{ status: 200 },
+		);
+	} catch (err) {
+		console.error("[POST /api/auth/login/discord] Error:", err);
+		return NextResponse.json(
+			{ success: false, error: "Discord認証の開始に失敗しました" },
+			{ status: 500 },
+		);
+	}
 }

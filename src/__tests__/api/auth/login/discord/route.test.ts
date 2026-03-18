@@ -125,11 +125,26 @@ describe("POST /api/auth/login/discord", () => {
 
 	describe("異常系（Service例外）", () => {
 		it("loginWithDiscord がエラーをスローした場合は 500 を返す", async () => {
+			// Service 例外がルートハンドラの try-catch で捕捉され、500 が返ること
 			mockRegistrationService.loginWithDiscord.mockRejectedValue(
 				new Error("RegistrationService.loginWithDiscord failed: discord error"),
 			);
 
-			await expect(POST(createRequest())).rejects.toThrow();
+			const consoleSpy = vi
+				.spyOn(console, "error")
+				.mockImplementation(() => {});
+
+			const response = await POST(createRequest());
+			const body = (await response.json()) as {
+				success: boolean;
+				error: string;
+			};
+
+			expect(response.status).toBe(500);
+			expect(body.success).toBe(false);
+			expect(body.error).toBe("Discord認証の開始に失敗しました");
+
+			consoleSpy.mockRestore();
 		});
 	});
 });

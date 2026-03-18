@@ -9,10 +9,17 @@
  * セキュリティ要件:
  *   - BOT_API_KEY が空文字または未設定の場合は全リクエストを拒否する
  *   - Authorization ヘッダーの Bearer トークンが BOT_API_KEY と一致する場合のみ許可
+ *   - トークン比較には crypto.timingSafeEqual を使用し、タイミング攻撃を防止する
  */
+
+import { timingSafeEqual } from "crypto";
 
 /**
  * Internal API の Bearer 認証を検証する。
+ *
+ * トークン比較には crypto.timingSafeEqual を使用する。
+ * BOT_API_KEY は運用者が任意に設定するため固定長とは限らず、
+ * 単純な文字列比較（===）では早期打ち切りによりトークンの先頭部分が推測される可能性がある。
  *
  * @param request - HTTP リクエスト
  * @returns 認証成功なら true、失敗なら false
@@ -37,7 +44,12 @@ export function verifyInternalApiKey(request: Request): boolean {
 
 	const token = authHeader.slice("Bearer ".length);
 
-	// タイミング安全な比較（Node.js 環境では timingSafeEqual が理想だが、
-	// 固定長キーの比較であれば単純比較でも実用上問題ない）
-	return token === apiKey;
+	// タイミング安全な比較: crypto.timingSafeEqual を使用し、タイミング攻撃を防止する
+	// 長さが異なる場合は timingSafeEqual が例外をスローするため、事前に長さチェックを行う
+	const tokenBuf = Buffer.from(token);
+	const keyBuf = Buffer.from(apiKey);
+	if (tokenBuf.length !== keyBuf.length) {
+		return false;
+	}
+	return timingSafeEqual(tokenBuf, keyBuf);
 }

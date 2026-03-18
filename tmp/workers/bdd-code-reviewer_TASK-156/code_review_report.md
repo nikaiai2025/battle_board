@@ -108,6 +108,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 問題点: `getActiveUsers()` と `getActiveThreads()` は、対象日のレコードを全件取得してからアプリケーション側で `Set` によるユニーク集計を行っている。`select("author_id")` / `select("thread_id")` に LIMIT がなく、書き込み数が膨大な場合（例: 1日1万件以上）にメモリ消費が増大する。Internal API であるため即座に問題になる可能性は低いが、SQL の `COUNT(DISTINCT ...)` を利用するか、RPC 関数化して DB 側で完結させることが望ましい。
 
+```typescript
+// 現状: 全件取得 + アプリケーション側 Set
+const { data } = await supabaseAdmin
+    .from("posts")
+    .select("author_id")
+    .gte(...)
+    .lt(...);
+const uniqueUsers = new Set((data ?? []).map((r) => r.author_id));
+
+// 改善案: RPC / DB View で COUNT(DISTINCT author_id) を実行する
+```
+
 重要度: **MEDIUM** -- スケーラビリティ懸念。MVP では問題ないが、成長に伴い改善が必要。
 
 ---
@@ -116,7 +128,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 ファイル: `src/app/api/internal/daily-stats/route.ts:93-103`
 
-問題点: `getCurrencyInCirculation()` は `currencies` テーブルの `balance` を全件取得してアプリケーション側で合計している。ユーザー数の増加に伴い、全行フェッチのコストが増大する。SQL の `SUM()` を RPC 関数化して DB 側で集計すべきである。
+問題点: `getCurrencyInCirculation()` は `currencies` テーブルの `balance` を全件取得してアプリケーション側で合計している。ユーザー数の増加に伴い、全行フェッチのコストが増大する。Supabase の `.select("balance")` は全行を返すため、SQL の `SUM()` を RPC 関数化して DB 側で集計すべきである。
 
 重要度: **MEDIUM** -- MEDIUM-001 と同種のスケーラビリティ懸念。
 
@@ -132,7 +144,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 ---
 
-### [MEDIUM-004] bot-repository.ts の `bulkReviveEliminated` が N+1 更新
+### [MEDIUM-004] bot-service.ts の `bulkReviveEliminated` が N+1 更新
 
 ファイル: `src/lib/infrastructure/repositories/bot-repository.ts:436-477`
 
@@ -156,7 +168,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 ファイル: `src/app/(senbra)/[boardId]/dat/[threadKey]/route.ts:20-24`
 
-問題点: 専ブラルートが `DatFormatter`, `ShiftJisEncoder`, `PostRepository`, `ThreadRepository` を `@/lib/infrastructure/` から直接 import している。Source_Layout ルールでは `app/` は `lib/services/` を呼ぶべきとされている。ただし、他の専ブラルート（subject.txt, bbs.cgi, SETTING.TXT 等）でも同様のパターンが確認されたため、これは専ブラルートのプロジェクト共通パターンとして確立していると推測される。Sprint-46~55 の変更範囲で新たに導入されたパターンではないため、重要度を下げる。
+問題点: 専ブラルートが `DatFormatter`, `ShiftJisEncoder`, `PostRepository`, `ThreadRepository` を `@/lib/infrastructure/` から直接 import している。Source_Layout ルールでは `app/` は `lib/services/` を呼ぶべきとされている。ただし、検索結果から他の専ブラルート（subject.txt, bbs.cgi, SETTING.TXT 等）でも同様のパターンが確認されたため、これは専ブラルートのプロジェクト共通パターンとして確立していると推測される。Sprint-46~55 の変更範囲で新たに導入されたパターンではないため、重要度を下げる。
 
 重要度: **LOW** -- 既存の専ブラルート共通パターンの踏襲。将来的にリファクタリングを検討。
 
@@ -181,10 +193,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 3. **エラーハンドリング: Internal API ルート** -- `bot/execute`, `daily-reset`, `daily-stats` の3ルートは全て try-catch で 500 エラーを適切にハンドリングしており、内部エラーの詳細をクライアントに漏洩しない。
 4. **横断的制約: AIボットの書き込みパス** -- `bot-service.ts` の `executeBotPost()` は `PostService.createPost` を `isBotWrite: true` で呼び出しており、「AIボットの書き込みはユーザーの書き込みと同一のAPIを通じて行い、直接DBを書き換えない」制約に準拠している。
 5. **テストカバレッジ** -- 新規ファイル7件に対し、テストファイル7件（+既存テスト4件の修正）が確認された。Internal API 認証、OAuth コールバック、BOT 投稿実行、日次リセット、日次統計、BOT スケジューリングの各テストが存在する。
-6. **ユビキタス言語** -- コード内のコメント・変数名はユビキタス言語辞書に準拠している。
+6. **ユビキタス言語** -- コード内のコメント・変数名はユビキタス言語辞書に準拠している（例: `bot` ではなく適切な文脈での使用、`dailyId` = 日次リセットID、`reveal` = BOTマーク付与 等）。
 7. **Cookie セキュリティ** -- `callback/route.ts` の Cookie 設定は `httpOnly: true`, `secure: process.env.NODE_ENV === "production"`, `sameSite: "lax"` と適切。
 8. **GitHub Actions ワークフロー** -- Secrets (`BOT_API_KEY`, `DEPLOY_URL`) を使用しており、ハードコード値なし。cron スケジュールも適切。
-9. **SQL マイグレーション** -- `00015_bot_next_post_at.sql` は `IF NOT EXISTS` を使用した冪等なマイグレーション。
+9. **SQL マイグレーション** -- `00015_bot_next_post_at.sql` は `IF NOT EXISTS` を使用した冪等なマイグレーション。既存データの初期値設定も含まれている。
 10. **domain モデル (bot.ts)** -- 外部依存なしの純粋な interface 定義。依存方向ルールに準拠。
 
 ---

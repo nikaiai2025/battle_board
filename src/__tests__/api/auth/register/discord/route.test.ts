@@ -223,4 +223,41 @@ describe("POST /api/auth/register/discord", () => {
 			).not.toHaveBeenCalled();
 		});
 	});
+
+	// =========================================================================
+	// 異常系（Service例外）
+	// =========================================================================
+
+	describe("異常系（Service例外）", () => {
+		it("registerWithDiscord がエラーをスローした場合は 500 を返す", async () => {
+			// Service 例外がルートハンドラの try-catch で捕捉され、500 が返ること
+			setupCookieWithEdgeToken(EDGE_TOKEN);
+			mockAuthService.verifyEdgeToken.mockResolvedValue({
+				valid: true,
+				userId: USER_ID,
+				authorIdSeed: "seed-001",
+			});
+			mockRegistrationService.registerWithDiscord.mockRejectedValue(
+				new Error(
+					"RegistrationService.registerWithDiscord failed: discord error",
+				),
+			);
+
+			const consoleSpy = vi
+				.spyOn(console, "error")
+				.mockImplementation(() => {});
+
+			const response = await POST(createRequest());
+			const body = (await response.json()) as {
+				success: boolean;
+				error: string;
+			};
+
+			expect(response.status).toBe(500);
+			expect(body.success).toBe(false);
+			expect(body.error).toBe("Discord本登録の開始に失敗しました");
+
+			consoleSpy.mockRestore();
+		});
+	});
 });
