@@ -148,9 +148,10 @@ async function handleFullRequest(thread: {
  *    - rangeStart < dat_byte_size: 差分レスを構築して206を返す
  *
  * 差分レスの特定方法:
- * - 全DATを構築してrangeStart以降のバイトを切り出す方式を採用する
- * - 理由: post_numberからバイトオフセットを逆算するより、
- *         DATを全構築してスライスする方が実装が正確で単純なため
+ * - 全DATを構築してrangeStart以降のバイトを切り出す方式を採用する（TDR-009）
+ * - 理由: 管理者によるレス削除（is_deleted=true）で過去行のShift_JISバイト数が
+ *         変動するため、差分レスだけのSELECT+構築ではバイト境界の整合性を保証できない。
+ *         全DAT再構築+sliceなら「現在のDB状態の正しいDAT」から常に正確なバイトを返せる
  *
  * @param thread - スレッドエンティティ
  * @param rangeStart - 差分開始バイト位置

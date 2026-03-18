@@ -998,7 +998,7 @@ supabase/
 
 | ジョブ | スケジュール | 内容 |
 |---|---|---|
-| bot-scheduler | 15分おき（初期値。調整可） | 運営ボットの書き込み実行 |
+| bot-scheduler | 毎時 :00, :30（`0,30 * * * *`） | 運営ボットの書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
 | daily-maintenance | 毎日 JST 0:00 | 日次リセットID・BOTマークリセット・生存日数加算 |
 | cleanup | 毎日 JST 3:00（初期値） | 期限切れ認証コード削除・不要データ掃除 |
 
@@ -1077,6 +1077,46 @@ supabase/
 - **影響範囲**: `src/app/(web)/page.tsx`, `src/app/(web)/threads/[threadId]/page.tsx`
 - **除外**: POST系操作（書き込み・認証）はClient Componentから引き続きAPIルート経由で行う（Cloudflare制約の影響なし）
 - **理由**: Service Bindings による回避策も検討したが、Next.jsの標準`fetch()`からはService Bindingsにアクセスできず（Cloudflare固有の`env.BINDING.fetch()` APIが必要）、フレームワークの制約により採用不可
+
+### TDR-009: Range差分応答は全DAT再構築+sliceで実装する
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-18
+- **背景**: D-07 §11.3 および senbra-adapter.md §4 では「差分レスのみクエリして差分だけDAT構築」を理想方針として記述している。しかし実装（`(senbra)/[boardId]/dat/[threadKey]/route.ts`）では全レスを取得し、全DATを構築した上で `slice(rangeStart)` する方式を採用している。これが妥当かを eddist の実装と比較して検証した
+- **決定**: 現行の「全DAT再構築 + slice」方式を正式な実装方針として維持する。差分SELECTによる最適化は採用しない
+- **理由**:
+  - 5ch本家・eddist でRange差分が成立する前提は「DATが追記専用ファイルであり、過去行のバイト数が変わらないこと」である
+  - BattleBoard では管理者によるレス削除（`is_deleted = true`）が発生すると、DATFormatter の出力が「元の本文」→「このレスは削除されました」に変わり、過去行の Shift_JIS バイト数が変動する。この時点で専ブラが保持するキャッシュのバイトオフセットとサーバー側のDATが乖離する
+  - 差分SELECTで新規レスだけを返すと、削除によるバイトずれを吸収できず、専ブラ側であぼーん検知→全DAT再取得が頻発する可能性がある
+  - 全DAT再構築 + slice は非効率だが、「現在のDB状態から生成した正しいDAT」からバイトを切り出すため、バイト境界の整合性が常に保証される
+- **将来の最適化方針**: DB負荷が問題になった場合は、差分SELECTではなく「生成済み Shift_JIS バッファのキャッシュ（メモリ or Edge Cache）」で対処する。書き込み時にキャッシュを更新し、Range要求時はキャッシュからsliceする。レス削除時はキャッシュを無効化する。eddist の「DATファイル配信」と本質的に同等の効果をファイルシステムなしで得る方式
+- **影響範囲**: `src/app/(senbra)/[boardId]/dat/[threadKey]/route.ts`
+- **関連**: TDR-002, senbra-adapter.md §4, eddist Fit & Gap レポート（`docs/research/eddist_frontend_fit_gap_2026-03-18.md` §1）
+
+### TDR-010: BOT cron間隔と投稿タイミング制御方式
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-18
+- **背景**: 運営ボットの定期書き込みを GitHub Actions cron で駆動する際、cron間隔と投稿タイミングのランダム性、GitHub Actions 無料枠（月2,000分）の3つを両立させる必要がある
+- **決定**:
+  1. **cron間隔**: 毎時 :00, :30 の30分間隔（`0,30 * * * *`）
+  2. **投稿タイミング制御**: DB予定時刻方式（`bots.next_post_at` カラム）を採用。投稿完了時に `next_post_at = NOW() + SchedulingStrategy.getNextPostDelay()` を保存し、cron起動時は `WHERE is_active = true AND next_post_at <= NOW()` で投稿対象を判定する
+- **制約と受容**:
+  - 現行インフラ（Vercel/Cloudflare + GitHub Actions）では投稿時刻の真のランダム化は不可能。サーバー側 sleep はサーバーレスのタイムアウト制限（Vercel 10秒 / Cloudflare 30秒）により不可。GitHub Actions 内 sleep は課金分数を浪費する
+  - `next_post_at` 方式が実現するのは「投稿間隔のランダム化」であり、外部から観測される投稿時刻は :00, :30 のいずれかに乗る
+  - このグリッド痕跡はゲーム情報として許容する。プレイヤーがBOTの投稿パターンを推理する材料となり、逆に人間がBOTを装う攪乱プレイの余地も生まれる
+- **GitHub Actions 無料枠との整合性**:
+  - GitHub Actions はジョブ単位で1分に切り上げ課金。実処理が数秒でも1回 = 1分消費
+  - 30分間隔: 2回/時 × 24時間 × 30日 = 1,440分/月（無料枠内。他ジョブ + CI/CD の余裕あり）
+  - 15分間隔: 2,880分/月（無料枠超過のため不採用）
+- **検討した代替案**:
+  - GitHub Actions 内 `sleep $((RANDOM % N))`: sleep 中も課金されるため不可
+  - API側 `setTimeout` による遅延: サーバーレス実行時間制限により不可
+  - 素数間隔（13分, 17分）や不揃い間隔による痕跡緩和: cron構文 `*/N` は毎時固定分に展開されるため効果限定的。かつ無料枠を超過する
+  - 常駐プロセス（別インフラ）: 秒単位精度が可能だが、CLAUDE.md 横断的制約によりインフラ追加はエスカレーション必須。Phase 2 では不要
+- **撃破との整合性**: 撃破時（`is_active = false`）は cron クエリの `is_active = true` 条件で自動除外される。`next_post_at` の変更は不要。日次リセットでの復活時に `next_post_at` を再設定する
+- **議論経緯**: `tmp/archive/discussion_bot_cron_design.md`
+- **影響範囲**: `bots` テーブル（`next_post_at` カラム追加）、D-08 bot.md §5（データモデル）、`.github/workflows/bot-scheduler.yml`
 
 ---
 
