@@ -24,6 +24,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { parsePaginationRange } from "@/lib/domain/rules/pagination-parser";
 import * as PostService from "@/lib/services/post-service";
+import PaginationNav from "../../../_components/PaginationNav";
 import PostForm from "../../../_components/PostForm";
 import { PostFormContextProvider } from "../../../_components/PostFormContext";
 import type { Post } from "../../../_components/PostItem";
@@ -280,6 +281,17 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 				<p className="text-xs text-gray-500">レス数: {thread.postCount}</p>
 			</div>
 
+			{/* pagination-nav (上部): スレッドヘッダ直下のページナビゲーション
+			    postCount <= 50 の場合は PaginationNav が null を返す（非表示）。
+			    See: features/thread.feature @pagination
+			    See: tmp/workers/bdd-architect_TASK-162/design.md §2.6
+			    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ */}
+			<PaginationNav
+				boardId={boardId}
+				threadKey={threadKey}
+				postCount={thread.postCount}
+			/>
+
 			{/* PostFormContextProvider: PostItem のレス番号クリック時に PostForm にテキスト挿入する
 			    設計書 §6.2 の通り、PostForm と PostList をまとめてラップする。
 			    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ
@@ -306,6 +318,16 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 					pollingEnabled={pollingEnabled}
 				/>
 			</PostFormContextProvider>
+
+			{/* pagination-nav (下部): レス一覧直後のページナビゲーション（5ch慣習: 上下両方に表示）
+			    See: features/thread.feature @pagination
+			    See: tmp/workers/bdd-architect_TASK-162/design.md §2.6
+			    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ */}
+			<PaginationNav
+				boardId={boardId}
+				threadKey={threadKey}
+				postCount={thread.postCount}
+			/>
 		</main>
 	);
 }

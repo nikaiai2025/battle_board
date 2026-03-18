@@ -6,54 +6,62 @@
  *
  * See: features/thread.feature @スレッド一覧にスレッドの基本情報が表示される
  * See: features/thread.feature @スレッドが0件の場合はメッセージが表示される
+ * See: features/thread.feature @url_structure
  * See: docs/specs/screens/thread-list.yaml > elements > thread-list
  */
 
 import ThreadCard from "./ThreadCard";
 
 interface Thread {
-  id: string;
-  title: string;
-  postCount: number;
-  lastPostAt: string;
+	id: string;
+	title: string;
+	postCount: number;
+	lastPostAt: string;
+	/** 板ID。ThreadCard のリンク先生成に伝播 */
+	boardId: string;
+	/** 専ブラ互換キー（10桁 UNIX タイムスタンプ）。ThreadCard のリンク先生成に伝播 */
+	threadKey: string;
 }
 
 interface ThreadListProps {
-  threads: Thread[];
+	threads: Thread[];
 }
 
 /**
  * スレッド一覧コンポーネント（Server Component）
  *
+ * See: features/thread.feature @url_structure
  * See: docs/architecture/components/web-ui.md §3.1 スレッド一覧ページ
  * See: docs/specs/screens/thread-list.yaml @SCR-001 > thread-list
  */
 export default function ThreadList({ threads }: ThreadListProps) {
-  // スレッドが0件の場合は空メッセージを表示
-  if (threads.length === 0) {
-    return (
-      <div
-        className="text-gray-500 text-sm text-center py-8"
-        id="thread-list-empty"
-      >
-        スレッドがありません
-      </div>
-    );
-  }
+	// スレッドが0件の場合は空メッセージを表示
+	if (threads.length === 0) {
+		return (
+			<div
+				className="text-gray-500 text-sm text-center py-8"
+				id="thread-list-empty"
+			>
+				スレッドがありません
+			</div>
+		);
+	}
 
-  return (
-    <section id="thread-list">
-      <ul className="list-none p-0 m-0">
-        {threads.map((thread) => (
-          <ThreadCard
-            key={thread.id}
-            id={thread.id}
-            title={thread.title}
-            postCount={thread.postCount}
-            lastPostAt={thread.lastPostAt}
-          />
-        ))}
-      </ul>
-    </section>
-  );
+	return (
+		<section id="thread-list">
+			<ul className="list-none p-0 m-0">
+				{threads.map((thread) => (
+					<ThreadCard
+						key={thread.id}
+						id={thread.id}
+						title={thread.title}
+						postCount={thread.postCount}
+						lastPostAt={thread.lastPostAt}
+						boardId={thread.boardId}
+						threadKey={thread.threadKey}
+					/>
+				))}
+			</ul>
+		</section>
+	);
 }

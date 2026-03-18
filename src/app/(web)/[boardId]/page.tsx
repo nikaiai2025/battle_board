@@ -126,9 +126,10 @@ export default async function BoardPage({ params }: BoardPageProps) {
 				書き込みするには認証が必要です（送信時に認証画面が表示されます）
 			</p>
 
-			{/* thread-list: スレッド一覧（boardId + threadKey は T4 タスクで伝播予定）
-			    現在の ThreadList は id/title/postCount/lastPostAt のみ受け取る。
-			    ThreadCard のリンク先変更（/{boardId}/{threadKey}/）は T4 タスクで対応予定。
+			{/* thread-list: スレッド一覧
+			    ThreadList → ThreadCard に boardId/threadKey を伝播し、
+			    リンク先を /{boardId}/{threadKey}/ 形式で生成する。
+			    See: features/thread.feature @url_structure
 			    See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.6
 			*/}
 			<ThreadList threads={threads} />

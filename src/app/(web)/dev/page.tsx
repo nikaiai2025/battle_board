@@ -4,6 +4,7 @@
  * BattleBoard メイン板と同一のコンポーネント群を再利用し、
  * boardId="dev" でスレッド一覧・スレッド作成フォームを表示する薄いラッパー。
  *
+ * See: features/thread.feature @url_structure
  * See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-b
  */
 
@@ -20,11 +21,16 @@ interface ThreadView {
 	title: string;
 	postCount: number;
 	lastPostAt: string;
+	/** 板ID。ThreadCard のリンク先生成に伝播 */
+	boardId: string;
+	/** 専ブラ互換キー（10桁 UNIX タイムスタンプ）。ThreadCard のリンク先生成に伝播 */
+	threadKey: string;
 }
 
 /**
  * dev 板のスレッド一覧をサービス層から直接取得する。
  *
+ * See: features/thread.feature @url_structure
  * See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-b
  */
 async function fetchDevThreads(): Promise<ThreadView[]> {
@@ -38,6 +44,8 @@ async function fetchDevThreads(): Promise<ThreadView[]> {
 				t.lastPostAt instanceof Date
 					? t.lastPostAt.toISOString()
 					: String(t.lastPostAt),
+			threadKey: t.threadKey,
+			boardId: t.boardId,
 		}));
 	} catch (err) {
 		console.error("[fetchDevThreads] Exception:", err);
@@ -48,6 +56,7 @@ async function fetchDevThreads(): Promise<ThreadView[]> {
 /**
  * 開発連絡板ページ（Server Component）
  *
+ * See: features/thread.feature @url_structure
  * See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-b
  */
 export default async function DevBoardPage() {
@@ -69,7 +78,11 @@ export default async function DevBoardPage() {
 				書き込みするには認証が必要です（送信時に認証画面が表示されます）
 			</p>
 
-			{/* thread-list: スレッド一覧 */}
+			{/* thread-list: スレッド一覧
+			    ThreadList → ThreadCard に boardId/threadKey を伝播し、
+			    リンク先を /dev/{threadKey}/ 形式で生成する。
+			    See: features/thread.feature @url_structure
+			*/}
 			<ThreadList threads={threads} />
 		</main>
 	);
