@@ -16,6 +16,20 @@ See: docs/architecture/architecture.md §13 TDR-006
 
 ---
 
+## 1.1 UIコンポーネント基盤
+
+shadcn/ui (style: base-nova) を採用。デザイントークン・共通UIコンポーネント・ページレイアウトの3層でスタイルを管理する。See: D-07 §13 TDR-011
+
+| 層 | 所在 | 役割 |
+|---|---|---|
+| デザイントークン | `src/app/globals.css` の CSS変数 | 色・余白・角丸等のサイト全体テーマ定義 |
+| 共通UIコンポーネント | `src/components/ui/` | shadcn/ui のButton, Input, Card等。`npx shadcn@latest add <name>` で追加 |
+| ページレイアウト | `src/app/(web)/` 各ページ | 共通コンポーネントを組み合わせて画面を構成 |
+
+コーディング規約は `.claude/rules/UI_Components.md` を参照。
+
+---
+
 ## 2. SSR / CSR / Server Actions の使い分け方針
 
 | 画面・操作 | 方式 | 理由 |

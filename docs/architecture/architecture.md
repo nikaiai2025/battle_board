@@ -1120,6 +1120,23 @@ supabase/
 - **議論経緯**: `tmp/archive/discussion_bot_cron_design.md`
 - **影響範囲**: `bots` テーブル（`next_post_at` カラム追加）、D-08 bot.md §5（データモデル）、`.github/workflows/bot-scheduler.yml`
 
+### TDR-011: UIコンポーネント基盤に shadcn/ui を採用
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-19
+- **背景**: 既存の Web UI はスタイルが各ページの TSX に Tailwind ユーティリティクラスとしてハードコードされており、色・余白・フォント等の一括変更が不可能。デザイントークン（CSS変数）も `--background` / `--foreground` の2変数のみで、サイト全体のテーマ管理機構が存在しなかった
+- **決定**: shadcn/ui (style: base-nova, base color: neutral) を導入し、以下の3層構造を確立する
+  1. **デザイントークン**: `globals.css` の CSS 変数（oklch形式、ライト/ダーク対応）
+  2. **共通UIコンポーネント**: `src/components/ui/` に shadcn/ui コンポーネントを配置
+  3. **ページレイアウト**: 各ページは共通コンポーネントとデザイントークンを参照
+- **移行方針**: 既存ページは一括置換せず画面単位で段階的に移行する。新規コードではハードコードされた色（`text-gray-800` 等）の使用を禁止し、セマンティックトークン（`text-foreground`, `text-muted-foreground` 等）を使用する
+- **追加された依存**: `shadcn`, `@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`, `lucide-react`
+- **影響範囲**: `src/app/globals.css`（テーマ変数追加）, `src/components/ui/`（新規ディレクトリ）, `src/lib/utils.ts`（`cn()` ユーティリティ追加）, `.claude/rules/UI_Components.md`（AIエージェント向けコーディング規約）
+- **検討した代替案**:
+  - 自前デザインシステム構築: 工数が大きく、デザイン専門知識が必要
+  - Material UI / Chakra UI: バンドルサイズが大きく、Tailwind CSS との二重管理になる
+  - Tailwind UI（テンプレート集）: コンポーネント抽象化が弱く、コピペ運用になる
+
 ---
 
 ## 14. 今後の拡張ポイント

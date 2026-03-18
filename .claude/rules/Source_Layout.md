@@ -22,7 +22,8 @@ battle_board/
 
 | ディレクトリ | 役割 | 置くもの | 置かないもの |
 |---|---|---|---|
-| `src/app/(web)/` | Web UI ページ | `page.tsx`, `layout.tsx`, React コンポーネント | ビジネスロジック |
+| `src/components/ui/` | 共通UIコンポーネント | shadcn/ui コンポーネント（`npx shadcn@latest add` で追加） | 手動作成コンポーネント、ビジネスロジック |
+| `src/app/(web)/` | Web UI ページ | `page.tsx`, `layout.tsx`, ページ固有コンポーネント | ビジネスロジック |
 | `src/app/api/` | Web API ルート | `route.ts`（リクエスト受付 → Service 呼び出し → レスポンス返却） | DB直接操作、複雑なロジック |
 | `src/app/(senbra)/` | 専ブラ互換ルート | `route.ts`（Shift_JIS変換・DAT生成 → Service 呼び出し） | — |
 | `src/lib/services/` | ユースケース実行 | トランザクション制御、Service 間連携、エラーハンドリング | DB操作の直接実装 |
