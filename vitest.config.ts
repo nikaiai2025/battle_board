@@ -1,16 +1,22 @@
-import { defineConfig } from 'vitest/config'
-import path from 'path'
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  test: {
-    environment: 'node',
-    globals: true,
-    include: ['src/**/*.test.ts'],
-    passWithNoTests: true,
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-})
+	plugins: [react()],
+	test: {
+		environment: "node",
+		globals: true,
+		include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+		passWithNoTests: true,
+		environmentMatchGlobs: [
+			// Client Componentのテストはjsdom環境で実行する
+			["src/__tests__/app/**/*.test.tsx", "jsdom"],
+		],
+	},
+	resolve: {
+		alias: {
+			"@": path.resolve(__dirname, "./src"),
+		},
+	},
+});
