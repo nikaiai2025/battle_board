@@ -55,6 +55,13 @@ interface PostListLiveWrapperProps {
 	threadId: string;
 	/** SSRで取得済みのレスの最大post_number。これより大きいレスだけを新着として表示 */
 	initialLastPostNumber: number;
+	/**
+	 * ポーリング有効フラグ（デフォルト: true）。
+	 * false の場合はポーリングを設定しない（過去ページ表示時に使用）。
+	 * See: features/thread.feature @pagination
+	 * See: tmp/workers/bdd-architect_TASK-162/design.md §2.7 ポーリングとの共存
+	 */
+	pollingEnabled?: boolean;
 }
 
 /**
@@ -65,6 +72,7 @@ interface PostListLiveWrapperProps {
 export default function PostListLiveWrapper({
 	threadId,
 	initialLastPostNumber,
+	pollingEnabled = true,
 }: PostListLiveWrapperProps) {
 	const [newPosts, setNewPosts] = useState<Post[]>([]);
 	const [lastPostNumber, setLastPostNumber] = useState(initialLastPostNumber);
@@ -143,10 +151,16 @@ export default function PostListLiveWrapper({
 	}, [initialLastPostNumber]);
 
 	// ポーリングの開始・停止
+	// pollingEnabled=false の場合はポーリングを設定しない（過去ページ表示時）
+	// See: features/thread.feature @pagination
+	// See: tmp/workers/bdd-architect_TASK-162/design.md §2.7 ポーリングとの共存
 	useEffect(() => {
+		if (!pollingEnabled) {
+			return;
+		}
 		const interval = setInterval(fetchNewPosts, POLLING_INTERVAL_MS);
 		return () => clearInterval(interval);
-	}, [fetchNewPosts]);
+	}, [fetchNewPosts, pollingEnabled]);
 
 	// 新着レスがない場合は何も表示しない
 	if (newPosts.length === 0) {

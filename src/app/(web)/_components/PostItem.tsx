@@ -5,14 +5,14 @@
  *
  * - レス番号、表示名、日次ID、書き込み日時、本文を表示
  * - 削除済みレスは「このレスは削除されました」と表示
- * - 本文内の >>N 形式のアンカーをページ内リンクに変換
+ * - 本文内の >>N 形式のアンカーをクリックでポップアップ表示（AnchorLink 使用）
  * - inlineSystemInfo が存在する場合、本文の下に区切り線付きでシステム情報を表示
  * - dangerouslySetInnerHTML 禁止（白スペース表示は white-space: pre-wrap で対応）
  * - 日時フォーマット: YYYY/MM/DD(ddd) HH:mm:ss
  * - レス番号はクリック可能なボタン（>>なし、数字のみ）。クリックでフォームに >>N を挿入
  *
  * See: features/thread.feature @スレッドのレスが書き込み順に表示される
- * See: features/thread.feature @レス内のアンカーで他のレスを参照できる
+ * See: features/thread.feature @anchor_popup
  * See: features/thread.feature @post_number_display
  * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
  * See: docs/specs/screens/thread-view.yaml > elements > post-list > itemTemplate
@@ -20,7 +20,7 @@
  * See: docs/architecture/components/web-ui.md §6 > dangerouslySetInnerHTML使用禁止
  */
 
-import Link from "next/link";
+import AnchorLink from "./AnchorLink";
 import { usePostFormContext } from "./PostFormContext";
 
 // ---------------------------------------------------------------------------
@@ -76,9 +76,10 @@ export function formatDateTime(dateStr: string): string {
  * 本文内の >>N 形式アンカーを解析してReact要素配列に変換する。
  *
  * dangerouslySetInnerHTML を使わずに Reactの標準エスケープを利用する。
- * >> の後に続く数字列をページ内リンク（#post-N）に変換する。
+ * >> の後に続く数字列を AnchorLink コンポーネントに変換する。
+ * クリックでポップアップ表示（ページ内スクロールからポップアップへ変更）。
  *
- * See: features/thread.feature @レス内のアンカーで他のレスを参照できる
+ * See: features/thread.feature @anchor_popup
  * See: docs/architecture/components/web-ui.md §6 > dangerouslySetInnerHTML使用禁止
  *
  * @param body - 本文テキスト
@@ -98,16 +99,11 @@ export function parseAnchorLinks(
 		if (match.index > lastIndex) {
 			parts.push(body.slice(lastIndex, match.index));
 		}
-		// アンカーリンクをReact要素として追加
-		const postNumber = match[2];
+		// AnchorLink コンポーネントとして追加（クリックでポップアップ表示）
+		// See: features/thread.feature @anchor_popup
+		const postNumber = parseInt(match[2], 10);
 		parts.push(
-			<Link
-				key={`anchor-${match.index}`}
-				href={`#post-${postNumber}`}
-				className="text-blue-600 hover:underline"
-			>
-				{match[1]}
-			</Link>,
+			<AnchorLink key={`anchor-${match.index}`} postNumber={postNumber} />,
 		);
 		lastIndex = match.index + match[0].length;
 	}
