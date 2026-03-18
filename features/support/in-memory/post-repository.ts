@@ -64,17 +64,36 @@ export async function findById(id: string): Promise<Post | null> {
 
 /**
  * スレッド ID に属するレス一覧を post_number ASC で取得する。
+ * fromPostNumber / range / latestCount オプションによりページネーション範囲指定に対応する。
+ *
  * See: src/lib/infrastructure/repositories/post-repository.ts
+ * See: features/thread.feature @pagination
  */
 export async function findByThreadId(
 	threadId: string,
-	options: { fromPostNumber?: number } = {},
+	options: {
+		fromPostNumber?: number;
+		range?: { start: number; end: number };
+		latestCount?: number;
+	} = {},
 ): Promise<Post[]> {
 	assertUUID(threadId, "PostRepository.findByThreadId.threadId");
 	const posts = Array.from(store.values())
 		.filter((p) => p.threadId === threadId && !p.isDeleted)
 		.sort((a, b) => a.postNumber - b.postNumber);
 
+	// latestCount 指定時: 末尾 latestCount 件を返す
+	if (options.latestCount !== undefined) {
+		return posts.slice(-options.latestCount);
+	}
+
+	// range 指定時: start <= postNumber <= end のレスを返す
+	if (options.range !== undefined) {
+		const { start, end } = options.range;
+		return posts.filter((p) => p.postNumber >= start && p.postNumber <= end);
+	}
+
+	// fromPostNumber 指定時: postNumber >= fromPostNumber のレスを返す
 	if (options.fromPostNumber !== undefined) {
 		return posts.filter((p) => p.postNumber >= options.fromPostNumber!);
 	}
