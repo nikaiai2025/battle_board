@@ -220,6 +220,7 @@ function createTrollBot(
 		accusedCount: options.accusedCount ?? 0,
 		timesAttacked: options.timesAttacked ?? 0,
 		botProfileKey: "荒らし役",
+		nextPostAt: null,
 		eliminatedAt: options.isActive === false ? new Date(Date.now()) : null,
 		eliminatedBy: null,
 		createdAt: new Date(Date.now()),

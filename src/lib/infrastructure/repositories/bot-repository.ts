@@ -35,6 +35,8 @@ interface BotRow {
 	times_attacked: number;
 	/** v5追加: config/bot_profiles.yaml のプロファイルキー */
 	bot_profile_key: string | null;
+	/** TDR-010追加: 次回投稿予定時刻 */
+	next_post_at: string | null;
 	eliminated_at: string | null;
 	eliminated_by: string | null;
 	created_at: string;
@@ -64,6 +66,7 @@ function rowToBot(row: BotRow): Bot {
 		accusedCount: row.accused_count,
 		timesAttacked: row.times_attacked,
 		botProfileKey: row.bot_profile_key,
+		nextPostAt: row.next_post_at ? new Date(row.next_post_at) : null,
 		eliminatedAt: row.eliminated_at ? new Date(row.eliminated_at) : null,
 		eliminatedBy: row.eliminated_by,
 		createdAt: new Date(row.created_at),
@@ -350,6 +353,52 @@ export async function incrementSurvivalDays(botId: string): Promise<void> {
  */
 export async function incrementTimesAttacked(botId: string): Promise<void> {
 	await incrementColumn(botId, "times_attacked");
+}
+
+/**
+ * ボットの次回投稿予定時刻を更新する。
+ * 投稿成功後に NOW() + SchedulingStrategy.getNextPostDelay() で設定される。
+ * See: docs/architecture/architecture.md §13 TDR-010
+ * See: docs/architecture/components/bot.md §2.1 書き込み実行
+ *
+ * @param botId ボットの UUID
+ * @param nextPostAt 次回投稿予定時刻
+ */
+export async function updateNextPostAt(
+	botId: string,
+	nextPostAt: Date,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("bots")
+		.update({ next_post_at: nextPostAt.toISOString() })
+		.eq("id", botId);
+
+	if (error) {
+		throw new Error(`BotRepository.updateNextPostAt failed: ${error.message}`);
+	}
+}
+
+/**
+ * 投稿対象のBOT一覧を取得する。
+ * is_active = true かつ next_post_at <= NOW() の条件で絞り込む。
+ * See: docs/architecture/architecture.md §13 TDR-010
+ * See: docs/architecture/components/bot.md §2.1 書き込み実行
+ *
+ * @returns 投稿対象のボット配列
+ */
+export async function findDueForPost(): Promise<Bot[]> {
+	const now = new Date().toISOString();
+	const { data, error } = await supabaseAdmin
+		.from("bots")
+		.select("*")
+		.eq("is_active", true)
+		.lte("next_post_at", now);
+
+	if (error) {
+		throw new Error(`BotRepository.findDueForPost failed: ${error.message}`);
+	}
+
+	return (data as BotRow[]).map(rowToBot);
 }
 
 /**

@@ -1,0 +1,61 @@
+# 日次メンテナンスワークフロー
+#
+# 目的: 毎日 JST 0:00 に日次リセットと統計集計を順次実行する。
+#       日次リセット（IDリセット・BOTマークリセット・生存日数加算）を完了させてから
+#       リセット後の状態を統計集計するため、2ジョブを直列で実行する。
+# 仕様: docs/architecture/architecture.md §12.2（定期ジョブ一覧）, §11（日次リセット処理）
+#
+# 実行順序: daily-reset → daily-stats（needs による依存関係）
+#   リセット前の状態を統計集計すると誤ったデータが記録されるため、
+#   daily-stats は daily-reset の成功を待って実行する。
+#
+# 【必要なGitHub Secretsの設定手順】
+# リポジトリの Settings > Secrets and variables > Actions > New repository secret から以下を登録:
+#
+#   1. BOT_API_KEY
+#      - 値: Cloudflare Workers 環境変数 BOT_API_KEY と同じ値
+#      - 用途: Internal API の Bearer 認証トークン
+#
+#   2. DEPLOY_URL
+#      - 例: https://battle-board.xxx.workers.dev
+#      - 用途: Cloudflare Workers のデプロイURL（末尾スラッシュなし）
+
+name: Daily Maintenance
+
+on:
+  schedule:
+    # 毎日 15:00 UTC = JST 00:00（翌日）
+    - cron: '0 15 * * *'
+  workflow_dispatch: {}  # 手動実行（デバッグ・緊急実行用）
+
+jobs:
+  # ジョブ1: 日次リセット
+  # IDリセット・BOTマークリセット・生存日数加算を実行する
+  daily-reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute daily reset
+        run: |
+          echo "=== Daily Reset triggered at $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+          RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.BOT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.DEPLOY_URL }}/api/internal/daily-reset")
+          echo "Response: ${RESPONSE}"
+
+  # ジョブ2: 日次統計集計
+  # リセット後の状態を集計するため、daily-reset の成功後に実行する
+  daily-stats:
+    runs-on: ubuntu-latest
+    needs: daily-reset  # daily-reset 成功後に実行（リセット後の状態を正確に集計するため）
+    steps:
+      - name: Execute daily stats
+        run: |
+          echo "=== Daily Stats triggered at $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+          RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.BOT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.DEPLOY_URL }}/api/internal/daily-stats")
+          echo "Response: ${RESPONSE}"

@@ -1,0 +1,53 @@
+# BOT投稿定期実行ワークフロー
+#
+# 目的: 運営ボットの書き込みを定期的にトリガーし、BOT投稿が停止しない状態を維持する。
+# 仕様: docs/architecture/architecture.md §12.2（定期ジョブ一覧）, TDR-010（cron間隔と投稿タイミング制御）
+#
+# 投稿タイミング制御:
+#   cron は毎時 :00, :30 に起動するが、実際に投稿するBOTの選択はAPIサーバー側で
+#   `bots.next_post_at <= NOW()` の条件で判定する（DB予定時刻方式, TDR-010）。
+#   これにより、cronの固定起動タイミングとは独立してBOT投稿間隔のランダム性を実現する。
+#
+# GitHub Actions 無料枠との整合性:
+#   30分間隔 = 2回/時 × 24時間 × 30日 = 1,440分/月（無料枠2,000分以内）
+#
+# 【必要なGitHub Secretsの設定手順】
+# リポジトリの Settings > Secrets and variables > Actions > New repository secret から以下を登録:
+#
+#   1. BOT_API_KEY
+#      - 値: Cloudflare Workers 環境変数 BOT_API_KEY と同じ値
+#      - 用途: Internal API の Bearer 認証トークン
+#
+#   2. DEPLOY_URL
+#      - 例: https://battle-board.xxx.workers.dev
+#      - 用途: Cloudflare Workers のデプロイURL（末尾スラッシュなし）
+#      - 注意: Cloudflare Workers を使用する（Vercelではない）。
+#              専ブラ互換APIのメインホストが Cloudflare であるため。
+
+name: Bot Scheduler
+
+on:
+  schedule:
+    # 毎時 :00, :30 に起動（UTC）
+    # TDR-010: 30分間隔を採用。15分間隔は無料枠（月2,000分）を超過するため不採用
+    - cron: '0,30 * * * *'
+  workflow_dispatch: {}  # 手動実行（デバッグ・緊急トリガー用）
+
+jobs:
+  execute-bots:
+    runs-on: ubuntu-latest
+    steps:
+      # BOT投稿APIを呼び出す
+      # -f: HTTPエラー（4xx, 5xx）時にcurlを失敗させ、ジョブをエラー終了させる
+      # -s: 進捗バーを非表示（ログを見やすくする）
+      # -S: -s と組み合わせ、エラーメッセージは表示する
+      # レスポンスボディはログ出力してデバッグに活用する
+      - name: Execute bot posting
+        run: |
+          echo "=== Bot Scheduler triggered at $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+          RESPONSE=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.BOT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.DEPLOY_URL }}/api/internal/bot/execute")
+          echo "Response: ${RESPONSE}"

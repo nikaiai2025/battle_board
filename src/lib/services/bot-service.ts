@@ -116,6 +116,16 @@ export interface IBotRepository {
 	): Promise<void>;
 	bulkResetRevealed(): Promise<number>;
 	bulkReviveEliminated(): Promise<number>;
+	/**
+	 * 次回投稿予定時刻を更新する。
+	 * See: docs/architecture/architecture.md §13 TDR-010
+	 */
+	updateNextPostAt(botId: string, nextPostAt: Date): Promise<void>;
+	/**
+	 * 投稿対象のBOT一覧を取得する（is_active=true AND next_post_at <= NOW()）。
+	 * See: docs/architecture/architecture.md §13 TDR-010
+	 */
+	findDueForPost(): Promise<Bot[]>;
 }
 
 /**
@@ -262,6 +272,25 @@ export class BotService {
 		// config/bot-profiles.ts の TS 定数をデフォルト値として使用する。
 		// See: docs/architecture/components/bot.md §4 隠蔽する実装詳細 > 撃破報酬パラメータのconfig読み込みとキャッシュ戦略
 		this.botProfiles = botProfilesData ?? botProfilesConfig;
+	}
+
+	// ---------------------------------------------------------------------------
+	// 投稿対象BOT取得（TDR-010）
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * 投稿対象のBOT一覧を取得する。
+	 *
+	 * is_active = true かつ next_post_at <= NOW() の条件で絞り込む。
+	 * Internal API の POST /api/internal/bot/execute から呼ばれる。
+	 *
+	 * See: docs/architecture/architecture.md §13 TDR-010
+	 * See: docs/architecture/components/bot.md §2.1 書き込み実行
+	 *
+	 * @returns 投稿対象のボット配列
+	 */
+	async getActiveBotsDueForPost(): Promise<Bot[]> {
+		return this.botRepository.findDueForPost();
 	}
 
 	// ---------------------------------------------------------------------------
@@ -561,6 +590,29 @@ export class BotService {
 		// See: docs/specs/bot_state_transitions.yaml #transitions > eliminated -> lurking
 		const botsRevived = await this.botRepository.bulkReviveEliminated();
 
+		// Step 4.5: 復活したBOTの next_post_at を再設定（TDR-010）
+		// 復活したBOTは next_post_at を再設定して投稿サイクルを再開する。
+		// bulkReviveEliminated は内部でBOTを復活させるが、next_post_at は更新しないため
+		// ここで改めて設定する。
+		// See: docs/architecture/architecture.md §13 TDR-010 > 撃破との整合性
+		// See: docs/architecture/components/bot.md §2.10 日次リセット処理
+		if (botsRevived > 0) {
+			// 復活したBOTを再取得して next_post_at を設定する
+			const allBotsAfterRevive = await this.botRepository.findAll();
+			for (const bot of allBotsAfterRevive) {
+				// 復活したBOT = is_active=true かつ survival_days=0 かつ
+				// 元のallBots取得時にis_active=falseだったBOT
+				const wasEliminated = allBots.some(
+					(original) => original.id === bot.id && !original.isActive,
+				);
+				if (wasEliminated && bot.isActive) {
+					const delayMinutes = this.getNextPostDelay(bot.id, bot.botProfileKey);
+					const nextPostAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+					await this.botRepository.updateNextPostAt(bot.id, nextPostAt);
+				}
+			}
+		}
+
 		// Step 5: attacks テーブルの前日分レコードをクリーンアップ
 		// 当日以前のレコードを削除する（今日の攻撃記録は維持）
 		// See: docs/specs/bot_state_transitions.yaml #daily_reset > attacks テーブル
@@ -601,7 +653,11 @@ export class BotService {
 	async executeBotPost(
 		botId: string,
 		threadId?: string,
-	): Promise<{ postId: string; postNumber: number; dailyId: string }> {
+	): Promise<{
+		postId: string;
+		postNumber: number;
+		dailyId: string;
+	} | null> {
 		if (!this.createPostFn) {
 			throw new Error(
 				"executeBotPost: createPostFn が未注入です。コンストラクタに PostService.createPost を渡してください",
@@ -614,6 +670,14 @@ export class BotService {
 			throw new Error(
 				`BotService.executeBotPost: ボットが見つかりません (botId=${botId})`,
 			);
+		}
+
+		// Step 1.5: next_post_at 判定（TDR-010: cron駆動時の投稿対象フィルタリング）
+		// next_post_at が設定されていて、まだ投稿予定時刻に達していなければスキップする。
+		// See: docs/architecture/architecture.md §13 TDR-010
+		// See: docs/architecture/components/bot.md §2.1 書き込み実行
+		if (bot.nextPostAt !== null && bot.nextPostAt.getTime() > Date.now()) {
+			return null;
 		}
 
 		// Step 2: bot_profiles.yaml からプロファイルを取得
@@ -697,7 +761,25 @@ export class BotService {
 			);
 		}
 
-		// Step 9: 結果を返す
+		// Step 9: next_post_at を更新（TDR-010: 次回投稿予定時刻の設定）
+		// See: docs/architecture/architecture.md §13 TDR-010
+		// See: docs/architecture/components/bot.md §2.1 書き込み実行 Step 6
+		try {
+			const delayMinutes = strategies.scheduling.getNextPostDelay({
+				botId,
+				botProfileKey: bot.botProfileKey,
+			});
+			const nextPostAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+			await this.botRepository.updateNextPostAt(botId, nextPostAt);
+		} catch (err) {
+			// next_post_at の更新失敗は致命的ではない（次回cronで再度投稿対象になる）
+			console.error(
+				`BotService.executeBotPost: next_post_at 更新に失敗（botId=${botId}）`,
+				err,
+			);
+		}
+
+		// Step 10: 結果を返す
 		return {
 			postId: result.postId,
 			postNumber: result.postNumber,
@@ -935,6 +1017,7 @@ export class BotService {
 			accusedCount: 0,
 			timesAttacked: 0,
 			botProfileKey,
+			nextPostAt: null,
 			eliminatedAt: null,
 			eliminatedBy: null,
 			createdAt: new Date(),

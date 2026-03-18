@@ -201,6 +201,35 @@ export async function updateDailyId(
 }
 
 /**
+ * ボットの次回投稿予定時刻を更新する。
+ * See: src/lib/infrastructure/repositories/bot-repository.ts
+ */
+export async function updateNextPostAt(
+	botId: string,
+	nextPostAt: Date,
+): Promise<void> {
+	assertUUID(botId, "BotRepository.updateNextPostAt.botId");
+	const bot = store.find((b) => b.id === botId);
+	if (bot) {
+		bot.nextPostAt = nextPostAt;
+	}
+}
+
+/**
+ * 投稿対象のBOT一覧を取得する（is_active=true AND next_post_at <= NOW()）。
+ * See: src/lib/infrastructure/repositories/bot-repository.ts
+ */
+export async function findDueForPost(): Promise<Bot[]> {
+	const now = new Date();
+	return store.filter(
+		(b) =>
+			b.isActive &&
+			b.nextPostAt !== null &&
+			b.nextPostAt.getTime() <= now.getTime(),
+	);
+}
+
+/**
  * is_revealed = true の全ボットの BOTマークを一括解除する（revealed -> lurking）。
  * 日次リセット処理で使用する。
  * See: src/lib/infrastructure/repositories/bot-repository.ts

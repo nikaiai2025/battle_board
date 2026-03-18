@@ -54,6 +54,14 @@ export interface Bot {
 	 * See: docs/architecture/components/bot.md §5.1
 	 */
 	botProfileKey: string | null;
+	/**
+	 * 次回投稿予定時刻。
+	 * 投稿完了時に NOW() + SchedulingStrategy.getNextPostDelay() で設定する。
+	 * cron 起動時は WHERE is_active = true AND next_post_at <= NOW() で投稿対象を判定する。
+	 * See: docs/architecture/architecture.md §13 TDR-010
+	 * See: docs/architecture/components/bot.md §5.1
+	 */
+	nextPostAt: Date | null;
 	/** 撃破日時 */
 	eliminatedAt: Date | null;
 	/** 撃破者の user_id */

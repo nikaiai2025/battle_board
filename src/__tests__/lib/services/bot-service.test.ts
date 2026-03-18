@@ -45,6 +45,7 @@ function createLurkingBot(overrides: Partial<Bot> = {}): Bot {
 		accusedCount: 0,
 		timesAttacked: 0,
 		botProfileKey: "荒らし役",
+		nextPostAt: null,
 		eliminatedAt: null,
 		eliminatedBy: null,
 		createdAt: new Date("2026-03-16T00:00:00Z"),
@@ -87,6 +88,8 @@ function createMockBotRepository(
 		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		updateDailyId: vi.fn().mockResolvedValue(undefined),
+		updateNextPostAt: vi.fn().mockResolvedValue(undefined),
+		findDueForPost: vi.fn().mockResolvedValue([]),
 	};
 }
 
