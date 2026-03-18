@@ -77,7 +77,8 @@ BattleBoard は「5chライクな匿名掲示板 + AIボット混在 + ゲーミ
 
 | 構成要素 | 責務 | 備考 |
 |---|---|---|
-| **Vercel / Cloudflare** | フロントエンド配信、API実行（Serverless Functions / Workers）、CDN | Next.js App Router をデプロイ。両環境で並行稼働中 |
+| **Cloudflare Workers**（メイン） | フロントエンド配信、API実行（Workers）、CDN、専ブラ互換API | Next.js App Router をデプロイ。専ブラ対応可能（HTTP:80直接接続）かつ無料で商用利用可能なため主系 |
+| **Vercel**（サブ） | フロントエンド配信、API実行（Serverless Functions）、CDN、BOT cron受付 | 冗長性確保 + BOT定期実行の負荷分散先（TDR-010）。Cloudflare障害時のフォールバック |
 | **Supabase PostgreSQL** | データ永続化（スレッド・レス・ユーザー・通貨・ボット等） | RLS でアクセス制御 |
 | **Supabase Auth** | 管理者認証（メール+パスワード） | 一般ユーザー認証には使わない |
 | **Cloudflare Turnstile** | 一般ユーザーの CAPTCHA 検証 | `/auth-code` 認証コード有効化時のみ |
@@ -1115,6 +1116,7 @@ supabase/
   - 素数間隔（13分, 17分）や不揃い間隔による痕跡緩和: cron構文 `*/N` は毎時固定分に展開されるため効果限定的。かつ無料枠を超過する
   - 常駐プロセス（別インフラ）: 秒単位精度が可能だが、CLAUDE.md 横断的制約によりインフラ追加はエスカレーション必須。Phase 2 では不要
 - **撃破との整合性**: 撃破時（`is_active = false`）は cron クエリの `is_active = true` 条件で自動除外される。`next_post_at` の変更は不要。日次リセットでの復活時に `next_post_at` を再設定する
+- **DEPLOY_URL の向き先**: Vercel を選択。Cloudflare Workers は通常ユーザー（専ブラ含む）のリクエストに専念させ、BOT cronの負荷を分離する。GitHub Secrets の `DEPLOY_URL` を変更するだけでCloudflareに切り替え可能
 - **議論経緯**: `tmp/archive/discussion_bot_cron_design.md`
 - **影響範囲**: `bots` テーブル（`next_post_at` カラム追加）、D-08 bot.md §5（データモデル）、`.github/workflows/bot-scheduler.yml`
 
