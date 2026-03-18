@@ -16,7 +16,8 @@
       "Bash(wc:*)",
       "Bash(node:*)",
       "Bash(TS_NODE_PROJECT=tsconfig.cucumber.json npx cucumber-js:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npx shadcn@latest:*)"
     ]
   },
   "hooks": {
