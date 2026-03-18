@@ -10,19 +10,10 @@
  *   - エッジケース: null プロファイルキー、空リスト、存在しないキー
  */
 
-import path from "path";
 import { describe, expect, it } from "vitest";
+import { botProfilesConfig } from "../../../../../config/bot-profiles";
 import { FixedMessageContentStrategy } from "../../../../lib/services/bot-strategies/content/fixed-message";
 import type { ContentGenerationContext } from "../../../../lib/services/bot-strategies/types";
-
-// ---------------------------------------------------------------------------
-// テスト用 YAML パス（実際の config/bot_profiles.yaml を使用）
-// ---------------------------------------------------------------------------
-
-const BOT_PROFILES_YAML_PATH = path.resolve(
-	process.cwd(),
-	"config/bot_profiles.yaml",
-);
 
 // ---------------------------------------------------------------------------
 // テスト用コンテキスト生成ヘルパー
@@ -51,7 +42,7 @@ describe("FixedMessageContentStrategy", () => {
 	describe("generateContent() — 正常系", () => {
 		it("固定文リストのいずれかの文字列を返す", async () => {
 			// See: features/bot_system.feature @荒らし役ボットが書き込みを行う場合本文は固定文リストのいずれかである
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const context = createContext({ botProfileKey: "荒らし役" });
 
 			const result = await strategy.generateContent(context);
@@ -63,7 +54,7 @@ describe("FixedMessageContentStrategy", () => {
 
 		it("100回呼び出しても常に固定文リスト内の文字列を返す（境界値）", async () => {
 			// See: features/bot_system.feature @荒らし役ボットが書き込みを行う場合本文は固定文リストのいずれかである
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const context = createContext({ botProfileKey: "荒らし役" });
 			const fixedMessages = strategy.getFixedMessages("荒らし役");
 
@@ -75,7 +66,7 @@ describe("FixedMessageContentStrategy", () => {
 
 		it("複数回呼び出した場合、必ずしも同じ値ではない（ランダム性の確認）", async () => {
 			// 確率論的テスト: 15件の固定文から100回選んでも毎回同じ確率は (1/15)^99 ≒ 0
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const context = createContext({ botProfileKey: "荒らし役" });
 
 			const results = new Set<string>();
@@ -95,7 +86,7 @@ describe("FixedMessageContentStrategy", () => {
 	describe("generateContent() — エッジケース", () => {
 		it("botProfileKey が null の場合、フォールバック文字列 '...' を返す", async () => {
 			// See: docs/architecture/components/bot.md §4 > 固定文リストの管理方法
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const context = createContext({ botProfileKey: null });
 
 			const result = await strategy.generateContent(context);
@@ -104,7 +95,7 @@ describe("FixedMessageContentStrategy", () => {
 		});
 
 		it("存在しないプロファイルキーの場合、フォールバック文字列 '...' を返す", async () => {
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const context = createContext({ botProfileKey: "存在しない役" });
 
 			const result = await strategy.generateContent(context);
@@ -119,21 +110,21 @@ describe("FixedMessageContentStrategy", () => {
 
 	describe("getFixedMessages()", () => {
 		it("荒らし役の固定文リストが空でないことを確認する", () => {
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const messages = strategy.getFixedMessages("荒らし役");
 
 			expect(messages.length).toBeGreaterThan(0);
 		});
 
 		it("null キーの場合、['...'] を返す", () => {
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const messages = strategy.getFixedMessages(null);
 
 			expect(messages).toEqual(["..."]);
 		});
 
 		it("存在しないキーの場合、['...'] を返す", () => {
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const messages = strategy.getFixedMessages("存在しない役");
 
 			expect(messages).toEqual(["..."]);
@@ -146,7 +137,7 @@ describe("FixedMessageContentStrategy", () => {
 
 	describe("ContentStrategy インターフェース準拠", () => {
 		it("generateContent() は Promise<string> を返す", async () => {
-			const strategy = new FixedMessageContentStrategy(BOT_PROFILES_YAML_PATH);
+			const strategy = new FixedMessageContentStrategy(botProfilesConfig);
 			const context = createContext();
 
 			const result = strategy.generateContent(context);

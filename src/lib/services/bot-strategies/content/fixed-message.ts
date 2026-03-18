@@ -10,9 +10,7 @@
  * See: config/bot_profiles.yaml > fixed_messages
  */
 
-import fs from "fs";
-import path from "path";
-import { parse as parseYaml } from "yaml";
+import { botProfilesConfig } from "../../../../../config/bot-profiles";
 import type {
 	BotProfile,
 	ContentGenerationContext,
@@ -36,16 +34,15 @@ export class FixedMessageContentStrategy implements ContentStrategy {
 	private readonly botProfiles: BotProfilesYaml;
 
 	/**
-	 * @param botProfilesYamlPath - bot_profiles.yaml のパス（省略時はデフォルトパス）
+	 * @param botProfiles - ボットプロファイルデータ（省略時は config/bot-profiles.ts の定数を使用）
+	 *   テスト時は DI でモックデータを注入可能。
 	 *
 	 * See: docs/architecture/components/bot.md §4 > 固定文リストの管理方法
 	 */
-	constructor(botProfilesYamlPath?: string) {
-		const yamlPath =
-			botProfilesYamlPath ??
-			path.resolve(process.cwd(), "config/bot_profiles.yaml");
-		const yamlContent = fs.readFileSync(yamlPath, "utf-8");
-		this.botProfiles = parseYaml(yamlContent) as BotProfilesYaml;
+	constructor(botProfiles?: BotProfilesYaml) {
+		// Cloudflare Workers 環境では fs.readFileSync が使えないため、
+		// config/bot-profiles.ts の TS 定数をデフォルト値として使用する。
+		this.botProfiles = botProfiles ?? botProfilesConfig;
 	}
 
 	/**

@@ -11,8 +11,8 @@
  *     デフォルト（Phase 2）解決のみ検証する
  */
 
-import path from "path";
 import { describe, expect, it, vi } from "vitest";
+import { botProfilesConfig } from "../../../../../config/bot-profiles";
 import type { Bot } from "../../../../lib/domain/models/bot";
 import type { IThreadRepository } from "../../../../lib/services/bot-service";
 import { RandomThreadBehaviorStrategy } from "../../../../lib/services/bot-strategies/behavior/random-thread";
@@ -23,15 +23,6 @@ import {
 	resolveStrategies,
 } from "../../../../lib/services/bot-strategies/strategy-resolver";
 import type { BotProfile } from "../../../../lib/services/bot-strategies/types";
-
-// ---------------------------------------------------------------------------
-// テスト用 YAML パス
-// ---------------------------------------------------------------------------
-
-const BOT_PROFILES_YAML_PATH = path.resolve(
-	process.cwd(),
-	"config/bot_profiles.yaml",
-);
 
 // ---------------------------------------------------------------------------
 // テスト用ヘルパー
@@ -88,7 +79,7 @@ function createOptions(
 ): ResolveStrategiesOptions {
 	return {
 		threadRepository: createMockThreadRepository(),
-		botProfilesYamlPath: BOT_PROFILES_YAML_PATH,
+		botProfiles: botProfilesConfig,
 		...overrides,
 	};
 }

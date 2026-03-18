@@ -21,9 +21,7 @@
  *         See: docs/architecture/components/bot.md §2.12 Strategy パターン設計
  */
 
-import fs from "fs";
-import path from "path";
-import { parse as parseYaml } from "yaml";
+import { botProfilesConfig } from "../../../config/bot-profiles";
 import type { Bot } from "../domain/models/bot";
 import {
 	calculateEliminationReward,
@@ -176,7 +174,7 @@ export type ResolveStrategiesFn = (
 	profile: BotProfile | null,
 	options: {
 		threadRepository: IThreadRepository;
-		botProfilesYamlPath?: string;
+		botProfiles?: BotProfilesYaml;
 	},
 ) => BotStrategies;
 
@@ -199,9 +197,10 @@ const BOT_DEFAULT_BOARD_ID = "battleboard";
 /**
  * bot_profiles.yaml のルート型。
  * 個別プロファイルの型は bot-strategies/types.ts の BotProfile を使用する。
+ * config/bot-profiles.ts からも参照できるよう export する。
  * See: docs/architecture/components/bot.md §2.12.7 bot_profiles.yaml 拡張スキーマ
  */
-type BotProfilesYaml = Record<string, BotProfile>;
+export type BotProfilesYaml = Record<string, BotProfile>;
 
 // ---------------------------------------------------------------------------
 // デフォルト報酬パラメータ（bot_profiles.yaml に値がない場合のフォールバック）
@@ -240,7 +239,9 @@ export class BotService {
 	 * @param botRepository - ボット情報の CRUD（DI）
 	 * @param botPostRepository - ボット書き込み紐付けの検索・INSERT（DI）
 	 * @param attackRepository - 攻撃記録の管理（DI）
-	 * @param botProfilesYamlPath - bot_profiles.yaml のパス（省略時はデフォルトパス）
+	 * @param botProfiles - ボットプロファイルデータ（省略時は config/bot-profiles.ts の定数を使用）
+	 *   テスト時は DI でモックデータを注入可能。
+	 *   See: docs/architecture/components/bot.md §4 隠蔽する実装詳細 > 撃破報酬パラメータのconfig読み込みとキャッシュ戦略
 	 * @param threadRepository - スレッド一覧取得（DI・省略可）
 	 * @param createPostFn - PostService.createPost の関数参照（DI・省略可）
 	 * @param resolveStrategiesFn - Strategy 解決関数（DI・省略時はデフォルト resolveStrategies）
@@ -251,18 +252,16 @@ export class BotService {
 		private readonly botRepository: IBotRepository,
 		private readonly botPostRepository: IBotPostRepository,
 		private readonly attackRepository: IAttackRepository,
-		private readonly botProfilesYamlPath?: string,
+		private readonly botProfilesData?: BotProfilesYaml,
 		private readonly threadRepository?: IThreadRepository,
 		private readonly createPostFn?: CreatePostFn,
 		private readonly resolveStrategiesFn?: ResolveStrategiesFn,
 	) {
-		// bot_profiles.yaml を読み込みキャッシュする
+		// ボットプロファイルデータをキャッシュする
+		// Cloudflare Workers 環境では fs.readFileSync が使えないため、
+		// config/bot-profiles.ts の TS 定数をデフォルト値として使用する。
 		// See: docs/architecture/components/bot.md §4 隠蔽する実装詳細 > 撃破報酬パラメータのconfig読み込みとキャッシュ戦略
-		const yamlPath =
-			botProfilesYamlPath ??
-			path.resolve(process.cwd(), "config/bot_profiles.yaml");
-		const yamlContent = fs.readFileSync(yamlPath, "utf-8");
-		this.botProfiles = parseYaml(yamlContent) as BotProfilesYaml;
+		this.botProfiles = botProfilesData ?? botProfilesConfig;
 	}
 
 	// ---------------------------------------------------------------------------
@@ -879,7 +878,7 @@ export class BotService {
 			return this.resolveStrategiesFn(bot, profile, {
 				threadRepository:
 					this.threadRepository ?? this.createFallbackThreadRepository(),
-				botProfilesYamlPath: this.botProfilesYamlPath,
+				botProfiles: this.botProfiles,
 			});
 		}
 
@@ -888,7 +887,7 @@ export class BotService {
 		return defaultResolveStrategies(bot, profile, {
 			threadRepository:
 				this.threadRepository ?? this.createFallbackThreadRepository(),
-			botProfilesYamlPath: this.botProfilesYamlPath,
+			botProfiles: this.botProfiles,
 		});
 	}
 

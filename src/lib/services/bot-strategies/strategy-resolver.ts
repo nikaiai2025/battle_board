@@ -15,6 +15,9 @@ import { FixedMessageContentStrategy } from "./content/fixed-message";
 import { FixedIntervalSchedulingStrategy } from "./scheduling/fixed-interval";
 import type { BotProfile, BotStrategies, IThreadRepository } from "./types";
 
+/** bot_profiles.yaml のルート型エイリアス（strategy-resolver.ts 内部用） */
+type BotProfilesYaml = Record<string, BotProfile>;
+
 /**
  * resolveStrategies のオプション引数。
  * Strategy 実装が必要とする依存関係を渡すために使用する。
@@ -22,8 +25,8 @@ import type { BotProfile, BotStrategies, IThreadRepository } from "./types";
 export interface ResolveStrategiesOptions {
 	/** RandomThreadBehaviorStrategy が必要とする IThreadRepository */
 	threadRepository: IThreadRepository;
-	/** bot_profiles.yaml のパス（省略時はデフォルトパス）*/
-	botProfilesYamlPath?: string;
+	/** ボットプロファイルデータ（省略時は config/bot-profiles.ts の定数を使用）*/
+	botProfiles?: BotProfilesYaml;
 }
 
 /**
@@ -54,7 +57,7 @@ export function resolveStrategies(
 
 	// デフォルト解決: Phase 2 荒らし役の3 Strategy を返す
 	// See: docs/architecture/components/bot.md §2.12.2 解決の優先順位 > 3. デフォルト
-	const content = new FixedMessageContentStrategy(options.botProfilesYamlPath);
+	const content = new FixedMessageContentStrategy(options.botProfiles);
 	const behavior = new RandomThreadBehaviorStrategy(options.threadRepository);
 	const scheduling = new FixedIntervalSchedulingStrategy();
 
