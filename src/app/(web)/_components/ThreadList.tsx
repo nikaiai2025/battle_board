@@ -11,20 +11,13 @@
  */
 
 import ThreadCard from "./ThreadCard";
+import type { ThreadSummary } from "./thread-types";
 
-interface Thread {
-	id: string;
-	title: string;
-	postCount: number;
-	lastPostAt: string;
-	/** 板ID。ThreadCard のリンク先生成に伝播 */
-	boardId: string;
-	/** 専ブラ互換キー（10桁 UNIX タイムスタンプ）。ThreadCard のリンク先生成に伝播 */
-	threadKey: string;
-}
+// ローカル Thread 型は ThreadSummary に統合。
+// See: tmp/workers/bdd-architect_TASK-187/thread_type_consolidation.md §3.1
 
 interface ThreadListProps {
-	threads: Thread[];
+	threads: ThreadSummary[];
 }
 
 /**

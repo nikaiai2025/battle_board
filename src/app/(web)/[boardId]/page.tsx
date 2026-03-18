@@ -18,6 +18,7 @@
 import * as PostService from "@/lib/services/post-service";
 import ThreadCreateForm from "../_components/ThreadCreateForm";
 import ThreadList from "../_components/ThreadList";
+import type { ThreadSummary } from "../_components/thread-types";
 
 // リクエストごとにSSRを実行し、Vercelのページキャッシュを無効化する。
 // Cloudflare Workers環境でのself-fetch禁止（error code 1042）対応として
@@ -30,16 +31,8 @@ export const dynamic = "force-dynamic";
 // 型定義
 // ---------------------------------------------------------------------------
 
-interface ThreadView {
-	id: string;
-	title: string;
-	postCount: number;
-	lastPostAt: string;
-	/** 専ブラ互換キー（10桁 UNIX タイムスタンプ）。ThreadCard のリンク先生成に使用 */
-	threadKey: string;
-	/** 板ID。ThreadCard のリンク先生成に使用 */
-	boardId: string;
-}
+// ThreadView は ThreadSummary に統合。
+// See: tmp/workers/bdd-architect_TASK-187/thread_type_consolidation.md §3.1
 
 interface BoardPageProps {
 	params: Promise<{ boardId: string }>;
@@ -63,7 +56,7 @@ interface BoardPageProps {
  * @param boardId - 板ID（例: 'battleboard'）
  * @returns ThreadView 配列
  */
-async function fetchThreads(boardId: string): Promise<ThreadView[]> {
+async function fetchThreads(boardId: string): Promise<ThreadSummary[]> {
 	try {
 		const threads = await PostService.getThreadList(boardId, 50);
 		// PostService は Date 型で返すが、UI表示用に string へ変換する

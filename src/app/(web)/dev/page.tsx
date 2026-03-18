@@ -11,21 +11,14 @@
 import * as PostService from "@/lib/services/post-service";
 import ThreadCreateForm from "../_components/ThreadCreateForm";
 import ThreadList from "../_components/ThreadList";
+import type { ThreadSummary } from "../_components/thread-types";
 
 // リクエストごとにSSRを実行し、Vercelのページキャッシュを無効化する。
 // See: docs/architecture/architecture.md §13 TDR-006
 export const dynamic = "force-dynamic";
 
-interface ThreadView {
-	id: string;
-	title: string;
-	postCount: number;
-	lastPostAt: string;
-	/** 板ID。ThreadCard のリンク先生成に伝播 */
-	boardId: string;
-	/** 専ブラ互換キー（10桁 UNIX タイムスタンプ）。ThreadCard のリンク先生成に伝播 */
-	threadKey: string;
-}
+// ThreadView は ThreadSummary に統合。
+// See: tmp/workers/bdd-architect_TASK-187/thread_type_consolidation.md §3.1
 
 /**
  * dev 板のスレッド一覧をサービス層から直接取得する。
@@ -33,7 +26,7 @@ interface ThreadView {
  * See: features/thread.feature @url_structure
  * See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-b
  */
-async function fetchDevThreads(): Promise<ThreadView[]> {
+async function fetchDevThreads(): Promise<ThreadSummary[]> {
 	try {
 		const threads = await PostService.getThreadList("dev", 50);
 		return threads.map((t) => ({

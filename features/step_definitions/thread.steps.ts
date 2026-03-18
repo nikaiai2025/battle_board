@@ -1666,15 +1666,14 @@ When(
 
 /**
  * ポーリングによりレス{int}が自動的に画面に追加される。
- * UIのポーリング動作確認 — Cucumber サービス層では検証不可。
- * 代替検証: PostListLiveWrapper.test.tsx（ポーリングロジックの単体テスト）
+ * 分類: ブラウザ固有動作（setInterval依存） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostListLiveWrapper.test.tsx
  *
  * See: features/thread.feature @pagination
- * See: docs/architecture/bdd_test_strategy.md §7.3 UIインタラクション → pending
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Then(
 	"ポーリングによりレス{int}が自動的に画面に追加される",
-	// @pending: UI操作テスト — ポーリングはブラウザ環境依存。単体テスト（PostListLiveWrapper）で担保済み
 	(_postNumber: number) => "pending",
 );
 
@@ -1698,17 +1697,13 @@ Given(
 
 /**
  * 画面は更新されない。
- * 過去ページ表示時はポーリング無効 — Cucumber サービス層では検証不可。
- * 代替検証: PostListLiveWrapper.test.tsx（isLatestPage フラグの単体テスト）
+ * 分類: ブラウザ固有動作（setInterval依存） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostListLiveWrapper.test.tsx
  *
  * See: features/thread.feature @pagination
- * See: docs/architecture/bdd_test_strategy.md §7.3 UIインタラクション → pending
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"画面は更新されない",
-	// @pending: UI操作テスト — ポーリング無効化はブラウザ環境依存。単体テスト（PostListLiveWrapper）で担保済み
-	() => "pending",
-);
+Then("画面は更新されない", () => "pending");
 
 // ---------------------------------------------------------------------------
 // アンカーポップアップシナリオ用ステップ定義
@@ -1717,137 +1712,145 @@ Then(
 
 /**
  * スレッドにレス1 "{string}" とレス2 "{string}" が存在する。
- * @pending: UI操作テスト — ポップアップ表示はブラウザ環境依存。
- * 単体テスト（AnchorPopupContext.test.tsx 17件）で担保済み。
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
  *
  * See: features/thread.feature @anchor_popup
- * See: docs/architecture/bdd_test_strategy.md §7.3 UIインタラクション → pending
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Given(
 	"スレッドにレス1 {string} とレス2 {string} が存在する",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
 	(_a: string, _b: string) => "pending",
 );
 
 /**
  * レス2の本文中の "{string}" をクリックする。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When(
-	"レス2の本文中の {string} をクリックする",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	(_anchor: string) => "pending",
-);
+When("レス2の本文中の {string} をクリックする", (_anchor: string) => "pending");
 
 /**
  * レス1の内容がポップアップで表示される。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"レス1の内容がポップアップで表示される",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+Then("レス1の内容がポップアップで表示される", () => "pending");
 
 /**
  * ポップアップにはレス番号、表示名、日次ID、本文が含まれる。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Then(
 	"ポップアップにはレス番号、表示名、日次ID、本文が含まれる",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
 	() => "pending",
 );
 
 /**
  * スレッドにレス1、レス2 "{string}"、レス3 "{string}" が存在する。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Given(
 	"スレッドにレス1、レス2 {string}、レス3 {string} が存在する",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
 	(_a: string, _b: string) => "pending",
 );
 
 /**
  * レス3の "{string}" をクリックする。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When(
-	"レス3の {string} をクリックする",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	(_anchor: string) => "pending",
-);
+When("レス3の {string} をクリックする", (_anchor: string) => "pending");
 
 /**
  * 表示されたポップアップ内の "{string}" をクリックする。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 When(
 	"表示されたポップアップ内の {string} をクリックする",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
 	(_anchor: string) => "pending",
 );
 
 /**
  * 2つのポップアップが重なって表示される。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"2つのポップアップが重なって表示される",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+Then("2つのポップアップが重なって表示される", () => "pending");
 
 /**
  * 最前面にレス1のポップアップが表示される。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"最前面にレス1のポップアップが表示される",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+Then("最前面にレス1のポップアップが表示される", () => "pending");
 
 /**
  * 2つのポップアップが重なって表示されている。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Given(
-	"2つのポップアップが重なって表示されている",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+Given("2つのポップアップが重なって表示されている", () => "pending");
 
 /**
  * ポップアップの外側をクリックする。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When(
-	"ポップアップの外側をクリックする",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+When("ポップアップの外側をクリックする", () => "pending");
 
 /**
  * 最前面のポップアップが閉じる。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"最前面のポップアップが閉じる",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+Then("最前面のポップアップが閉じる", () => "pending");
 
 /**
  * 背面のポップアップは残る。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"背面のポップアップは残る",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+Then("背面のポップアップは残る", () => "pending");
 
 // Note: "スレッドに3件のレスが存在する" は "スレッドに{int}件のレスが存在する" (L1357) にマッチする。
 // @anchor_popup シナリオでは次の When ステップが pending を返すため、
@@ -1856,23 +1859,23 @@ Then(
 
 /**
  * レスの本文中の "{string}" をクリックする。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When(
-	"レスの本文中の {string} をクリックする",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	(_anchor: string) => "pending",
-);
+When("レスの本文中の {string} をクリックする", (_anchor: string) => "pending");
 
 /**
  * ポップアップは表示されない。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"ポップアップは表示されない",
-	// @pending: UI操作テスト — 単体テストで担保（AnchorPopupContext.test.tsx）
-	() => "pending",
-);
+Then("ポップアップは表示されない", () => "pending");
 
 // ---------------------------------------------------------------------------
 // レス番号表示シナリオ用ステップ定義
@@ -1881,84 +1884,86 @@ Then(
 
 /**
  * スレッドにレス番号{int}のレスが存在する。
- * @pending: UI操作テスト（post_number_display シナリオ）
- * 代替検証: PostItem.test.tsx 10件, PostFormInsertText.test.tsx 4件
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
  *
  * See: features/thread.feature @post_number_display
- * See: docs/architecture/bdd_test_strategy.md §7.3 UIインタラクション → pending
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Given(
 	"スレッドにレス番号{int}のレスが存在する",
-	// @pending: UI操作テスト — 単体テストで担保（PostItem.test.tsx, PostFormInsertText.test.tsx）
 	(_postNumber: number) => "pending",
 );
 
 /**
  * レス番号が {string} と表示される。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ *
+ * See: features/thread.feature @post_number_display
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"レス番号が {string} と表示される",
-	// @pending: UI操作テスト — 単体テストで担保（PostItem.test.tsx）
-	(_label: string) => "pending",
-);
+Then("レス番号が {string} と表示される", (_label: string) => "pending");
 
 /**
  * レス番号に {string} は付与されない。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ *
+ * See: features/thread.feature @post_number_display
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"レス番号に {string} は付与されない",
-	// @pending: UI操作テスト — 単体テストで担保（PostItem.test.tsx）
-	(_prefix: string) => "pending",
-);
+Then("レス番号に {string} は付与されない", (_prefix: string) => "pending");
 
 /**
  * 書き込みフォームが空である。
- * @pending: UI操作テスト（post_number_display シナリオ）
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ *
+ * See: features/thread.feature @post_number_display
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Given(
-	"書き込みフォームが空である",
-	// @pending: UI操作テスト — 単体テストで担保（PostFormInsertText.test.tsx）
-	() => "pending",
-);
+Given("書き込みフォームが空である", () => "pending");
 
 /**
  * レス番号 "{string}" をクリックする。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ *
+ * See: features/thread.feature @post_number_display
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When(
-	"レス番号 {string} をクリックする",
-	// @pending: UI操作テスト — 単体テストで担保（PostFormInsertText.test.tsx）
-	(_postNumber: string) => "pending",
-);
+When("レス番号 {string} をクリックする", (_postNumber: string) => "pending");
 
 /**
  * 書き込みフォームに {string} が挿入される。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ *
+ * See: features/thread.feature @post_number_display
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"書き込みフォームに {string} が挿入される",
-	// @pending: UI操作テスト — 単体テストで担保（PostFormInsertText.test.tsx）
-	(_text: string) => "pending",
-);
+Then("書き込みフォームに {string} が挿入される", (_text: string) => "pending");
 
 /**
  * 書き込みフォームに {string} と入力されている。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ *
+ * See: features/thread.feature @post_number_display
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Given(
 	"書き込みフォームに {string} と入力されている",
-	// @pending: UI操作テスト — 単体テストで担保（PostFormInsertText.test.tsx）
 	(_text: string) => "pending",
 );
 
 /**
  * 書き込みフォームの内容が {string} になる。
- * @pending: UI操作テスト
+ * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ *
+ * See: features/thread.feature @post_number_display
+ * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"書き込みフォームの内容が {string} になる",
-	// @pending: UI操作テスト — 単体テストで担保（PostFormInsertText.test.tsx）
-	(_text: string) => "pending",
-);
+Then("書き込みフォームの内容が {string} になる", (_text: string) => "pending");

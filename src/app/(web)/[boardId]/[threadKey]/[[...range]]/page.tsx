@@ -32,6 +32,7 @@ import { PostFormContextProvider } from "../../../_components/PostFormContext";
 import type { Post } from "../../../_components/PostItem";
 import PostList from "../../../_components/PostList";
 import PostListLiveWrapper from "../../../_components/PostListLiveWrapper";
+import type { ThreadDetail } from "../../../_components/thread-types";
 
 // リクエストごとにSSRを実行し、Vercelのページキャッシュを無効化する。
 // Cloudflare Workers環境でのself-fetch禁止（error code 1042）対応として
@@ -44,18 +45,12 @@ export const dynamic = "force-dynamic";
 // 型定義
 // ---------------------------------------------------------------------------
 
-interface Thread {
-	id: string;
-	threadKey: string;
-	boardId: string;
-	title: string;
-	postCount: number;
-	lastPostAt: string;
-	createdAt: string;
-}
+// ローカル Thread 型は ThreadDetail に統合。
+// See: tmp/workers/bdd-architect_TASK-187/thread_type_consolidation.md §3.1
 
+/** SSR データ取得結果型（このページ固有）。 */
 interface ThreadDetailResponse {
-	thread: Thread;
+	thread: ThreadDetail;
 	posts: Post[];
 }
 

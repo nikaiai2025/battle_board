@@ -42,7 +42,14 @@ const POLLING_INTERVAL_MS = 30_000;
 // 型定義
 // ---------------------------------------------------------------------------
 
-interface ThreadDetailResponse {
+/**
+ * ポーリング API レスポンスのパース用型。
+ * GET /api/threads/{threadId} のレスポンスに対応する。
+ * SSR データ取得の ThreadDetailResponse（page.tsx）とは用途が異なるため別型とする。
+ *
+ * See: tmp/workers/bdd-architect_TASK-187/thread_type_consolidation.md §3.2
+ */
+interface PollingResponse {
 	thread: { id: string; title: string };
 	posts: Post[];
 }
@@ -102,7 +109,7 @@ export default function PostListLiveWrapper({
 				return;
 			}
 
-			const data = (await res.json()) as ThreadDetailResponse;
+			const data = (await res.json()) as PollingResponse;
 			const allPosts: Post[] = data.posts ?? [];
 
 			// lastPostNumber より大きいpost_numberのレスだけを新着として追加
