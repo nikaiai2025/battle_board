@@ -145,3 +145,41 @@ function getService(): Service | null {
 サービス層のシングルトンDIパターン全般。特に「テストでは手動注入、本番ではアプリ起動時に自動注入」が期待される依存に注意。
 
 See: `docs/operations/incidents/2026-03-18_command_service_not_initialized.md`
+
+---
+
+## LL-005: `useState(prop)` は router.refresh() で同期されない
+
+- **発見日:** 2026-03-18
+- **発見契機:** 本番環境でレスの二重表示を人間が目視で発見
+
+### 事象
+
+`PostListLiveWrapper` が `useState(initialLastPostNumber)` で SSR から渡された prop を state に保持していた。`PostForm` が書き込み成功後に `router.refresh()` を呼ぶと、Server Component（PostList）は新しいレスを含んで再描画されるが、Client Component の state は保持される（Next.js App Router の仕様）。結果、SSR 側と Client 側で同じレスが二重に表示された。
+
+### 根本原因
+
+React の `useState(initialValue)` は初回マウント時にしか初期値を使わない。Next.js App Router の `router.refresh()` は Server Component を再SSRするが Client Component を再マウントしない。この2つの仕様の組み合わせにより、SSR の props 更新が Client state に反映されなかった。
+
+### 教訓
+
+**`useState(prop)` を使う場合は、prop 変化時の state 同期を必ず実装する。** React 公式ドキュメントでも注意喚起されている well-known pitfall である。
+
+```typescript
+// NG: prop が変わっても state は初回値のまま
+const [value, setValue] = useState(initialProp);
+
+// OK: useEffect で prop 変化を検知して state を同期
+const [value, setValue] = useState(initialProp);
+useEffect(() => {
+  setValue(prev => Math.max(prev, initialProp));
+}, [initialProp]);
+```
+
+特に Next.js App Router では `router.refresh()` が頻出するため、Server Component → Client Component の prop 受け渡しで `useState(prop)` を使うケースは全て同期 useEffect の要否を検討すべきである。
+
+### 検出方法
+
+Client Component の単体テストで `rerender(<Component newProp={...} />)` を呼び、prop 変化後の表示が正しいことを検証する。今回のケースでは PostListLiveWrapper の単体テストが0件だったことが発見遅延の直接原因。
+
+See: `docs/operations/incidents/2026-03-18_post_list_duplicate_display.md`
