@@ -34,12 +34,14 @@ BotPostResult {
 ```
 
 内部フロー（Strategy 委譲版 -- v6）：
-1. `resolveStrategies(bot, profile)` で3つの Strategy を解決
-2. `behavior.decideAction(context)` で投稿先を決定（`BotAction` を取得）
-3. `BotAction.type` に応じて分岐:
+1. `next_post_at <= NOW()` を判定し、投稿予定時刻に達していなければスキップして終了（TDR-010: cron駆動時の投稿対象フィルタリング）
+2. `resolveStrategies(bot, profile)` で3つの Strategy を解決
+3. `behavior.decideAction(context)` で投稿先を決定（`BotAction` を取得）
+4. `BotAction.type` に応じて分岐:
    - `post_to_existing`: `content.generateContent(context)` で本文生成 -> `PostService.createPost(isBotWrite=true)`
    - `create_thread`: BehaviorStrategy が返した title/body を使用 -> `PostService.createThread(isBotWrite=true)`
-4. 成功したら `bot_posts` に { postId, botId } を INSERT
+5. 成功したら `bot_posts` に { postId, botId } を INSERT
+6. `next_post_at = NOW() + scheduling.getNextPostDelay()` でDBを更新（TDR-010: 次回投稿予定時刻の設定）
 
 `bot_posts` へのINSERTはこのコンポーネントのみが行う。PostServiceは `bot_posts` を意識しない。
 
@@ -159,7 +161,7 @@ DailyResetResult {
 1. 全ボットの偽装IDを再生成
 2. revealed -> lurking（BOTマーク解除）
 3. lurking のまま日次リセット: survival_days +1
-4. eliminated -> lurking（HP初期値復帰、survival_days=0、times_attacked=0）
+4. eliminated -> lurking（HP初期値復帰、survival_days=0、times_attacked=0、`next_post_at` を再設定）（TDR-010: 撃破からの復活時に次回投稿予定時刻を設定し、投稿サイクルを再開する）
 5. attacks テーブルの前日分レコードをクリーンアップ
 
 ### 2.11 書き込み先決定（BehaviorStrategy に委譲）
@@ -535,6 +537,7 @@ v5で以下のカラムを追加・変更する。
 | bot_profile_key | 追加 | VARCHAR | bot_profiles.yaml 内のプロファイルキー |
 | hp | 変更 | - | 荒らし役の初期値を 30 -> 10 に変更 |
 | max_hp | 変更 | - | 荒らし役の初期値を 30 -> 10 に変更 |
+| next_post_at | 追加 | TIMESTAMPTZ | 次回投稿予定時刻。投稿完了時に `NOW() + SchedulingStrategy.getNextPostDelay()` で設定する。cron起動時は `WHERE is_active = true AND next_post_at <= NOW()` で投稿対象を判定する（TDR-010） |
 
 ### 5.2 attacks テーブル（新規）
 
