@@ -183,3 +183,34 @@ useEffect(() => {
 Client Component の単体テストで `rerender(<Component newProp={...} />)` を呼び、prop 変化後の表示が正しいことを検証する。今回のケースでは PostListLiveWrapper の単体テストが0件だったことが発見遅延の直接原因。
 
 See: `docs/operations/incidents/2026-03-18_post_list_duplicate_display.md`
+
+---
+
+## LL-006: workerd 非互換 API の修正は依存チェーン全体を横展開する
+
+- **発見日:** 2026-03-18
+- **発見契機:** 本番で全コマンドが無効化されていることを人間が手動テストで発見
+
+### 事象
+
+commit `68fe555` で `commands.yaml` の `fs.readFileSync` 依存を TS定数化で除去した。しかし、同じ `fs.readFileSync` パターンを持つ `bot_profiles.yaml`（`BotService` 内）を見落とした。`CommandService` → `AttackHandler` → `BotService` → `fs.readFileSync` という間接依存チェーンのため、`CommandService` のlazy初期化が例外で失敗し、全コマンドが無効化された。
+
+### 根本原因
+
+修正スコープが「直接的な fs 依存」に限定され、`require()` 経由の **間接依存** が調査対象に含まれなかった。Node.js環境のテストでは `fs` が正常動作するため、本番デプロイまで問題が顕在化しなかった。
+
+### 教訓
+
+**workerd 非互換 API（`fs`, `path`, `child_process` 等）の修正時は、直接依存だけでなく `require()` / `import` チェーンの先にある間接依存も含めてコードベース全体を grep し、同じパターンを一括で修正する。**
+
+```bash
+# 修正時の横展開チェックコマンド例
+grep -r "import.*fs\b\|require.*['\"]fs['\"]\|readFileSync\|readSync" src/lib/
+```
+
+### 検出方法
+
+- **防止:** ESLint `no-restricted-imports` で `src/lib/` 配下の `fs` import を禁止する
+- **検出:** デプロイ後のスモークテスト（最低1コマンドの実行確認）をCI/CDに組み込む
+
+See: `docs/operations/incidents/2026-03-18_bot_profiles_yaml_fs_dependency.md`
