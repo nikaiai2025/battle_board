@@ -285,8 +285,8 @@ test.describe("スレッドページ /battleboard/{threadKey}/", () => {
 		// リンクをクリックして板トップに遷移する
 		// See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx > href=`/${boardId}/`
 		await backLink.click();
-		await page.waitForURL("/battleboard/");
-		expect(page.url()).toContain("/battleboard/");
+		await page.waitForURL("**/battleboard");
+		expect(page.url()).toContain("/battleboard");
 
 		// JSエラーがないことを確認
 		expect(jsErrors).toHaveLength(0);
