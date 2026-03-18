@@ -298,29 +298,40 @@ export class CommandService {
 			resolvedAttackHandler = attackHandler ?? null;
 		} else if (parsed.commands.attack?.enabled) {
 			// YAML で attack が有効化されており、DI がない場合のみ本番用生成
-			const attackConfig = parsed.commands.attack;
-			// eslint-disable-next-line @typescript-eslint/no-require-imports
-			const botService = require("./bot-service").createBotService();
-			// eslint-disable-next-line @typescript-eslint/no-require-imports
-			const postRepository = require("../infrastructure/repositories/post-repository");
-			// ICurrencyService (deduct/getBalance) → IAttackCurrencyService (debit/credit/getBalance) アダプター
-			// AttackHandler は debit（=deduct）と credit の両方を使用するため、
-			// credit は CurrencyService モジュールから直接取得する
-			// eslint-disable-next-line @typescript-eslint/no-require-imports
-			const CurrencyServiceModule = require("./currency-service");
-			const attackCurrencyService = {
-				getBalance: this.currencyService.getBalance,
-				debit: this.currencyService.deduct,
-				credit: CurrencyServiceModule.credit,
-			};
-			resolvedAttackHandler = new AttackHandler(
-				botService,
-				attackCurrencyService,
-				postRepository,
-				attackConfig?.cost ?? 5,
-				attackConfig?.damage ?? 10,
-				attackConfig?.compensation_multiplier ?? 3,
-			);
+			// try-catch で保護: BotService が bot_profiles.yaml を fs.readFileSync で読み込むため
+			// Cloudflare Workers (workerd) では失敗する。AttackHandler 生成失敗時は
+			// attack コマンドのみ無効化し、他コマンド（!w, !tell）への影響を防ぐ。
+			try {
+				const attackConfig = parsed.commands.attack;
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const botService = require("./bot-service").createBotService();
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const postRepository = require("../infrastructure/repositories/post-repository");
+				// ICurrencyService (deduct/getBalance) → IAttackCurrencyService (debit/credit/getBalance) アダプター
+				// AttackHandler は debit（=deduct）と credit の両方を使用するため、
+				// credit は CurrencyService モジュールから直接取得する
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const CurrencyServiceModule = require("./currency-service");
+				const attackCurrencyService = {
+					getBalance: this.currencyService.getBalance,
+					debit: this.currencyService.deduct,
+					credit: CurrencyServiceModule.credit,
+				};
+				resolvedAttackHandler = new AttackHandler(
+					botService,
+					attackCurrencyService,
+					postRepository,
+					attackConfig?.cost ?? 5,
+					attackConfig?.damage ?? 10,
+					attackConfig?.compensation_multiplier ?? 3,
+				);
+			} catch (err) {
+				console.error(
+					"[CommandService] AttackHandler init failed (attack command disabled):",
+					err,
+				);
+				resolvedAttackHandler = null;
+			}
 		}
 
 		// GrassHandler の解決
@@ -380,11 +391,14 @@ export class CommandService {
 			}
 			const handler = handlerMap.get(name);
 			if (!handler) {
-				// YAML にあるがハンドラが未実装のコマンドは起動時エラー
+				// ハンドラが未実装（または初期化失敗）のコマンドは警告を出してスキップする。
+				// Cloudflare Workers 環境では一部ハンドラの依存（fs.readFileSync 等）が
+				// 動作しないため、初期化失敗時に他コマンドを巻き込まないようにする。
 				// See: docs/architecture/components/command.md §2.2
-				throw new Error(
-					`CommandService: ハンドラが未実装のコマンド "${name}" が config/commands.yaml に定義されています。`,
+				console.warn(
+					`[CommandService] ハンドラが利用できないコマンド "${name}" をスキップします`,
 				);
+				continue;
 			}
 			this.configs.set(name, config);
 			this.registry.set(name, handler);

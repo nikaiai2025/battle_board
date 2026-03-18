@@ -250,7 +250,7 @@ describe("CommandService", () => {
 			expect(names).toContain("w");
 		});
 
-		it("設定にあるがハンドラが未実装のコマンドがある場合は起動時エラーになる", () => {
+		it("設定にあるがハンドラが未実装のコマンドがある場合は警告を出してスキップする", () => {
 			// unknown_command を追加した設定
 			const configWithUnknown: CommandsYaml = {
 				commands: {
@@ -271,13 +271,21 @@ describe("CommandService", () => {
 				},
 			};
 			const currencyService = createMockCurrencyService();
-			expect(() => {
-				new CommandService(
-					currencyService,
-					accusationService,
-					configWithUnknown,
-				);
-			}).toThrow('ハンドラが未実装のコマンド "unknown_command"');
+			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				configWithUnknown,
+			);
+			// unknown_command はスキップされ、w のみ登録される
+			expect(service.getRegisteredCommandNames()).toContain("w");
+			expect(service.getRegisteredCommandNames()).not.toContain(
+				"unknown_command",
+			);
+			expect(warnSpy).toHaveBeenCalledWith(
+				expect.stringContaining("unknown_command"),
+			);
+			warnSpy.mockRestore();
 		});
 	});
 
