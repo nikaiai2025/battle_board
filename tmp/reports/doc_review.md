@@ -1,168 +1,142 @@
-# ドキュメントレビューレポート (TASK-175)
+# ドキュメントレビューレポート (TASK-182)
 
-> 対象: Sprint-59~63 UI構造改善後のドキュメント整合性
-> レビュー日: 2026-03-19
+> 対象: Sprint-65 差し戻し修正 -- web-ui.md (Sprint-64 HIGH 1件 + MEDIUM 3件の修正確認)
+> レビュー日: 2026-03-20
 > レビュアー: bdd-doc-reviewer
 
 ---
 
-## 指摘事項
+## Sprint-64 指摘の修正確認
 
-### [HIGH-001] web-ui.md section 3.2 コンポーネントツリーに AnchorPopupProvider / AnchorPopup が記載されているが page.tsx に実装されていない
+### [HIGH-001] AnchorPopupProvider / AnchorPopup の記述 -- 修正済み (部分的に不正確)
 
-**重要度:** HIGH
-**対象:** `docs/architecture/components/web-ui.md` section 3.2 vs `src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx`
+**Sprint-64 指摘:** web-ui.md section 3.2 のコンポーネントツリーに記載されているが page.tsx に実装されていない
+**Sprint-65 対応:** TASK-177 で page.tsx に配置、TASK-178 で web-ui.md を更新
 
-web-ui.md section 3.2 のコンポーネントツリーには以下の記載がある:
+**確認結果:** page.tsx への配置は正しく行われている (L302-335)。AnchorPopupProvider が PostFormContextProvider の外側にラップし、AnchorPopup がその内部末尾に配置されている。PostListLiveWrapper も registerPosts を呼び出している (L85, L115)。
 
-```
-└── AnchorPopupProvider [Client Component]  // ポップアップスタック管理 Context
-      └── AnchorPopup [Client Component]    // ポップアップカード表示
-```
-
-しかし実際の `page.tsx` では `AnchorPopupProvider` も `AnchorPopup` もインポート・使用されていない。import文は PaginationNav, PostForm, PostFormContextProvider, PostItem(型のみ), PostList, PostListLiveWrapper の6つのみ。
-
-`AnchorPopupContext.tsx` にはProviderの実装が存在し、`AnchorLink.tsx` は `useAnchorPopupContext()` を呼び出している。Providerがない状態では AnchorLink のクリック時にデフォルトの no-op コンテキスト (`openPopup: () => {}`, `allPosts: new Map()`) が使われ、ポップアップ機能が動作しない。
-
-**影響:** BDDシナリオ `@anchor_popup` の4シナリオ全てがブラウザ上で機能しない可能性がある。ドキュメントは正しい設計を記述しているが、実装が追いついていない。
-
-**修正方針:** `page.tsx` に `AnchorPopupProvider` と `AnchorPopup` を追加し、web-ui.md のツリーと一致させる。具体的には:
-1. `AnchorPopupProvider` で既存ツリーをラップ（`initialPosts={posts}` を渡す）
-2. `AnchorPopup` をツリーの末尾に配置
+ただし、web-ui.md のコンポーネントツリーと実装の間にネスト構造の差異が残存している (後述 MEDIUM-NEW-001)。
 
 ---
 
-### [HIGH-002] web-ui.md section 3.2 のポーリングURL記述が実装と乖離
+### [HIGH-002] ポーリングURL記述 -- 修正済み
 
-**重要度:** HIGH
-**対象:** `docs/architecture/components/web-ui.md` section 3.2 ポーリング方式
+**Sprint-64 指摘:** ドキュメントは `/api/threads/{threadId}/posts?since={lastPostNumber}` だが実装は `/api/threads/{threadId}`
+**Sprint-65 対応:** TASK-178 で web-ui.md のポーリング方式記述を修正
 
-web-ui.md の記述:
-> 定期的な `GET /api/threads/{threadId}/posts?since={lastPostNumber}` で新着レスを取得。
+**確認結果:** web-ui.md L99 の記述:
+> 定期的な `GET /api/threads/{threadId}` で全レスを取得し、`lastPostNumber` より大きいレスのみを新着として表示。
 
-実装 (`PostListLiveWrapper.tsx` L89):
+PostListLiveWrapper.tsx L96 の実装:
 ```typescript
 const res = await fetch(`/api/threads/${threadId}`, { cache: "no-store" });
 ```
 
-2点の乖離:
-1. **エンドポイント:** ドキュメントは `/api/threads/{threadId}/posts` だが、実装は `/api/threads/{threadId}`
-2. **sinceパラメータ:** ドキュメントは `?since={lastPostNumber}` を記述しているが、実装ではクエリパラメータを使わず全レスを取得してクライアント側でフィルタリング
-
-OpenAPI仕様書(D-04)にも `/api/threads/{threadId}/posts` はPOST（書き込み）のみ定義されており、GETは存在しない。実装は `/api/threads/{threadId}` の GET を使用しており、こちらはOpenAPIに定義済み。
-
-**影響:** 開発者が web-ui.md の記述を信じて `/posts?since=` エンドポイントを呼ぶコードを書くと動作しない。
-
-**修正方針:** web-ui.md のポーリング方式の記述を実装に合わせて修正:
-> 定期的な `GET /api/threads/{threadId}` で全レスを取得し、`lastPostNumber` より大きいレスのみを新着として表示。
+エンドポイント・フィルタリング方式ともに一致。修正完了。
 
 ---
 
-### [MEDIUM-001] web-ui.md section 3.1 のコンポーネントツリーに ThreadCreateForm が欠落
+### [MEDIUM-001] ThreadCreateForm 欠落 -- 修正済み
+
+**Sprint-64 指摘:** section 3.1 のコンポーネントツリーに ThreadCreateForm がない
+**Sprint-65 対応:** TASK-178 で section 3.1 に追加
+
+**確認結果:** web-ui.md L64-65:
+```
+└── ThreadCreateForm [Client Component]  // スレッド作成フォーム
+      └── AuthModal [Client Component]   // 認証コード入力（未認証時）
+```
+
+実装 (`[boardId]/page.tsx` L118-119) では `<ThreadCreateForm />` が `<ThreadList>` の前に配置されており、ThreadCreateForm.tsx (L24) で AuthModal をインポートしている。記述と実装が一致。修正完了。
+
+---
+
+### [MEDIUM-002] リダイレクトステータスコード -- 修正済み
+
+**Sprint-64 指摘:** 「302リダイレクト」と記載されているが Next.js の redirect() は 307 を返す
+**Sprint-65 対応:** TASK-178 で 307 に修正
+
+**確認結果:** web-ui.md L108:
+> 旧 `threads/[threadId]/page.tsx` はリダイレクト専用に変更済み（UUID→新URLへの**307**リダイレクト）
+
+実装 (`threads/[threadId]/page.tsx` L46) では `redirect()` を使用しており、Next.js Server Component のデフォルト 307 と一致。section 3.1 の `/` -> `/battleboard/` (L77) も同様に 307 と記載されており、ファイル内の一貫性も確保されている。修正完了。
+
+---
+
+### [MEDIUM-003] PostItem 依存記述 -- 修正済み
+
+**Sprint-64 指摘:** 「PostFormContext と AnchorPopupContext を消費するため」は不正確。PostItem は AnchorPopupContext を直接消費していない
+**Sprint-65 対応:** TASK-178 で記述を修正
+
+**確認結果:** web-ui.md L104:
+> `PostList` / `PostItem` が Client Component に変更（`PostFormContext` を消費し、`AnchorLink`（`AnchorPopupContext` 消費）を描画するため）
+
+実装:
+- PostItem.tsx L24: `usePostFormContext()` を直接消費
+- PostItem.tsx L23: `AnchorLink` をインポートし、parseAnchorLinks() (L106) で AnchorLink を生成
+- AnchorLink.tsx L17: `useAnchorPopupContext()` を消費
+
+依存の直接/間接関係が正確に記述されている。修正完了。
+
+---
+
+## 新規指摘事項
+
+### [MEDIUM-NEW-001] section 3.2 コンポーネントツリーのネスト構造が実装と不一致
 
 **重要度:** MEDIUM
-**対象:** `docs/architecture/components/web-ui.md` section 3.1
+**対象:** `docs/architecture/components/web-ui.md` L82-94 vs `src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx` L262-348
 
-web-ui.md section 3.1 のスレッド一覧ページのツリー:
+web-ui.md のツリー表記 (L82-94):
 ```
-app/(web)/[boardId]/page.tsx  [Server Component]
-  └── ThreadList [Server Component]
-        └── ThreadCard [Server Component]
-```
-
-実装 (`[boardId]/page.tsx`) では `ThreadCreateForm` (Client Component) が `ThreadList` より前に配置されている:
-```tsx
-<ThreadCreateForm />
-<p id="auth-prompt" ...>...</p>
-<ThreadList threads={threads} />
-```
-
-`ThreadCreateForm` はスレッド作成フォームであり、認証連携 (`AuthModal`) も内蔵する。コンポーネントツリーからの欠落によりUIの全体構造を正確に把握できない。
-
-**修正方針:** section 3.1 のツリーに追加:
-```
-app/(web)/[boardId]/page.tsx  [Server Component]
-  └── ThreadCreateForm [Client Component]  // スレッド作成フォーム
-        └── AuthModal [Client Component]   // 認証コード入力（未認証時）
-  └── ThreadList [Server Component]
-        └── ThreadCard [Server Component]
+page.tsx [Server Component]
+  └── PaginationNav [Server]              // 上部
+  └── PostFormContextProvider [Client]     // ---- (A)
+        └── PostForm
+        └── PostList
+        └── PostListLiveWrapper
+  └── PaginationNav [Server]              // 下部
+  └── AnchorPopupProvider [Client]        // ---- (B) PostFormContextProvider と兄弟
+        └── AnchorPopup
 ```
 
----
+実装の JSX ツリー (L291-345):
+```
+page.tsx [Server Component]
+  └── PaginationNav [Server]              // 上部
+  └── AnchorPopupProvider [Client]        // ---- (B) PostFormContextProvider の *親*
+        └── PostFormContextProvider [Client]  // ---- (A) AnchorPopupProvider の *子*
+              └── PostForm
+              └── PostList
+              └── PostListLiveWrapper
+        └── AnchorPopup
+  └── PaginationNav [Server]              // 下部
+```
 
-### [MEDIUM-002] web-ui.md section 3.2 のリダイレクトステータスコード記述が不正確
+2点の相違:
+1. **親子関係の逆転:** ドキュメントでは `AnchorPopupProvider` が `PostFormContextProvider` と同列の兄弟要素だが、実装では `AnchorPopupProvider` が `PostFormContextProvider` を包含する親要素になっている
+2. **下部 PaginationNav の位置:** ドキュメントでは `AnchorPopupProvider` の前 (L92) に配置されているが、実装では `AnchorPopupProvider` の後 (L341-345) に配置されている
 
-**重要度:** MEDIUM
-**対象:** `docs/architecture/components/web-ui.md` L106
+**影響:** 実装のネスト構造は正しい。`PostItem` -> `AnchorLink` -> `useAnchorPopupContext()` というコンテキスト消費チェーンが成立するためには、`AnchorPopupProvider` が `PostList` (および `PostListLiveWrapper`) の祖先要素である必要がある。ドキュメントのフラット構造では React の Context が届かず、アンカーポップアップ機能が動作しない。
 
-web-ui.md の記述:
-> 旧 `threads/[threadId]/page.tsx` はリダイレクト専用に変更済み（UUID→新URLへの**302**リダイレクト）
+つまり実装が設計意図に対して正しく、ドキュメントのツリー表記が不正確である。開発者がこのツリー図を参照してコンポーネントを再配置した場合、Context の Provider/Consumer 関係が壊れるリスクがある。
 
-実装 (`src/app/(web)/threads/[threadId]/page.tsx`) では Next.js の `redirect()` を使用。Next.js の `redirect()` は Server Component でデフォルトで **307** を返す。
-
-同じファイル内の section 3.1 では `/` → `/battleboard/` を「307リダイレクト」と正しく記載しており、同一の `redirect()` 関数使用にもかかわらず記述が不一致。
-
-**修正方針:** 「302リダイレクト」を「307リダイレクト」に修正。
-
----
-
-### [MEDIUM-003] web-ui.md section 3.2 の PostItem Client Component化の理由が不正確
-
-**重要度:** MEDIUM
-**対象:** `docs/architecture/components/web-ui.md` L102
-
-web-ui.md の記述:
-> `PostList` / `PostItem` が Client Component に変更（`PostFormContext` と `AnchorPopupContext` を消費するため）
-
-実装では PostItem は `AnchorPopupContext` を直接消費していない:
-- PostItem → `usePostFormContext()` (PostFormContext を直接消費)
-- PostItem → `AnchorLink` を描画 → AnchorLink が `useAnchorPopupContext()` を消費
-
-Client Component化の直接の理由は `PostFormContext` の消費と `AnchorLink` (Client Component) の描画。AnchorPopupContext は間接依存。
-
-**修正方針:** 記述を「PostFormContext を消費し、AnchorLink (AnchorPopupContext 消費) を描画するため」等に修正。実質的な誤解は生じにくいが正確性の観点で修正推奨。
-
----
-
-### [LOW-001] ポーリング方式のパフォーマンス懸念（情報提供）
-
-**重要度:** LOW
-**対象:** 実装 `PostListLiveWrapper.tsx`
-
-現在のポーリング実装は `GET /api/threads/{threadId}` で全レスを取得しクライアント側でフィルタリングしている。レス数が増加した場合（数百〜1000件）にはレスポンスサイズが大きくなるが、これは設計判断の範囲内であり、現時点では問題ない。将来的に `since` パラメータによる差分取得を導入する場合はOpenAPIとweb-ui.mdを同時に更新すること。
-
----
-
-## ドキュメント間整合性チェック結果
-
-### 用語使用の一貫性
-
-レビュー対象ドキュメント内でユビキタス言語辞書(D-02)と矛盾する用語使用は検出されなかった。「レス」「スレッド」「書き込み」「アンカー」「日次リセットID」等の用語は辞書に準拠して使用されている。
-
-### BDDテスト戦略書(D-10)との整合性
-
-テスト構成は D-10 section 4 のディレクトリ構成・ファイル分割方針と一致:
-- `features/step_definitions/thread.steps.ts` に thread.feature 固有のステップが集約
-- `features/support/` に world.ts, hooks.ts, mock-installer.ts が存在
-- `features/support/in-memory/` にリポジトリごとのインメモリ実装が存在
-- Sprint-59~63 で追加されたテストファイル (`PaginationNav.test.ts`, `AnchorLink.test.tsx`, `AnchorPopup.test.tsx`, `AnchorPopupContext.test.tsx`) は `src/__tests__/app/(web)/_components/` に正しく配置
-
-### OpenAPI仕様書(D-04)との整合性
-
-- スレッド一覧・閲覧の内部URLルーティング変更 (`/threads/{UUID}` → `/{boardId}/{threadKey}/`) はWeb UIルーティングの変更であり、APIエンドポイント自体 (`/api/threads/{threadId}`) は変更されていない。APIレベルでの不整合はない
-- ポーリングURLの不一致は HIGH-002 で指摘済み
-
-### アーキテクチャ設計書(D-07)との整合性
-
-- TDR-006 (認証不要のSSRページでサービス層を直接インポート) の記述と実装が一致: `[boardId]/page.tsx` と `[[...range]]/page.tsx` の両方で `PostService` を直接インポートし `export const dynamic = 'force-dynamic'` を設定
-- Server Component / Client Component の分類は web-ui.md section 2 の方針と実装が一致 (HIGH-001 の AnchorPopupProvider 欠落を除く)
-
-### 問題なしの確認事項
-
-1. **新コンポーネントの Server/Client 分類**: PaginationNav (Server), AnchorLink (Client), AnchorPopup (Client), AnchorPopupContext (Client), PostFormContext (Client) -- 全て web-ui.md の記載通り `"use client"` ディレクティブの有無で正しく分類
-2. **リダイレクト実装**: `page.tsx` (`/` → `/battleboard/`) と `threads/[threadId]/page.tsx` (旧URL → 新URL) は共に `redirect()` で正しく実装
-3. **専ブラread.cgiリダイレクト**: `src/app/(senbra)/test/read.cgi/[boardId]/[key]/route.ts` が新URL形式 `/{boardId}/{key}/` へリダイレクトしており、URL構造変更に追従済み
-4. **dangerouslySetInnerHTML禁止**: PostItem.tsx は `white-space: pre-wrap` と `parseAnchorLinks()` による React標準エスケープを使用。web-ui.md section 6 の制約に準拠
+**修正方針:** section 3.2 のツリーを以下に修正:
+```
+app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx  [Server Component]
+  └── PaginationNav [Server Component]      // ページナビゲーション（上部）
+  └── AnchorPopupProvider [Client Component]  // ポップアップスタック管理 Context
+        └── PostFormContextProvider [Client Component]  // レス番号クリック → PostForm テキスト挿入 Context
+              └── PostForm [Client Component]
+                    └── AuthModal [Client Component]
+              └── PostList [Client Component]
+                    └── PostItem [Client Component]
+                          └── AnchorLink [Client Component]
+              └── PostListLiveWrapper [Client Component]
+                    └── PostItem [Client Component]
+        └── AnchorPopup [Client Component]    // ポップアップカード表示
+  └── PaginationNav [Server Component]      // ページナビゲーション（下部）
+```
 
 ---
 
@@ -171,13 +145,24 @@ Client Component化の直接の理由は `PostFormContext` の消費と `AnchorL
 | 重要度   | 件数  | ステータス |
 |----------|-------|-----------|
 | CRITICAL | 0     | pass      |
-| HIGH     | 2     | warn      |
-| MEDIUM   | 3     | info      |
-| LOW      | 1     | note      |
+| HIGH     | 0     | pass      |
+| MEDIUM   | 1     | info      |
+| LOW      | 0     | pass      |
 
-判定: WARNING -- マージ前に2件のHIGH（重要）な問題を解決してください。
+判定: APPROVE -- Sprint-64 で検出された HIGH 2件 + MEDIUM 3件の修正は全て正しく行われている。新規 MEDIUM 1件 (コンポーネントツリーのネスト構造表記) はマージを妨げない。
 
-### HIGH指摘の要旨
+### Sprint-64 指摘の修正状況
 
-1. **HIGH-001**: `page.tsx` に `AnchorPopupProvider` / `AnchorPopup` が組み込まれておらず、ドキュメントに記載された設計が実装されていない。アンカーポップアップ機能 (`@anchor_popup` シナリオ 4件) がブラウザ上で動作しない可能性がある
-2. **HIGH-002**: ポーリングURLの記述が実装と乖離 (エンドポイント名・クエリパラメータの両方が不一致)。開発者が誤った前提でコードを修正するリスクがある
+| 指摘ID | 重要度 | 修正状況 |
+|--------|--------|----------|
+| HIGH-001 | HIGH | 修正済み (AnchorPopupProvider/AnchorPopup 配置完了) |
+| HIGH-002 | HIGH | 修正済み (ポーリングURL記述を実装に一致) |
+| MEDIUM-001 | MEDIUM | 修正済み (ThreadCreateForm 追加) |
+| MEDIUM-002 | MEDIUM | 修正済み (302 -> 307 修正) |
+| MEDIUM-003 | MEDIUM | 修正済み (PostItem 依存記述の正確化) |
+
+### 新規指摘
+
+| 指摘ID | 重要度 | 概要 |
+|--------|--------|------|
+| MEDIUM-NEW-001 | MEDIUM | section 3.2 コンポーネントツリーのネスト構造 (AnchorPopupProvider の親子関係・PaginationNav の位置) が実装と不一致 |
