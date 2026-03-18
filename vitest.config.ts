@@ -9,10 +9,6 @@ export default defineConfig({
 		globals: true,
 		include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
 		passWithNoTests: true,
-		environmentMatchGlobs: [
-			// Client Componentのテストはjsdom環境で実行する
-			["src/__tests__/app/**/*.test.tsx", "jsdom"],
-		],
 	},
 	resolve: {
 		alias: {
