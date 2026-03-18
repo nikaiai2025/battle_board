@@ -1086,7 +1086,10 @@ export class BotService {
  * 本番コードでは実際のリポジトリを使用する。
  * テストコードでは BotService コンストラクタを直接使用してモックを注入する。
  *
+ * require() による遅延評価で循環依存を回避する（post-service ↔ bot-service の依存関係）。
+ *
  * See: docs/architecture/bdd_test_strategy.md §7-12 モック戦略
+ * See: docs/architecture/components/bot.md §3.1 依存先 > PostService
  */
 export function createBotService(): BotService {
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -1095,6 +1098,24 @@ export function createBotService(): BotService {
 	const BotPostRepository = require("../infrastructure/repositories/bot-post-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const AttackRepository = require("../infrastructure/repositories/attack-repository");
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const ThreadRepository = require("../infrastructure/repositories/thread-repository");
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const { createPost } = require("./post-service");
 
-	return new BotService(BotRepository, BotPostRepository, AttackRepository);
+	// IThreadRepository アダプタ: ThreadRepository.findByBoardId を IBotService.IThreadRepository に適合させる
+	// findByBoardId は options 引数が省略可能なため、boardId のみ渡すシグネチャで適合する
+	// See: src/lib/infrastructure/repositories/thread-repository.ts > findByBoardId
+	const threadRepository: IThreadRepository = {
+		findByBoardId: (boardId: string) => ThreadRepository.findByBoardId(boardId),
+	};
+
+	return new BotService(
+		BotRepository,
+		BotPostRepository,
+		AttackRepository,
+		undefined, // botProfilesData（省略 → コンストラクタ内で botProfilesConfig をデフォルト使用）
+		threadRepository, // executeBotPost の BehaviorStrategy でスレッド選択に使用
+		createPost, // executeBotPost で PostService.createPost を呼び出すために使用
+	);
 }
