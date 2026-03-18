@@ -65,6 +65,11 @@ export interface CommandExecutionResult {
 	systemMessage: string | null;
 	/** 実際に消費した通貨量（失敗時は 0） */
 	currencyCost: number;
+	/**
+	 * ★システム名義の独立レス本文。null / undefined なら独立レス投稿なし。
+	 * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+	 */
+	eliminationNotice?: string | null;
 }
 
 /**
@@ -88,8 +93,14 @@ export interface CommandContext {
 export interface CommandHandlerResult {
 	/** 実行に成功したか */
 	success: boolean;
-	/** システムメッセージ文字列（null なら出力なし） */
+	/** システムメッセージ文字列（null なら出力なし）。インライン表示用 */
 	systemMessage: string | null;
+	/**
+	 * ★システム名義の独立レス本文。null / undefined なら独立レス投稿なし。
+	 * PostService が受け取り、AdminService と同パターンで createPost() を呼び出す。
+	 * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+	 */
+	eliminationNotice?: string | null;
 }
 
 /**
@@ -526,10 +537,13 @@ export class CommandService {
 		// skipDebit コマンドはハンドラ内で消費が決まるため、成功時のみ cost を返す。
 		// See: docs/architecture/components/command.md §5 通貨引き落としの順序
 		// 「コマンド失敗時に通貨を戻す補償処理は行わない」
+		// eliminationNotice: ハンドラが設定した場合は PostService に伝播する。
+		// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 		return {
 			success: result.success,
 			systemMessage: result.systemMessage,
 			currencyCost: shouldSkipDebit ? (result.success ? cost : 0) : cost,
+			eliminationNotice: result.eliminationNotice ?? null,
 		};
 	}
 }

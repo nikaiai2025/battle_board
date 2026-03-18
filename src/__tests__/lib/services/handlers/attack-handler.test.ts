@@ -400,8 +400,11 @@ describe("AttackHandler", () => {
 			expect(botService.revealBot).not.toHaveBeenCalled();
 		});
 
-		it("BOT撃破時に撃破通知メッセージが含まれる", async () => {
+		it("BOT撃破時に eliminationNotice が設定される", async () => {
 			// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// See: docs/operations/incidents/2026-03-19_attack_elimination_no_system_post.md 案A
+			// systemMessage はインライン表示（HP変化）のみ。
+			// eliminationNotice に★システム名義の独立レス本文が設定される。
 			const handler = createHandler({
 				isBot: true,
 				botInfo: createBotInfo({
@@ -416,8 +419,14 @@ describe("AttackHandler", () => {
 			});
 			const result = await handler.execute(createCtx());
 			expect(result.success).toBe(true);
-			// 撃破通知に必要な情報が含まれているかチェック
-			expect(result.systemMessage).toContain("撃破");
+			// systemMessage はインライン表示（HP変化）のみを含む
+			expect(result.systemMessage).toContain("HP:");
+			expect(result.systemMessage).not.toContain("撃破されました");
+			// eliminationNotice に撃破通知が設定されることを確認する
+			expect(result.eliminationNotice).toBeTruthy();
+			expect(result.eliminationNotice).toContain("撃破");
+			expect(result.eliminationNotice).toContain("+265");
+			expect(result.eliminationNotice).toContain("荒らし役");
 		});
 
 		it("BOT攻撃成功時にrecordAttackが呼ばれる", async () => {

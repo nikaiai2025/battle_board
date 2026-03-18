@@ -349,6 +349,51 @@ test.describe("マイページ /mypage", () => {
 		expect(jsErrors).toHaveLength(0);
 	});
 
+	test("仮ユーザー状態で本登録リンクが表示され、遷移先が404/500でない", async ({
+		page,
+	}) => {
+		// See: docs/architecture/bdd_test_strategy.md §10.5.8 pendingシナリオのUI到達性
+		// See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// 認証フローを実行（仮ユーザー状態）
+		await page.goto("/");
+		await page.locator("#thread-title-input").fill("仮ユーザーテスト");
+		await page.locator("#thread-body-input").fill("仮ユーザーテスト本文");
+		await page.locator("#thread-submit-btn").click();
+		await completeAuth(page);
+
+		await page.goto("/mypage");
+		await expect(page.locator("#account-info")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		// 本登録案内の登録ボタンが表示される
+		// See: src/app/(web)/mypage/page.tsx > data-testid="register-email-button"
+		// See: src/app/(web)/mypage/page.tsx > data-testid="register-discord-button"
+		const emailBtn = page.locator('[data-testid="register-email-button"]');
+		const discordBtn = page.locator('[data-testid="register-discord-button"]');
+		await expect(emailBtn).toBeVisible();
+		await expect(discordBtn).toBeVisible();
+
+		// 各リンク先が404/500でないことを検証
+		// See: docs/architecture/bdd_test_strategy.md §10.5.3 > リンク・ボタンの操作可能性
+		for (const btn of [emailBtn, discordBtn]) {
+			const href = await btn.getAttribute("href");
+			expect(href).toBeTruthy();
+			const res = await page.request.get(href!);
+			expect(
+				res.status(),
+				`${href} が ${res.status()} を返した（200を期待）`,
+			).toBe(200);
+		}
+
+		expect(jsErrors).toHaveLength(0);
+	});
+
 	test("マイページからトップへの戻りリンクが存在する", async ({ page }) => {
 		// JSエラー収集用配列
 		const jsErrors: string[] = [];

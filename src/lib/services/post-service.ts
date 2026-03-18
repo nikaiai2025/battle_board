@@ -533,6 +533,31 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		isSystemMessage,
 	});
 
+	// Step 9b: 撃破通知独立レス投稿（commandResult.eliminationNotice がある場合）
+	// AttackHandler が撃破時に返す eliminationNotice を ★システム名義の独立レスとして投稿する。
+	// AdminService の削除通知（L117-138）と同パターンを採用する。
+	// 投稿失敗は攻撃レスの成功を巻き戻さない（try-catch で保護）。
+	// 攻撃者のレスの INSERT（Step 9）より後に実行する必要がある。
+	// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+	// See: src/lib/services/admin-service.ts L117-138（先行パターン）
+	// See: docs/operations/incidents/2026-03-19_attack_elimination_no_system_post.md 案A
+	if (commandResult?.eliminationNotice) {
+		try {
+			await createPost({
+				threadId: input.threadId,
+				body: commandResult.eliminationNotice,
+				edgeToken: null,
+				ipHash: "system",
+				displayName: "★システム",
+				isBotWrite: true,
+				isSystemMessage: true,
+			});
+		} catch (err) {
+			// 撃破通知レス挿入失敗は攻撃レスの成功を巻き戻さない
+			console.error("[PostService] 撃破通知レス挿入失敗:", err);
+		}
+	}
+
 	// Step 10: スレッド更新
 	// See: docs/architecture/architecture.md §7.1 Step 2
 	await ThreadRepository.incrementPostCount(input.threadId);

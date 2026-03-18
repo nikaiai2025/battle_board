@@ -48,6 +48,16 @@ function getCurrencyService() {
 }
 
 /**
+ * PostService を動的 require で取得するヘルパー。
+ * モック差し替え後に評価されるよう require を遅延させる。
+ * executeAttackCommand 内で eliminationNotice の独立レス投稿に使用する。
+ * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+ */
+function getPostService() {
+	return require("../../src/lib/services/post-service") as typeof import("../../src/lib/services/post-service");
+}
+
+/**
  * BotService インスタンスを生成する（インメモリリポジトリを注入）。
  * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト
  */
@@ -314,6 +324,31 @@ async function executeAttackCommand(
 		isDeleted: false,
 		createdAt: new Date(Date.now()),
 	});
+
+	// 撃破通知独立レス投稿（eliminationNotice が存在する場合）
+	// AttackHandler が返す eliminationNotice を PostService.createPost() で
+	// ★システム名義の独立レスとして投稿する。
+	// これにより InMemory PostRepository に独立レスが追加され、
+	// "「★システム」名義の独立レスで撃破が通知される" ステップが実検証できる。
+	// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+	// See: src/lib/services/post-service.ts Step 9b（PostService 本体での対応箇所）
+	if (result.eliminationNotice) {
+		try {
+			const PostService = getPostService();
+			await PostService.createPost({
+				threadId: world.currentThreadId!,
+				body: result.eliminationNotice,
+				edgeToken: null,
+				ipHash: "system",
+				displayName: "★システム",
+				isBotWrite: true,
+				isSystemMessage: true,
+			});
+		} catch (err) {
+			// 撃破通知レス挿入失敗は攻撃レスの成功を巻き戻さない
+			console.error("[BDD executeAttackCommand] 撃破通知レス挿入失敗:", err);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -796,15 +831,40 @@ Given("荒らし役ボットが活動中である", async function (this: Battle
 Then(
 	"ボットは既存のスレッドに書き込む",
 	async function (this: BattleBoardWorld) {
-		// ボットの書き込みは既存スレッドにのみ行われること（設計仕様）を確認する。
-		// selectTargetThread が既存スレッドをランダム選択するのみ（Phase 3 実装予定）。
-		assert(true, "ボットは既存スレッドにのみ書き込む設計で保証されています");
+		// See: features/bot_system.feature @荒らし役ボットはスレッドを作成しない
+		// When ステップで書き込まれたレスが this.currentThreadId（既存スレッド）に存在することを検証する。
+		// botPostNumberToId にはWhenステップが設定した postNumber=100 のpostIdが入っている。
+		assert(this.currentThreadId, "スレッドIDが設定されていません");
+		const botPostId = this.botPostNumberToId.get(100);
+		assert(
+			botPostId !== undefined,
+			"ボットの書き込みが記録されていません（When ステップが実行されたか確認してください）",
+		);
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+		const botPost = posts.find((p) => p.id === botPostId);
+		assert(
+			botPost !== undefined,
+			`ボットの書き込み (id=${botPostId}) が既存スレッド (id=${this.currentThreadId}) に存在することを期待しましたが、見つかりませんでした`,
+		);
 	},
 );
 
 Then("新しいスレッドの作成は行わない", async function (this: BattleBoardWorld) {
-	// executeBotPost は既存スレッドIDを受け取る設計のため、スレッド作成は行わない。
-	assert(true, "ボットはスレッドを作成しない設計で保証されています");
+	// See: features/bot_system.feature @荒らし役ボットはスレッドを作成しない
+	// Given ステップで1件のスレッドが作成された後、ボット書き込みによってスレッド数が
+	// 増加していないことを検証する。
+	// BotService.executeBotPost は既存スレッドIDのみを受け取る設計であり、
+	// create_thread アクション時は明示的に Error を throw する（bot-service.ts L708-713）。
+	assert(this.currentThreadId, "スレッドIDが設定されていません");
+	const threads = await InMemoryThreadRepo.findByBoardId(TEST_BOARD_ID);
+	assert(
+		threads.length === 1,
+		`スレッド数は1件（Givenで作成した既存スレッドのみ）であることを期待しましたが、${threads.length}件でした`,
+	);
+	assert(
+		threads[0].id === this.currentThreadId,
+		`唯一のスレッドはGivenで作成した既存スレッド (id=${this.currentThreadId}) であることを期待しましたが、異なるスレッド (id=${threads[0].id}) でした`,
+	);
 });
 
 // ---------------------------------------------------------------------------
@@ -1490,13 +1550,29 @@ Then(
 Then(
 	/^「★システム」名義の独立レスで撃破が通知される(?::)?$/,
 	async function (this: BattleBoardWorld, _docString?: string) {
-		// AttackHandler は systemMessage に撃破通知文字列を返す。
-		// ★システム名義の独立レス登録は PostService が担当（Phase 3 実装予定）。
-		assert(this.lastAttackResult, "攻撃結果が存在しません");
-		const msg = this.lastAttackResult.systemMessage;
+		// 実検証: InMemory PostRepository に ★システム名義の独立レスが存在することを確認する。
+		// executeAttackCommand 内で result.eliminationNotice が存在した場合に
+		// PostService.createPost() を呼び出して独立レスを投稿している。
+		// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+		// See: docs/operations/incidents/2026-03-19_attack_elimination_no_system_post.md 問題 #1
+		assert(this.currentThreadId, "スレッドIDが設定されていません");
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+
+		// isSystemMessage=true かつ displayName=★システム のレスが存在することを確認する
+		const systemPost = posts.find(
+			(p) => p.isSystemMessage && p.displayName === "★システム",
+		);
+
 		assert(
-			msg.includes("撃破"),
-			`撃破通知が systemMessage に含まれることを期待しましたが "${msg}" でした`,
+			systemPost !== undefined,
+			`「★システム」名義の独立レスが InMemory PostRepository に存在しません。` +
+				`スレッド内のレス: ${JSON.stringify(posts.map((p) => ({ displayName: p.displayName, isSystemMessage: p.isSystemMessage, body: p.body?.slice(0, 50) })))}`,
+		);
+
+		// 独立レスの本文に撃破通知の必須要素が含まれることを確認する
+		assert(
+			systemPost.body.includes("撃破"),
+			`★システム名義の独立レスの本文に「撃破」が含まれることを期待しましたが、実際: "${systemPost.body}"`,
 		);
 	},
 );
@@ -1506,10 +1582,27 @@ Then(
 	async function (this: BattleBoardWorld, rewardStr: string) {
 		const expectedReward = parseInt(rewardStr, 10);
 		assert(this.lastAttackResult, "攻撃結果が存在しません");
-		const msg = this.lastAttackResult.systemMessage;
+
+		// 撃破通知の独立レス（★システム名義）から報酬額を確認する。
+		// attack-handler.ts の変更により、eliminationNotice が PostService 経由で独立レスとして投稿される。
+		// 独立レスの本文には「撃破者：名無しさん(ID:xxx) に撃破報酬 +{N}」が含まれる。
+		// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+		// See: src/lib/services/handlers/attack-handler.ts > executeFlowB > eliminationNoticeBody
+		assert(this.currentThreadId, "スレッドIDが設定されていません");
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+		const systemPost = posts.find(
+			(p) => p.isSystemMessage && p.displayName === "★システム",
+		);
+
 		assert(
-			msg.includes(`+${expectedReward}`),
-			`撃破報酬 ${expectedReward} が systemMessage に含まれることを期待しましたが "${msg}" でした`,
+			systemPost !== undefined,
+			`★システム名義の独立レスが存在しないため撃破報酬を確認できません。` +
+				`スレッド内のレス: ${JSON.stringify(posts.map((p) => ({ displayName: p.displayName, isSystemMessage: p.isSystemMessage, body: p.body?.slice(0, 50) })))}`,
+		);
+
+		assert(
+			systemPost.body.includes(`+${expectedReward}`),
+			`撃破報酬 ${expectedReward} が独立レスの本文に含まれることを期待しましたが、実際: "${systemPost.body}"`,
 		);
 	},
 );

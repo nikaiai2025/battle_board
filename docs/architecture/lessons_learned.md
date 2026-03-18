@@ -214,3 +214,39 @@ grep -r "import.*fs\b\|require.*['\"]fs['\"]\|readFileSync\|readSync" src/lib/
 - **検出:** デプロイ後のスモークテスト（最低1コマンドの実行確認）をCI/CDに組み込む
 
 See: `docs/operations/incidents/2026-03-18_bot_profiles_yaml_fs_dependency.md`
+
+---
+
+## LL-007: BDDステップの「Phase N 実装予定」コメントはテストの空洞化を招く
+
+- **発見日:** 2026-03-19
+- **発見契機:** 本番で `!attack` 撃破時のシステムレスが未投稿であることを人間が手動テストで発見
+
+### 事象
+
+`bot_system.steps.ts` のステップ定義に `// ★システム名義の独立レス登録は PostService が担当（Phase 3 実装予定）。` というコメントがあり、本来「★システム」名義の独立レスがDBに存在するかを検証すべきところが、`systemMessage` に「撃破」という文字列が含まれるかだけを確認するスタブ実装になっていた。テストは全件PASSしていたが、仕様は満たされていなかった。
+
+### 根本原因
+
+BDDステップ定義内のTODOコメントは、テストフレームワークに対して不可視である。`npx cucumber-js` の実行結果は「PASS」と表示され、未実装の検証ロジックがあることは一切報告されない。人間がコードレビューでコメントを読まない限り検出不可能。
+
+### 教訓
+
+**BDDステップの検証ロジックを「Phase N で実装予定」として先送りする場合、コメントではなく Cucumber の `pending()` を使用する。**
+
+```typescript
+// NG: コメントで先送り（テスト結果に表示されない）
+// Phase 3 実装予定
+assert(msg.includes("撃破"));
+
+// OK: pending() で先送り（テスト結果に PENDING として表示される）
+return 'pending';  // Phase 3: 独立レスのDB存在確認を実装する
+```
+
+`pending()` を使えば、テスト実行結果のサマリに PENDING 件数が表示され、未実装の検証が可視化される。CI でも PENDING 件数を監視可能。
+
+### 適用範囲
+
+BDDステップ定義全般。特に「ハンドラの戻り値だけ検証し、副作用（DB書き込み、外部呼び出し）の検証を先送りする」パターンに注意。
+
+See: `docs/operations/incidents/2026-03-19_attack_elimination_no_system_post.md`

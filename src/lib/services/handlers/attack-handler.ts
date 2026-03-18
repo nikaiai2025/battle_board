@@ -302,18 +302,23 @@ export class AttackHandler implements CommandHandler {
 				"bot_elimination",
 			);
 
-			// 撃破通知（★システム名義の独立レスで通知）
+			// 撃破通知（★システム名義の独立レス）
+			// systemMessage: インライン表示用（攻撃レス末尾にマージ）
+			// eliminationNotice: PostService が独立レスとして投稿する本文
 			// See: docs/specs/bot_state_transitions.yaml #battle_record > display_format
-			const eliminationNotice = [
-				inlineMsg,
-				`\n⚔️ ボット「${botInfo.name}」が撃破されました！`,
+			// See: docs/operations/incidents/2026-03-19_attack_elimination_no_system_post.md 案A
+			const eliminationNoticeBody = [
+				`⚔️ ボット「${botInfo.name}」が撃破されました！`,
 				`生存日数：${botInfo.survivalDays}日 / 総書き込み：${botInfo.totalPosts}件 / 被告発：${botInfo.accusedCount}回`,
 				`撃破者：名無しさん(ID:${ctx.userId}) に撃破報酬 +${damageResult.reward}`,
 			].join("\n");
 
 			return {
 				success: true,
-				systemMessage: eliminationNotice,
+				// systemMessage にはインライン表示（HP変化）のみを設定する
+				systemMessage: inlineMsg,
+				// eliminationNotice を PostService に伝播して独立レスを投稿させる
+				eliminationNotice: eliminationNoticeBody,
 			};
 		}
 
