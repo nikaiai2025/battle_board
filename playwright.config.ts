@@ -85,25 +85,27 @@ export default defineConfig({
 	 * - e2e: ブラウザ（Chromium）を使用したE2Eフロー検証テスト（basic-flow.spec.ts等）
 	 * - smoke: ナビゲーションスモークテスト（e2e/smoke/ 配下）
 	 * - api: ブラウザ不要のHTTPレベルAPIテスト（e2e/api/ 配下）
-	 * - cf-smoke: CF Workers互換性スモークテスト（e2e/cf-smoke/ 配下）
+	 *
+	 * 除外:
+	 * - cf-smoke: 常設プロジェクトから除外。npm run test:cf-smoke で手動実行
+	 * - prod: 別config（playwright.prod.config.ts）で実行。testIgnore で除外済み
 	 *
 	 * 実行方法:
 	 *   全テスト(ローカル): npx playwright test
-	 *   APIのみ:        npx playwright test --project=api
 	 *   E2Eのみ:        npx playwright test --project=e2e
 	 *   Smokeのみ:      npx playwright test --project=smoke
-	 *   CF Smoke:       npx playwright test --project=cf-smoke
+	 *   APIのみ:        npx playwright test --project=api
+	 *   CF Smoke:       npm run test:cf-smoke（wrangler dev 事前起動が必要）
 	 *   本番Smoke:      npx playwright test --config=playwright.prod.config.ts
 	 *
 	 * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
-	 * See: docs/architecture/bdd_test_strategy.md §10.5 ナビゲーションスモークテスト
-	 * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
+	 * See: docs/architecture/bdd_test_strategy.md §10.2 ナビゲーションテスト
 	 */
 	projects: [
 		{
 			name: "e2e",
 			testDir: "./e2e",
-			testIgnore: ["**/api/**", "**/cf-smoke/**", "**/smoke/**"],
+			testIgnore: ["**/api/**", "**/cf-smoke/**", "**/smoke/**", "**/prod/**"],
 			use: { ...devices["Desktop Chrome"] },
 		},
 		{
@@ -124,19 +126,11 @@ export default defineConfig({
 				baseURL: "http://localhost:3000",
 			},
 		},
-		{
-			/**
-			 * CF Smokeテスト: wrangler dev (Cloudflare Workers ローカルランタイム) に対する
-			 * Node.js API互換性のスモークテスト。wrangler dev は手動起動前提。
-			 *
-			 * See: docs/architecture/bdd_test_strategy.md §13 CF Smokeテスト方針
-			 */
-			name: "cf-smoke",
-			testDir: "./e2e/cf-smoke",
-			use: {
-				baseURL: "http://localhost:8788", // wrangler dev のデフォルトポート
-			},
-		},
+		// CF Smokeテスト（cf-smoke）は常設プロジェクトから除外。
+		// CF Runtime互換性の技術検証であり、必要時のみ手動実行する:
+		//   npm run test:cf-smoke  (wrangler dev 事前起動が必要)
+		// See: docs/architecture/bdd_test_strategy.md §14 CF Smokeテスト（技術検証）
+		//
 		// 本番スモークテストは別 config: playwright.prod.config.ts
 		// 実行: npx playwright test --config=playwright.prod.config.ts
 	],

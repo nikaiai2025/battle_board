@@ -1,14 +1,16 @@
 ---
 name: bdd-gate
-description: 実環境テスト実行・合否判定ゲート
+description: ローカル環境で全テストスイート（単体・BDD・統合・API・E2E）を実行し、合否を判定してレポートする品質ゲート。テストコードは書かない。本番スモークテストは bdd-smoke が担当する。
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 model: sonnet
 color: purple
 ---
 
-# bdd-gate — 実環境テストゲート
+# bdd-gate — ローカル品質ゲート
 
-テストコードは書かない。実環境で全テストスイートを実行し、合否を判定してレポートする。
+テストコードは書かない。ローカル環境（Supabase Local + Next.js dev）で全テストスイートを実行し、合否を判定してレポートする。フェーズ5検証サイクルにおける最終品質ゲートとして機能する。
+
+> **本番環境のスモークテストは `bdd-smoke` が担当する。** 本エージェントはローカルテストのみ。
 
 ## 実行手順
 
@@ -20,6 +22,7 @@ color: purple
 4. テストスイートを順に実行する
    - 単体テスト: `npx vitest run`
    - BDDテスト: `npx cucumber-js`
+   - 統合テスト: `npx cucumber-js --profile integration`
    - E2Eテスト: `npx playwright test`
 5. 結果をレポートする
 

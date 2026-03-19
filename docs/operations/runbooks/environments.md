@@ -22,8 +22,24 @@
 | 環境 | 設定場所 | 備考 |
 |---|---|---|
 | ローカル | `.env.local` | gitignore済み。Supabase Localの接続情報 |
+| 本番スモーク | `.env.prod.smoke` | gitignore済み。スモークテスト用シークレット（`seed-smoke-user.md` 参照） |
 | Vercel | Vercel ダッシュボード > Settings > Environment Variables | Build/Runtime両方に設定 |
 | Cloudflare | Cloudflare ダッシュボード > Workers & Pages > Settings > Variables | Build/Runtime両方に設定。`NEXT_PUBLIC_*` はBuild側にも必要 |
+
+| GitHub Actions | リポジトリ Settings > Secrets and variables > Actions | 下表参照 |
+
+### GitHub Actions Secrets 一覧
+
+設定場所: リポジトリ Settings > Secrets and variables > Actions > New repository secret
+
+| Secret名 | 取得先 | 使用ワークフロー |
+|---|---|---|
+| `BOT_API_KEY` | デプロイ先環境変数 `BOT_API_KEY` と同じ値 | bot-scheduler, daily-maintenance |
+| `DEPLOY_URL` | デプロイURL（末尾スラッシュなし）※TDR-010によりVercelを指定 | bot-scheduler, daily-maintenance |
+| `SUPABASE_ACCESS_TOKEN` | Supabase Dashboard > Account > Access Tokens | migrate |
+| `SUPABASE_PROJECT_REF` | Supabase Dashboard > Project Settings > General > Reference ID | migrate |
+| `SUPABASE_URL` | Supabase Dashboard > Project Settings > Data API > Project URL | seed-pinned-thread |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard > Project Settings > Data API > service_role (secret) | seed-pinned-thread |
 
 ## 専ブラ互換状況
 

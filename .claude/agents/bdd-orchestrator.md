@@ -100,6 +100,11 @@ color: green
   - Vercel: `npx vercel ls`
   - Cloudflare: `wrangler deployments list --name battle-board`
 - 仮にデプロイに問題があったとしても**手動デプロイは禁止**。修正コードをコミット・プッシュして、再度自動デプロイを待つ。
+
+### ステップ9: デプロイ後検証
+- CFデプロイ完了を確認後、`bdd-smoke` にタスクを発行して本番スモークテストを実行する。
+- **全テストPASS:** 次へ進む。
+- **FAILの場合:** 人間に報告して停止する。（障害調査は人間が `auto-debugger` で実施する）
 - この時点でコンテキスト使用量が9割を超えている場合はコンテキスト圧縮 `/compact` を行ってください。（スプリント途中で自動的にコンテキスト圧縮されると事故に繋がるため）。圧縮後は、ステップ１の「状況把握」の手順を繰り返すこと
 - 問題がなければ、続けて次のスプリントを開始（人間の確認は不要）
 
@@ -119,7 +124,7 @@ color: green
 task_id: TASK-{ID}
 sprint_id: Sprint-{N}
 status: assigned
-assigned_to: {bdd-coding | bdd-architect | bdd-gate | bdd-code-reviewer | bdd-doc-reviewer}
+assigned_to: {bdd-coding | bdd-architect | bdd-gate | bdd-code-reviewer | bdd-doc-reviewer | bdd-smoke}
 artifacts_dir: tmp/workers/{role}_{TASK_ID}  # ファイル出力が必要な場合のみ（省略可）
 depends_on: []
 created_at: {ISO8601}
@@ -221,7 +226,10 @@ Task toolで以下のsubagent_typeを指定してワーカーを起動する:
 - `bdd-coding`: コーディングAI（実装・単体テスト）
 
 **検証フェーズ:**
-- `bdd-gate`: BDDゲートAI（BDDシナリオ全件実行）
+- `bdd-gate`: BDDゲートAI。ローカル環境で全テストスイート（単体・BDD・統合・API・E2E）を実行し
 - `bdd-code-reviewer`: コードレビューAI（コード品質検査）
 - `bdd-doc-reviewer`: ドキュメントレビューAI（ドキュメント整合性検査）
 - `bdd-test-auditor`: テスト監査AI（pending管理・テストピラミッド健全性・トレーサビリティ）
+
+**デプロイ後検証:**
+- `bdd-smoke`: 本番スモークAI（本番環境でのPlaywrightテスト実行・結果報告）
