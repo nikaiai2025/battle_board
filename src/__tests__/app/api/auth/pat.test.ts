@@ -73,6 +73,13 @@ function createRegisteredUser(overrides: Partial<User> = {}): User {
 		registeredAt: new Date("2026-03-01T00:00:00Z"),
 		patToken: PAT_TOKEN,
 		patLastUsedAt: new Date("2026-03-15T14:23:00Z"),
+		// Phase 4: 草コマンド関連フィールド（デフォルト値）
+		// See: features/reactions.feature §成長ビジュアル
+		grassCount: 0,
+		// Phase 5: BAN システム関連フィールド（デフォルト値）
+		// See: features/admin.feature @ユーザーBAN
+		isBanned: false,
+		lastIpHash: null,
 		...overrides,
 	};
 }

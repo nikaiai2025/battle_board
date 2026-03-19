@@ -46,6 +46,8 @@ function createBot(overrides: Partial<Bot> = {}): Bot {
 		accusedCount: 0,
 		timesAttacked: 0,
 		botProfileKey: "荒らし役",
+		// See: docs/architecture/architecture.md §13 TDR-010
+		nextPostAt: null,
 		eliminatedAt: null,
 		eliminatedBy: null,
 		createdAt: new Date("2026-03-17T00:00:00Z"),

@@ -52,6 +52,10 @@ function makeTemporaryUserInfo(): MypageInfo {
 		registrationType: null,
 		patToken: null,
 		patLastUsedAt: null,
+		// Phase 4: 草コマンド関連フィールド（デフォルト値）
+		// See: features/reactions.feature §成長ビジュアル
+		grassCount: 0,
+		grassIcon: "🌱",
 	};
 }
 
@@ -68,6 +72,10 @@ function makeRegisteredUserInfo(
 		registrationType: "email",
 		patToken: PAT_TOKEN,
 		patLastUsedAt: "2026-03-15T14:23:00.000Z",
+		// Phase 4: 草コマンド関連フィールド（デフォルト値）
+		// See: features/reactions.feature §成長ビジュアル
+		grassCount: 0,
+		grassIcon: "🌱",
 		...overrides,
 	};
 }

@@ -1,6 +1,7 @@
 # D-05 スレッド（Thread）状態遷移仕様書
 # ステータス: 運用中
 # 作成日: 2026-03-07
+# 最終更新: 2026-03-20 — 休眠方式（is_dormant）導入
 # 対象: Phase 1 + Phase 2 (MVP)
 
 entity: Thread
@@ -13,18 +14,24 @@ description: >
 # =============================================
 states:
   - name: listed
-    label: 一覧表示中
+    label: 一覧表示中（アクティブ）
     description: >
-      スレッド一覧（最新50件）に表示されている状態。
+      スレッド一覧（subject.txt / Web UI）に表示されている状態。
+      is_dormant = false で表現される。
       最終書き込み日時でソートされ、新しいものが上に来る。
+    db_condition: "is_deleted = false AND is_dormant = false"
     initial: true
 
   - name: unlisted
-    label: 一覧非表示
+    label: 一覧非表示（休眠）
     description: >
-      スレッドが51件目以降となり、一覧に表示されていない状態。
-      URLを知っていれば閲覧・書き込みは可能。
-      書き込みがあれば last_post_at が更新され、一覧に復活しうる。
+      アクティブスレッド数の上限（50件）を超え、
+      書き込み時の同期処理により休眠化された状態。
+      is_dormant = true で表現される。
+      subject.txt / スレッド一覧には表示されない。
+      dat/ や bbs.cgi からの閲覧・書き込みは引き続き可能（dat落ちではない）。
+      書き込みがあれば復活する。
+    db_condition: "is_deleted = false AND is_dormant = true"
 
   - name: deleted
     label: 削除済み
@@ -32,6 +39,7 @@ states:
       管理者により削除された状態。
       一覧から消え、全レスも削除扱いとなる。
       URLでのアクセスも不可。
+    db_condition: "is_deleted = true"
 
 # =============================================
 # 状態遷移
@@ -39,24 +47,32 @@ states:
 transitions:
   - from: listed
     to: unlisted
-    trigger: 他スレッドの書き込みにより順位が51位以下に落ちる
+    trigger: 書き込みにより当該板のアクティブスレッド数が上限を超えた場合
     guard:
-      - アクティブなスレッド数が50件を超える
-      - 当該スレッドの last_post_at が51位以下
+      - アクティブなスレッド数（is_dormant=false, is_deleted=false）が MAX_LISTED (50) を超える
+      - 当該スレッドが is_pinned = false（固定スレッドは休眠化しない）
+      - 当該スレッドの last_post_at がアクティブ非固定スレッド中で最も古い
     action:
-      - 一覧表示から除外（動的クエリによる自動判定）
+      - "threads.is_dormant = true に更新"
     feature_ref: thread.feature#スレッド一覧には最新50件のみ表示される
     note: >
-      明示的な状態フラグではなく、last_post_at によるソートの結果として
-      動的に決定される。DBに unlisted フラグは持たない。
+      書き込み時の同期処理として PostService 内で実行される。
+      書き込み対象スレッドの last_post_at 更新後に、アクティブスレッド数をチェックし、
+      上限超過分の末尾スレッドを休眠化する。cron ではなく書き込みトリガー。
 
   - from: unlisted
     to: listed
-    trigger: 一覧外のスレッドに書き込みがある
+    trigger: 休眠中のスレッドに書き込みがある
+    guard:
+      - メール欄の値（sage等）に関わらず、書き込みがあれば無条件に復活する
     action:
-      - last_post_at を更新
-      - 一覧表示に復活（ソート順で上位50件に入る）
+      - "threads.is_dormant = false に更新（復活）"
+      - "threads.last_post_at を更新"
+      - "アクティブスレッド数が上限を超える場合、末尾スレッドを休眠化（listed→unlisted 遷移を連鎖発火）"
     feature_ref: thread.feature#一覧外のスレッドに書き込むと一覧に復活する
+    note: >
+      復活と末尾休眠化は同一の書き込みトランザクション内で同期的に実行される。
+      sage による復活抑止は行わない（本PJにはsage要件がなく、Web版にメール欄が存在しない）。
 
   - from: listed
     to: deleted
@@ -85,11 +101,38 @@ transitions:
 listing_rules:
   max_listed: 50
   sort_key: last_post_at DESC
-  filter: is_deleted = false
+  filter: "is_deleted = false AND is_dormant = false"
   note: >
-    一覧表示の50件制限は threads テーブルへのフラグではなく、
-    クエリの LIMIT 50 + ORDER BY last_post_at DESC で実現する。
-    listed/unlisted は概念上の状態であり、DBに明示的なカラムは持たない。
+    一覧表示の50件制限は is_dormant フラグで管理する。
+    書き込み時にアクティブスレッド数が50件を超えた場合、
+    last_post_at が最も古い非固定アクティブスレッドを is_dormant = true に設定する。
+    subject.txt および Web UI のスレッド一覧クエリは
+    WHERE is_deleted = false AND is_dormant = false で取得する。LIMIT は使用しない。
+    固定スレッド（is_pinned = true）は休眠化の対象外だが、50件の上限には含まれる。
+
+  design_ref: docs/research/thread_dormancy_design_2026-03-20.md
+  previous_design: >
+    旧方式: クエリの LIMIT 50 + ORDER BY last_post_at DESC で動的に判定。
+    DBに unlisted フラグは持たなかった。
+    この方式では専ブラ（ChMate等）のローカル履歴に
+    LIMIT 圏外のスレッドが幽霊として蓄積する問題があった。
+
+# =============================================
+# エンドポイントごとの休眠スレッドの扱い
+# =============================================
+dormancy_visibility:
+  - endpoint: "/{boardId}/subject.txt"
+    includes_dormant: false
+    note: "アクティブスレッドのみ返す"
+  - endpoint: "Web UI スレッド一覧"
+    includes_dormant: false
+    note: "アクティブスレッドのみ表示する"
+  - endpoint: "/{boardId}/dat/{threadKey}.dat"
+    includes_dormant: true
+    note: "休眠スレッドも閲覧可能（dat落ちではない）"
+  - endpoint: "/test/bbs.cgi"
+    includes_dormant: true
+    note: "休眠スレッドにも書き込み可能。書き込み時に復活する"
 
 # =============================================
 # インセンティブ関連の条件

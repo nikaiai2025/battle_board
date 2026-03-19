@@ -81,6 +81,10 @@ function createMockBotRepository(
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
 		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
+		// See: features/bot_system.feature @BOTの書き込みで総書き込み数がインクリメントされる
+		incrementTotalPosts: vi.fn().mockResolvedValue(undefined),
+		// See: features/bot_system.feature @AI告発成功でBOTの被告発回数がインクリメントされる
+		incrementAccusedCount: vi.fn().mockResolvedValue(undefined),
 		updateDailyId: vi.fn().mockResolvedValue(undefined),
 		updateNextPostAt: vi.fn().mockResolvedValue(undefined),
 		findDueForPost: vi.fn().mockResolvedValue([]),

@@ -58,7 +58,7 @@ interface BoardPageProps {
  */
 async function fetchThreads(boardId: string): Promise<ThreadSummary[]> {
 	try {
-		const threads = await PostService.getThreadList(boardId, 50);
+		const threads = await PostService.getThreadList(boardId);
 		// PostService は Date 型で返すが、UI表示用に string へ変換する
 		// （APIルート経由の場合は JSON シリアライズで自動変換されていた）
 		return threads.map((t) => ({

@@ -70,9 +70,13 @@ export async function GET(
 ): Promise<Response> {
 	const { boardId } = await params;
 
-	// ThreadRepositoryからbump順（last_post_at DESC）でスレッド一覧を取得する
-	// findByBoardId は is_deleted=false かつ last_post_at DESC ソート済みを返す
-	const threads = await ThreadRepository.findByBoardId(boardId, { limit: 100 });
+	// ThreadRepositoryからアクティブスレッド（is_dormant=false）のみを取得する
+	// onlyActive: true により is_dormant=false の条件が付加され LIMIT は使用しない
+	// See: docs/specs/thread_state_transitions.yaml #listing_rules LIMIT不使用
+	// See: docs/architecture/components/senbra-adapter.md §6 subject.txtフィルタリング
+	const threads = await ThreadRepository.findByBoardId(boardId, {
+		onlyActive: true,
+	});
 
 	// 304判定・Last-Modifiedヘッダ用の最終更新時刻を決定する
 	// 固定スレッドのlastPostAt（未来日時）を除外して実際の最新投稿時刻を求める

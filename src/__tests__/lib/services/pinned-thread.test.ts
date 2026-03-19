@@ -25,6 +25,11 @@ vi.mock("../../../lib/infrastructure/repositories/thread-repository", () => ({
 	findByThreadKey: vi.fn(),
 	updateDatByteSize: vi.fn(),
 	softDelete: vi.fn(),
+	// 休眠管理関数（TASK-203 で追加）
+	// See: docs/specs/thread_state_transitions.yaml #transitions
+	wakeThread: vi.fn(),
+	demoteOldestActiveThread: vi.fn(),
+	countActiveThreads: vi.fn(),
 }));
 
 // PostRepository モック（書き込みが実際に行われないよう）
@@ -93,6 +98,8 @@ function makePinnedThread(overrides: Partial<Thread> = {}): Thread {
 		lastPostAt: new Date("2099-01-01T00:00:00Z"),
 		isDeleted: false,
 		isPinned: true,
+		// See: docs/specs/thread_state_transitions.yaml #states.listed
+		isDormant: false,
 		...overrides,
 	};
 }
@@ -111,6 +118,8 @@ function makeNormalThread(overrides: Partial<Thread> = {}): Thread {
 		lastPostAt: new Date(),
 		isDeleted: false,
 		isPinned: false,
+		// See: docs/specs/thread_state_transitions.yaml #states.listed
+		isDormant: false,
 		...overrides,
 	};
 }
@@ -123,6 +132,14 @@ function makeNormalThread(overrides: Partial<Thread> = {}): Thread {
 describe("PostService.createPost — 固定スレッドへの書き込みガード", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// 休眠管理関数のデフォルトモック（TASK-203 で追加）
+		// See: docs/specs/thread_state_transitions.yaml #transitions
+		vi.mocked(ThreadRepository.wakeThread).mockResolvedValue(undefined);
+		vi.mocked(ThreadRepository.demoteOldestActiveThread).mockResolvedValue(
+			undefined,
+		);
+		// デフォルトはアクティブスレッド数 < 50（休眠化不要）
+		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
 	});
 
 	it("isPinned=true のスレッドへの書き込みは PINNED_THREAD エラーで拒否される", async () => {

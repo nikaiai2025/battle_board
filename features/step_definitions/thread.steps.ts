@@ -312,6 +312,10 @@ Given(
 /**
  * 51個のアクティブなスレッドが存在する。
  * 最終書き込み時刻が最も古い51番目のスレッドはデフォルトではリストに含まれない。
+ *
+ * 51個作成後に demoteOldestActiveThread を呼び出し、最古スレッドを休眠化する。
+ * これにより getThreadList(onlyActive:true) が50件を返す状態を再現する。
+ * See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
  */
 Given(
 	"51個のアクティブなスレッドが存在する",
@@ -334,6 +338,10 @@ Given(
 				(this as any)._oldestThreadTitle = `テストスレッド${i + 1}`;
 			}
 		}
+
+		// 51個→50個アクティブ: 最古スレッドを休眠化してアクティブ上限を再現する
+		// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
+		await InMemoryThreadRepo.demoteOldestActiveThread(TEST_BOARD_ID);
 	},
 );
 
@@ -375,6 +383,11 @@ Given(
 		// このスレッドのIDを記録する（後の When ステップで参照する）
 		(this as any)._lowActivityThreadId = thread.id;
 		(this as any)._lowActivityThreadTitle = title;
+
+		// 追加後のアクティブ数が51件になるため、最古スレッド（このスレッド）を休眠化する
+		// これにより「一覧に表示されていない」状態を再現する
+		// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
+		await InMemoryThreadRepo.demoteOldestActiveThread(TEST_BOARD_ID);
 	},
 );
 

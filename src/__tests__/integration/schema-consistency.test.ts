@@ -111,8 +111,10 @@ function extractRowFields(
 ): { rowTypeName: string; fields: string[] } | null {
 	// interface *Row { ... } ブロックを抽出（複数行対応）
 	// Row という名前で終わる interface を対象とする
+	// /s フラグ（dotall）は ES2018 以降の機能のため [\s\S] で代替する
+	// See: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Regular_expressions/Dotall_flag
 	const interfaceMatch = content.match(
-		/interface\s+(\w+Row)\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/s,
+		/interface\s+(\w+Row)\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/,
 	);
 	if (!interfaceMatch) return null;
 

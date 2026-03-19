@@ -78,21 +78,11 @@ function decodeSjis(buffer: ArrayBuffer): string {
 
 /**
  * テスト用Thread型のファクトリ
+ * See: features/thread.feature @pinned_thread
  */
 function makeThread(
-	overrides: Partial<{
-		id: string;
-		threadKey: string;
-		boardId: string;
-		title: string;
-		postCount: number;
-		datByteSize: number;
-		createdBy: string;
-		createdAt: Date;
-		lastPostAt: Date;
-		isDeleted: boolean;
-	}> = {},
-) {
+	overrides: Partial<import("@/lib/domain/models/thread").Thread> = {},
+): import("@/lib/domain/models/thread").Thread {
 	return {
 		id: "thread-uuid-001",
 		threadKey: "1234567890",
@@ -104,6 +94,10 @@ function makeThread(
 		createdAt: new Date("2025-01-01T00:00:00Z"),
 		lastPostAt: new Date("2025-01-01T12:00:00Z"),
 		isDeleted: false,
+		// See: features/thread.feature @pinned_thread
+		isPinned: false,
+		// See: docs/specs/thread_state_transitions.yaml #states.listed
+		isDormant: false,
 		...overrides,
 	};
 }

@@ -133,6 +133,13 @@ function createTemporaryUser(overrides: Partial<User> = {}): User {
 		registeredAt: null,
 		patToken: null,
 		patLastUsedAt: null,
+		// Phase 4: 草コマンド関連フィールド（デフォルト値）
+		// See: features/reactions.feature §成長ビジュアル
+		grassCount: 0,
+		// Phase 5: BAN システム関連フィールド（デフォルト値）
+		// See: features/admin.feature @ユーザーBAN
+		isBanned: false,
+		lastIpHash: null,
 		...overrides,
 	};
 }

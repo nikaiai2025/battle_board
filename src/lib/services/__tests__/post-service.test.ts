@@ -37,6 +37,11 @@ vi.mock("@/lib/infrastructure/repositories/thread-repository", () => ({
 	findByThreadKey: vi.fn(),
 	updateDatByteSize: vi.fn(),
 	softDelete: vi.fn(),
+	// 休眠管理関数（TASK-203 で追加）
+	// See: docs/specs/thread_state_transitions.yaml #transitions
+	wakeThread: vi.fn(),
+	demoteOldestActiveThread: vi.fn(),
+	countActiveThreads: vi.fn(),
 }));
 
 vi.mock("@/lib/infrastructure/repositories/user-repository", () => ({
@@ -109,6 +114,20 @@ const mockUser: User = {
 	streakDays: 0,
 	lastPostDate: null,
 	createdAt: new Date("2026-01-01"),
+	// Phase 3: 本登録・PAT 関連フィールド（デフォルトは仮ユーザー状態）
+	// See: features/user_registration.feature
+	supabaseAuthId: null,
+	registrationType: null,
+	registeredAt: null,
+	patToken: null,
+	patLastUsedAt: null,
+	// Phase 4: 草コマンド関連フィールド
+	// See: features/reactions.feature
+	grassCount: 0,
+	// Phase 5: BAN システム関連フィールド
+	// See: features/admin.feature @ユーザーBAN
+	isBanned: false,
+	lastIpHash: null,
 };
 
 const mockPremiumUser: User = {
@@ -121,6 +140,20 @@ const mockPremiumUser: User = {
 	streakDays: 5,
 	lastPostDate: "2026-03-08",
 	createdAt: new Date("2026-01-01"),
+	// Phase 3: 本登録・PAT 関連フィールド（デフォルトは仮ユーザー状態）
+	// See: features/user_registration.feature
+	supabaseAuthId: null,
+	registrationType: null,
+	registeredAt: null,
+	patToken: null,
+	patLastUsedAt: null,
+	// Phase 4: 草コマンド関連フィールド
+	// See: features/reactions.feature
+	grassCount: 0,
+	// Phase 5: BAN システム関連フィールド
+	// See: features/admin.feature @ユーザーBAN
+	isBanned: false,
+	lastIpHash: null,
 };
 
 const mockPost: Post = {
@@ -148,6 +181,10 @@ const mockThread: Thread = {
 	createdAt: new Date("2026-03-09"),
 	lastPostAt: new Date("2026-03-09"),
 	isDeleted: false,
+	// See: features/thread.feature @pinned_thread
+	isPinned: false,
+	// See: docs/specs/thread_state_transitions.yaml #states.listed
+	isDormant: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -166,6 +203,16 @@ describe("PostService", () => {
 		});
 		// PostRepository.findByThreadId のデフォルトモック（アンカー解析用）
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([]);
+		// ThreadRepository.findById のデフォルトモック（Step 0: 固定スレッドチェック）
+		vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
+		// ThreadRepository 休眠管理関数のデフォルトモック（Step 10b）
+		// See: docs/specs/thread_state_transitions.yaml #transitions
+		vi.mocked(ThreadRepository.wakeThread).mockResolvedValue(undefined);
+		vi.mocked(ThreadRepository.demoteOldestActiveThread).mockResolvedValue(
+			undefined,
+		);
+		// デフォルトはアクティブスレッド数 < 50（休眠化不要）
+		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
 	});
 
 	// =========================================================================
@@ -1584,6 +1631,209 @@ describe("PostService", () => {
 	});
 
 	// =========================================================================
+	// createPost — Step 10b: 休眠管理
+	// See: docs/specs/thread_state_transitions.yaml #transitions
+	// See: docs/architecture/components/posting.md §5 休眠管理の責務
+	// See: docs/architecture/architecture.md §7.1 step 2b
+	// =========================================================================
+
+	describe("createPost — Step 10b: 休眠管理", () => {
+		// 全テストで共通する認証・書き込みのモックを beforeEach で設定
+		beforeEach(() => {
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-001",
+				authorIdSeed: "seed-abc",
+			});
+			vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
+			vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2);
+			vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+			vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
+				undefined,
+			);
+			vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined);
+		});
+
+		describe("休眠中スレッドへの書き込み → 復活", () => {
+			// See: docs/specs/thread_state_transitions.yaml #transitions unlisted→listed
+
+			it("isDormant=true のスレッドへの書き込み時に wakeThread が呼ばれる", async () => {
+				// Arrange: 休眠中スレッドを返すようモック設定
+				const dormantThread = { ...mockThread, isDormant: true };
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(dormantThread);
+
+				// Act
+				const result = await createPost({
+					threadId: "thread-001",
+					body: "復活書き込み",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: 書き込み成功 + wakeThread が呼ばれた
+				expect(result).toMatchObject({ success: true });
+				expect(ThreadRepository.wakeThread).toHaveBeenCalledWith("thread-001");
+			});
+
+			it("isDormant=false のスレッドへの書き込み時に wakeThread が呼ばれない", async () => {
+				// Arrange: アクティブスレッド（isDormant=false）
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
+
+				// Act
+				await createPost({
+					threadId: "thread-001",
+					body: "通常書き込み",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: wakeThread は呼ばれない
+				expect(ThreadRepository.wakeThread).not.toHaveBeenCalled();
+			});
+		});
+
+		describe("アクティブスレッド数が上限超過 → 末尾スレッドを休眠化", () => {
+			// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
+
+			it("アクティブ数が50件を超えた場合に demoteOldestActiveThread が呼ばれる", async () => {
+				// Arrange: アクティブスレッド数 = 51（上限超過）
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(51);
+
+				// Act
+				const result = await createPost({
+					threadId: "thread-001",
+					body: "51件超過時の書き込み",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: 書き込み成功 + demoteOldestActiveThread が呼ばれた
+				expect(result).toMatchObject({ success: true });
+				expect(ThreadRepository.demoteOldestActiveThread).toHaveBeenCalledWith(
+					"battleboard",
+				);
+			});
+
+			it("アクティブ数がちょうど50件の場合は demoteOldestActiveThread が呼ばれない", async () => {
+				// Arrange: アクティブスレッド数 = 50（上限ちょうど）
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(50);
+
+				// Act
+				await createPost({
+					threadId: "thread-001",
+					body: "50件ちょうどの書き込み",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: demoteOldestActiveThread は呼ばれない（> 50 が条件）
+				expect(
+					ThreadRepository.demoteOldestActiveThread,
+				).not.toHaveBeenCalled();
+			});
+
+			it("アクティブ数が49件の場合は demoteOldestActiveThread が呼ばれない", async () => {
+				// Arrange: アクティブスレッド数 = 49（上限未満）
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(49);
+
+				// Act
+				await createPost({
+					threadId: "thread-001",
+					body: "49件の書き込み",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: demoteOldestActiveThread は呼ばれない
+				expect(
+					ThreadRepository.demoteOldestActiveThread,
+				).not.toHaveBeenCalled();
+			});
+		});
+
+		describe("休眠復活 + 末尾休眠化が同時に発生するケース", () => {
+			// See: docs/specs/thread_state_transitions.yaml #transitions unlisted→listed
+			// 休眠スレッドが復活 → アクティブ数が上限超過 → 末尾スレッドを休眠化
+
+			it("isDormant=true のスレッドへの書き込みでアクティブ数が上限を超えた場合、両方の処理が行われる", async () => {
+				// Arrange: 休眠中スレッド + 復活後にアクティブ数 = 51
+				const dormantThread = { ...mockThread, isDormant: true };
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(dormantThread);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(51);
+
+				// Act
+				const result = await createPost({
+					threadId: "thread-001",
+					body: "休眠→復活+末尾休眠化",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: wakeThread と demoteOldestActiveThread の両方が呼ばれる
+				expect(result).toMatchObject({ success: true });
+				expect(ThreadRepository.wakeThread).toHaveBeenCalledWith("thread-001");
+				expect(ThreadRepository.demoteOldestActiveThread).toHaveBeenCalledWith(
+					"battleboard",
+				);
+			});
+		});
+
+		describe("countActiveThreads は Step 10（last_post_at更新）後の最新DB状態を参照する", () => {
+			it("countActiveThreads が適切な boardId で呼ばれる", async () => {
+				// Arrange
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
+
+				// Act
+				await createPost({
+					threadId: "thread-001",
+					body: "countのテスト",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: mockThread.boardId = 'battleboard'
+				expect(ThreadRepository.countActiveThreads).toHaveBeenCalledWith(
+					"battleboard",
+				);
+			});
+		});
+
+		describe("スレッドが存在しない場合（nullスレッド）のフォールバック", () => {
+			it("スレッドが null の場合は countActiveThreads が battleboard でフォールバック呼び出しされる", async () => {
+				// Arrange: スレッドが存在しない（targetThread = null）
+				vi.mocked(ThreadRepository.findById).mockResolvedValue(null);
+				// null スレッドでも後続処理（認証 → バリデーション → Step 9）まで進む必要があるが、
+				// null の場合は isPinned チェックが false → Step 1以降が処理される
+				// ただし null.boardId のアクセスはフォールバック "battleboard" で対応
+
+				// Act: 通常書き込み
+				await createPost({
+					threadId: "thread-001",
+					body: "nullスレッドへの書き込み",
+					edgeToken: "token-abc",
+					ipHash: "seed-abc",
+					isBotWrite: false,
+				});
+
+				// Assert: フォールバック "battleboard" で呼ばれる
+				expect(ThreadRepository.countActiveThreads).toHaveBeenCalledWith(
+					"battleboard",
+				);
+			});
+		});
+	});
+
+	// =========================================================================
 	// getThreadList: スレッド一覧取得
 	// =========================================================================
 
@@ -1592,8 +1842,9 @@ describe("PostService", () => {
 		// 正常系
 		// -----------------------------------------------------------------------
 
-		describe("正常系: スレッド一覧を返す", () => {
+		describe("正常系: スレッド一覧を返す（onlyActive方式）", () => {
 			// See: features/thread.feature @スレッド一覧にスレッドの基本情報が表示される
+			// See: docs/specs/thread_state_transitions.yaml #listing_rules LIMIT不使用
 
 			it("スレッド一覧（Thread 配列）を返す", async () => {
 				const mockThreads = [mockThread];
@@ -1604,39 +1855,31 @@ describe("PostService", () => {
 				const result = await getThreadList("battleboard");
 
 				expect(result).toEqual(mockThreads);
+				// onlyActive: true で呼ばれ、LIMIT は使用しない
 				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith(
 					"battleboard",
-					{ limit: 50 },
+					{ onlyActive: true },
 				);
 			});
 
-			it("最大50件制限が適用される", async () => {
+			it("アクティブスレッドのみ取得する（onlyActive:true を使用）", async () => {
 				// See: features/thread.feature @スレッド一覧には最新50件のみ表示される
-				const many = Array.from({ length: 50 }, (_, i) => ({
+				// is_dormant=false のスレッドのみ返す（休眠管理はDB側が担保）
+				const activeThreads = Array.from({ length: 50 }, (_, i) => ({
 					...mockThread,
 					id: `thread-${i + 1}`,
+					isDormant: false,
 				}));
-				vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue(many);
+				vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue(
+					activeThreads,
+				);
 
 				const result = await getThreadList("battleboard");
 
 				expect(result).toHaveLength(50);
 				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith(
 					"battleboard",
-					expect.objectContaining({ limit: 50 }),
-				);
-			});
-
-			it("limit オプションを上書きできる", async () => {
-				vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([
-					mockThread,
-				]);
-
-				await getThreadList("battleboard", 20);
-
-				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith(
-					"battleboard",
-					{ limit: 20 },
+					{ onlyActive: true },
 				);
 			});
 

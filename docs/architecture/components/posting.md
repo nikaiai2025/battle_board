@@ -50,7 +50,7 @@ PostResult {
 | 操作 | 用途 |
 |---|---|
 | `createThread(ThreadInput)` | スレッド新規作成 |
-| `getThreadList(boardId, cursor?)` | 一覧取得（subject.txt / Web UI共用） |
+| `getThreadList(boardId, cursor?)` | 一覧取得（subject.txt / Web UI共用）。アクティブスレッド（is_dormant=false）のみ返す |
 | `getPostList(threadId, range?)` | レス取得（.dat Range / Web UI共用） |
 
 ---
@@ -65,7 +65,7 @@ PostResult {
 | CommandService | 本文中にコマンドを検出した場合のみ呼び出す。失敗しても書き込みはコミット済み |
 | IncentiveService | 書き込み成功後に呼び出す。失敗しても書き込みを巻き戻さない |
 | PostRepository | 書き込みレコードのINSERT、スレッド内レスの取得 |
-| ThreadRepository | post_count / last_post_at の更新、スレッド取得 |
+| ThreadRepository | post_count / last_post_at の更新、スレッド取得、休眠⇔復活の更新（D-05参照） |
 | UserRepository | ユーザー特定・streak更新 |
 | `domain/rules/daily-id` | 日次リセットID生成（純粋関数。副作用なし） |
 | `domain/rules/command-parser` | コマンド有無の検出（純粋関数。副作用なし） |
@@ -93,6 +93,17 @@ BotService             →  PostService（isBotWrite=trueで呼び出す）
 ### コマンド検出を Parsing と Execution に分離
 
 `command-parser`（純粋関数）でコマンドの有無だけを検出し、CommandServiceに渡す。PostServiceはコマンドの種類・コストを知らない。これによりコマンド仕様の変更がPostServiceに波及しない。
+
+### 休眠管理の責務（D-05 スレッド状態遷移）
+
+書き込み時の同期処理として、PostService が休眠⇔復活の遷移を管理する。cron ではなく書き込みトランザクション内で実行するため、タイミング不整合が発生しない。
+
+処理順序（D-07 §7.1 step 2b）:
+1. 対象スレッドの last_post_at を更新
+2. 対象スレッドが休眠中（is_dormant=true）の場合、is_dormant=false に更新（復活）
+3. アクティブスレッド数が上限（50件）を超える場合、last_post_at が最古の非固定（is_pinned=false）アクティブスレッドを is_dormant=true に更新
+
+この処理はコマンド解析・インセンティブ判定より前に実行する。休眠管理の失敗は書き込み全体を巻き戻す（スレッド状態の整合性が崩れるため、コマンド・インセンティブとは異なり部分的スキップを許容しない）。
 
 ### `getThreadList` / `getPostList` の共用
 

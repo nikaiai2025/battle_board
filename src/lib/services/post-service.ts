@@ -563,6 +563,33 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	await ThreadRepository.incrementPostCount(input.threadId);
 	await ThreadRepository.updateLastPostAt(input.threadId, new Date(Date.now()));
 
+	// Step 10b: 休眠管理（D-07 §7.1 step 2b, D-08 posting.md §5）
+	// Step 10（last_post_at更新）の後に実行する。
+	// 処理順序:
+	//   1. 対象スレッドが休眠中（isDormant=true）の場合、is_dormant=false に更新（復活）
+	//   2. アクティブスレッド数が上限（50件）を超える場合、末尾スレッドを休眠化
+	// 失敗時は例外を上位に伝搬させる（try-catch で握りつぶさない）。
+	// See: docs/specs/thread_state_transitions.yaml #transitions
+	// See: docs/architecture/components/posting.md §5 休眠管理の責務
+	if (targetThread?.isDormant === true) {
+		// 休眠中スレッドへの書き込み → 復活させる
+		// sage 等のメール欄に関わらず無条件に復活する（TDR-012）
+		// See: docs/specs/thread_state_transitions.yaml #transitions unlisted→listed
+		await ThreadRepository.wakeThread(input.threadId);
+	}
+	// アクティブスレッド数が上限を超えた場合、末尾スレッドを休眠化する
+	// targetThread は Step 0 のスナップショットを使うが、countActiveThreads は最新のDB状態を参照する
+	const activeCount = await ThreadRepository.countActiveThreads(
+		targetThread?.boardId ?? "battleboard",
+	);
+	if (activeCount > THREAD_LIST_MAX_LIMIT) {
+		// アクティブ非固定スレッドの中で last_post_at が最古のものを休眠化する
+		// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
+		await ThreadRepository.demoteOldestActiveThread(
+			targetThread?.boardId ?? "battleboard",
+		);
+	}
+
 	// Step 11: IncentiveService 遅延評価ボーナス（Phase 2: INSERT + incrementPostCount後）
 	// 対象: hot_post, thread_revival, thread_growth
 	// これらは「スレッド全体のレス一覧」「postCount」を参照する必要があるため、
@@ -762,21 +789,19 @@ export async function createThread(
 // ---------------------------------------------------------------------------
 
 /**
- * スレッド一覧を取得する（最大50件、last_post_at DESC）。
+ * スレッド一覧を取得する（アクティブスレッドのみ、last_post_at DESC）。
+ * LIMIT 方式から onlyActive 方式に移行済み。
+ * スレッド数の制御は書き込み時の休眠管理（Step 10b）で行われる。
  *
  * See: features/thread.feature @スレッド一覧には最新50件のみ表示される
  * See: docs/architecture/components/posting.md §2.3 getThreadList
+ * See: docs/specs/thread_state_transitions.yaml #listing_rules LIMIT不使用
  *
  * @param boardId - 板 ID（例: 'battleboard'）
- * @param limit - 取得件数（デフォルト 50）
- * @returns Thread 配列（last_post_at DESC ソート済み）
+ * @returns Thread 配列（last_post_at DESC ソート済み、is_dormant=false のみ）
  */
-export async function getThreadList(
-	boardId: string,
-	limit?: number,
-): Promise<Thread[]> {
-	const resolvedLimit = limit ?? THREAD_LIST_MAX_LIMIT;
-	return ThreadRepository.findByBoardId(boardId, { limit: resolvedLimit });
+export async function getThreadList(boardId: string): Promise<Thread[]> {
+	return ThreadRepository.findByBoardId(boardId, { onlyActive: true });
 }
 
 /**

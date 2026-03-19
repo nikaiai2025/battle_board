@@ -32,6 +32,8 @@ interface ThreadRow {
 	is_deleted: boolean;
 	/** 固定スレッドフラグ。See: supabase/migrations/00009_pinned_thread.sql */
 	is_pinned: boolean;
+	/** 休眠フラグ。See: supabase/migrations/00018_add_thread_dormancy.sql */
+	is_dormant: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +58,9 @@ function rowToThread(row: ThreadRow): Thread {
 		isDeleted: row.is_deleted,
 		// is_pinned が未定義（マイグレーション前の行）の場合は false にフォールバック
 		isPinned: row.is_pinned ?? false,
+		// is_dormant が未定義（マイグレーション前の行）の場合は false にフォールバック
+		// See: docs/specs/thread_state_transitions.yaml #states.listed (initial: true)
+		isDormant: row.is_dormant ?? false,
 	};
 }
 
@@ -110,27 +115,39 @@ export async function findByThreadKey(
 
 /**
  * 板 ID に属するスレッド一覧を last_post_at DESC で取得する。
- * カーソルページネーションに対応する（cursor は last_post_at の ISO 文字列）。
+ * カーソルページネーションおよびアクティブスレッドフィルタリングに対応する。
  *
  * See: docs/architecture/components/posting.md §2.3 getThreadList
+ * See: docs/specs/thread_state_transitions.yaml #listing_rules
  *
  * @param boardId - 板 ID（例: 'battleboard'）
- * @param options.limit - 取得件数（デフォルト 100）
+ * @param options.limit - 取得件数（デフォルト 100）。onlyActive=true の場合は使用しない
  * @param options.cursor - カーソル（この last_post_at より古いものを取得）
+ * @param options.onlyActive - true の場合は is_dormant=false のスレッドのみ取得し LIMIT を付けない
+ *   アクティブスレッド数は書き込み時の休眠管理で制御されるため LIMIT 不要
+ *   See: docs/specs/thread_state_transitions.yaml #listing_rules LIMIT不使用
  * @returns Thread 配列（last_post_at DESC ソート済み）
  */
 export async function findByBoardId(
 	boardId: string,
-	options: { limit?: number; cursor?: string } = {},
+	options: { limit?: number; cursor?: string; onlyActive?: boolean } = {},
 ): Promise<Thread[]> {
-	const limit = options.limit ?? 100;
 	let query = supabaseAdmin
 		.from("threads")
 		.select("*")
 		.eq("board_id", boardId)
 		.eq("is_deleted", false)
-		.order("last_post_at", { ascending: false })
-		.limit(limit);
+		.order("last_post_at", { ascending: false });
+
+	if (options.onlyActive) {
+		// アクティブスレッドのみ: is_dormant=false を条件に追加し LIMIT は付けない
+		// See: docs/specs/thread_state_transitions.yaml #listing_rules filter
+		query = query.eq("is_dormant", false);
+	} else {
+		// 後方互換: onlyActive 未指定時は従来の LIMIT 方式を維持する
+		const limit = options.limit ?? 100;
+		query = query.limit(limit);
+	}
 
 	// カーソルが指定された場合は、その last_post_at より古いものだけを取得する
 	if (options.cursor) {
@@ -149,6 +166,7 @@ export async function findByBoardId(
 /**
  * 新しいスレッドを作成する。
  * id / createdAt / lastPostAt / postCount / datByteSize / isDeleted は DB のデフォルト値を使用する。
+ * isDormant は DB のデフォルト値（false）を使用するため省略可能とする。
  *
  * @param thread - 作成するスレッドのデータ（自動設定フィールドを除く）
  * @returns 作成された Thread（DB デフォルト値を含む）
@@ -162,6 +180,7 @@ export async function create(
 		| "postCount"
 		| "datByteSize"
 		| "isDeleted"
+		| "isDormant"
 	> & { isPinned?: boolean },
 ): Promise<Thread> {
 	const { data, error } = await supabaseAdmin
@@ -272,4 +291,108 @@ export async function softDelete(threadId: string): Promise<void> {
 	if (error) {
 		throw new Error(`ThreadRepository.softDelete failed: ${error.message}`);
 	}
+}
+
+// ---------------------------------------------------------------------------
+// 休眠管理関数
+// See: docs/specs/thread_state_transitions.yaml #transitions
+// See: docs/architecture/components/posting.md §5 休眠管理の責務
+// ---------------------------------------------------------------------------
+
+/**
+ * 休眠中のスレッドを復活させる（is_dormant = false に更新）。
+ * 書き込み時に対象スレッドが休眠中の場合に呼び出される。
+ *
+ * See: docs/specs/thread_state_transitions.yaml #transitions unlisted→listed
+ * See: docs/architecture/architecture.md §7.1 step 2b
+ *
+ * @param threadId - 対象スレッドの UUID
+ */
+export async function wakeThread(threadId: string): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("threads")
+		.update({ is_dormant: false })
+		.eq("id", threadId);
+
+	if (error) {
+		throw new Error(`ThreadRepository.wakeThread failed: ${error.message}`);
+	}
+}
+
+/**
+ * 指定板のアクティブスレッドのうち、last_post_at が最古の非固定スレッドを休眠化する。
+ * アクティブスレッド数が上限（50件）を超えた場合に書き込み時の同期処理で呼び出される。
+ *
+ * 条件:
+ *   - is_deleted = false（削除されていない）
+ *   - is_dormant = false（アクティブ）
+ *   - is_pinned = false（固定スレッドは休眠化対象外）
+ *   - last_post_at が上記条件の中で最も古いスレッド
+ *
+ * See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
+ * See: docs/architecture/architecture.md §7.1 step 2b
+ *
+ * @param boardId - 板 ID（例: 'battleboard'）
+ */
+export async function demoteOldestActiveThread(boardId: string): Promise<void> {
+	// アクティブ非固定スレッドの中で last_post_at が最古のものを1件取得する
+	const { data, error: selectError } = await supabaseAdmin
+		.from("threads")
+		.select("id")
+		.eq("board_id", boardId)
+		.eq("is_deleted", false)
+		.eq("is_dormant", false)
+		.eq("is_pinned", false)
+		.order("last_post_at", { ascending: true })
+		.limit(1)
+		.single();
+
+	if (selectError) {
+		// PGRST116: 対象スレッドが存在しない（全スレッドが固定 or 休眠済み）
+		if (selectError.code === "PGRST116") return;
+		throw new Error(
+			`ThreadRepository.demoteOldestActiveThread (select) failed: ${selectError.message}`,
+		);
+	}
+
+	if (!data) return;
+
+	// 取得したスレッドを休眠化する
+	const { error: updateError } = await supabaseAdmin
+		.from("threads")
+		.update({ is_dormant: true })
+		.eq("id", (data as { id: string }).id);
+
+	if (updateError) {
+		throw new Error(
+			`ThreadRepository.demoteOldestActiveThread (update) failed: ${updateError.message}`,
+		);
+	}
+}
+
+/**
+ * 指定板のアクティブスレッド数を返す。
+ * アクティブスレッド = is_deleted=false かつ is_dormant=false
+ *
+ * See: docs/specs/thread_state_transitions.yaml #listing_rules max_listed
+ * See: docs/architecture/architecture.md §7.1 step 2b
+ *
+ * @param boardId - 板 ID（例: 'battleboard'）
+ * @returns アクティブスレッド数
+ */
+export async function countActiveThreads(boardId: string): Promise<number> {
+	const { count, error } = await supabaseAdmin
+		.from("threads")
+		.select("*", { count: "exact", head: true })
+		.eq("board_id", boardId)
+		.eq("is_deleted", false)
+		.eq("is_dormant", false);
+
+	if (error) {
+		throw new Error(
+			`ThreadRepository.countActiveThreads failed: ${error.message}`,
+		);
+	}
+
+	return count ?? 0;
 }

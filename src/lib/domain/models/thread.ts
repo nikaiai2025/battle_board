@@ -32,6 +32,15 @@ export interface Thread {
 	 * See: tmp/feature_plan_pinned_thread_and_dev_board.md §2-e
 	 */
 	isPinned: boolean;
+	/**
+	 * 休眠フラグ。true の場合はスレッド一覧（subject.txt / Web UI）に表示されない。
+	 * アクティブスレッド数が上限（50件）を超えた場合に書き込み時の同期処理で設定される。
+	 * 休眠スレッドは dat/ や bbs.cgi からの閲覧・書き込みは引き続き可能（dat落ちではない）。
+	 * See: features/thread.feature @スレッド一覧には最新50件のみ表示される
+	 * See: docs/specs/thread_state_transitions.yaml #states.unlisted
+	 * See: docs/architecture/architecture.md TDR-012
+	 */
+	isDormant: boolean;
 }
 
 /** スレッド作成時の入力型 */

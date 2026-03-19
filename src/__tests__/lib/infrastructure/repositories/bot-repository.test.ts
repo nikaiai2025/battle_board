@@ -735,6 +735,8 @@ describe("BotRepository", () => {
 				isRevealed: false,
 				revealedAt: null,
 				botProfileKey: "荒らし役",
+				// See: docs/architecture/architecture.md §13 TDR-010
+				nextPostAt: null,
 			});
 
 			expect(result).toEqual(createExpectedBot());
@@ -758,6 +760,8 @@ describe("BotRepository", () => {
 					isRevealed: false,
 					revealedAt: null,
 					botProfileKey: null,
+					// See: docs/architecture/architecture.md §13 TDR-010
+					nextPostAt: null,
 				}),
 			).rejects.toThrow("BotRepository.create failed: duplicate key");
 		});

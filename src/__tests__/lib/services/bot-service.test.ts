@@ -88,6 +88,8 @@ function createMockBotRepository(
 		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		incrementTotalPosts: vi.fn().mockResolvedValue(undefined),
+		// See: features/bot_system.feature @AI告発成功でBOTの被告発回数がインクリメントされる
+		incrementAccusedCount: vi.fn().mockResolvedValue(undefined),
 		updateDailyId: vi.fn().mockResolvedValue(undefined),
 		updateNextPostAt: vi.fn().mockResolvedValue(undefined),
 		findDueForPost: vi.fn().mockResolvedValue([]),
@@ -753,6 +755,8 @@ describe("BotService", () => {
 
 			const result = await service.executeBotPost("bot-001", "thread-001");
 
+			// null チェック: executeBotPost は null を返す可能性があるため型ガードを追加
+			if (!result) throw new Error("result should not be null");
 			expect(result.postId).toBe("post-001");
 			expect(result.postNumber).toBe(1);
 			expect(typeof result.dailyId).toBe("string");

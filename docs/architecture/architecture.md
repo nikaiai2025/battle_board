@@ -343,8 +343,9 @@ AdminService
 │ last_post_at│     │ is_system_msg│     └──────────────┘
 │ created_by  │     │ is_deleted   │            │
 │ is_deleted  │     │ created_at   │            │
-└─────────────┘     └───────┬──────┘            │
-                            │1                  │
+│ is_dormant  │     └───────┬──────┘            │
+│ is_pinned   │             │1                  │
+└─────────────┘                                 │
 ┌─────────────┐     ┌──────┴───────┐     ┌──────┴───────┐
 │    bots     │◄──┐ │  bot_posts   │     │  currencies  │
 ├─────────────┤   │ ├──────────────┤     ├──────────────┤
@@ -420,6 +421,8 @@ RLS: service role   │   attacks    │
 | created_at | TIMESTAMPTZ | 作成日時 |
 | last_post_at | TIMESTAMPTZ | 最終書き込み日時（ソート用） |
 | is_deleted | BOOLEAN | 管理者削除フラグ |
+| is_dormant | BOOLEAN DEFAULT false | 休眠フラグ（D-05参照。true: subject.txt非掲載だが閲覧・書き込み可能） |
+| is_pinned | BOOLEAN DEFAULT false | 固定スレッドフラグ（休眠化の対象外。50件上限には含まれる） |
 
 #### posts
 
@@ -701,6 +704,10 @@ app/
 BEGIN TRANSACTION
   1. posts に書き込みレコード INSERT
   2. threads.post_count を INCREMENT、last_post_at を UPDATE
+  2b. 休眠管理（D-05 スレッド状態遷移参照）:
+      - 対象スレッドが is_dormant = true の場合、is_dormant = false に更新（復活）
+      - アクティブスレッド数（is_dormant=false, is_deleted=false, 当該board_id）が上限(50)を超える場合、
+        last_post_at が最古の非固定（is_pinned=false）アクティブスレッドを is_dormant = true に更新
   3. コマンド解析（本文中の !command を検出）
   4. コマンドがある場合:
      a. currencies からコスト分を DEDUCT（残高チェック付き）
@@ -965,6 +972,7 @@ supabase/
 | テーブル | インデックス | 用途 |
 |---|---|---|
 | threads | `(board_id, last_post_at DESC)` | スレッド一覧ソート |
+| threads | `(board_id, is_deleted, is_dormant, last_post_at DESC)` | 休眠管理用（アクティブスレッド一覧・末尾スレッド特定。D-05参照） |
 | threads | `(thread_key)` UNIQUE | 専ブラからのDAT取得 |
 | posts | `(thread_id, post_number)` | スレッド内レス取得 |
 | posts | `(thread_id, created_at)` | Range差分応答用 |
@@ -1137,6 +1145,25 @@ supabase/
   - 自前デザインシステム構築: 工数が大きく、デザイン専門知識が必要
   - Material UI / Chakra UI: バンドルサイズが大きく、Tailwind CSS との二重管理になる
   - Tailwind UI（テンプレート集）: コンポーネント抽象化が弱く、コピペ運用になる
+
+### TDR-012: スレッド休眠方式（is_dormant）の採用
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-20
+- **背景**: subject.txt の返却件数を LIMIT で動的に制御する方式では、専ブラ（ChMate等）のローカル履歴にスレッドが蓄積し続ける問題が発生した。原因は LIMIT 圏外に落ちたスレッドが bump 順変動で subject.txt に不安定に出入りし、専ブラのローカルDBに幽霊として残り続けること
+- **決定**: `threads` テーブルに `is_dormant` フラグを導入し、書き込み時の同期処理でアクティブスレッド数を上限（50件）に制御する。subject.txt は `WHERE is_dormant = false` で安定した一覧を返す（LIMIT 不使用）。休眠スレッドは dat/ および bbs.cgi からは引き続きアクセス可能（dat落ちなし）。書き込みがあれば自動復活する
+- **要件の充足**:
+  - R1（表示件数制御）: subject.txt は常に ≤ 50件
+  - R2（dat落ちなし）: 休眠スレッドも閲覧・書き込み可能
+  - R3（書き込みで復活）: 休眠スレッドへの書き込み時に is_dormant = false に更新し、末尾スレッドと入れ替え
+- **検討した代替案**:
+  - LIMIT方式（変更前の方式）: 専ブラ蓄積問題が構造的に発生する
+  - eddist方式（不可逆アーカイブ + cron）: R2・R3を満たせない。古いスレッドへの書き込み需要に対応不可
+  - cron方式（定期バッチで休眠化）: タイミング不整合が発生しうる。書き込みトリガーの同期処理が整合性に優れる
+- **sage 復活**: 書き込みがあれば無条件に復活する（sage による復活抑止なし。本PJにはsage要件がなく、Web版にメール欄が存在しない）
+- **同時実行制御**: 明示的なロックは設けない。同時書き込みにより一時的に50件を超える場合があるが許容する（次回書き込み時に自動是正される）
+- **詳細**: `docs/research/thread_dormancy_design_2026-03-20.md`, D-05 `docs/specs/thread_state_transitions.yaml`
+- **影響範囲**: threads テーブル（`is_dormant` カラム追加）、PostService（休眠⇔復活ロジック追加: D-07 §7.1 step 2b）、ThreadRepository（クエリ条件追加）、subject.txt Route Handler（LIMIT廃止 → is_dormant 条件）
 
 ---
 

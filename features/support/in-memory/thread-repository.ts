@@ -60,27 +60,37 @@ export async function findByThreadKey(
 
 /**
  * 板 ID に属するスレッド一覧を last_post_at DESC で取得する。
+ * onlyActive: true の場合は is_dormant=false のスレッドのみ返し、LIMIT は使用しない。
  * See: src/lib/infrastructure/repositories/thread-repository.ts
+ * See: docs/specs/thread_state_transitions.yaml #listing_rules LIMIT不使用
  */
 export async function findByBoardId(
 	boardId: string,
-	options: { limit?: number; cursor?: string } = {},
+	options: { limit?: number; cursor?: string; onlyActive?: boolean } = {},
 ): Promise<Thread[]> {
-	const limit = options.limit ?? 100;
 	let threads = Array.from(store.values())
 		.filter((t) => t.boardId === boardId && !t.isDeleted)
 		.sort((a, b) => b.lastPostAt.getTime() - a.lastPostAt.getTime());
 
-	if (options.cursor) {
-		const cursorTime = new Date(options.cursor).getTime();
-		threads = threads.filter((t) => t.lastPostAt.getTime() < cursorTime);
+	if (options.onlyActive) {
+		// アクティブスレッドのみ: is_dormant=false を条件に追加し LIMIT は付けない
+		threads = threads.filter((t) => !t.isDormant);
+	} else {
+		// 後方互換: onlyActive 未指定時は従来の LIMIT 方式を維持する
+		const limit = options.limit ?? 100;
+		if (options.cursor) {
+			const cursorTime = new Date(options.cursor).getTime();
+			threads = threads.filter((t) => t.lastPostAt.getTime() < cursorTime);
+		}
+		threads = threads.slice(0, limit);
 	}
 
-	return threads.slice(0, limit);
+	return threads;
 }
 
 /**
  * 新しいスレッドを作成する。
+ * isDormant は DB のデフォルト値（false）を使用するため省略可能とする。
  * See: src/lib/infrastructure/repositories/thread-repository.ts
  */
 export async function create(
@@ -92,6 +102,7 @@ export async function create(
 		| "postCount"
 		| "datByteSize"
 		| "isDeleted"
+		| "isDormant"
 	> & { isPinned?: boolean },
 ): Promise<Thread> {
 	const now = new Date(Date.now());
@@ -103,6 +114,9 @@ export async function create(
 		isDeleted: false,
 		// isPinned は呼び出し元が設定しなければ false がデフォルト
 		isPinned: thread.isPinned ?? false,
+		// 新規スレッドはアクティブ状態（isDormant=false）で作成する
+		// See: docs/specs/thread_state_transitions.yaml #states.listed initial: true
+		isDormant: false,
 		createdAt: now,
 		lastPostAt: now,
 	};
@@ -162,4 +176,53 @@ export async function softDelete(threadId: string): Promise<void> {
 	if (thread) {
 		store.set(threadId, { ...thread, isDeleted: true });
 	}
+}
+
+// ---------------------------------------------------------------------------
+// 休眠管理関数（TASK-203 で追加）
+// See: docs/specs/thread_state_transitions.yaml #transitions
+// See: docs/architecture/components/posting.md §5 休眠管理の責務
+// ---------------------------------------------------------------------------
+
+/**
+ * 休眠中のスレッドを復活させる（is_dormant = false に更新）。
+ * See: src/lib/infrastructure/repositories/thread-repository.ts
+ */
+export async function wakeThread(threadId: string): Promise<void> {
+	assertUUID(threadId, "ThreadRepository.wakeThread.threadId");
+	const thread = store.get(threadId);
+	if (thread) {
+		store.set(threadId, { ...thread, isDormant: false });
+	}
+}
+
+/**
+ * 指定板のアクティブスレッドのうち、last_post_at が最古の非固定スレッドを休眠化する。
+ * See: src/lib/infrastructure/repositories/thread-repository.ts
+ * See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
+ */
+export async function demoteOldestActiveThread(boardId: string): Promise<void> {
+	// アクティブ非固定スレッドの中で last_post_at が最古のものを取得する
+	const candidates = Array.from(store.values())
+		.filter(
+			(t) =>
+				t.boardId === boardId && !t.isDeleted && !t.isDormant && !t.isPinned,
+		)
+		.sort((a, b) => a.lastPostAt.getTime() - b.lastPostAt.getTime());
+
+	if (candidates.length === 0) return;
+
+	const oldest = candidates[0];
+	store.set(oldest.id, { ...oldest, isDormant: true });
+}
+
+/**
+ * 指定板のアクティブスレッド数を返す。
+ * アクティブスレッド = is_deleted=false かつ is_dormant=false
+ * See: src/lib/infrastructure/repositories/thread-repository.ts
+ */
+export async function countActiveThreads(boardId: string): Promise<number> {
+	return Array.from(store.values()).filter(
+		(t) => t.boardId === boardId && !t.isDeleted && !t.isDormant,
+	).length;
 }

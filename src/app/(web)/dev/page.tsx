@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
  */
 async function fetchDevThreads(): Promise<ThreadSummary[]> {
 	try {
-		const threads = await PostService.getThreadList("dev", 50);
+		const threads = await PostService.getThreadList("dev");
 		return threads.map((t) => ({
 			id: t.id,
 			title: t.title,

@@ -75,6 +75,7 @@ vi.mock("@/lib/infrastructure/repositories/ip-ban-repository", () => ({
 // インポート（モック宣言後）
 // ---------------------------------------------------------------------------
 
+import type { User } from "@/lib/domain/models/user";
 import * as TurnstileClient from "@/lib/infrastructure/external/turnstile-client";
 import * as AuthCodeRepository from "@/lib/infrastructure/repositories/auth-code-repository";
 import * as EdgeTokenRepository from "@/lib/infrastructure/repositories/edge-token-repository";
@@ -97,19 +98,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** テスト用ユーザーオブジェクトのファクトリ */
-function makeUser(
-	overrides: Partial<{
-		id: string;
-		authToken: string;
-		authorIdSeed: string;
-		isPremium: boolean;
-		isVerified: boolean;
-		username: string | null;
-		streakDays: number;
-		lastPostDate: string | null;
-		createdAt: Date;
-	}> = {},
-) {
+function makeUser(overrides: Partial<User> = {}): User {
 	return {
 		id: "user-uuid-001",
 		authToken: "valid-edge-token",
@@ -120,6 +109,20 @@ function makeUser(
 		streakDays: 0,
 		lastPostDate: null,
 		createdAt: new Date("2026-03-08T00:00:00Z"),
+		// Phase 3: 本登録・PAT 関連フィールド（デフォルトは仮ユーザー状態）
+		// See: features/user_registration.feature
+		supabaseAuthId: null,
+		registrationType: null,
+		registeredAt: null,
+		patToken: null,
+		patLastUsedAt: null,
+		// Phase 4: 草コマンド関連フィールド
+		// See: features/reactions.feature
+		grassCount: 0,
+		// Phase 5: BAN システム関連フィールド
+		// See: features/admin.feature @ユーザーBAN
+		isBanned: false,
+		lastIpHash: null,
 		...overrides,
 	};
 }

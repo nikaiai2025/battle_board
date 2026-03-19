@@ -60,7 +60,7 @@ function getIpHash(req: NextRequest): string {
  */
 export async function GET(_req: NextRequest): Promise<NextResponse> {
 	try {
-		const threads = await PostService.getThreadList("battleboard", 50);
+		const threads = await PostService.getThreadList("battleboard");
 		return NextResponse.json({ threads }, { status: 200 });
 	} catch (err) {
 		// HIGH-002: err.message をクライアントに漏洩させない（固定メッセージのみ返す）

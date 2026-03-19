@@ -133,6 +133,10 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
 		createdAt: new Date("2026-03-13T00:00:00Z"),
 		lastPostAt: new Date("2026-03-13T00:00:00Z"),
 		isDeleted: false,
+		// See: features/thread.feature @pinned_thread
+		isPinned: false,
+		// See: docs/specs/thread_state_transitions.yaml #states.listed
+		isDormant: false,
 		...overrides,
 	};
 }
