@@ -12,6 +12,14 @@
  * 3. スレッドページ /battleboard/{threadKey}/
  * 4. マイページ /mypage（認証必須）
  * 5. 認証コード検証ページ /auth/verify
+ * 6. 開発連絡板 /dev
+ * 7. メール本登録ページ /register/email（仮ユーザー認証必須）
+ * 8. Discord本登録ページ /register/discord（仮ユーザー認証必須）
+ * 9. 管理ダッシュボード /admin（管理者認証必須）
+ * 10. 管理ユーザー一覧 /admin/users（管理者認証必須）
+ * 11. 管理ユーザー詳細 /admin/users/[userId]（管理者認証必須）
+ * 12. IP BAN管理 /admin/ip-bans（管理者認証必須）
+ * 13. 旧スレッドURLリダイレクト /threads/[threadId]
  *
  * See: docs/architecture/bdd_test_strategy.md §10.2 ナビゲーションテスト（Phase A）
  * See: docs/architecture/bdd_test_strategy.md §10.2.5 増減基準
@@ -344,6 +352,386 @@ test.describe("認証コード検証ページ /auth/verify", () => {
 			timeout: 10_000,
 		});
 		await expect(page.locator("#auth-code-input")).toHaveValue("123456");
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (6) 開発連絡板 /dev
+// ---------------------------------------------------------------------------
+
+/**
+ * 開発連絡板の到達性・UI要素を検証する。
+ *
+ * 認証不要のページ。既存の非認証テストと同パターン。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.3 各ページでの検証項目
+ * See: src/app/(web)/dev/page.tsx
+ * See: features/thread.feature @url_structure
+ */
+test.describe("開発連絡板 /dev", () => {
+	test("HTTPステータス200で応答し、主要UI要素が表示される", async ({
+		page,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		const response = await page.goto("/dev");
+		expect(response?.status()).toBe(200);
+
+		// See: src/app/(web)/dev/page.tsx > #thread-create-form（ThreadCreateForm で boardId="dev"）
+		await expect(page.locator("#thread-create-form")).toBeVisible();
+
+		// See: src/app/(web)/dev/page.tsx > #auth-prompt
+		await expect(page.locator("#auth-prompt")).toBeVisible();
+
+		await expect(page.locator("main")).toBeVisible();
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (7) メール本登録ページ /register/email（仮ユーザー認証必須）
+// ---------------------------------------------------------------------------
+
+/**
+ * メール本登録ページの到達性・UI要素を検証する。
+ *
+ * authenticate フィクスチャは is_verified=false の仮ユーザーを作成するため、
+ * 本ページ（仮ユーザー向け）が正常表示されることを検証する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.6 認証が必要なページの扱い
+ * See: src/app/(web)/register/email/page.tsx
+ * See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
+ */
+test.describe("メール本登録ページ /register/email", () => {
+	test("認証後にアクセスでき、登録フォームが表示される", async ({
+		page,
+		authenticate,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// authenticate フィクスチャで仮ユーザーとして Cookie 設定済み → 直接アクセス
+		// See: e2e/fixtures/auth.fixture.ts > authenticateLocal (is_verified=false)
+		const response = await page.goto("/register/email");
+		expect(response?.status()).toBe(200);
+
+		// See: src/app/(web)/register/email/page.tsx > #register-email-form
+		await expect(page.locator("#register-email-form")).toBeVisible({
+			timeout: 10_000,
+		});
+
+		// See: src/app/(web)/register/email/page.tsx > #register-email-input
+		await expect(page.locator("#register-email-input")).toBeVisible();
+
+		// See: src/app/(web)/register/email/page.tsx > #register-email-submit-btn
+		await expect(page.locator("#register-email-submit-btn")).toBeVisible();
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (8) Discord本登録ページ /register/discord（仮ユーザー認証必須）
+// ---------------------------------------------------------------------------
+
+/**
+ * Discord本登録ページの到達性・UI要素を検証する。
+ *
+ * authenticate フィクスチャは is_verified=false の仮ユーザーを作成するため、
+ * 本ページ（仮ユーザー向け）が正常表示されることを検証する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.6 認証が必要なページの扱い
+ * See: src/app/(web)/register/discord/page.tsx
+ * See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+ */
+test.describe("Discord本登録ページ /register/discord", () => {
+	test("認証後にアクセスでき、Discord登録ボタンが表示される", async ({
+		page,
+		authenticate,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// authenticate フィクスチャで仮ユーザーとして Cookie 設定済み → 直接アクセス
+		// See: e2e/fixtures/auth.fixture.ts > authenticateLocal (is_verified=false)
+		const response = await page.goto("/register/discord");
+		expect(response?.status()).toBe(200);
+
+		// See: src/app/(web)/register/discord/page.tsx > #register-discord-page
+		await expect(page.locator("#register-discord-page")).toBeVisible({
+			timeout: 10_000,
+		});
+
+		// See: src/app/(web)/register/discord/page.tsx > #register-discord-btn
+		await expect(page.locator("#register-discord-btn")).toBeVisible();
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (9) 管理ダッシュボード /admin（管理者認証必須）
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理ダッシュボードの到達性・UI要素を検証する。
+ *
+ * adminSessionToken フィクスチャで管理者セッショントークンを取得し、
+ * admin_session Cookie を設定してからページにアクセスする。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.6 認証が必要なページの扱い
+ * See: src/app/(web)/admin/page.tsx
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+test.describe("管理ダッシュボード /admin", () => {
+	test("管理者認証後にアクセスでき、ダッシュボード要素が表示される", async ({
+		page,
+		adminSessionToken,
+		context,
+		baseURL,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// admin_session Cookie を設定してから /admin にアクセスする
+		// See: src/lib/constants/cookie-names.ts > ADMIN_SESSION_COOKIE = 'admin_session'
+		// See: src/app/(web)/admin/layout.tsx > admin_session ガード
+		await context.addCookies([
+			{
+				name: "admin_session",
+				value: adminSessionToken,
+				url: baseURL,
+			},
+		]);
+
+		const response = await page.goto("/admin");
+		expect(response?.status()).toBe(200);
+
+		// See: src/app/(web)/admin/layout.tsx > #admin-nav（サイドナビゲーション）
+		await expect(page.locator("#admin-nav")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		// See: src/app/(web)/admin/page.tsx > #stats-cards（統計カードグリッド）
+		await expect(page.locator("#stats-cards")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (10) 管理ユーザー一覧 /admin/users（管理者認証必須）
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理ユーザー一覧ページの到達性・UI要素を検証する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.6 認証が必要なページの扱い
+ * See: src/app/(web)/admin/users/page.tsx
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ */
+test.describe("管理ユーザー一覧 /admin/users", () => {
+	test("管理者認証後にアクセスでき、ユーザーテーブルが表示される", async ({
+		page,
+		adminSessionToken,
+		context,
+		baseURL,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// admin_session Cookie を設定してから /admin/users にアクセスする
+		// See: src/lib/constants/cookie-names.ts > ADMIN_SESSION_COOKIE = 'admin_session'
+		await context.addCookies([
+			{
+				name: "admin_session",
+				value: adminSessionToken,
+				url: baseURL,
+			},
+		]);
+
+		const response = await page.goto("/admin/users");
+		expect(response?.status()).toBe(200);
+
+		// See: src/app/(web)/admin/layout.tsx > #admin-nav（サイドナビゲーション）
+		await expect(page.locator("#admin-nav")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		// See: src/app/(web)/admin/users/page.tsx > #user-list-table（ユーザーテーブル）
+		await expect(page.locator("#user-list-table")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (11) 管理ユーザー詳細 /admin/users/[userId]（管理者認証必須）
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理ユーザー詳細ページの到達性・UI要素を検証する。
+ *
+ * authenticate フィクスチャでテストユーザーを作成し、そのユーザーIDでアクセスする。
+ * 管理者認証は adminSessionToken フィクスチャで取得した Cookie で行う。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.6 認証が必要なページの扱い
+ * See: src/app/(web)/admin/users/[userId]/page.tsx
+ * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ */
+test.describe("管理ユーザー詳細 /admin/users/[userId]", () => {
+	test("管理者認証後にユーザー詳細にアクセスでき、基本情報が表示される", async ({
+		page,
+		adminSessionToken,
+		authenticate,
+		context,
+		baseURL,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// authenticate フィクスチャでテストユーザーを作成し userId を取得
+		// See: e2e/fixtures/auth.fixture.ts > authenticateLocal
+		const { userId } = authenticate;
+
+		// admin_session Cookie を設定してから /admin/users/{userId} にアクセスする
+		// See: src/lib/constants/cookie-names.ts > ADMIN_SESSION_COOKIE = 'admin_session'
+		await context.addCookies([
+			{
+				name: "admin_session",
+				value: adminSessionToken,
+				url: baseURL,
+			},
+		]);
+
+		const response = await page.goto(`/admin/users/${userId}`);
+		expect(response?.status()).toBe(200);
+
+		// See: src/app/(web)/admin/layout.tsx > #admin-nav（サイドナビゲーション）
+		await expect(page.locator("#admin-nav")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		// See: src/app/(web)/admin/users/[userId]/page.tsx > #user-basic-info（基本情報セクション）
+		await expect(page.locator("#user-basic-info")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (12) IP BAN管理 /admin/ip-bans（管理者認証必須）
+// ---------------------------------------------------------------------------
+
+/**
+ * IP BAN管理ページの到達性・UI要素を検証する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.6 認証が必要なページの扱い
+ * See: src/app/(web)/admin/ip-bans/page.tsx
+ * See: features/admin.feature @管理者がIP BANを解除する
+ */
+test.describe("IP BAN管理 /admin/ip-bans", () => {
+	test("管理者認証後にアクセスでき、IP BANテーブルが表示される", async ({
+		page,
+		adminSessionToken,
+		context,
+		baseURL,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		// admin_session Cookie を設定してから /admin/ip-bans にアクセスする
+		// See: src/lib/constants/cookie-names.ts > ADMIN_SESSION_COOKIE = 'admin_session'
+		await context.addCookies([
+			{
+				name: "admin_session",
+				value: adminSessionToken,
+				url: baseURL,
+			},
+		]);
+
+		const response = await page.goto("/admin/ip-bans");
+		expect(response?.status()).toBe(200);
+
+		// See: src/app/(web)/admin/layout.tsx > #admin-nav（サイドナビゲーション）
+		await expect(page.locator("#admin-nav")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		// See: src/app/(web)/admin/ip-bans/page.tsx > #ip-ban-list-table（IP BANテーブル）
+		await expect(page.locator("#ip-ban-list-table")).toBeVisible({
+			timeout: 15_000,
+		});
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (13) 旧スレッドURLリダイレクト /threads/[threadId]
+// ---------------------------------------------------------------------------
+
+/**
+ * 旧スレッドURL `/threads/{UUID}` が新URLへリダイレクトされることを検証する。
+ *
+ * seedThread フィクスチャでスレッドを作成し、そのスレッドIDでアクセスする。
+ * Playwright の page.goto() はデフォルトでリダイレクトを追跡するため、
+ * 最終URLが `/{boardId}/{threadKey}/` 形式になることを確認する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.7 動的ルートの扱い
+ * See: src/app/(web)/threads/[threadId]/page.tsx
+ * See: features/thread.feature @url_structure
+ */
+test.describe("旧スレッドURLリダイレクト /threads/[threadId]", () => {
+	test("旧スレッドURLにアクセスすると新URLへリダイレクトされる", async ({
+		page,
+		seedThread,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		const { threadId, threadKey } = seedThread;
+
+		// page.goto() はリダイレクトを追跡し最終ページのレスポンスを返す
+		// See: src/app/(web)/threads/[threadId]/page.tsx > redirect(`/${boardId}/${threadKey}/`)
+		const response = await page.goto(`/threads/${threadId}`);
+		expect(response?.status()).toBe(200);
+
+		// 最終 URL に threadKey が含まれていることを確認する。
+		// Next.js のトレイリングスラッシュ正規化により末尾スラッシュが除去される場合があるため
+		// threadKey を含む /{boardId}/{threadKey} 形式のパスで検証する。
+		// See: features/thread.feature @url_structure
+		expect(page.url()).toContain(`/${threadKey}`);
+
+		// スレッドページの主要 UI 要素が表示されていること
+		// See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx > #thread-title
+		await expect(page.locator("#thread-title")).toBeVisible();
 
 		expect(jsErrors).toHaveLength(0);
 	});

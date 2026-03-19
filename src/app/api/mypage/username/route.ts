@@ -14,12 +14,14 @@
  * 設計上の判断:
  *   - 未認証時は 401 を返す
  *   - 無料ユーザーが設定を試みた場合は 403 を返す
+ *   - 認証は AuthService.verifyEdgeToken() を使用（edge_tokens テーブル経由）
+ *     verifyEdgeToken は内部で is_verified チェックを含むため、別途チェック不要
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import * as MypageService from '@/lib/services/mypage-service'
-import * as UserRepository from '@/lib/infrastructure/repositories/user-repository'
-import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
+import { type NextRequest, NextResponse } from "next/server";
+import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import * as AuthService from "@/lib/services/auth-service";
+import * as MypageService from "@/lib/services/mypage-service";
 
 /**
  * PUT /api/mypage/username — ユーザーネーム設定
@@ -38,81 +40,75 @@ import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
  *   403: ErrorResponse（無料ユーザーは利用不可）
  */
 export async function PUT(req: NextRequest): Promise<NextResponse> {
-  // --- Cookie から edge-token を読み取る ---
-  // See: src/lib/constants/cookie-names.ts
-  const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null
+	// --- Cookie から edge-token を読み取る ---
+	// See: src/lib/constants/cookie-names.ts
+	const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
 
-  if (!edgeToken) {
-    return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: '認証が必要です' },
-      { status: 401 }
-    )
-  }
+	if (!edgeToken) {
+		return NextResponse.json(
+			{ error: "UNAUTHORIZED", message: "認証が必要です" },
+			{ status: 401 },
+		);
+	}
 
-  // --- edge-token でユーザーを特定する ---
-  const user = await UserRepository.findByAuthToken(edgeToken)
-  if (!user) {
-    return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: '認証が必要です' },
-      { status: 401 }
-    )
-  }
+	// --- edge-token で認証確認（edge_tokens テーブル経由、is_verified チェック含む）---
+	// See: src/lib/services/auth-service.ts > verifyEdgeToken
+	const authResult = await AuthService.verifyEdgeToken(edgeToken, "");
+	if (!authResult.valid) {
+		return NextResponse.json(
+			{ error: "UNAUTHORIZED", message: "認証が必要です" },
+			{ status: 401 },
+		);
+	}
 
-  // --- 認証フロー完了チェック（is_verified） ---
-  // See: features/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
-  // See: features/authentication.feature @認証フロー是正
-  if (!user.isVerified) {
-    return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: '認証が必要です' },
-      { status: 401 }
-    )
-  }
+	// --- リクエストボディのパース ---
+	let body: { username?: unknown };
+	try {
+		body = (await req.json()) as { username?: unknown };
+	} catch {
+		return NextResponse.json(
+			{ error: "INVALID_REQUEST", message: "リクエストボディが不正です" },
+			{ status: 400 },
+		);
+	}
 
-  // --- リクエストボディのパース ---
-  let body: { username?: unknown }
-  try {
-    body = (await req.json()) as { username?: unknown }
-  } catch {
-    return NextResponse.json(
-      { error: 'INVALID_REQUEST', message: 'リクエストボディが不正です' },
-      { status: 400 }
-    )
-  }
+	const { username } = body;
 
-  const { username } = body
+	// --- バリデーション ---
+	if (!username || typeof username !== "string") {
+		return NextResponse.json(
+			{
+				error: "VALIDATION_ERROR",
+				message: "ユーザーネームを入力してください",
+			},
+			{ status: 400 },
+		);
+	}
 
-  // --- バリデーション ---
-  if (!username || typeof username !== 'string') {
-    return NextResponse.json(
-      { error: 'VALIDATION_ERROR', message: 'ユーザーネームを入力してください' },
-      { status: 400 }
-    )
-  }
+	// --- MypageService への委譲 ---
+	const result = await MypageService.setUsername(authResult.userId, username);
 
-  // --- MypageService への委譲 ---
-  const result = await MypageService.setUsername(user.id, username)
+	if (!result.success) {
+		// 無料ユーザーが試みた場合: 403
+		if (result.code === "NOT_PREMIUM") {
+			return NextResponse.json(
+				{ error: result.code, message: result.error },
+				{ status: 403 },
+			);
+		}
+		// ユーザー不存在: 404
+		if (result.code === "USER_NOT_FOUND") {
+			return NextResponse.json(
+				{ error: result.code, message: result.error },
+				{ status: 404 },
+			);
+		}
+		// バリデーションエラー: 400
+		return NextResponse.json(
+			{ error: result.code, message: result.error },
+			{ status: 400 },
+		);
+	}
 
-  if (!result.success) {
-    // 無料ユーザーが試みた場合: 403
-    if (result.code === 'NOT_PREMIUM') {
-      return NextResponse.json(
-        { error: result.code, message: result.error },
-        { status: 403 }
-      )
-    }
-    // ユーザー不存在: 404
-    if (result.code === 'USER_NOT_FOUND') {
-      return NextResponse.json(
-        { error: result.code, message: result.error },
-        { status: 404 }
-      )
-    }
-    // バリデーションエラー: 400
-    return NextResponse.json(
-      { error: result.code, message: result.error },
-      { status: 400 }
-    )
-  }
-
-  return NextResponse.json({ username: result.username }, { status: 200 })
+	return NextResponse.json({ username: result.username }, { status: 200 });
 }

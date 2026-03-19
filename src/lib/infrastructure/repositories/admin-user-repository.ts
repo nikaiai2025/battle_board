@@ -13,7 +13,29 @@
  *   - ビジネスロジックを含まない薄いデータアクセス層
  */
 
-import { supabaseAdmin } from '../supabase/client'
+import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "../supabase/client";
+
+// ---------------------------------------------------------------------------
+// 認証用クライアント生成ヘルパー
+// ---------------------------------------------------------------------------
+
+/**
+ * 認証専用の一時クライアントを生成する。
+ *
+ * loginWithPassword 内で signInWithPassword を実行する際に使用する。
+ * supabaseAdmin（シングルトン）で signInWithPassword を呼ぶと、そのクライアントに
+ * 一般ユーザーのJWTセッションがセットされ、以後の service_role クエリが
+ * RLS によりブロックされる問題（セッション汚染）を回避するための分離クライアント。
+ *
+ * See: tmp/escalations/escalation_ESC-TASK-198-1.md — バグの詳細分析
+ * See: docs/architecture/architecture.md §5.3 管理者認証
+ */
+function createAuthClient() {
+	const supabaseUrl = process.env.SUPABASE_URL ?? "";
+	const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+	return createClient(supabaseUrl, supabaseServiceRoleKey);
+}
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -21,22 +43,22 @@ import { supabaseAdmin } from '../supabase/client'
 
 /** admin_users テーブルの DB レコード（snake_case）*/
 interface AdminUserRow {
-  id: string
-  role: string
-  created_at: string
+	id: string;
+	role: string;
+	created_at: string;
 }
 
 /** 管理者ユーザードメインモデル */
 export interface AdminUser {
-  id: string
-  role: string
-  createdAt: Date
+	id: string;
+	role: string;
+	createdAt: Date;
 }
 
 /** Supabase Auth によるログイン結果 */
 export type AdminLoginResult =
-  | { success: true; sessionToken: string; userId: string }
-  | { success: false; reason: 'invalid_credentials' | 'not_admin' }
+	| { success: true; sessionToken: string; userId: string }
+	| { success: false; reason: "invalid_credentials" | "not_admin" };
 
 // ---------------------------------------------------------------------------
 // 変換ヘルパー
@@ -46,11 +68,11 @@ export type AdminLoginResult =
  * DB レコード（snake_case）をドメインモデル（camelCase）に変換する。
  */
 function rowToAdminUser(row: AdminUserRow): AdminUser {
-  return {
-    id: row.id,
-    role: row.role,
-    createdAt: new Date(row.created_at),
-  }
+	return {
+		id: row.id,
+		role: row.role,
+		createdAt: new Date(row.created_at),
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -66,19 +88,19 @@ function rowToAdminUser(row: AdminUserRow): AdminUser {
  * @returns 見つかった AdminUser、存在しない場合は null
  */
 export async function findById(id: string): Promise<AdminUser | null> {
-  const { data, error } = await supabaseAdmin
-    .from('admin_users')
-    .select('*')
-    .eq('id', id)
-    .single()
+	const { data, error } = await supabaseAdmin
+		.from("admin_users")
+		.select("*")
+		.eq("id", id)
+		.single();
 
-  if (error) {
-    // PGRST116: 行が見つからない場合
-    if (error.code === 'PGRST116') return null
-    throw new Error(`AdminUserRepository.findById failed: ${error.message}`)
-  }
+	if (error) {
+		// PGRST116: 行が見つからない場合
+		if (error.code === "PGRST116") return null;
+		throw new Error(`AdminUserRepository.findById failed: ${error.message}`);
+	}
 
-  return data ? rowToAdminUser(data as AdminUserRow) : null
+	return data ? rowToAdminUser(data as AdminUserRow) : null;
 }
 
 /**
@@ -94,29 +116,33 @@ export async function findById(id: string): Promise<AdminUser | null> {
  * @returns ログイン結果（成功時はセッショントークンとユーザーIDを含む）
  */
 export async function loginWithPassword(
-  email: string,
-  password: string
+	email: string,
+	password: string,
 ): Promise<AdminLoginResult> {
-  // Supabase Auth でメール・パスワード認証を実行する
-  const { data, error } = await supabaseAdmin.auth.signInWithPassword({
-    email,
-    password,
-  })
+	// 認証専用の一時クライアントを作成し、signInWithPassword を実行する。
+	// supabaseAdmin（シングルトン）で signInWithPassword を呼ぶと一般ユーザーJWTセッションが
+	// セットされ、以後の admin_users クエリが RLS でブロックされるため分離が必須。
+	// See: tmp/escalations/escalation_ESC-TASK-198-1.md
+	const authClient = createAuthClient();
+	const { data, error } = await authClient.auth.signInWithPassword({
+		email,
+		password,
+	});
 
-  if (error || !data.session || !data.user) {
-    return { success: false, reason: 'invalid_credentials' }
-  }
+	if (error || !data.session || !data.user) {
+		return { success: false, reason: "invalid_credentials" };
+	}
 
-  // admin_users テーブルで管理者ロールを確認する
-  const adminUser = await findById(data.user.id)
-  if (!adminUser) {
-    // Supabase Auth には存在するが admin_users テーブルに登録されていない場合
-    return { success: false, reason: 'not_admin' }
-  }
+	// admin_users テーブルで管理者ロールを確認する
+	const adminUser = await findById(data.user.id);
+	if (!adminUser) {
+		// Supabase Auth には存在するが admin_users テーブルに登録されていない場合
+		return { success: false, reason: "not_admin" };
+	}
 
-  return {
-    success: true,
-    sessionToken: data.session.access_token,
-    userId: data.user.id,
-  }
+	return {
+		success: true,
+		sessionToken: data.session.access_token,
+		userId: data.user.id,
+	};
 }

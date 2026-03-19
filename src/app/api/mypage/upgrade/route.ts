@@ -14,12 +14,14 @@
  *   - MVP フェーズでは実決済なし。isPremium フラグの切替のみ行う
  *   - 既に有料ユーザーの場合は 409 Conflict を返す
  *   - 未認証時は 401 を返す
+ *   - 認証は AuthService.verifyEdgeToken() を使用（edge_tokens テーブル経由）
+ *     verifyEdgeToken は内部で is_verified チェックを含むため、別途チェック不要
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import * as MypageService from '@/lib/services/mypage-service'
-import * as UserRepository from '@/lib/infrastructure/repositories/user-repository'
-import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
+import { type NextRequest, NextResponse } from "next/server";
+import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import * as AuthService from "@/lib/services/auth-service";
+import * as MypageService from "@/lib/services/mypage-service";
 
 /**
  * POST /api/mypage/upgrade — 課金（モック）
@@ -35,53 +37,44 @@ import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
  *   409: ErrorResponse（既に有料ユーザー）
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // --- Cookie から edge-token を読み取る ---
-  // See: src/lib/constants/cookie-names.ts
-  const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null
+	// --- Cookie から edge-token を読み取る ---
+	// See: src/lib/constants/cookie-names.ts
+	const edgeToken = req.cookies.get(EDGE_TOKEN_COOKIE)?.value ?? null;
 
-  if (!edgeToken) {
-    return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: '認証が必要です' },
-      { status: 401 }
-    )
-  }
+	if (!edgeToken) {
+		return NextResponse.json(
+			{ error: "UNAUTHORIZED", message: "認証が必要です" },
+			{ status: 401 },
+		);
+	}
 
-  // --- edge-token でユーザーを特定する ---
-  const user = await UserRepository.findByAuthToken(edgeToken)
-  if (!user) {
-    return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: '認証が必要です' },
-      { status: 401 }
-    )
-  }
+	// --- edge-token で認証確認（edge_tokens テーブル経由、is_verified チェック含む）---
+	// See: src/lib/services/auth-service.ts > verifyEdgeToken
+	const authResult = await AuthService.verifyEdgeToken(edgeToken, "");
+	if (!authResult.valid) {
+		return NextResponse.json(
+			{ error: "UNAUTHORIZED", message: "認証が必要です" },
+			{ status: 401 },
+		);
+	}
 
-  // --- 認証フロー完了チェック（is_verified） ---
-  // See: features/mypage.feature（前提:「ログイン済みユーザー」= is_verified=true）
-  // See: features/authentication.feature @認証フロー是正
-  if (!user.isVerified) {
-    return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: '認証が必要です' },
-      { status: 401 }
-    )
-  }
+	// --- MypageService への委譲 ---
+	const result = await MypageService.upgradeToPremium(authResult.userId);
 
-  // --- MypageService への委譲 ---
-  const result = await MypageService.upgradeToPremium(user.id)
+	if (!result.success) {
+		// 既に有料ユーザー: 409 Conflict
+		if (result.code === "ALREADY_PREMIUM") {
+			return NextResponse.json(
+				{ error: result.code, message: result.error },
+				{ status: 409 },
+			);
+		}
+		// ユーザー不存在: 404
+		return NextResponse.json(
+			{ error: result.code, message: result.error },
+			{ status: 404 },
+		);
+	}
 
-  if (!result.success) {
-    // 既に有料ユーザー: 409 Conflict
-    if (result.code === 'ALREADY_PREMIUM') {
-      return NextResponse.json(
-        { error: result.code, message: result.error },
-        { status: 409 }
-      )
-    }
-    // ユーザー不存在: 404
-    return NextResponse.json(
-      { error: result.code, message: result.error },
-      { status: 404 }
-    )
-  }
-
-  return NextResponse.json({ isPremium: true }, { status: 200 })
+	return NextResponse.json({ isPremium: true }, { status: 200 });
 }

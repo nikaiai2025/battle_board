@@ -64,7 +64,7 @@ export async function authenticateLocal(
 			auth_token: `e2e-fixture-auth-${suffix}`,
 			author_id_seed: `e2e-fixture-seed-${suffix}`,
 			is_premium: false,
-			is_verified: false,
+			is_verified: true,
 		},
 	});
 	const users = (await userRes.json()) as Array<{ id: string }>;

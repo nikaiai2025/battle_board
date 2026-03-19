@@ -26,14 +26,7 @@ const SMOKE_DIR = path.join(ROOT, "e2e/smoke");
  * 追加時は理由を必ず記載すること。
  */
 const EXCLUDED_ROUTES: Record<string, string> = {
-	// --- テスト未実装（実装タスク待ち） ---
-	"/admin": "admin認証基盤未整備",
-	"/admin/users": "admin認証基盤未整備",
-	"/admin/users/[userId]": "admin認証基盤未整備",
-	"/admin/ip-bans": "admin認証基盤未整備",
-	"/dev": "テスト未実装",
-	"/register/email": "テスト未実装",
-	"/register/discord": "テスト未実装",
+	// 現在すべてのルートがカバーされているため除外エントリなし
 };
 
 /**
@@ -46,6 +39,9 @@ const EXCLUDED_ROUTES: Record<string, string> = {
 const DYNAMIC_ROUTE_HINTS: Record<string, string> = {
 	"/[boardId]": "/battleboard",
 	"/[boardId]/[threadKey]": "/battleboard/",
+	// /threads/[threadId] は旧URLリダイレクトルート。テストでは `/threads/` を含む URL でアクセスする。
+	// See: e2e/smoke/navigation.spec.ts > (13) 旧スレッドURLリダイレクト /threads/[threadId]
+	"/threads/[threadId]": "/threads/",
 };
 
 // ---------------------------------------------------------------------------

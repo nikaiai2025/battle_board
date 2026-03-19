@@ -156,18 +156,18 @@ export async function cleanupLocal(request: APIRequestContext): Promise<void> {
 	const base = supabaseUrl();
 	const headers = supabaseHeaders("return=minimal");
 
-	// 外部キー制約の順序: posts → threads → edge_tokens → currencies → users
-	// ただし users は他テーブルから参照されるため最後には削除しない（テスト間で独立性は十分）
+	// 外部キー制約の順序: posts → threads → users
+	// edge_tokens は authenticate フィクスチャが管理するため cleanup 対象外。
+	// cleanupLocal は beforeEach で呼ばれるが、authenticate フィクスチャはフィクスチャの
+	// セットアップ時（beforeEach より前）に edge_token を作成する。
+	// ここで edge_tokens を全件削除すると認証必須ページが 401 エラーで失敗するため除外する。
+	// users も同様の理由で削除しない（テスト間で独立性は十分）。
 	await request.delete(
 		`${base}/rest/v1/posts?id=neq.00000000-0000-0000-0000-000000000000`,
 		{ headers },
 	);
 	await request.delete(
 		`${base}/rest/v1/threads?id=neq.00000000-0000-0000-0000-000000000000`,
-		{ headers },
-	);
-	await request.delete(
-		`${base}/rest/v1/edge_tokens?id=neq.00000000-0000-0000-0000-000000000000`,
 		{ headers },
 	);
 }
