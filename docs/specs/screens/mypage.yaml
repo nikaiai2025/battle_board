@@ -1,6 +1,7 @@
 # D-06 画面要素定義書: マイページ
 # ステータス: 運用中
 # 作成日: 2026-03-07
+# 更新日: 2026-03-20
 # 対象: Phase 1 + Phase 2
 
 screen_id: SCR-003
@@ -18,6 +19,7 @@ api_dependencies:
   - GET /api/mypage/history (getPostHistory)
   - GET /api/mypage/notifications (getNotifications)
   - GET /api/currency/balance (getCurrencyBalance)
+  - POST /api/auth/logout (logout)
 
 access_control: 認証済みユーザーのみ
 
@@ -51,6 +53,16 @@ elements:
         type: text
         source: user.streakDays
         format: "連続書き込み: {streakDays}日"
+
+      - id: logout-btn
+        type: button
+        condition: user.isRegistered == true
+        label: ログアウト
+        action: POST /api/auth/logout
+        style: danger
+        confirm: ログアウトしますか？
+        # See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+        # 本登録ユーザーのみ表示。仮ユーザーはログアウトするとユーザーIDを喪失するため非表示。
 
   # --- ユーザーネーム設定 ---
   - id: username-section

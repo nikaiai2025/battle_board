@@ -7,12 +7,14 @@
  * See: features/user_registration.feature @仮ユーザーには PAT が表示されない
  * See: features/user_registration.feature @仮ユーザーは課金できない
  * See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
+ * See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
  * See: docs/architecture/components/user-registration.md § 4.2 認証状態, § 8.2 マイページ表示
  *
  * テスト方針:
  *   - MypageInfo の registrationType / patToken / patLastUsedAt フィールドを検証する
  *   - マイページ表示ロジック（getAccountTypeLabel, canUpgrade 等）を純粋関数レベルでテストする
  *   - /api/mypage のレスポンス型に本登録フィールドが含まれることを検証する
+ *   - ログアウトボタン表示条件: isPermanentUser（本登録ユーザーのみ）
  *   - node 環境で動作（jsdom 不要）
  */
 
@@ -295,5 +297,47 @@ describe("エッジケース", () => {
 		// patToken が null でも registrationType で判定するため影響なし
 		const info = makeRegisteredUserInfo({ patToken: null });
 		expect(getAccountTypeLabel(info)).toBe("本登録ユーザー");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// テストスイート: ログアウトボタン表示制御
+// D-06 mypage.yaml: logout-btn condition: user.isRegistered == true
+// ---------------------------------------------------------------------------
+
+describe("ログアウトボタン表示制御 (isPermanentUser)", () => {
+	it("本登録ユーザー（email）はログアウトボタンが表示される", () => {
+		// See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+		// See: docs/specs/screens/mypage.yaml @logout-btn condition: user.isRegistered == true
+		const info = makeRegisteredUserInfo({ registrationType: "email" });
+		expect(isPermanentUser(info)).toBe(true);
+	});
+
+	it("本登録ユーザー（discord）はログアウトボタンが表示される", () => {
+		// See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+		const info = makeRegisteredUserInfo({ registrationType: "discord" });
+		expect(isPermanentUser(info)).toBe(true);
+	});
+
+	it("仮ユーザーはログアウトボタンが表示されない", () => {
+		// See: docs/specs/screens/mypage.yaml @logout-btn
+		// 仮ユーザーはログアウトするとユーザーIDを喪失するため非表示
+		const info = makeTemporaryUserInfo();
+		expect(isPermanentUser(info)).toBe(false);
+	});
+
+	it("有料ユーザーでも本登録済みであればログアウトボタンが表示される", () => {
+		// See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+		const info = makeRegisteredUserInfo({ isPremium: true });
+		expect(isPermanentUser(info)).toBe(true);
+	});
+
+	it("registrationType が null（仮ユーザー）の場合はログアウトボタンが非表示", () => {
+		// 境界値テスト: registrationType === null は仮ユーザー
+		const info: MypageInfo = {
+			...makeTemporaryUserInfo(),
+			registrationType: null,
+		};
+		expect(isPermanentUser(info)).toBe(false);
 	});
 });

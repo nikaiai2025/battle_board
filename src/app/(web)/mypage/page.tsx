@@ -20,6 +20,7 @@
  *   - アカウント情報（アカウント種別・認証方法・有料/無料ステータス）
  *   - 本登録セクション（仮ユーザーのみ）: メール登録ボタン + Discord登録ボタン
  *   - PAT表示セクション（本登録ユーザーのみ）: PAT文字列 + コピーボタン + 使い方説明 + 再発行ボタン + 最終使用日時
+ *   - ログアウトボタン（本登録ユーザーのみ）: 確認ダイアログ + POST /api/auth/logout + トップページリダイレクト
  *   - ユーザーネーム設定フォーム（有料ユーザーのみ）
  *   - 課金ボタン（本登録済み無料ユーザーのみ有効）
  *   - 書き込み履歴
@@ -61,6 +62,7 @@ interface PostHistoryItem {
  * See: features/mypage.feature @通知欄が存在する
  * See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
  * See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
+ * See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
  */
 export default function MypagePage() {
 	// ---------------------------------------------------------------------------
@@ -240,6 +242,30 @@ export default function MypagePage() {
 	};
 
 	/**
+	 * ログアウト処理。
+	 * 確認ダイアログ表示後、POST /api/auth/logout を呼び出し、
+	 * 成功時にトップページへリダイレクトする。
+	 * 本登録ユーザー（isPermanentUser）のみ表示（D-06 condition: user.isRegistered == true）。
+	 *
+	 * See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+	 * See: docs/specs/screens/mypage.yaml @logout-btn
+	 */
+	const handleLogout = async () => {
+		// 確認ダイアログ（D-06: confirm: ログアウトしますか？）
+		if (!window.confirm("ログアウトしますか？")) return;
+
+		try {
+			const res = await fetch("/api/auth/logout", { method: "POST" });
+			if (res.ok) {
+				// ログアウト成功: トップページへリダイレクト
+				window.location.href = "/";
+			}
+		} catch {
+			// ネットワークエラーはサイレントに処理する
+		}
+	};
+
+	/**
 	 * PAT を再発行する。
 	 * POST /api/auth/pat を呼び出し、新しい PAT をローカル状態に反映する。
 	 *
@@ -386,6 +412,23 @@ export default function MypagePage() {
 					<span className="font-medium">連続書き込み: </span>
 					{mypageInfo.streakDays}日
 				</div>
+
+				{/* ログアウトボタン（本登録ユーザーのみ表示）
+            D-06: id=logout-btn, style=danger, condition=user.isRegistered==true
+            See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+            仮ユーザーはログアウトするとユーザーIDを喪失するため非表示。 */}
+				{isPermanentUser(mypageInfo) && (
+					<button
+						id="logout-btn"
+						type="button"
+						onClick={() => {
+							void handleLogout();
+						}}
+						className="px-4 py-1.5 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700"
+					>
+						ログアウト
+					</button>
+				)}
 			</section>
 
 			{/* =============================

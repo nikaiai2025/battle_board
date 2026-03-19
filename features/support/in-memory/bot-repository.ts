@@ -198,6 +198,20 @@ export async function incrementTotalPosts(botId: string): Promise<void> {
 }
 
 /**
+ * ボットの被告発回数（accusedCount）を 1 インクリメントする。
+ * AccusationService.accuse() の告発成功（isBot=true）後に呼び出される。
+ * See: src/lib/infrastructure/repositories/bot-repository.ts
+ * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+ */
+export async function incrementAccusedCount(botId: string): Promise<void> {
+	assertUUID(botId, "BotRepository.incrementAccusedCount.botId");
+	const bot = store.find((b) => b.id === botId);
+	if (bot) {
+		bot.accusedCount += 1;
+	}
+}
+
+/**
  * ボットの偽装日次リセットIDと発行日を更新する。
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */

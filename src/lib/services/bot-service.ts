@@ -115,6 +115,12 @@ export interface IBotRepository {
 	 * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 	 */
 	incrementTotalPosts(botId: string): Promise<void>;
+	/**
+	 * ボットの被告発回数（accused_count）を 1 インクリメントする。
+	 * AccusationService.accuse() の告発成功（isBot=true）後に呼び出す。
+	 * See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+	 */
+	incrementAccusedCount(botId: string): Promise<void>;
 	updateDailyId(
 		botId: string,
 		dailyId: string,

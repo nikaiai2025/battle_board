@@ -25,6 +25,7 @@ import {
 	type AccusationBonusConfig,
 	type AccusationInput,
 	AccusationService,
+	type IAccusationBotRepository,
 	type IAccusationRepository,
 	type IBotPostRepository,
 	type IPostRepository,
@@ -115,6 +116,13 @@ function createMockAccusationRepository(
 	};
 }
 
+/** モック IAccusationBotRepository を生成する */
+function createMockBotRepository(): IAccusationBotRepository {
+	return {
+		incrementAccusedCount: vi.fn().mockResolvedValue(undefined),
+	};
+}
+
 /** デフォルトのAccusationInputを生成する */
 function createAccusationInput(
 	overrides: Partial<AccusationInput> = {},
@@ -134,6 +142,7 @@ function createService(options: {
 	isBot?: boolean;
 	alreadyExists?: boolean;
 	bonusConfig?: AccusationBonusConfig;
+	botRepository?: IAccusationBotRepository;
 }): AccusationService {
 	// post が明示的に null を渡された場合は null を使う（存在しないレスのテスト用）
 	const post = "post" in options ? options.post! : createHumanPost();
@@ -142,6 +151,7 @@ function createService(options: {
 		createMockBotPostRepository(options.isBot ?? false),
 		createMockAccusationRepository(options.alreadyExists ?? false),
 		options.bonusConfig ?? TEST_BONUS_CONFIG,
+		options.botRepository,
 	);
 }
 
@@ -225,6 +235,24 @@ describe("AccusationService", () => {
 				}),
 			);
 		});
+
+		it("告発成功時に botRepository.incrementAccusedCount が1回呼ばれる", async () => {
+			// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+			// See: LL-010 派生カウンタは書き込み経路上の単体テストで保護する
+			const botRepo = createMockBotRepository();
+			const service = new AccusationService(
+				createMockPostRepository(createBotPost()),
+				createMockBotPostRepository(true),
+				createMockAccusationRepository(),
+				TEST_BONUS_CONFIG,
+				botRepo,
+			);
+
+			await service.accuse(createAccusationInput());
+
+			expect(botRepo.incrementAccusedCount).toHaveBeenCalledTimes(1);
+			expect(botRepo.incrementAccusedCount).toHaveBeenCalledWith("bot-001");
+		});
 	});
 
 	// =========================================================================
@@ -297,6 +325,23 @@ describe("AccusationService", () => {
 					bonusAmount: 0,
 				}),
 			);
+		});
+
+		it("告発失敗時（人間）は botRepository.incrementAccusedCount が呼ばれない", async () => {
+			// See: LL-010 派生カウンタは書き込み経路上の単体テストで保護する
+			// miss（人間だった場合）では accused_count をインクリメントしない
+			const botRepo = createMockBotRepository();
+			const service = new AccusationService(
+				createMockPostRepository(createHumanPost()),
+				createMockBotPostRepository(false),
+				createMockAccusationRepository(),
+				TEST_BONUS_CONFIG,
+				botRepo,
+			);
+
+			await service.accuse(createAccusationInput());
+
+			expect(botRepo.incrementAccusedCount).not.toHaveBeenCalled();
 		});
 	});
 

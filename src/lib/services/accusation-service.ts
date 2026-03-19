@@ -114,6 +114,17 @@ export interface IAccusationRepository {
 	}): Promise<{ id: string }>;
 }
 
+/**
+ * BotRepository の依存インターフェース（告発サービス用）。
+ * AccusationService が使用する最小限のインターフェース。
+ * 告発成功時に accused_count をインクリメントするために使用する。
+ * See: tmp/workers/bdd-architect_INCIDENT-BOT-TOTAL-POSTS/ll010_draft.md (LL-010)
+ */
+export interface IAccusationBotRepository {
+	/** ボットの被告発回数（accused_count）を 1 インクリメントする。 */
+	incrementAccusedCount(botId: string): Promise<void>;
+}
+
 // ---------------------------------------------------------------------------
 // AccusationService クラス
 // ---------------------------------------------------------------------------
@@ -139,6 +150,12 @@ export class AccusationService {
 		private readonly accusationRepository: IAccusationRepository,
 		/** 告発設定（config/commands.yaml から注入。省略時はデフォルト値） */
 		bonusConfig?: AccusationBonusConfig,
+		/**
+		 * ボット統計更新に使用するリポジトリ（省略時は accused_count を更新しない）。
+		 * 告発成功時（isBot=true）に accused_count を +1 するために使用する。
+		 * See: LL-010 派生カウンタは書き込み経路上の単体テストで保護する
+		 */
+		private readonly botRepository?: IAccusationBotRepository,
 	) {
 		this.bonusConfig = bonusConfig ?? DEFAULT_BONUS_CONFIG;
 	}
@@ -233,6 +250,20 @@ export class AccusationService {
 			bonusAmount: 0,
 		});
 
+		// Step 6.5: 告発成功時（isBot=true）に accused_count をインクリメントする。
+		// LL-010: 派生カウンタは書き込み経路上の単体テストで保護する。
+		// botRepository が注入されており、かつ incrementAccusedCount メソッドを持つ場合のみ実行する。
+		// （後方互換: 旧バージョンのコードが誤ったオブジェクトを渡した場合でも安全に動作する）
+		// See: features/ai_accusation.feature @AI告発に成功すると結果がスレッド全体に公開される
+		if (
+			isBot &&
+			botRecord &&
+			this.botRepository &&
+			typeof this.botRepository.incrementAccusedCount === "function"
+		) {
+			await this.botRepository.incrementAccusedCount(botRecord.botId);
+		}
+
 		// Step 7: システムメッセージ文字列生成 → 返却
 		// v4: ボーナス関連文言を除去した簡素なメッセージ
 		let systemMessage: string;
@@ -283,11 +314,14 @@ export function createAccusationService(
 	const BotPostRepository = require("../infrastructure/repositories/bot-post-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const AccusationRepository = require("../infrastructure/repositories/accusation-repository");
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const BotRepository = require("../infrastructure/repositories/bot-repository");
 
 	return new AccusationService(
 		PostRepository,
 		BotPostRepository,
 		AccusationRepository,
 		bonusConfig,
+		BotRepository,
 	);
 }
