@@ -1075,6 +1075,7 @@ supabase/
 - **決定日**: 2026-03-14
 - **背景**: Cloudflare Workers環境ではWorker自身の外部URLへのfetchがerror code 1042（自己参照ループ禁止）でブロックされる。Server ComponentからAPIルート経由でデータを取得する従来方式が動作しない
 - **決定**: 認証不要のGET系Server Component（スレッド一覧・スレッド閲覧）では、PostServiceを直接importしてデータを取得する。`export const dynamic = 'force-dynamic'` を設定し、リクエストごとにSSRを実行する
+- **補足（2026-03-19）**: Next.js 16 ではキャッシュがopt-in（`use cache` を明示しない限り全ページ動的）に変わったため、`force-dynamic` は本来不要である。ただし意図の明示として残しても害はない
 - **影響範囲**: `src/app/(web)/page.tsx`, `src/app/(web)/threads/[threadId]/page.tsx`
 - **除外**: POST系操作（書き込み・認証）はClient Componentから引き続きAPIルート経由で行う（Cloudflare制約の影響なし）
 - **理由**: Service Bindings による回避策も検討したが、Next.jsの標準`fetch()`からはService Bindingsにアクセスできず（Cloudflare固有の`env.BINDING.fetch()` APIが必要）、フレームワークの制約により採用不可
