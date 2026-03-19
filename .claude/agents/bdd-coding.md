@@ -105,6 +105,7 @@ Acceptance Test が GREEN になったことを確認する。
 判断基準は `docs/architecture/bdd_test_strategy.md` §7-12 を参照。
 
 - **E2Eテスト** (`e2e/*.spec.ts`): タスク指示書で明示的に指示された場合のみ追加する。Playwright形式で記述し、`npx playwright test` でPASSすることを確認する
+- **E2Eカバレッジチェック**: `src/app/**/page.tsx` の追加・削除を伴うタスクでは、完了前に `npx tsx scripts/check-e2e-coverage.ts` を実行しPASSを確認する
 - **APIテスト**: 専ブラ互換（Shift_JIS・DAT形式）、Cookie属性、エラーレスポンス形式など、サービス層テストではカバーできないHTTPレベルの検証が必要な場合に追加する。全APIに書く必要はない
 - **統合テスト**: 統合テスト基盤（リポジトリ切替の仕組み）が導入された後、タスク指示書の指示に従い対応する
 

@@ -1,7 +1,7 @@
 ---
 name: bdd-architect
 description: "BDD（振る舞い駆動開発）でスケーラブルで保守性の高いシステム設計を専門とするシニア・ソフトウェア・アーキテクト\\n"
-tools: Read, Write, Edit, Grep, Glob, WebFetch ,WebSearch
+tools: Read, Write, Edit, Grep, Glob, WebFetch ,WebSearch, Bash
 model: opus
 color: orange
 ---
