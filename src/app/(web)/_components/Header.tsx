@@ -13,8 +13,8 @@
 import Link from "next/link";
 
 interface HeaderProps {
-  /** 認証済みかどうか（マイページリンクの表示制御に使用） */
-  isAuthenticated?: boolean;
+	/** 認証済みかどうか（マイページリンクの表示制御に使用） */
+	isAuthenticated?: boolean;
 }
 
 /**
@@ -23,32 +23,42 @@ interface HeaderProps {
  * See: docs/specs/screens/thread-list.yaml @SCR-001 > header
  */
 export default function Header({ isAuthenticated = false }: HeaderProps) {
-  return (
-    <header className="bg-gray-800 text-white py-2 px-4 border-b border-gray-600">
-      <div className="max-w-4xl mx-auto flex items-center justify-between">
-        {/* site-title: サイトタイトル */}
-        <Link
-          href="/"
-          className="text-lg font-bold text-yellow-300 hover:text-yellow-200"
-          id="site-title"
-        >
-          BattleBoard
-        </Link>
+	return (
+		<header className="bg-gray-800 text-white py-2 px-4 border-b border-gray-600">
+			<div className="max-w-4xl mx-auto flex items-center justify-between">
+				{/* site-title: サイトタイトル */}
+				<Link
+					href="/"
+					className="text-lg font-bold text-yellow-300 hover:text-yellow-200"
+					id="site-title"
+				>
+					BattleBoard
+				</Link>
 
-        {/* ナビゲーション */}
-        <nav className="flex items-center gap-4 text-sm">
-          {/* nav-mypage: 認証済みの場合のみ表示 */}
-          {isAuthenticated && (
-            <Link
-              href="/mypage"
-              className="text-gray-300 hover:text-white"
-              id="nav-mypage"
-            >
-              マイページ
-            </Link>
-          )}
-        </nav>
-      </div>
-    </header>
-  );
+				{/* ナビゲーション */}
+				<nav className="flex items-center gap-4 text-sm">
+					{isAuthenticated ? (
+						/* nav-mypage: 認証済みの場合のみ表示 */
+						<Link
+							href="/mypage"
+							className="text-gray-300 hover:text-white"
+							id="nav-mypage"
+						>
+							マイページ
+						</Link>
+					) : (
+						/* nav-login: 未認証の場合のみ表示
+               See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする */
+						<Link
+							href="/login"
+							className="text-gray-300 hover:text-white"
+							id="nav-login"
+						>
+							ログイン
+						</Link>
+					)}
+				</nav>
+			</div>
+		</header>
+	);
 }
