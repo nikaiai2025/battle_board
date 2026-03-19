@@ -109,6 +109,12 @@ export interface IBotRepository {
 	reveal(botId: string): Promise<void>;
 	incrementTimesAttacked(botId: string): Promise<void>;
 	incrementSurvivalDays(botId: string): Promise<void>;
+	/**
+	 * ボットの総書き込み数（total_posts）を 1 インクリメントする。
+	 * executeBotPost の bot_posts INSERT 成功直後に呼び出す。
+	 * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+	 */
+	incrementTotalPosts(botId: string): Promise<void>;
 	updateDailyId(
 		botId: string,
 		dailyId: string,
@@ -746,10 +752,14 @@ export class BotService {
 			);
 		}
 
-		// Step 8: bot_posts に { postId, botId } を INSERT
+		// Step 8: bot_posts に { postId, botId } を INSERT し、total_posts をインクリメントする
 		// See: docs/architecture/components/bot.md §6.1 bot_posts INSERTのタイミングと失敗時の扱い
+		// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 		try {
 			await this.botPostRepository.create(result.postId, botId);
+			// bot_posts INSERT 成功後に total_posts をインクリメントする。
+			// INSERT 失敗時はその投稿をボット投稿として認識しないため、カウントしない。
+			await this.botRepository.incrementTotalPosts(botId);
 		} catch (err) {
 			// bot_posts INSERTに失敗してもpostレコードは残る。
 			// この不整合はゲーム上「ボットが人間として扱われる」方向に作用するため、

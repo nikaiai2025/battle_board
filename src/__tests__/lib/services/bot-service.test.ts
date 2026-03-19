@@ -87,6 +87,7 @@ function createMockBotRepository(
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
 		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
+		incrementTotalPosts: vi.fn().mockResolvedValue(undefined),
 		updateDailyId: vi.fn().mockResolvedValue(undefined),
 		updateNextPostAt: vi.fn().mockResolvedValue(undefined),
 		findDueForPost: vi.fn().mockResolvedValue([]),
@@ -892,6 +893,64 @@ describe("BotService", () => {
 			await expect(
 				service.executeBotPost("bot-999", "thread-001"),
 			).rejects.toThrow();
+		});
+
+		it("PostService 成功後に botRepository.incrementTotalPosts が1回呼ばれる", async () => {
+			// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+			// See: tmp/workers/bdd-architect_ANALYSIS-TOTAL-POSTS/analysis.md §4.3
+			const bot = createLurkingBot({
+				id: "bot-001",
+				botProfileKey: "荒らし役",
+				dailyId: "FkBot01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(bot);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				createMockCreatePostFn(),
+			);
+
+			await service.executeBotPost("bot-001", "thread-001");
+
+			expect(botRepo.incrementTotalPosts).toHaveBeenCalledTimes(1);
+			expect(botRepo.incrementTotalPosts).toHaveBeenCalledWith("bot-001");
+		});
+
+		it("botPostRepository.create が失敗した場合は incrementTotalPosts が呼ばれない", async () => {
+			// See: tmp/workers/bdd-architect_ANALYSIS-TOTAL-POSTS/analysis.md §4.3
+			// bot_posts INSERT 失敗時はボット投稿として認識しないため total_posts をカウントしない
+			const bot = createLurkingBot({
+				id: "bot-001",
+				botProfileKey: "荒らし役",
+				dailyId: "FkBot01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(bot);
+			const failingBotPostRepo: IBotPostRepository = {
+				findByPostId: vi.fn().mockResolvedValue(null),
+				create: vi.fn().mockRejectedValue(new Error("DB接続エラー")),
+			};
+			const service = new BotService(
+				botRepo,
+				failingBotPostRepo,
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				createMockCreatePostFn(),
+			);
+
+			// bot_posts INSERT 失敗はエラーを再スローしない（エラーログのみ）
+			await service.executeBotPost("bot-001", "thread-001");
+
+			expect(botRepo.incrementTotalPosts).not.toHaveBeenCalled();
 		});
 	});
 

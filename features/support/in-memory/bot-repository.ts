@@ -184,6 +184,20 @@ export async function incrementSurvivalDays(botId: string): Promise<void> {
 }
 
 /**
+ * ボットの総書き込み数（totalPosts）を 1 インクリメントする。
+ * executeBotPost の bot_posts INSERT 成功直後に呼び出される。
+ * See: src/lib/infrastructure/repositories/bot-repository.ts
+ * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+ */
+export async function incrementTotalPosts(botId: string): Promise<void> {
+	assertUUID(botId, "BotRepository.incrementTotalPosts.botId");
+	const bot = store.find((b) => b.id === botId);
+	if (bot) {
+		bot.totalPosts += 1;
+	}
+}
+
+/**
  * ボットの偽装日次リセットIDと発行日を更新する。
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
