@@ -60,7 +60,7 @@ npx playwright test --config=playwright.prod.config.ts
 
 ## テスト対象
 
-テストファイルは `e2e/prod/` 配下に配置されている。テスト設計の詳細は `docs/architecture/bdd_test_strategy.md` §10 を参照。
+テストは `playwright.prod.config.ts` で定義された2プロジェクト構成で実行される。`e2e/smoke/`（Phase A: ナビゲーション）と `e2e/flows/`（Phase B: フロー検証）を `isProduction=true` フィクスチャオプション付きで実行する。テスト設計の詳細は `docs/architecture/bdd_test_strategy.md` §10 を参照。
 
 | Phase | 内容 | 設計定義 |
 |---|---|---|

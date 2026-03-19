@@ -82,38 +82,32 @@ export default defineConfig({
 	/**
 	 * テストプロジェクトの定義。
 	 *
-	 * - e2e: ブラウザ（Chromium）を使用したE2Eフロー検証テスト（basic-flow.spec.ts等）
-	 * - smoke: ナビゲーションスモークテスト（e2e/smoke/ 配下）
-	 * - api: ブラウザ不要のHTTPレベルAPIテスト（e2e/api/ 配下）
+	 * - e2e: フロー検証テスト — Phase B（e2e/flows/ 配下）
+	 * - smoke: ナビゲーションテスト — Phase A（e2e/smoke/ 配下）
+	 * - api: HTTPレベルAPIテスト（e2e/api/ 配下）
 	 *
 	 * 除外:
 	 * - cf-smoke: 常設プロジェクトから除外。npm run test:cf-smoke で手動実行
-	 * - prod: 別config（playwright.prod.config.ts）で実行。testIgnore で除外済み
+	 * - 本番: playwright.prod.config.ts で同一テストを isProduction=true で実行
 	 *
 	 * 実行方法:
 	 *   全テスト(ローカル): npx playwright test
-	 *   E2Eのみ:        npx playwright test --project=e2e
+	 *   フローのみ:     npx playwright test --project=e2e
 	 *   Smokeのみ:      npx playwright test --project=smoke
 	 *   APIのみ:        npx playwright test --project=api
 	 *   CF Smoke:       npm run test:cf-smoke（wrangler dev 事前起動が必要）
-	 *   本番Smoke:      npx playwright test --config=playwright.prod.config.ts
+	 *   本番:           npx playwright test --config=playwright.prod.config.ts
 	 *
-	 * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
-	 * See: docs/architecture/bdd_test_strategy.md §10.2 ナビゲーションテスト
+	 * See: docs/architecture/bdd_test_strategy.md §10 E2Eテスト方針
+	 * See: docs/architecture/bdd_test_strategy.md §10.3.3 ファイル構成
 	 */
 	projects: [
 		{
 			name: "e2e",
-			testDir: "./e2e",
-			testIgnore: ["**/api/**", "**/cf-smoke/**", "**/smoke/**", "**/prod/**"],
+			testDir: "./e2e/flows",
 			use: { ...devices["Desktop Chrome"] },
 		},
 		{
-			/**
-			 * ナビゲーションスモークテスト: 全ページの到達性・JSエラーなし・主要UI要素の存在を検証。
-			 *
-			 * See: docs/architecture/bdd_test_strategy.md §10.5 ナビゲーションスモークテスト
-			 */
 			name: "smoke",
 			testDir: "./e2e/smoke",
 			use: { ...devices["Desktop Chrome"] },
@@ -122,17 +116,12 @@ export default defineConfig({
 			name: "api",
 			testDir: "./e2e/api",
 			use: {
-				// APIテストはブラウザ不要（baseURLのみ設定）
 				baseURL: "http://localhost:3000",
 			},
 		},
 		// CF Smokeテスト（cf-smoke）は常設プロジェクトから除外。
-		// CF Runtime互換性の技術検証であり、必要時のみ手動実行する:
 		//   npm run test:cf-smoke  (wrangler dev 事前起動が必要)
 		// See: docs/architecture/bdd_test_strategy.md §14 CF Smokeテスト（技術検証）
-		//
-		// 本番スモークテストは別 config: playwright.prod.config.ts
-		// 実行: npx playwright test --config=playwright.prod.config.ts
 	],
 
 	/**
