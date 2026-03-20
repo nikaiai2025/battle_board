@@ -138,6 +138,7 @@ export async function registerWithDiscord(
 		provider: "discord",
 		options: {
 			redirectTo,
+			scopes: "identify",
 		},
 	});
 
@@ -252,6 +253,7 @@ export async function loginWithDiscord(
 		provider: "discord",
 		options: {
 			redirectTo,
+			scopes: "identify",
 		},
 	});
 

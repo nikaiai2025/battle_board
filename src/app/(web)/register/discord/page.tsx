@@ -183,8 +183,7 @@ export default function RegisterDiscordPage() {
 
 				{/* 注意事項 */}
 				<p className="text-xs text-gray-500 mt-3">
-					※ Discord のメールアドレスへのアクセス権限が必要です。
-					認可画面で「承認」を押すと本登録が完了します。
+					※ 認可画面で「承認」を押すと本登録が完了します。
 				</p>
 
 				{/* マイページへの戻りリンク */}
