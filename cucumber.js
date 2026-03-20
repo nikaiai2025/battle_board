@@ -65,6 +65,9 @@ module.exports = {
 			// TASK-100: 草コマンド(!w) BDD シナリオ追加
 			// See: features/reactions.feature
 			"features/reactions.feature",
+			// TASK-210: 調査コマンド(!hissi/!kinou) BDD シナリオ追加
+			// See: features/investigation.feature
+			"features/investigation.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -102,6 +105,9 @@ module.exports = {
 			// TASK-100: 草コマンド(!w) BDD ステップ定義
 			// See: features/reactions.feature
 			"features/step_definitions/reactions.steps.ts",
+			// TASK-210: 調査コマンド(!hissi/!kinou) BDD ステップ定義
+			// See: features/investigation.feature
+			"features/step_definitions/investigation.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

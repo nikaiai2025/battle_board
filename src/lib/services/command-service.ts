@@ -34,6 +34,17 @@ import {
 	type IGrassPostRepository,
 	type IGrassRepository,
 } from "./handlers/grass-handler";
+// eslint-disable-next-line no-restricted-imports
+import {
+	HissiHandler,
+	type IHissiPostRepository,
+	type IHissiThreadRepository,
+} from "./handlers/hissi-handler";
+// eslint-disable-next-line no-restricted-imports
+import {
+	type IKinouPostRepository,
+	KinouHandler,
+} from "./handlers/kinou-handler";
 import { TellHandler } from "./handlers/tell-handler";
 
 // ---------------------------------------------------------------------------
@@ -71,6 +82,12 @@ export interface CommandExecutionResult {
 	 * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 	 */
 	eliminationNotice?: string | null;
+	/**
+	 * 調査コマンド等のハンドラ主出力を独立システムレスとして投稿するための本文。
+	 * null / undefined なら独立レス投稿なし。
+	 * See: features/investigation.feature
+	 */
+	independentMessage?: string | null;
 }
 
 /**
@@ -102,6 +119,12 @@ export interface CommandHandlerResult {
 	 * See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
 	 */
 	eliminationNotice?: string | null;
+	/**
+	 * 調査コマンド等のハンドラ主出力を独立システムレスとして投稿するための本文。
+	 * null / undefined なら独立レス投稿なし。
+	 * See: features/investigation.feature
+	 */
+	independentMessage?: string | null;
 }
 
 /**
@@ -140,6 +163,13 @@ export interface CommandConfig {
 	damage?: number;
 	/** !attack 専用: 賠償金倍率 */
 	compensation_multiplier?: number;
+	/**
+	 * 結果の表示方式。
+	 * "inline": レス内マージ（デフォルト）。
+	 * "independent": ★システム名義の独立レスとして投稿する。
+	 * See: features/investigation.feature
+	 */
+	responseType?: "inline" | "independent";
 }
 
 /**
@@ -251,6 +281,9 @@ export class CommandService {
 	 * @param commandsYamlOverride - コマンド設定のオーバーライド（テスト時に使用。省略時は config/commands.ts の定数を使用）
 	 * @param attackHandler - AttackHandler（DI。テスト時はモックを注入する。省略時はYAML設定値で内部生成）
 	 * @param grassHandler - GrassHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
+	 * @param postNumberResolver - PostNumberResolver（DI。>>N → UUID 解決）
+	 * @param hissiHandler - HissiHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
+	 * @param kinouHandler - KinouHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
 	 *
 	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
 	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
@@ -266,6 +299,8 @@ export class CommandService {
 		attackHandler?: AttackHandler | null,
 		grassHandler?: GrassHandler | null,
 		postNumberResolver?: IPostNumberResolver | null,
+		hissiHandler?: HissiHandler | null,
+		kinouHandler?: KinouHandler | null,
 	) {
 		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
 		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
@@ -371,6 +406,38 @@ export class CommandService {
 			}
 		}
 
+		// HissiHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に hissi コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// See: features/investigation.feature
+		let resolvedHissiHandler: CommandHandler | null = null;
+		if (hissiHandler !== undefined) {
+			// 明示的に DI された場合（null を含む）
+			resolvedHissiHandler = hissiHandler ?? null;
+		} else if (parsed.commands.hissi?.enabled) {
+			// YAML で hissi が有効化されており、DI がない場合のみ本番用生成
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const postRepository: IHissiPostRepository = require("../infrastructure/repositories/post-repository");
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const threadRepository: IHissiThreadRepository = require("../infrastructure/repositories/thread-repository");
+			resolvedHissiHandler = new HissiHandler(postRepository, threadRepository);
+		}
+
+		// KinouHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に kinou コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// See: features/investigation.feature
+		let resolvedKinouHandler: CommandHandler | null = null;
+		if (kinouHandler !== undefined) {
+			// 明示的に DI された場合（null を含む）
+			resolvedKinouHandler = kinouHandler ?? null;
+		} else if (parsed.commands.kinou?.enabled) {
+			// YAML で kinou が有効化されており、DI がない場合のみ本番用生成
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const postRepository: IKinouPostRepository = require("../infrastructure/repositories/post-repository");
+			resolvedKinouHandler = new KinouHandler(postRepository);
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
@@ -379,6 +446,8 @@ export class CommandService {
 			new TellHandler(resolvedAccusationService),
 			...(resolvedAttackHandler ? [resolvedAttackHandler] : []),
 			new AbeshinzoHandler(),
+			...(resolvedHissiHandler ? [resolvedHissiHandler] : []),
+			...(resolvedKinouHandler ? [resolvedKinouHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();
@@ -545,11 +614,14 @@ export class CommandService {
 		// 「コマンド失敗時に通貨を戻す補償処理は行わない」
 		// eliminationNotice: ハンドラが設定した場合は PostService に伝播する。
 		// See: features/bot_system.feature @HPが0になったボットが撃破され戦歴が全公開される
+		// independentMessage: 調査コマンド等の主出力を PostService に伝播する。
+		// See: features/investigation.feature
 		return {
 			success: result.success,
 			systemMessage: result.systemMessage,
 			currencyCost: shouldSkipDebit ? (result.success ? cost : 0) : cost,
 			eliminationNotice: result.eliminationNotice ?? null,
+			independentMessage: result.independentMessage ?? null,
 		};
 	}
 }

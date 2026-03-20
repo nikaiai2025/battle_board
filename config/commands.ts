@@ -53,5 +53,21 @@ export const commandsConfig: CommandsYaml = {
 			stealth: false,
 			hidden: true,
 		},
+		hissi: {
+			description: "対象ユーザーの本日の書き込みを表示",
+			cost: 20,
+			targetFormat: ">>postNumber",
+			responseType: "independent",
+			enabled: true,
+			stealth: false,
+		},
+		kinou: {
+			description: "対象ユーザーの昨日の日次リセットIDを表示",
+			cost: 20,
+			targetFormat: ">>postNumber",
+			responseType: "independent",
+			enabled: true,
+			stealth: false,
+		},
 	},
 };

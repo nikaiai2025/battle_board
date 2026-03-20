@@ -152,6 +152,52 @@ export async function findByThreadId(
 }
 
 /**
+ * 著者 ID と日付でレス一覧を取得する（調査コマンド用）。
+ * 全スレッド横断。システムメッセージ・削除済みレスを除外する。
+ * !hissi（本日の書き込み表示）・!kinou（昨日のID取得）で使用する。
+ *
+ * 日付フィルタは UTC ベース（既存の countByDate と同方式）。
+ * See: features/investigation.feature
+ * See: tmp/workers/bdd-architect_TASK-208/implementation_plan.md §3.3
+ *
+ * @param authorId - 著者ユーザーの UUID
+ * @param date - 対象日付（YYYY-MM-DD 形式）
+ * @param options.limit - 取得件数（省略時は全件）
+ * @returns Post 配列（created_at DESC ソート済み）
+ */
+export async function findByAuthorIdAndDate(
+	authorId: string,
+	date: string,
+	options: { limit?: number } = {},
+): Promise<Post[]> {
+	const limit = options.limit;
+
+	let query = supabaseAdmin
+		.from("posts")
+		.select("*")
+		.eq("author_id", authorId)
+		.gte("created_at", `${date}T00:00:00.000Z`)
+		.lt("created_at", `${date}T23:59:59.999Z`)
+		.eq("is_system_message", false)
+		.eq("is_deleted", false)
+		.order("created_at", { ascending: false });
+
+	if (limit !== undefined) {
+		query = query.limit(limit);
+	}
+
+	const { data, error } = await query;
+
+	if (error) {
+		throw new Error(
+			`PostRepository.findByAuthorIdAndDate failed: ${error.message}`,
+		);
+	}
+
+	return (data as PostRow[]).map(rowToPost);
+}
+
+/**
  * 著者 ID（author_id）に紐づくレス一覧を created_at DESC で取得する。
  * マイページの書き込み履歴表示や管理画面のユーザー書き込み履歴に使用する。
  *

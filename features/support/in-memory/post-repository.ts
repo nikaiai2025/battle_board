@@ -226,6 +226,36 @@ export async function softDeleteByThreadId(threadId: string): Promise<void> {
 }
 
 /**
+ * 著者 ID と日付で絞り込んだレス一覧を created_at DESC で取得する。
+ * 調査系コマンド（!hissi, !kinou）の全スレッド横断検索に使用する。
+ * システムメッセージと削除済みレスは除外する。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > findByAuthorIdAndDate
+ * See: features/investigation.feature
+ * See: tmp/workers/bdd-architect_TASK-208/implementation_plan.md §3.7
+ */
+export async function findByAuthorIdAndDate(
+	authorId: string,
+	date: string,
+	options: { limit?: number } = {},
+): Promise<Post[]> {
+	assertUUID(authorId, "PostRepository.findByAuthorIdAndDate.authorId");
+	const limit = options.limit;
+
+	const filtered = Array.from(store.values())
+		.filter((p) => {
+			if (p.authorId !== authorId) return false;
+			if (p.isSystemMessage) return false;
+			if (p.isDeleted) return false;
+			const postDate = p.createdAt.toISOString().slice(0, 10);
+			return postDate === date;
+		})
+		.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+	return limit !== undefined ? filtered.slice(0, limit) : filtered;
+}
+
+/**
  * 指定日の書き込み数を集計する（非システムメッセージのみ）。
  * ダッシュボードのリアルタイムサマリーに使用する。
  *
