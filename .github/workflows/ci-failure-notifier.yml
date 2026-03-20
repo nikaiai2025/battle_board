@@ -1,0 +1,62 @@
+# CI失敗時に GitHub Issue を自動作成する監視ワークフロー
+#
+# 全ワークフローの失敗を一元的に検知し、ラベル ci-failure の Issue を起票する。
+# AI エージェントはセッション開始時に gh issue list --label ci-failure で未解決の障害を確認できる。
+#
+# 【重要】 .github/workflows/ に新しいワークフローを追加した場合、
+#          下記 workflows: リストにもワークフロー名（name:）を追加すること。
+
+name: CI Failure Notifier
+
+on:
+  workflow_run:
+    workflows:
+      - "Bot Scheduler"
+      - "Daily Maintenance"
+      - "Apply DB Migrations"
+      - "Seed Pinned Thread"
+    types: [completed]
+
+jobs:
+  create-issue:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Check for existing open issue
+        id: check
+        run: |
+          EXISTING=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "ci-failure" \
+            --state open \
+            --search "CI: ${{ github.event.workflow_run.name }} failed" \
+            --json number \
+            --jq 'length')
+          echo "exists=$EXISTING" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create issue
+        if: steps.check.outputs.exists == '0'
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "CI: ${{ github.event.workflow_run.name }} failed" \
+            --label "ci-failure" \
+            --body "$(cat <<'EOF'
+          ## CI 失敗検知
+
+          | 項目 | 値 |
+          |---|---|
+          | Workflow | ${{ github.event.workflow_run.name }} |
+          | Branch | ${{ github.event.workflow_run.head_branch }} |
+          | Run | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }} |
+          | 検知時刻 | $(date -u '+%Y-%m-%dT%H:%M:%SZ') |
+
+          ログを確認し、原因を調査してください。
+          EOF
+          )"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
