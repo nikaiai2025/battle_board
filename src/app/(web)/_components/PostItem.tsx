@@ -6,6 +6,8 @@
  * - レス番号、表示名、日次ID、書き込み日時、本文を表示
  * - 削除済みレスは「このレスは削除されました」と表示
  * - 本文内の >>N 形式のアンカーをクリックでポップアップ表示（AnchorLink 使用）
+ * - 本文内の画像URLをサムネイル表示（ImageThumbnail 使用）
+ * - 本文内の非画像URLをリンク化
  * - inlineSystemInfo が存在する場合、本文の下に区切り線付きでシステム情報を表示
  * - dangerouslySetInnerHTML 禁止（白スペース表示は white-space: pre-wrap で対応）
  * - 日時フォーマット: YYYY/MM/DD(ddd) HH:mm:ss
@@ -14,13 +16,16 @@
  * See: features/thread.feature @スレッドのレスが書き込み順に表示される
  * See: features/thread.feature @anchor_popup
  * See: features/thread.feature @post_number_display
+ * See: features/thread.feature @image_preview
  * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
  * See: docs/specs/screens/thread-view.yaml > elements > post-list > itemTemplate
  * See: docs/specs/screens/thread-view.yaml > post-inline-system-info
  * See: docs/architecture/components/web-ui.md §6 > dangerouslySetInnerHTML使用禁止
  */
 
+import { detectUrls } from "../../../lib/domain/rules/url-detector";
 import AnchorLink from "./AnchorLink";
+import ImageThumbnail from "./ImageThumbnail";
 import { usePostFormContext } from "./PostFormContext";
 
 // ---------------------------------------------------------------------------
@@ -126,6 +131,76 @@ export function parseAnchorLinks(
 	return parts;
 }
 
+/**
+ * 本文全体をパースして React 要素配列に変換する上位パーサー。
+ *
+ * parseAnchorLinks を変更せず、本文全体の URL 処理を統括する新関数。
+ * 処理フロー:
+ *   1. 全 URL を正規表現で検出（位置情報付き）
+ *   2. 本文を「URL部分」と「テキスト部分」に分割
+ *   3. テキスト部分 → parseAnchorLinks でアンカー変換
+ *   4. 画像URL部分 → ImageThumbnail コンポーネント
+ *   5. 非画像URL部分 → <a> リンク
+ *
+ * See: features/thread.feature @image_preview
+ * See: tmp/workers/bdd-architect_TASK-212/design.md §3.1 設計方針
+ * See: tmp/workers/bdd-architect_TASK-212/design.md §6 parsePostBody の設計
+ *
+ * @param body - レス本文テキスト
+ * @returns パース済みの React 要素配列
+ */
+export function parsePostBody(body: string): (string | React.ReactElement)[] {
+	const urlMatches = detectUrls(body);
+
+	// URL が含まれない場合は既存の parseAnchorLinks に委譲
+	if (urlMatches.length === 0) {
+		return parseAnchorLinks(body);
+	}
+
+	const parts: (string | React.ReactElement)[] = [];
+	let lastIndex = 0;
+
+	for (const match of urlMatches) {
+		// URL より前のテキスト部分を parseAnchorLinks でアンカー変換して追加
+		if (match.startIndex > lastIndex) {
+			const textBefore = body.slice(lastIndex, match.startIndex);
+			parts.push(...parseAnchorLinks(textBefore));
+		}
+
+		if (match.isImage) {
+			// 画像URL → ImageThumbnail コンポーネント
+			// See: features/thread.feature @画像URLがサムネイルとして展開表示される
+			parts.push(
+				<ImageThumbnail key={`img-${match.startIndex}`} url={match.url} />,
+			);
+		} else {
+			// 非画像URL → <a> リンク
+			// See: features/thread.feature @画像以外のURLはサムネイル展開されない
+			parts.push(
+				<a
+					key={`link-${match.startIndex}`}
+					href={match.url}
+					target="_blank"
+					rel="noopener noreferrer"
+					className="text-blue-600 hover:underline break-all"
+				>
+					{match.url}
+				</a>,
+			);
+		}
+
+		lastIndex = match.endIndex;
+	}
+
+	// 末尾の残りテキストを parseAnchorLinks でアンカー変換して追加
+	if (lastIndex < body.length) {
+		const textAfter = body.slice(lastIndex);
+		parts.push(...parseAnchorLinks(textAfter));
+	}
+
+	return parts;
+}
+
 // ---------------------------------------------------------------------------
 // コンポーネント
 // ---------------------------------------------------------------------------
@@ -211,8 +286,10 @@ export default function PostItem({ post }: PostItemProps) {
 			{/* post-body: 本文
           削除済みの場合は削除メッセージを表示。
           通常は white-space: pre-wrap で改行を表現（dangerouslySetInnerHTML 禁止）。
-          >>N 形式のアンカーはクリック可能なリンクに変換。
-          See: docs/specs/screens/thread-view.yaml > post-body */}
+          >>N 形式のアンカーはクリック可能なリンクに変換（parseAnchorLinks）。
+          画像URLはサムネイル表示、非画像URLはリンク化（parsePostBody）。
+          See: docs/specs/screens/thread-view.yaml > post-body
+          See: features/thread.feature @image_preview */}
 			<div
 				className={`pl-6 whitespace-pre-wrap break-words ${
 					isDeleted ? "text-gray-400 line-through" : "text-gray-800"
@@ -223,7 +300,7 @@ export default function PostItem({ post }: PostItemProps) {
 						このレスは削除されました
 					</span>
 				) : (
-					parseAnchorLinks(post.body)
+					parsePostBody(post.body)
 				)}
 			</div>
 

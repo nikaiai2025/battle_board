@@ -71,6 +71,8 @@ elements:
             style: system-message-bg
         features:
           - anchor-link: ">>N 形式をクリック可能なリンクに変換"
+          - image-thumbnail: "画像URL（.jpg/.jpeg/.png/.gif/.webp）をサムネイル表示。クリックで新タブに原寸表示"
+          - non-image-link: "非画像URLを <a> リンクとして表示"
 
       - id: post-inline-system-info
         type: component

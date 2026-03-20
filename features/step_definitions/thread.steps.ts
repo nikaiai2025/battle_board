@@ -1980,3 +1980,313 @@ Given(
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Then("書き込みフォームの内容が {string} になる", (_text: string) => "pending");
+
+// ---------------------------------------------------------------------------
+// 画像URLサムネイル表示シナリオ用ステップ定義
+// See: features/thread.feature @image_preview
+// See: tmp/workers/bdd-architect_TASK-212/design.md §7 BDDステップ定義方針
+// ---------------------------------------------------------------------------
+
+/**
+ * スレッドにレス "{string}" が存在する。
+ * 指定の本文を持つレスを含むスレッドを作成する。
+ * @image_preview シナリオ用: 画像URL・非画像URLを含む本文を設定する。
+ *
+ * See: features/thread.feature @image_preview
+ */
+Given(
+	"スレッドにレス {string} が存在する",
+	async function (this: BattleBoardWorld, body: string) {
+		const AuthService = getAuthService();
+		const PostService = getPostService();
+
+		if (!this.currentEdgeToken) {
+			const { token, userId } =
+				await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
+			this.currentEdgeToken = token;
+			this.currentUserId = userId;
+			this.currentIpHash = DEFAULT_IP_HASH;
+			// isVerified=true に設定して書き込み可能状態にする
+			// See: features/authentication.feature @認証フロー是正
+			await InMemoryUserRepo.updateIsVerified(userId, true);
+		}
+
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: Math.floor(Date.now() / 1000).toString(),
+			boardId: TEST_BOARD_ID,
+			title: "image_preview テストスレ",
+			createdBy: this.currentUserId ?? "system",
+		});
+		this.currentThreadId = thread.id;
+		this.currentThreadTitle = thread.title;
+
+		await PostService.createPost({
+			threadId: thread.id,
+			body,
+			edgeToken: this.currentEdgeToken!,
+			ipHash: this.currentIpHash,
+			isBotWrite: false,
+		});
+	},
+);
+
+/**
+ * 画像URLがクリック可能なサムネイル画像として表示される。
+ *
+ * BDDサービス層テストとして、`detectUrls` の結果で isImage=true であることを検証する。
+ * UIコンポーネントの描画はサービス層テストの範囲外であるため、
+ * domain層の振る舞いで受け入れ基準を担保する。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §7.3 BDDステップ定義の実装方針
+ */
+Then(
+	"画像URLがクリック可能なサムネイル画像として表示される",
+	function (this: BattleBoardWorld) {
+		const { detectUrls: detect } =
+			require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+		// viewedThreadPosts に取得済みのレス一覧を使用する
+		assert(viewedThreadPosts.length > 0, "レスが存在しません");
+
+		// 画像URLを含むレスがあることを確認する
+		const imagePost = viewedThreadPosts.find((p) => {
+			const matches = detect(p.body);
+			return matches.some((m) => m.isImage);
+		});
+		assert(
+			imagePost,
+			"画像URLを含むレスが見つかりません。本文を確認してください。",
+		);
+
+		// 検出された画像URLの isImage が true であることを確認する
+		const imageMatches = detect(imagePost.body).filter((m) => m.isImage);
+		assert(imageMatches.length > 0, "画像URLが検出されませんでした");
+		assert(imageMatches[0].isImage, "検出されたURLが画像URLであることを確認");
+	},
+);
+
+/**
+ * 元のURLテキストも表示される。
+ *
+ * BDDサービス層テストとして、`detectUrls` の結果に URL 文字列が含まれることを検証する。
+ * ImageThumbnail コンポーネントが URL テキストを表示することは UI 層の責務だが、
+ * サービス層テストでは URL 文字列が正しく保持されていることを確認する。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §7.3 BDDステップ定義の実装方針
+ */
+Then("元のURLテキストも表示される", function (this: BattleBoardWorld) {
+	const { detectUrls: detect } =
+		require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+	assert(viewedThreadPosts.length > 0, "レスが存在しません");
+
+	// 画像URLを含むレスから URL 文字列が正しく取得できることを確認する
+	const imagePost = viewedThreadPosts.find((p) => {
+		const matches = detect(p.body);
+		return matches.some((m) => m.isImage);
+	});
+	assert(imagePost, "画像URLを含むレスが見つかりません");
+
+	const imageMatches = detect(imagePost.body).filter((m) => m.isImage);
+	assert(imageMatches.length > 0, "画像URLが検出されませんでした");
+	// URL 文字列が空でないことを確認（ImageThumbnail で表示される元URLテキスト）
+	assert(imageMatches[0].url.length > 0, "URL 文字列が空です");
+	assert(
+		imageMatches[0].url.startsWith("http"),
+		"URL 文字列が http で始まることを確認",
+	);
+});
+
+/**
+ * スレッドに画像URL付きのレスが存在する。
+ * シナリオ2（サムネイルをクリックすると原寸画像が表示される）の前提条件。
+ *
+ * See: features/thread.feature @image_preview
+ */
+Given(
+	"スレッドに画像URL付きのレスが存在する",
+	async function (this: BattleBoardWorld) {
+		const AuthService = getAuthService();
+		const PostService = getPostService();
+
+		if (!this.currentEdgeToken) {
+			const { token, userId } =
+				await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
+			this.currentEdgeToken = token;
+			this.currentUserId = userId;
+			this.currentIpHash = DEFAULT_IP_HASH;
+			await InMemoryUserRepo.updateIsVerified(userId, true);
+		}
+
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: Math.floor(Date.now() / 1000).toString(),
+			boardId: TEST_BOARD_ID,
+			title: "image_preview クリックテストスレ",
+			createdBy: this.currentUserId ?? "system",
+		});
+		this.currentThreadId = thread.id;
+		this.currentThreadTitle = thread.title;
+
+		await PostService.createPost({
+			threadId: thread.id,
+			body: "https://i.imgur.com/example.jpg",
+			edgeToken: this.currentEdgeToken!,
+			ipHash: this.currentIpHash,
+			isBotWrite: false,
+		});
+	},
+);
+
+/**
+ * サムネイルが表示されている。
+ * 分類: DOM/CSS表示（ImageThumbnail コンポーネントのレンダリング） — サービス層テストで代替検証。
+ * `detectUrls` で isImage=true の URL が存在することで「サムネイル表示可能状態」を確認する。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §7.3 BDDステップ定義の実装方針
+ */
+Given("サムネイルが表示されている", async function (this: BattleBoardWorld) {
+	const PostService = getPostService();
+	const { detectUrls: detect } =
+		require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+	assert(this.currentThreadId, "スレッドが設定されていません");
+	viewedThreadPosts = await PostService.getPostList(this.currentThreadId);
+
+	const hasImagePost = viewedThreadPosts.some((p) =>
+		detect(p.body).some((m) => m.isImage),
+	);
+	assert(hasImagePost, "画像URLを含むレスが存在しません（サムネイル表示不可）");
+});
+
+/**
+ * サムネイルをクリックする。
+ * 分類: DOM/CSS操作（ブラウザクリックイベント） — サービス層テストでは振る舞いで代替検証。
+ * `detectUrls` で画像URLの href が正しく取得できることで「クリック先URL」を確認する。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §4.1 方式決定（新タブで原寸表示）
+ * See: docs/architecture/bdd_test_strategy.md §7.3
+ */
+When("サムネイルをクリックする", function (this: BattleBoardWorld) {
+	const { detectUrls: detect } =
+		require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+	assert(viewedThreadPosts.length > 0, "レスが存在しません");
+
+	// 画像URLが取得できることで「クリック先が存在する」ことを確認する
+	const imagePost = viewedThreadPosts.find((p) =>
+		detect(p.body).some((m) => m.isImage),
+	);
+	assert(imagePost, "画像URLを含むレスが見つかりません");
+
+	const imageMatches = detect(imagePost.body).filter((m) => m.isImage);
+	// クリック時に target="_blank" で開かれる URL を this に保存する
+	(this as any)._clickedImageUrl = imageMatches[0].url;
+});
+
+/**
+ * 原寸の画像が表示される。
+ * 分類: DOM/CSS表示（新タブへの遷移）— サービス層テストで振る舞いを代替検証。
+ * クリックした URL が画像URLであることで「原寸画像が表示される」ことを確認する。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §4.1 方式決定（新タブで target="_blank" href={url}）
+ * See: docs/architecture/bdd_test_strategy.md §7.3
+ */
+Then("原寸の画像が表示される", function (this: BattleBoardWorld) {
+	const { isImageUrl } =
+		require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+	const clickedUrl: string | undefined = (this as any)._clickedImageUrl;
+	assert(clickedUrl, "クリックされた画像URLが設定されていません");
+	assert(
+		isImageUrl(clickedUrl),
+		`クリック先 URL "${clickedUrl}" が画像URLであることを確認`,
+	);
+});
+
+/**
+ * URLはリンクとして表示される。
+ *
+ * BDDサービス層テストとして、`detectUrls` の結果に URL が検出され、
+ * isImage=false であることを確認する（リンクとして表示される対象URL）。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §6.2 非画像URLは <a> リンクとして表示
+ */
+Then("URLはリンクとして表示される", function (this: BattleBoardWorld) {
+	const { detectUrls: detect } =
+		require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+	assert(viewedThreadPosts.length > 0, "レスが存在しません");
+
+	// 少なくとも1件のURLが検出されることを確認する
+	const urlPost = viewedThreadPosts.find((p) => detect(p.body).length > 0);
+	assert(urlPost, "URLを含むレスが見つかりません");
+
+	const allMatches = detect(urlPost.body);
+	assert(allMatches.length > 0, "URLが検出されませんでした");
+	// URL が検出されていること（リンクとして表示可能）
+	assert(
+		allMatches[0].url.startsWith("http"),
+		"URL 文字列が正しく検出されていることを確認",
+	);
+});
+
+/**
+ * サムネイル画像は表示されない。
+ *
+ * BDDサービス層テストとして、`detectUrls` の結果に isImage=true の URL が
+ * 含まれないことを確認する（非画像URLはサムネイル展開されない）。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §7.3 シナリオ3のステップ定義
+ */
+Then("サムネイル画像は表示されない", function (this: BattleBoardWorld) {
+	const { detectUrls: detect } =
+		require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+	assert(viewedThreadPosts.length > 0, "レスが存在しません");
+
+	// 画像URLが検出されないことを確認する（isImage=true のURLなし）
+	const hasImageUrl = viewedThreadPosts.some((p) =>
+		detect(p.body).some((m) => m.isImage),
+	);
+	assert(
+		!hasImageUrl,
+		"サムネイル表示対象の画像URLが検出されました（非表示を期待）",
+	);
+});
+
+/**
+ * {int}つのサムネイル画像が表示される。
+ *
+ * BDDサービス層テストとして、`detectUrls` の結果に isImage=true の URL が
+ * 指定件数分含まれることを確認する（複数画像URLの全展開）。
+ *
+ * See: features/thread.feature @image_preview
+ * See: design.md §7.3 シナリオ4のステップ定義
+ */
+Then(
+	"{int}つのサムネイル画像が表示される",
+	function (this: BattleBoardWorld, expectedCount: number) {
+		const { detectUrls: detect } =
+			require("../../src/lib/domain/rules/url-detector") as typeof import("../../src/lib/domain/rules/url-detector");
+
+		assert(viewedThreadPosts.length > 0, "レスが存在しません");
+
+		// 全レスの画像URL件数を合計する
+		const totalImageCount = viewedThreadPosts.reduce((sum, p) => {
+			return sum + detect(p.body).filter((m) => m.isImage).length;
+		}, 0);
+
+		assert.strictEqual(
+			totalImageCount,
+			expectedCount,
+			`サムネイル画像が ${expectedCount} 件表示されることを期待しましたが ${totalImageCount} 件でした`,
+		);
+	},
+);

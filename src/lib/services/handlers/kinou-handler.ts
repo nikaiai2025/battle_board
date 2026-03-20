@@ -139,10 +139,12 @@ export class KinouHandler implements CommandHandler {
 		// See: tmp/workers/bdd-architect_TASK-208/implementation_plan.md §3.2 「今日のID」の取得
 		const todayDailyId = targetPost.dailyId;
 
-		// ステップ4: 昨日の日付を計算（JST基準）
+		// ステップ4: 昨日の日付を計算（UTC基準）
+		// findByAuthorIdAndDate は UTC の created_at で絞り込むため UTC で統一する
+		// hissi-handler.ts の今日計算（UTC）と対称の方式
 		// Date.now() を使用することで時刻スタブが正しく機能する
 		// See: features/support/world.ts @setCurrentTime
-		const yesterday = getYesterdayJst();
+		const yesterday = getYesterdayUtc();
 
 		// ステップ5: 昨日の書き込みから dailyId を取得（limit=1 で最新1件のみ）
 		// See: tmp/workers/bdd-architect_TASK-208/implementation_plan.md §1.2 案B
@@ -179,21 +181,24 @@ export class KinouHandler implements CommandHandler {
 // ---------------------------------------------------------------------------
 
 /**
- * 昨日の日付文字列（YYYY-MM-DD）を JST 基準で生成する。
+ * 昨日の日付文字列（YYYY-MM-DD）を UTC 基準で生成する。
  * !kinou の「昨日のID」検索に使用する。
+ *
+ * findByAuthorIdAndDate（本番・InMemory 共通）が UTC 基準の日付で絞り込みを行うため、
+ * 渡す日付は UTC 基準で統一する必要がある。
+ * hissi-handler.ts の「今日」計算（UTC ベース）と対称になっている。
+ *
  * Date.now() を使用することで BDD テストの時刻スタブが正しく機能する。
  *
  * See: features/support/world.ts @setCurrentTime
+ * See: src/lib/services/handlers/hissi-handler.ts（今日の日付を UTC で計算する同方式）
  *
- * @returns JST 昨日の日付文字列（YYYY-MM-DD 形式）
+ * @returns UTC 昨日の日付文字列（YYYY-MM-DD 形式）
  */
-function getYesterdayJst(): string {
+function getYesterdayUtc(): string {
 	// Date.now() を使用することで時刻スタブが反映される
 	const now = new Date(Date.now());
-	// JST = UTC+9
-	const jstOffset = 9 * 60 * 60 * 1000;
-	const jstDate = new Date(now.getTime() + jstOffset);
-	// 1日前に戻す
-	jstDate.setUTCDate(jstDate.getUTCDate() - 1);
-	return jstDate.toISOString().slice(0, 10);
+	// UTC の 1日前
+	now.setUTCDate(now.getUTCDate() - 1);
+	return now.toISOString().slice(0, 10);
 }
