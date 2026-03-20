@@ -84,19 +84,24 @@ export const test = base.extend<TestFixtures & TestOptions>({
 	// --- authenticate ---
 	authenticate: async ({ request, context, isProduction, baseURL }, use) => {
 		if (isProduction) {
+			const edgeToken = process.env.PROD_SMOKE_EDGE_TOKEN ?? "";
 			await authenticateProd(context, baseURL!);
+			// edge-token Cookie から /api/mypage 経由で userId を取得する。
+			// context（BrowserContext）と request（APIRequestContext）は Cookie を共有しないため、
+			// request に Cookie ヘッダーを手動付与する。
 			// See: docs/operations/runbooks/seed-smoke-user.md
-			await use({
-				userId:
-					process.env.PROD_SMOKE_USER_ID ??
-					(() => {
-						throw new Error(
-							"PROD_SMOKE_USER_ID is not set in .env.prod.smoke. " +
-								"See: docs/operations/runbooks/seed-smoke-user.md",
-						);
-					})(),
-				edgeToken: process.env.PROD_SMOKE_EDGE_TOKEN ?? "",
+			const mypageRes = await request.get(`${baseURL}/api/mypage`, {
+				headers: { Cookie: `edge-token=${edgeToken}` },
 			});
+			if (!mypageRes.ok()) {
+				throw new Error(
+					`Failed to fetch /api/mypage for userId: ${mypageRes.status()} ${await mypageRes.text()}. ` +
+						"Ensure PROD_SMOKE_EDGE_TOKEN is valid. " +
+						"See: docs/operations/runbooks/seed-smoke-user.md",
+				);
+			}
+			const mypage = (await mypageRes.json()) as { userId: string };
+			await use({ userId: mypage.userId, edgeToken });
 		} else {
 			const result = await authenticateLocal(
 				request,
