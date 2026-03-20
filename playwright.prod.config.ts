@@ -46,7 +46,7 @@ export default defineConfig({
 
 	projects: [
 		{
-			/** Phase A: ナビゲーションテスト（本番） */
+			/** ナビゲーションテスト（本番） */
 			name: "prod-smoke",
 			testDir: "./e2e/smoke",
 			use: {
@@ -57,7 +57,7 @@ export default defineConfig({
 			} as (typeof devices)["Desktop Chrome"] & { isProduction: boolean },
 		},
 		{
-			/** Phase B: フロー検証テスト（本番） */
+			/** ベーシックフローテスト（本番） */
 			name: "prod-flows",
 			testDir: "./e2e/flows",
 			use: {

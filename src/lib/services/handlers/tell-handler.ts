@@ -77,11 +77,7 @@ export class TellHandler implements CommandHandler {
 			accuserId: ctx.userId,
 			targetPostId: targetArg,
 			threadId: ctx.threadId,
-			// accuserDailyId は ctx に含まれないため、CommandContext を拡張するか
-			// PostService が dailyId を解決してから渡す必要がある。
-			// 現フェーズでは ctx.userId を仮の dailyId として使用する。
-			// BDDステップ定義（TASK-079）で正しい dailyId を渡すよう修正する。
-			accuserDailyId: ctx.userId,
+			accuserDailyId: ctx.dailyId,
 		});
 
 		// alreadyAccused の場合はシステムメッセージのみ返す（成功フラグは false）

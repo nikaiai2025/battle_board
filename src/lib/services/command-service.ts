@@ -64,6 +64,8 @@ export interface CommandExecutionInput {
 	threadId: string;
 	/** 通貨引き落とし先のユーザーID */
 	userId: string;
+	/** 実行ユーザーの日次ID（表示用。ハンドラはビジネスロジックには userId を使う） */
+	dailyId: string;
 }
 
 /**
@@ -101,8 +103,10 @@ export interface CommandContext {
 	postId: string;
 	/** スレッドID */
 	threadId: string;
-	/** 実行ユーザーID */
+	/** 実行ユーザーID（内部UUID。ビジネスロジック用） */
 	userId: string;
+	/** 実行ユーザーの日次ID（表示用。"名無しさん(ID:xxx)" の xxx に使用） */
+	dailyId: string;
 }
 
 /**
@@ -604,6 +608,7 @@ export class CommandService {
 			postId: input.postId,
 			threadId: input.threadId,
 			userId: input.userId,
+			dailyId: input.dailyId,
 		};
 
 		const result = await handler.execute(ctx);

@@ -8,7 +8,7 @@
 | 発見者 | 人間（本番手動テスト） |
 | 重大度 | 下表参照 |
 | 種別 | 未実装機能（Phase 3 TODO の残存） |
-| ステータス | Open（修正待ち） |
+| ステータス | Resolved（2026-03-21 修正完了） |
 
 ## 検出された問題一覧
 
@@ -143,3 +143,70 @@ BDDステップ定義内に「Phase N 実装予定」コメントを残してス
 - `features/bot_system.feature` L135-139, L228-243
 - `features/step_definitions/bot_system.steps.ts` L796-808, L1490-1501
 - `src/lib/services/admin-service.ts` L117-138（動作する先行パターン）
+
+---
+
+## 修正履歴
+
+### 2026-03-19: Sprint-70 — eliminationNotice 型・フロー追加（部分修正）
+
+コミット `0336504` で問題 #1 の修正方針（案A）を実装。
+`CommandHandlerResult.eliminationNotice` フィールド追加、PostService Step 9b での独立レス投稿、BDDステップの実検証化。
+
+**しかし本番では依然として撃破通知が表示されなかった。**
+
+### 2026-03-21: attacks.post_id UUID型エラーによるサイレント失敗の修正
+
+#### 真の根本原因
+
+Sprint-70 の修正（eliminationNotice フロー）は正しかったが、それ以前から存在していた別のバグにより本番で効果が発揮されていなかった。
+
+PostService は書き込み処理の Step 5 で CommandService を呼び出す際、レスがまだ INSERT されていないため `postId: ""` を渡す:
+
+```typescript
+// post-service.ts L426
+commandResult = await cmdService.executeCommand({
+    postId: "", // ← INSERT前のためプレースホルダ
+    ...
+});
+```
+
+この空文字が AttackHandler → BotService.recordAttack → AttackRepository.create を通じて `attacks.post_id` カラム（`UUID NOT NULL REFERENCES posts(id)`）に INSERT される。PostgreSQL は UUID 型構文エラーを返し、AttackHandler.executeFlowB 全体が例外で中断。PostService の try-catch がこの例外を握りつぶすため、`commandResult` は null のまま。結果:
+
+- インラインメッセージ（HP変化表示）: 表示されない
+- 撃破報酬: 付与されない
+- eliminationNotice（★システム独立レス）: 投稿されない
+- コスト消費・HP減少・撃破状態変更: 実行済み（B7 より前のため）
+
+#### BDDテストで検出できなかった理由
+
+BDDテストは AttackHandler を PostService 経由ではなく直接呼び出しており、`postId` に `crypto.randomUUID()`（有効な UUID）を渡す。また InMemory AttackRepository は UUID バリデーションや FK 制約チェックを行わない。このため、BDD テストでは `postId: ""` が流入する経路が再現されなかった。
+
+なお、この問題は本番固有ではない。ローカル E2E テスト（Phase B）であれば、実 API → PostService → CommandService の経路を Supabase Local（実 PostgreSQL）上で実行するため、同じ UUID 型エラーが検出可能だった。バグの所在は PostService → CommandService の境界であり、この境界を通過し、かつ実 PostgreSQL を使用するテストであれば環境を問わず検出できる。Phase B テスト（ローカル・本番共通）が未実装だったことが検出遅延の原因。
+
+#### 修正内容
+
+1. `supabase/migrations/00020_attacks_post_id_nullable.sql` — `attacks.post_id` の NOT NULL / FK 制約を削除
+2. `src/lib/infrastructure/repositories/attack-repository.ts` — `Attack.postId` 型を `string | null` に変更
+3. `src/lib/services/handlers/attack-handler.ts` — `ctx.postId || null` で空文字を null に変換
+4. `src/lib/services/bot-service.ts` — `recordAttack` の postId 引数を `string | null` に変更
+
+### 2026-03-21: CommandContext に dailyId が未提供 — 表示文字列に内部UUID露出
+
+上記 post_id nullable 修正により B7-B9 が到達可能になったことで、表示文字列に新たな不具合が判明。
+AttackHandler のインラインメッセージ・撃破通知が `ctx.userId`（内部UUID）を使用しており、BDD仕様が期待する日次ID形式（例: `Gz4nP7`）と不一致。`CommandContext` に `dailyId` フィールドが存在しなかったことが原因。
+
+修正: `CommandExecutionInput` / `CommandContext` に `dailyId` を追加し、PostService Step 4 の生成結果を Step 5 経由でハンドラに伝播。同じ問題を持っていた TellHandler（`accuserDailyId` の仮実装）も同時に修正。
+
+---
+
+## 横展開調査（Q9）
+
+`postId: ""` と同じパターン（UUID列に到達し得る空文字プレースホルダ）をコードベース全体で検索した結果:
+
+| # | 箇所 | パターン | リスク | 対処要否 |
+|---|---|---|---|---|
+| 1 | `post-service.ts` L428 `userId: resolvedAuthorId ?? ""` | 未ログインユーザーの場合 `ctx.userId` が `""` になり得る | 低（コマンドハンドラが事前に認証済みユーザーを要求するため到達しない） | 不要 |
+| 2 | `post-service.ts` L430-434 try-catch パターン | コマンド実行の全例外をサイレントに握りつぶす | 中（新コマンド追加時に同種のサイレント失敗を引き起こす構造） | 要注意 |
+
+教訓として LL-011 を `docs/architecture/lessons_learned.md` に追記。

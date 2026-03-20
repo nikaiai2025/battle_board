@@ -1,5 +1,5 @@
 /**
- * E2E フロー検証テスト: 基本フロー（環境共通）
+ * E2E ベーシックフローテスト（環境共通）
  *
  * 認証済み状態から書き込み→コマンド→専ブラAPI確認→管理者削除の一連のフローを検証する。
  * ローカル・本番の両環境で実行される（環境差分はフィクスチャが吸収）。
@@ -10,7 +10,7 @@
  *   3. 専ブラAPI整合（書き込みデータが subject.txt / DAT に反映）
  *   4. 管理者テストデータ削除（削除完了 + 公開API消失確認）
  *
- * See: docs/architecture/bdd_test_strategy.md §10.3 フロー検証テスト（Phase B）
+ * See: docs/architecture/bdd_test_strategy.md §10.3 ベーシックフローテスト・認証テスト
  * See: docs/architecture/bdd_test_strategy.md §10.3.2 検証範囲
  * See: docs/architecture/bdd_test_strategy.md §10.3.4 安全性制約
  */

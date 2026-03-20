@@ -54,7 +54,7 @@ export interface IAttackBotService {
 	recordAttack(
 		attackerId: string,
 		botId: string,
-		postId: string,
+		postId: string | null,
 		damage: number,
 	): Promise<void>;
 }
@@ -280,17 +280,20 @@ export class AttackHandler implements CommandHandler {
 
 		// B7: 攻撃記録
 		// See: docs/architecture/components/attack.md §3.3 B7
+		// ctx.postId はコマンド実行時点でレス未作成のため空文字の場合がある。
+		// attacks.post_id は nullable のため、空文字を null に変換して渡す。
+		// See: supabase/migrations/00020_attacks_post_id_nullable.sql
 		await this.botService.recordAttack(
 			ctx.userId,
 			botInfo.botId,
-			ctx.postId,
+			ctx.postId || null,
 			this.damage,
 		);
 
 		// B9: インライン・システム情報生成
 		// See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
 		// "⚔ 名無しさん(ID:{attackerDailyId}) → 🤖{botName} に攻撃！ HP:{prev}→{remaining}"
-		const inlineMsg = `⚔ 名無しさん(ID:${ctx.userId}) → 🤖${botInfo.name} に攻撃！ HP:${damageResult.previousHp}→${damageResult.remainingHp}`;
+		const inlineMsg = `⚔ 名無しさん(ID:${ctx.dailyId}) → 🤖${botInfo.name} に攻撃！ HP:${damageResult.previousHp}→${damageResult.remainingHp}`;
 
 		if (damageResult.eliminated && damageResult.reward !== null) {
 			// B8: 撃破時 → 撃破報酬付与 + 撃破通知
@@ -310,7 +313,7 @@ export class AttackHandler implements CommandHandler {
 			const eliminationNoticeBody = [
 				`⚔️ ボット「${botInfo.name}」が撃破されました！`,
 				`生存日数：${botInfo.survivalDays}日 / 総書き込み：${botInfo.totalPosts}件 / 被告発：${botInfo.accusedCount}回`,
-				`撃破者：名無しさん(ID:${ctx.userId}) に撃破報酬 +${damageResult.reward}`,
+				`撃破者：名無しさん(ID:${ctx.dailyId}) に撃破報酬 +${damageResult.reward}`,
 			].join("\n");
 
 			return {

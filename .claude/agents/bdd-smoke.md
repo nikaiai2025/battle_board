@@ -60,12 +60,12 @@ npx playwright test --config=playwright.prod.config.ts
 
 ## テスト対象
 
-テストは `playwright.prod.config.ts` で定義された2プロジェクト構成で実行される。`e2e/smoke/`（Phase A: ナビゲーション）と `e2e/flows/`（Phase B: フロー検証）を `isProduction=true` フィクスチャオプション付きで実行する。テスト設計の詳細は `docs/architecture/bdd_test_strategy.md` §10 を参照。
+テストは `playwright.prod.config.ts` で定義された2プロジェクト構成で実行される。`e2e/smoke/`（ナビゲーションテスト）と `e2e/flows/`（ベーシックフローテスト）を `isProduction=true` フィクスチャオプション付きで実行する。認証テストはローカル限定のため本番では `test.skip` でスキップされる。テスト設計の詳細は `docs/architecture/bdd_test_strategy.md` §10 を参照。
 
-| Phase | 内容 | 設計定義 |
+| テスト | 内容 | 設計定義 |
 |---|---|---|
-| A: ナビゲーション | 全ページ・主要APIの到達性検証（GET のみ） | §10.2 |
-| B: フロー検証 | 書き込み→コマンド→専ブラ反映→管理者削除 | §10.3 |
+| ナビゲーションテスト | 全ページ・主要APIの到達性検証（GET のみ） | §10.2 |
+| ベーシックフローテスト | 書き込み→コマンド→専ブラ反映→管理者削除 | §10.3 |
 
 ---
 

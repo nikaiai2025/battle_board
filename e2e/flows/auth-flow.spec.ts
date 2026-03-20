@@ -1,12 +1,12 @@
 /**
- * E2E フロー検証テスト: 認証UI連結フロー（ローカル限定）
+ * E2E 認証テスト（ローカルのみ）
  *
  * 未認証→401→AuthModal→認証コード入力→認証成功→操作リトライの連結フローが
  * 正常に動作することを検証する。
  *
  * 本番ではTurnstile制約により自動テスト不可能なため、ローカル限定テストとする。
  *
- * See: docs/architecture/bdd_test_strategy.md §10.3.1 テストケースの環境分類
+ * See: docs/architecture/bdd_test_strategy.md §10.3.1 ベーシックフローテストと認証テストの分類
  * See: docs/architecture/bdd_test_strategy.md §10.3.3 auth-flow.spec.ts
  */
 

@@ -30,8 +30,8 @@ export interface Attack {
 	botId: string;
 	/** 攻撃実施日（JST, YYYY-MM-DD） */
 	attackDate: string;
-	/** 攻撃が含まれたレスの post_id */
-	postId: string;
+	/** 攻撃が含まれたレスの post_id（コマンド実行時点でレス未作成のため null） */
+	postId: string | null;
 	/** 与ダメージ */
 	damage: number;
 	/** 攻撃日時 */
@@ -48,7 +48,7 @@ interface AttackRow {
 	attacker_id: string;
 	bot_id: string;
 	attack_date: string;
-	post_id: string;
+	post_id: string | null;
 	damage: number;
 	created_at: string;
 }
@@ -66,7 +66,7 @@ function rowToAttack(row: AttackRow): Attack {
 		attackerId: row.attacker_id,
 		botId: row.bot_id,
 		attackDate: row.attack_date,
-		postId: row.post_id,
+		postId: row.post_id ?? null,
 		damage: row.damage,
 		createdAt: new Date(row.created_at),
 	};

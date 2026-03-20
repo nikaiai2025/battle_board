@@ -48,6 +48,7 @@ function createCtx(overrides: Partial<CommandContext> = {}): CommandContext {
 		postId: "post-attacker-001",
 		threadId: "thread-001",
 		userId: "attacker-user-001",
+		dailyId: "Gz4nP7Xk",
 		...overrides,
 	};
 }

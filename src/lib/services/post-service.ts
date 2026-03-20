@@ -426,6 +426,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				postId: "", // postId は INSERT 前のためプレースホルダ（コマンド実行には不要）
 				threadId: input.threadId,
 				userId: resolvedAuthorId ?? "",
+				dailyId, // Step 4 で生成済み。ハンドラの表示文字列（"名無しさん(ID:xxx)"）に使用
 			});
 		} catch (err) {
 			// コマンド実行失敗は書き込みを巻き戻さない

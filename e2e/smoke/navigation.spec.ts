@@ -1,5 +1,5 @@
 /**
- * E2E ナビゲーションテスト: 全ページの到達性検証（Phase A）
+ * E2E ナビゲーションテスト: 全ページの到達性検証
  *
  * 全ページの到達性・JSエラーなし・主要UI要素の存在を検証する。
  * ビジネスロジックの正しさやデータの正確性は検証しない。
@@ -21,7 +21,7 @@
  * 12. IP BAN管理 /admin/ip-bans（管理者認証必須）
  * 13. 旧スレッドURLリダイレクト /threads/[threadId]
  *
- * See: docs/architecture/bdd_test_strategy.md §10.2 ナビゲーションテスト（Phase A）
+ * See: docs/architecture/bdd_test_strategy.md §10.2 ナビゲーションテスト
  * See: docs/architecture/bdd_test_strategy.md §10.2.5 増減基準
  */
 

@@ -129,6 +129,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toContain("対象レスを指定してください");
@@ -144,6 +145,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toContain("見つかりません");
@@ -160,6 +162,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toBe("システムメッセージは対象にできません");
@@ -176,6 +179,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toBe("削除されたレスは対象にできません");
@@ -192,6 +196,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toBe("このレスは対象にできません");
@@ -206,6 +211,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(true);
 		expect(result.systemMessage).toBeNull();
@@ -232,6 +238,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(true);
 		expect(result.independentMessage).toContain("（1件）");
@@ -260,6 +267,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(true);
 		expect(result.independentMessage).toContain("（3件）");
@@ -290,6 +298,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(true);
 		expect(result.independentMessage).toContain("（5件中3件表示）");
@@ -319,6 +328,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		const msg = result.independentMessage ?? "";
 		expect(msg).toContain("[雑談スレ]");
@@ -342,6 +352,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.independentMessage).toContain("ID:Ax8kP2 の本日の書き込み");
 	});
@@ -375,6 +386,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		const msg = result.independentMessage ?? "";
 		expect(msg).toContain("[雑談スレ]");
@@ -413,6 +425,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 
 		// 時系列順: おはよう → 昼休み → ただいま の順に現れること
@@ -438,6 +451,7 @@ describe("HissiHandler", () => {
 			postId: "p1",
 			threadId: THREAD_1_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.independentMessage).toBeUndefined();

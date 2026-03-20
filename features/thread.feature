@@ -247,3 +247,33 @@ Feature: スレッド管理
     And ユーザーがレス1-100のページを表示している
     When 新しいレス251が書き込まれる
     Then 画面は更新されない
+  # ===========================================
+  # 画像URLのサムネイル表示
+  # ===========================================
+
+  @image_preview
+  Scenario: 画像URLがサムネイルとして展開表示される
+    Given スレッドにレス "https://i.imgur.com/example.jpg" が存在する
+    When スレッドを表示する
+    Then 画像URLがクリック可能なサムネイル画像として表示される
+    And 元のURLテキストも表示される
+
+  @image_preview
+  Scenario: サムネイルをクリックすると原寸画像が表示される
+    Given スレッドに画像URL付きのレスが存在する
+    And サムネイルが表示されている
+    When サムネイルをクリックする
+    Then 原寸の画像が表示される
+
+  @image_preview
+  Scenario: 画像以外のURLはサムネイル展開されない
+    Given スレッドにレス "https://example.com/page" が存在する
+    When スレッドを表示する
+    Then URLはリンクとして表示される
+    And サムネイル画像は表示されない
+
+  @image_preview
+  Scenario: 複数の画像URLが1つのレスに含まれる場合すべて展開される
+    Given スレッドにレス "画像1 https://i.imgur.com/a.jpg 画像2 https://i.imgur.com/b.png" が存在する
+    When スレッドを表示する
+    Then 2つのサムネイル画像が表示される

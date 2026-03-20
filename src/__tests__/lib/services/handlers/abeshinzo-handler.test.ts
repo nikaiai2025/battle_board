@@ -14,6 +14,7 @@ describe("AbeshinzoHandler", () => {
 			postId: "post-1",
 			threadId: "thread-1",
 			userId: "user-1",
+			dailyId: "test-daily-id",
 		});
 
 		expect(result).toEqual({
@@ -29,6 +30,7 @@ describe("AbeshinzoHandler", () => {
 			postId: "post-1",
 			threadId: "thread-1",
 			userId: "user-1",
+			dailyId: "test-daily-id",
 		});
 
 		expect(result.eliminationNotice).toBe("意味のないコマンドだよ");

@@ -192,6 +192,7 @@ function createInput(rawCommand: string): CommandExecutionInput {
 		postId: "post-uuid-001",
 		threadId: "thread-uuid-001",
 		userId: "user-uuid-001",
+		dailyId: "test-daily-id",
 	};
 }
 

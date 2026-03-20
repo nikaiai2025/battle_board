@@ -82,8 +82,8 @@ export default defineConfig({
 	/**
 	 * テストプロジェクトの定義。
 	 *
-	 * - e2e: フロー検証テスト — Phase B（e2e/flows/ 配下）
-	 * - smoke: ナビゲーションテスト — Phase A（e2e/smoke/ 配下）
+	 * - e2e: ベーシックフローテスト + 認証テスト（e2e/flows/ 配下）
+	 * - smoke: ナビゲーションテスト（e2e/smoke/ 配下）
 	 * - api: HTTPレベルAPIテスト（e2e/api/ 配下）
 	 *
 	 * 除外:

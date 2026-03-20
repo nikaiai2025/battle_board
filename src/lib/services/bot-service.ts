@@ -533,13 +533,13 @@ export class BotService {
 	 *
 	 * @param attackerId - 攻撃者のユーザーID
 	 * @param botId - 攻撃対象ボットID
-	 * @param postId - 攻撃が含まれたレスID
+	 * @param postId - 攻撃が含まれたレスID（コマンド実行時点でレス未作成のため null の場合がある）
 	 * @param damage - 与ダメージ
 	 */
 	async recordAttack(
 		attackerId: string,
 		botId: string,
-		postId: string,
+		postId: string | null,
 		damage: number,
 	): Promise<void> {
 		const today = this.getTodayJst();

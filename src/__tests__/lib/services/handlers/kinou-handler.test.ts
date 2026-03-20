@@ -92,6 +92,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toContain("対象レスを指定してください");
@@ -107,6 +108,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toContain("見つかりません");
@@ -123,6 +125,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toBe("システムメッセージは対象にできません");
@@ -139,6 +142,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toBe("削除されたレスは対象にできません");
@@ -155,6 +159,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toBe("このレスは対象にできません");
@@ -177,6 +182,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(true);
 		expect(result.systemMessage).toBeNull();
@@ -193,6 +199,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(true);
 		expect(result.systemMessage).toBeNull();
@@ -214,6 +221,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.independentMessage).toContain("ID:Cx9nR3");
 	});
@@ -234,6 +242,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.independentMessage).toContain("ID:Bz3mQ9");
 	});
@@ -246,6 +255,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(postRepo.findByAuthorIdAndDate).toHaveBeenCalledWith(
 			USER_ID,
@@ -265,6 +275,7 @@ describe("KinouHandler", () => {
 			postId: "p1",
 			threadId: THREAD_ID,
 			userId: USER_ID,
+			dailyId: "test-daily-id",
 		});
 		expect(result.success).toBe(false);
 		expect(result.independentMessage).toBeUndefined();
