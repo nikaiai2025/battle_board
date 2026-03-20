@@ -58,12 +58,28 @@ commands:
     description: "指定レスをAIだと告発する"
     cost: 50
     targetFormat: ">>postNumber"
+    responseType: inline
     enabled: true
     stealth: false
   w:
     description: "指定レスに草を生やす"
     cost: 0
     targetFormat: ">>postNumber"
+    responseType: inline
+    enabled: true
+    stealth: false
+  hissi:
+    description: "対象ユーザーの本日の書き込みを表示"
+    cost: 20
+    targetFormat: ">>postNumber"
+    responseType: independent
+    enabled: true
+    stealth: false
+  kinou:
+    description: "対象ユーザーの昨日のIDを表示"
+    cost: 20
+    targetFormat: ">>postNumber"
+    responseType: independent
     enabled: true
     stealth: false
 ```
@@ -73,6 +89,7 @@ commands:
 | description | string | ユーザー向け説明文（ヘルプページ表示用） |
 | cost | number | 通貨コスト（0 = 無料） |
 | targetFormat | string \| null | 必要な引数の形式（null = 引数なし） |
+| responseType | "inline" \| "independent" | 結果の表示方式。inline=レス内マージ（方式A）、independent=独立システムレス（方式B）。エラー時は responseType に関わらず常にレス内マージ |
 | enabled | boolean | falseにするとコマンド無効化（存在しないコマンドと同等の扱い） |
 | stealth | boolean | trueの場合、コマンド文字列が本文から除去される（Phase 2ではすべてfalse） |
 

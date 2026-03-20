@@ -85,8 +85,16 @@ export const test = base.extend<TestFixtures & TestOptions>({
 	authenticate: async ({ request, context, isProduction, baseURL }, use) => {
 		if (isProduction) {
 			await authenticateProd(context, baseURL!);
+			// See: docs/operations/runbooks/seed-smoke-user.md
 			await use({
-				userId: "prod-smoke-user",
+				userId:
+					process.env.PROD_SMOKE_USER_ID ??
+					(() => {
+						throw new Error(
+							"PROD_SMOKE_USER_ID is not set in .env.prod.smoke. " +
+								"See: docs/operations/runbooks/seed-smoke-user.md",
+						);
+					})(),
 				edgeToken: process.env.PROD_SMOKE_EDGE_TOKEN ?? "",
 			});
 		} else {

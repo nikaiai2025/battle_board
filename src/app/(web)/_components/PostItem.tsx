@@ -51,23 +51,33 @@ export interface Post {
 const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 /**
- * 日時を YYYY/MM/DD(ddd) HH:mm:ss 形式にフォーマットする。
+ * 日時を YYYY/MM/DD(ddd) HH:mm:ss 形式（JST固定）にフォーマットする。
+ *
+ * UTC メソッド + 9時間オフセットで JST を計算することで、
+ * サーバー（Cloudflare Workers: UTC）とクライアント（ブラウザ: 任意TZ）の
+ * 両方で同一の JST 日時文字列を出力し、React hydration mismatch を防ぐ。
+ *
+ * タイムゾーン依存メソッド（getFullYear等）は一切使用しない。
  *
  * See: docs/specs/screens/thread-view.yaml > post-datetime > format
+ * See: tmp/workers/bdd-architect_TASK-204/analysis.md §4 修正方針
  *
  * @param dateStr - ISO8601形式の日時文字列
- * @returns フォーマット済み日時文字列
+ * @returns フォーマット済み日時文字列（JST固定）
  */
 export function formatDateTime(dateStr: string): string {
 	const date = new Date(dateStr);
+	// JST = UTC + 9時間。UTCメソッドで取得することでサーバー・クライアント問わず
+	// 環境非依存の同一 JST 日時文字列を出力する。
+	const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
 
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, "0");
-	const day = String(date.getDate()).padStart(2, "0");
-	const dayName = DAY_NAMES[date.getDay()];
-	const hours = String(date.getHours()).padStart(2, "0");
-	const minutes = String(date.getMinutes()).padStart(2, "0");
-	const seconds = String(date.getSeconds()).padStart(2, "0");
+	const year = jst.getUTCFullYear();
+	const month = String(jst.getUTCMonth() + 1).padStart(2, "0");
+	const day = String(jst.getUTCDate()).padStart(2, "0");
+	const dayName = DAY_NAMES[jst.getUTCDay()];
+	const hours = String(jst.getUTCHours()).padStart(2, "0");
+	const minutes = String(jst.getUTCMinutes()).padStart(2, "0");
+	const seconds = String(jst.getUTCSeconds()).padStart(2, "0");
 
 	return `${year}/${month}/${day}(${dayName}) ${hours}:${minutes}:${seconds}`;
 }

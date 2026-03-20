@@ -18,8 +18,9 @@
 
 | TASK_ID | 内容 | 担当 | 状態 | depends_on | locked_files |
 |---|---|---|---|---|---|
-| TASK-202 | TSC型エラー74件修正 + pre-commit hook導入 | bdd-coding | assigned | - | 13テストファイル + package.json + .husky/ |
-| TASK-203 | スレッド休眠(is_dormant)実装 | bdd-coding | pending | TASK-202 | thread.ts, thread-repository.ts, post-service.ts, subject.txt route等 |
+| TASK-202 | TSC型エラー74件修正 + pre-commit hook導入 | bdd-coding | completed | - | 13テストファイル + package.json + .husky/ |
+| TASK-203 | スレッド休眠(is_dormant)実装 | bdd-coding | completed | TASK-202 | thread.ts, thread-repository.ts, post-service.ts, subject.txt route等 |
+| TASK-SMOKE-75 | 本番スモークテスト | bdd-smoke | failed | - | - |
 
 ## 依存関係
 
@@ -30,4 +31,10 @@ TASK-202 → TASK-203（直列）
 
 ## 結果
 
-<!-- スプリント完了後に記入 -->
+- TASK-202: completed — tsc 0エラー / vitest 1412件 / cucumber 240件 / husky pre-commit導入
+- TASK-203: completed — is_dormant実装 / vitest 1431件(+19) / cucumber 240件(BDD2シナリオ新規PASS) / tsc 0エラー
+- TASK-SMOKE-75: failed — 18/24 PASS, 5 FAIL（下記）
+  - React hydration #418: スレッドページ3件（Sprint-75変更対象外、既存問題の可能性大）
+  - Admin user detail: #user-basic-info要素未検出（Sprint-75変更対象外）
+  - inlineSystemInfo: 草コマンド自己レス制約による期待値不一致（テストシナリオ側の問題）
+- コミット: b04feb1 — push済み、Vercel Ready確認済み
