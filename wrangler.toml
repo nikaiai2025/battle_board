@@ -8,9 +8,9 @@
 # ビルド出力: .open-next/worker.js（メインワーカー） + .open-next/assets/（静的アセット）
 
 name = "battle-board"
-# カスタムエントリポイント: scheduled ハンドラを追加するために .open-next/worker.js をラップする
-# See: src/cf-scheduled.ts, docs/architecture/architecture.md §12.2, TDR-013
-main = "src/cf-scheduled.ts"
+# エントリポイント: build-cf.mjs がビルド後に scheduled ハンドラ付きの worker.js を生成する
+# See: scripts/build-cf.mjs, docs/architecture/architecture.md §12.2, TDR-013
+main = ".open-next/worker.js"
 compatibility_date = "2026-03-14"
 compatibility_flags = ["nodejs_compat"]
 
