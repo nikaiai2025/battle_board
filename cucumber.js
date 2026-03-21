@@ -68,6 +68,9 @@ module.exports = {
 			// TASK-210: 調査コマンド(!hissi/!kinou) BDD シナリオ追加
 			// See: features/investigation.feature
 			"features/investigation.feature",
+			// TASK-248: ウェルカムシーケンス BDD シナリオ追加
+			// See: features/welcome.feature
+			"features/welcome.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -108,6 +111,9 @@ module.exports = {
 			// TASK-210: 調査コマンド(!hissi/!kinou) BDD ステップ定義
 			// See: features/investigation.feature
 			"features/step_definitions/investigation.steps.ts",
+			// TASK-248: ウェルカムシーケンス BDD ステップ定義
+			// See: features/welcome.feature
+			"features/step_definitions/welcome.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

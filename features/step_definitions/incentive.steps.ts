@@ -26,6 +26,9 @@ import {
 	InMemoryUserRepo,
 } from "../support/mock-installer";
 import type { BattleBoardWorld, UserContext } from "../support/world";
+// ウェルカムシーケンス抑止用ヘルパー（TASK-248 で追加）
+// See: features/welcome.feature
+import { seedDummyPost } from "./common.steps";
 
 // ---------------------------------------------------------------------------
 // テスト用定数
@@ -60,6 +63,8 @@ async function ensureNamedUser(
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 		ctx = {
 			userId,
 			edgeToken: token,

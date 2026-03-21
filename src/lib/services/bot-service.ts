@@ -145,6 +145,25 @@ export interface IBotRepository {
 	 * See: docs/architecture/architecture.md §13 TDR-010
 	 */
 	findDueForPost(): Promise<Bot[]>;
+	/**
+	 * 新規ボットを作成する。
+	 * processPendingTutorials でチュートリアルBOTのスポーン時に使用する。
+	 * See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	 * See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+	 */
+	create(
+		bot: Omit<
+			Bot,
+			| "id"
+			| "createdAt"
+			| "survivalDays"
+			| "totalPosts"
+			| "accusedCount"
+			| "timesAttacked"
+			| "eliminatedAt"
+			| "eliminatedBy"
+		>,
+	): Promise<Bot>;
 }
 
 /**
@@ -193,6 +212,39 @@ export interface IAttackRepository {
 	): Promise<Attack | null>;
 	create(attack: Omit<Attack, "id" | "createdAt">): Promise<Attack>;
 	deleteByDateBefore(beforeDate: string): Promise<number>;
+}
+
+/**
+ * PendingTutorialRepository の依存インターフェース。
+ * チュートリアルBOTスポーン待ちキューの取得・削除に使用する。
+ * See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+ * See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+ */
+export interface IPendingTutorialRepository {
+	findAll(): Promise<
+		Array<{
+			id: string;
+			userId: string;
+			threadId: string;
+			triggerPostNumber: number;
+			createdAt: Date;
+		}>
+	>;
+	deletePendingTutorial(id: string): Promise<void>;
+}
+
+/**
+ * チュートリアルBOTスポーン処理の個別結果型。
+ * See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+ * See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+ */
+export interface TutorialResult {
+	pendingId: string;
+	success: boolean;
+	botId?: string;
+	postId?: string;
+	postNumber?: number;
+	error?: string;
 }
 
 /**
@@ -278,6 +330,8 @@ export class BotService {
 	 * @param resolveStrategiesFn - Strategy 解決関数（DI・省略時はデフォルト resolveStrategies）
 	 *   テスト時にモックの Strategy を注入するために使用する。
 	 *   See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+	 * @param pendingTutorialRepository - チュートリアルBOTスポーン待ちキュー（DI・省略可）
+	 *   See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
 	 */
 	constructor(
 		private readonly botRepository: IBotRepository,
@@ -287,6 +341,7 @@ export class BotService {
 		private readonly threadRepository?: IThreadRepository,
 		private readonly createPostFn?: CreatePostFn,
 		private readonly resolveStrategiesFn?: ResolveStrategiesFn,
+		private readonly pendingTutorialRepository?: IPendingTutorialRepository,
 	) {
 		// ボットプロファイルデータをキャッシュする
 		// Cloudflare Workers 環境では fs.readFileSync が使えないため、
@@ -675,11 +730,18 @@ export class BotService {
 	 *
 	 * @param botId - ボットID
 	 * @param threadId - 書き込み先スレッドID（省略時は BehaviorStrategy が決定）
+	 * @param contextOverrides - チュートリアルBOT用コンテキストオーバーライド（省略可）
+	 *   See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	 *   See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
 	 * @returns 書き込み結果
 	 */
 	async executeBotPost(
 		botId: string,
 		threadId?: string,
+		contextOverrides?: {
+			tutorialTargetPostNumber?: number;
+			tutorialThreadId?: string;
+		},
 	): Promise<{
 		postId: string;
 		postNumber: number;
@@ -725,10 +787,15 @@ export class BotService {
 		} else {
 			// v6 新規フロー: BehaviorStrategy に投稿先を委譲する
 			// See: docs/architecture/components/bot.md §2.1 Strategy 委譲版フロー
+			// チュートリアルBOT用: contextOverrides.tutorialThreadId が指定されていればBehaviorContextに渡す
+			// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
 			const behaviorContext: BehaviorContext = {
 				botId,
 				botProfileKey: bot.botProfileKey,
 				boardId: BOT_DEFAULT_BOARD_ID,
+				...(contextOverrides?.tutorialThreadId && {
+					tutorialThreadId: contextOverrides.tutorialThreadId,
+				}),
 			};
 			const action = await strategies.behavior.decideAction(behaviorContext);
 
@@ -744,11 +811,16 @@ export class BotService {
 		}
 
 		// Step 5: ContentStrategy で本文生成
+		// チュートリアルBOT用: contextOverrides.tutorialTargetPostNumber を ContentGenerationContext に渡す
 		// See: docs/architecture/components/bot.md §2.1 Strategy 委譲版フロー Step 3
+		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
 		const contentContext: ContentGenerationContext = {
 			botId,
 			botProfileKey: bot.botProfileKey,
 			threadId: resolvedThreadId,
+			...(contextOverrides?.tutorialTargetPostNumber !== undefined && {
+				tutorialTargetPostNumber: contextOverrides.tutorialTargetPostNumber,
+			}),
 		};
 		const body = await strategies.content.generateContent(contentContext);
 
@@ -820,6 +892,100 @@ export class BotService {
 			postNumber: result.postNumber,
 			dailyId,
 		};
+	}
+
+	// ---------------------------------------------------------------------------
+	// チュートリアルBOT pending 処理
+	// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * チュートリアルBOTのスポーン待ちキューを処理する。
+	 *
+	 * 処理フロー:
+	 *   1. PendingTutorialRepository.findAll() で未処理の pending を取得
+	 *   2. 各 pending に対して:
+	 *      a. BotRepository.create() でチュートリアルBOTを新規作成
+	 *      b. executeBotPost(newBotId, undefined, contextOverrides) で書き込み実行
+	 *      c. PendingTutorialRepository.delete(pendingId) で pending を削除
+	 *   3. 結果を返す
+	 *
+	 * See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	 * See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+	 *
+	 * @returns 処理件数と各pendingの個別結果
+	 */
+	async processPendingTutorials(): Promise<{
+		processed: number;
+		results: TutorialResult[];
+	}> {
+		// pendingTutorialRepository が未注入の場合は何もしない
+		if (!this.pendingTutorialRepository) {
+			return { processed: 0, results: [] };
+		}
+
+		const pendingList = await this.pendingTutorialRepository.findAll();
+
+		if (pendingList.length === 0) {
+			return { processed: 0, results: [] };
+		}
+
+		const results: TutorialResult[] = [];
+
+		for (const pending of pendingList) {
+			try {
+				// Step 2a: チュートリアルBOT新規作成
+				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.i
+				const today = this.getTodayJst();
+				const newBot = await this.botRepository.create({
+					name: "名無しさん",
+					persona: "チュートリアル",
+					hp: 10,
+					maxHp: 10,
+					dailyId: this.generateFakeDailyId(),
+					dailyIdDate: today,
+					isActive: true,
+					isRevealed: false,
+					revealedAt: null,
+					botProfileKey: "tutorial",
+					nextPostAt: new Date(),
+				});
+
+				// Step 2b: executeBotPost で書き込み実行（contextOverrides 付き）
+				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.ii
+				const postResult = await this.executeBotPost(newBot.id, undefined, {
+					tutorialTargetPostNumber: pending.triggerPostNumber,
+					tutorialThreadId: pending.threadId,
+				});
+
+				// Step 2c: pending 削除
+				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.iii
+				await this.pendingTutorialRepository.deletePendingTutorial(pending.id);
+
+				results.push({
+					pendingId: pending.id,
+					success: true,
+					botId: newBot.id,
+					postId: postResult?.postId,
+					postNumber: postResult?.postNumber,
+				});
+			} catch (err) {
+				const errorMessage =
+					err instanceof Error ? err.message : "Unknown error";
+				console.error(
+					`BotService.processPendingTutorials: pending=${pending.id} の処理に失敗`,
+					err,
+				);
+				results.push({
+					pendingId: pending.id,
+					success: false,
+					error: errorMessage,
+				});
+			}
+		}
+
+		return { processed: pendingList.length, results };
 	}
 
 	// ---------------------------------------------------------------------------
@@ -1137,12 +1303,22 @@ export function createBotService(): BotService {
 	const ThreadRepository = require("../infrastructure/repositories/thread-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const { createPost } = require("./post-service");
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const PendingTutorialRepository = require("../infrastructure/repositories/pending-tutorial-repository");
 
 	// IThreadRepository アダプタ: ThreadRepository.findByBoardId を IBotService.IThreadRepository に適合させる
 	// findByBoardId は options 引数が省略可能なため、boardId のみ渡すシグネチャで適合する
 	// See: src/lib/infrastructure/repositories/thread-repository.ts > findByBoardId
 	const threadRepository: IThreadRepository = {
 		findByBoardId: (boardId: string) => ThreadRepository.findByBoardId(boardId),
+	};
+
+	// IPendingTutorialRepository アダプタ
+	// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	const pendingTutorialRepository: IPendingTutorialRepository = {
+		findAll: () => PendingTutorialRepository.findAll(),
+		deletePendingTutorial: (id: string) =>
+			PendingTutorialRepository.deletePendingTutorial(id),
 	};
 
 	return new BotService(
@@ -1152,5 +1328,7 @@ export function createBotService(): BotService {
 		undefined, // botProfilesData（省略 → コンストラクタ内で botProfilesConfig をデフォルト使用）
 		threadRepository, // executeBotPost の BehaviorStrategy でスレッド選択に使用
 		createPost, // executeBotPost で PostService.createPost を呼び出すために使用
+		undefined, // resolveStrategiesFn（省略 → デフォルトの resolveStrategies を使用）
+		pendingTutorialRepository, // processPendingTutorials で使用
 	);
 }

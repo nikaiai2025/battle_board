@@ -64,12 +64,16 @@ import assert from "assert";
 import type { IncentiveLog } from "../../src/lib/domain/models/incentive";
 import {
 	InMemoryBotPostRepo,
+	InMemoryCurrencyRepo,
 	InMemoryIncentiveLogRepo,
 	InMemoryPostRepo,
 	InMemoryThreadRepo,
 	InMemoryUserRepo,
 } from "../support/mock-installer";
 import type { BattleBoardWorld } from "../support/world";
+// ウェルカムシーケンス抑止用ヘルパー（TASK-248 で追加）
+// See: features/welcome.feature
+import { seedDummyPost } from "./common.steps";
 
 // ---------------------------------------------------------------------------
 // サービス層の動的 require ヘルパー
@@ -601,6 +605,8 @@ async function ensureCurrentUserAndThread(
 		world.currentUserId = userId;
 		world.currentIpHash = `${IP_HASH_PREFIX}-current`;
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 	}
 
 	if (!world.currentThreadId) {
@@ -664,6 +670,8 @@ async function ensureNamedUserForGrass(
 	const ipHash = `${IP_HASH_PREFIX}-${name}`;
 	const { userId } = await AuthService.issueEdgeToken(ipHash);
 	await InMemoryUserRepo.updateIsVerified(userId, true);
+	// ウェルカムシーケンス抑止（TASK-248）
+	seedDummyPost(userId);
 
 	grassState.userNameToId.set(name, userId);
 
@@ -875,6 +883,8 @@ Given(
 				const result = await AuthService.issueEdgeToken(ipHash);
 				userId = result.userId;
 				await InMemoryUserRepo.updateIsVerified(userId, true);
+				// ウェルカムシーケンス抑止（TASK-248）
+				seedDummyPost(userId);
 				grassState.userNameToId.set(userName, userId);
 				this.setNamedUser(userName, {
 					userId,
@@ -1144,6 +1154,26 @@ Given(
 		const { userId: postAuthorId } = await AuthService.issueEdgeToken(
 			`${IP_HASH_PREFIX}-deleted-author`,
 		);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(postAuthorId);
+
+		// 通貨残高がデフォルト 0 のままだとコマンド実行時に
+		// CommandService Step 3 の通貨不足チェックで弾かれる（TASK-248）。
+		// 明示的に「ユーザーの通貨残高が N である」を設定していないシナリオのために
+		// デフォルト値を付与する。既に設定済みの場合はスキップする。
+		// See: src/lib/services/command-service.ts §Step 3
+		{
+			const balance = await InMemoryCurrencyRepo.getBalance(
+				this.currentUserId!,
+			);
+			if (balance === 0) {
+				InMemoryCurrencyRepo._upsert({
+					userId: this.currentUserId!,
+					balance: 100,
+					updatedAt: new Date(Date.now()),
+				});
+			}
+		}
 
 		const postId = crypto.randomUUID();
 		InMemoryPostRepo._insert({

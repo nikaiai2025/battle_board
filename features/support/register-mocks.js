@@ -182,6 +182,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/daily-stats-repository.ts",
 		"./in-memory/daily-stats-repository.ts",
 	],
+	// pending-tutorial リポジトリ（TASK-248 で追加）
+	// See: features/welcome.feature
+	[
+		"src/lib/infrastructure/repositories/pending-tutorial-repository.ts",
+		"./in-memory/pending-tutorial-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

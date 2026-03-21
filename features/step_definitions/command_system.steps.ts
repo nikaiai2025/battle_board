@@ -35,6 +35,9 @@ import type { BattleBoardWorld } from "../support/world";
 // !tell コマンドは PostService 経由ではなく AccusationService を直接呼び出す必要がある
 // See: features/ai_accusation.feature
 import { accusationState, executeTellCommand } from "./ai_accusation.steps";
+// ウェルカムシーケンス抑止用ヘルパー（TASK-248 で追加）
+// See: features/welcome.feature
+import { seedDummyPost } from "./common.steps";
 
 // ---------------------------------------------------------------------------
 // サービス層の動的 require ヘルパー
@@ -117,6 +120,8 @@ Given(
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 
 		// デフォルトのスレッドを作成（後続の Given で上書きされる場合もある）
 		const thread = await InMemoryThreadRepo.create({
@@ -184,6 +189,8 @@ Given(
 		this.currentIpHash = DEFAULT_IP_HASH;
 		// isVerified=true に設定して書き込み可能状態にする
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 
 		// コマンドテスト用スレッドを作成する
 		const thread = await InMemoryThreadRepo.create({
@@ -217,6 +224,8 @@ Given(
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 
 		// テスト用スレッドを作成する
 		const thread = await InMemoryThreadRepo.create({
@@ -257,11 +266,14 @@ Given(
 		this.currentUserId = userId;
 		this.currentIpHash = "reward-test-ip-hash";
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 
 		// 新しいスレッドを作成する（createdBy を新ユーザーではなくダミーにすることで
 		// new_thread_join ボーナスの条件も満たす）
 		const dummyCreatorResult =
 			await AuthService.issueEdgeToken("dummy-creator-ip");
+		seedDummyPost(dummyCreatorResult.userId);
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: Math.floor(Date.now() / 1000).toString(),
 			boardId: TEST_BOARD_ID,
@@ -358,6 +370,8 @@ Given(
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: Math.floor(Date.now() / 1000).toString(),
@@ -424,6 +438,8 @@ Given(
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: Math.floor(Date.now() / 1000).toString(),
@@ -483,6 +499,8 @@ Given(
 			this.currentUserId = userId;
 			this.currentIpHash = DEFAULT_IP_HASH;
 			await InMemoryUserRepo.updateIsVerified(userId, true);
+			// ウェルカムシーケンス抑止（TASK-248）
+			seedDummyPost(userId);
 		}
 
 		// スレッドが未作成の場合は作成する
@@ -533,6 +551,8 @@ Given(
 			this.currentUserId = userId;
 			this.currentIpHash = DEFAULT_IP_HASH;
 			await InMemoryUserRepo.updateIsVerified(userId, true);
+			// ウェルカムシーケンス抑止（TASK-248）
+			seedDummyPost(userId);
 		}
 
 		if (!this.currentThreadId) {
@@ -579,6 +599,8 @@ Given(
 			this.currentUserId = userId;
 			this.currentIpHash = DEFAULT_IP_HASH;
 			await InMemoryUserRepo.updateIsVerified(userId, true);
+			// ウェルカムシーケンス抑止（TASK-248）
+			seedDummyPost(userId);
 		}
 
 		if (!this.currentThreadId) {
@@ -589,6 +611,24 @@ Given(
 				createdBy: this.currentUserId,
 			});
 			this.currentThreadId = thread.id;
+		}
+
+		// 通貨残高がデフォルト 0 のままだとコマンド実行時に
+		// CommandService Step 3 の通貨不足チェックで弾かれる（TASK-248）。
+		// 明示的に「ユーザーの通貨残高が N である」を設定していないシナリオのために
+		// デフォルト値を付与する。既に設定済みの場合はスキップする。
+		// See: src/lib/services/command-service.ts §Step 3
+		{
+			const balance = await InMemoryCurrencyRepo.getBalance(
+				this.currentUserId!,
+			);
+			if (balance === 0) {
+				InMemoryCurrencyRepo._upsert({
+					userId: this.currentUserId!,
+					balance: 100,
+					updatedAt: new Date(Date.now()),
+				});
+			}
 		}
 
 		// システムメッセージをレス番号10で作成
@@ -714,6 +754,8 @@ When(
 				this.currentUserId = userId;
 				this.currentIpHash = DEFAULT_IP_HASH;
 				await InMemoryUserRepo.updateIsVerified(userId, true);
+				// ウェルカムシーケンス抑止（TASK-248）
+				seedDummyPost(userId);
 			}
 
 			// スレッドが未作成の場合は作成する
@@ -745,6 +787,8 @@ When(
 				this.currentUserId = userId;
 				this.currentIpHash = DEFAULT_IP_HASH;
 				await InMemoryUserRepo.updateIsVerified(userId, true);
+				// ウェルカムシーケンス抑止（TASK-248）
+				seedDummyPost(userId);
 			}
 			const thread = await InMemoryThreadRepo.create({
 				threadKey: Math.floor(Date.now() / 1000).toString(),
@@ -789,6 +833,37 @@ When(
 						isSystemMessage: false,
 						isDeleted: false,
 						createdAt: new Date(Date.now()),
+					});
+				}
+			}
+		}
+
+		// 通貨残高がデフォルト 0 のままだと有料コマンド実行時に
+		// CommandService Step 3 の通貨不足チェックで弾かれる（TASK-248）。
+		// コマンドコストが 0 のシナリオ（!w 等）では通貨残高 0 のまま維持する必要があるため、
+		// コマンドレジストリからコストを参照し、有料コマンドのみデフォルト値を付与する。
+		// See: src/lib/services/command-service.ts §Step 3
+		{
+			const cmdNameMatch = commandString.match(/^(![\w]+)/);
+			const registry = (this as any).commandRegistry as
+				| Array<{ name: string; cost: number }>
+				| undefined;
+			let cmdCost = 0;
+			if (cmdNameMatch && registry) {
+				const entry = registry.find((r) => r.name === cmdNameMatch[1]);
+				if (entry) {
+					cmdCost = entry.cost;
+				}
+			}
+			if (cmdCost > 0) {
+				const balance = await InMemoryCurrencyRepo.getBalance(
+					this.currentUserId!,
+				);
+				if (balance === 0) {
+					InMemoryCurrencyRepo._upsert({
+						userId: this.currentUserId!,
+						balance: 100,
+						updatedAt: new Date(Date.now()),
 					});
 				}
 			}

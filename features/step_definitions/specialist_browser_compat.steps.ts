@@ -30,6 +30,9 @@ import {
 	InMemoryThreadRepo,
 } from "../support/mock-installer";
 import type { BattleBoardWorld } from "../support/world";
+// ウェルカムシーケンス抑止用ヘルパー
+// See: features/step_definitions/common.steps.ts > seedDummyPost
+import { seedDummyPost } from "./common.steps";
 
 // ---------------------------------------------------------------------------
 // Adapter クラスのインポート
@@ -301,6 +304,9 @@ async function createPostWithBody(
 	// isVerified=true に設定して書き込み可能状態にする
 	// See: features/authentication.feature @認証フロー是正
 	await InMemoryUserRepo.updateIsVerified(userId, true);
+	// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+	// See: features/welcome.feature
+	seedDummyPost(userId);
 
 	const thread = await InMemoryThreadRepo.create({
 		threadKey: Date.now().toString().slice(-10), // 一意のスレッドキー
@@ -629,6 +635,9 @@ Given(
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey,
@@ -733,6 +742,9 @@ Given(
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: "9999999999",
@@ -864,6 +876,9 @@ Given(
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: "8888888888",
@@ -956,6 +971,9 @@ Given(
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: "7777777777",
@@ -1117,6 +1135,9 @@ Given(
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		// 書き込み先スレッドを作成しておく
 		const thread = await InMemoryThreadRepo.create({
@@ -1443,6 +1464,9 @@ Given(
 
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: "5555555555",
@@ -1641,6 +1665,9 @@ Given(
 
 		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: "4444444444",
@@ -2064,6 +2091,9 @@ Given(
 		this.currentEdgeToken = token;
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 	},
 );
 
@@ -2180,6 +2210,9 @@ Given(
 		this.currentEdgeToken = token;
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		// 認証コードを発行する
 		const { code } = await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
@@ -2386,6 +2419,9 @@ Given(
 		this.currentEdgeToken = token;
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		// 認証コードを発行して検証する（isVerified=true に更新される）
 		const { code } = await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
@@ -2798,6 +2834,9 @@ Given(
 		this.currentEdgeToken = token;
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 
 		// 認証コードを発行して検証し write_token を取得する
 		const { code } = await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);

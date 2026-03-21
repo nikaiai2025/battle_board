@@ -90,6 +90,10 @@ function createMockBotRepository(
 		updateDailyId: vi.fn().mockResolvedValue(undefined),
 		updateNextPostAt: vi.fn().mockResolvedValue(undefined),
 		findDueForPost: vi.fn().mockResolvedValue([]),
+		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+		create: vi
+			.fn()
+			.mockResolvedValue(createLurkingBot({ botProfileKey: "tutorial" })),
 	};
 }
 

@@ -677,6 +677,21 @@ Then(
 			return;
 		}
 
+		// マイページ検索結果が0件の場合
+		// See: features/mypage.feature @検索結果が0件の場合はメッセージが表示される
+		if (message === "該当する書き込みはありません") {
+			assert(
+				this.postHistoryResult !== null,
+				"書き込み履歴の検索が実行されていません",
+			);
+			assert.strictEqual(
+				this.postHistoryResult.total,
+				0,
+				`検索結果が 0 件であることを期待しましたが ${this.postHistoryResult.total} 件でした`,
+			);
+			return;
+		}
+
 		// スレッドが0件の場合
 		// See: features/thread.feature @スレッドが0件の場合はメッセージが表示される
 		const PostService = getPostService();

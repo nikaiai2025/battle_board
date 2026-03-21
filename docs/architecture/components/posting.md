@@ -29,10 +29,13 @@ PostInput {
   displayName?: string        // 省略 → "名無しさん"
   email?:     string          // 省略 → ""
   isBotWrite: boolean         // BotServiceからの呼び出し時true（認証スキップ用）
+  botUserId?: string          // BOT書き込み時のコマンド実行用ユーザーID（botIdをそのまま使用）
 }
 ```
 
 `isBotWrite` フラグの扱い：edge-token検証をスキップするが、それ以外の処理（コマンド・インセンティブ等）は人間と同一パスを通る。ボットか人間かをこのコンポーネント以下で意識させない。
+
+`botUserId` の扱い：`isBotWrite=true` かつ `botUserId` が指定されている場合、コマンド実行時の `resolvedAuthorId` を `botUserId` で上書きする。チュートリアルBOTの書き込みに `!w` コマンドが含まれる場合など、BOT書き込み時でもコマンドパイプラインを正常動作させるために使用する（Sprint-84新設）。See: docs/architecture/components/bot.md §6.10
 
 ### 2.2 出力型（PostResult）
 
@@ -89,6 +92,34 @@ BotService             →  PostService（isBotWrite=trueで呼び出す）
 ---
 
 ## 5. 設計上の判断
+
+### ウェルカムシーケンス（Sprint-84新設）
+
+初回書き込みユーザーへのウェルカム処理として、`createPost()` 内に2つのステップを追加した。
+
+**Step 6.5: 初回書き込み検出（レス番号採番完了後）**
+
+条件: `!isSystemMessage && !isBotWrite && resolvedAuthorId != null`
+- `PostRepository.countByAuthorId(resolvedAuthorId) === 0` の場合:
+  1. 初回書き込みボーナス +50 を付与（`CurrencyService.credit(userId, 50, "welcome_bonus")`）
+  2. ボーナス通知文字列をレス末尾の `inlineSystemInfo` に追加（方式A: レス内マージ）
+  3. `PendingTutorialRepository.create()` でチュートリアルBOTのキューイング
+
+**Step 11.5: ウェルカムメッセージ投稿（初回書き込み検出時のみ）**
+
+上記キューイングと同一トランザクション内で、独立システムレスとしてウェルカムメッセージを投稿する（方式B: 独立システムレス）。
+
+```
+PostService.createPost({
+  body: `>>${welcomeTargetPostNumber} Welcome to Underground...`,
+  displayName: "★システム",
+  isBotWrite: true,
+  isSystemMessage: true,
+})
+```
+
+See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
+See: tmp/workers/bdd-architect_TASK-236/design.md §2 初回書き込み検出 + ウェルカムシーケンス
 
 ### コマンド検出を Parsing と Execution に分離
 

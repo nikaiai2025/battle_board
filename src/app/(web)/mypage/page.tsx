@@ -38,18 +38,7 @@ import {
 	isTemporaryUser,
 } from "@/lib/domain/rules/mypage-display-rules";
 import type { MypageInfo } from "@/lib/services/mypage-service";
-
-// ---------------------------------------------------------------------------
-// 型定義
-// ---------------------------------------------------------------------------
-
-interface PostHistoryItem {
-	id: string;
-	threadId: string;
-	postNumber: number;
-	body: string;
-	createdAt: string;
-}
+import PostHistorySection from "./_components/PostHistorySection";
 
 // ---------------------------------------------------------------------------
 // マイページコンポーネント（Client Component）
@@ -70,7 +59,6 @@ export default function MypagePage() {
 	// ---------------------------------------------------------------------------
 
 	const [mypageInfo, setMypageInfo] = useState<MypageInfo | null>(null);
-	const [posts, setPosts] = useState<PostHistoryItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -119,31 +107,14 @@ export default function MypagePage() {
 		}
 	}, []);
 
-	/**
-	 * 書き込み履歴を取得する。
-	 * See: features/mypage.feature @自分の書き込み履歴を確認できる
-	 */
-	const fetchPostHistory = useCallback(async () => {
-		try {
-			const res = await fetch("/api/mypage/history", { cache: "no-store" });
-
-			if (!res.ok) return;
-
-			const data = (await res.json()) as { posts: PostHistoryItem[] };
-			setPosts(data.posts);
-		} catch {
-			// 書き込み履歴取得失敗はサイレントに処理する
-		}
-	}, []);
-
 	useEffect(() => {
 		const init = async () => {
 			setIsLoading(true);
-			await Promise.all([fetchMypageInfo(), fetchPostHistory()]);
+			await fetchMypageInfo();
 			setIsLoading(false);
 		};
 		void init();
-	}, [fetchMypageInfo, fetchPostHistory]);
+	}, [fetchMypageInfo]);
 
 	// ---------------------------------------------------------------------------
 	// イベントハンドラ
@@ -703,45 +674,14 @@ export default function MypagePage() {
 
 			{/* =============================
           書き込み履歴セクション
+          PostHistorySection コンポーネントに委譲（検索・ページネーション対応）
           See: features/mypage.feature @自分の書き込み履歴を確認できる
           See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
+          See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+          See: features/mypage.feature @書き込み履歴をキーワードや日付範囲で絞り込める
+          See: tmp/workers/bdd-architect_TASK-237/design.md §6 UIコンポーネント設計
           ============================= */}
-			<section
-				id="post-history"
-				className="bg-white border border-gray-300 rounded p-4 space-y-3"
-			>
-				<h2 className="text-base font-bold text-gray-700">書き込み履歴</h2>
-
-				{posts.length === 0 ? (
-					/* 0件の場合のメッセージ
-             See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される */
-					<p id="no-posts-message" className="text-gray-500 text-sm">
-						まだ書き込みがありません
-					</p>
-				) : (
-					<ul id="post-history-list" className="space-y-2">
-						{posts.map((post) => (
-							<li
-								key={post.id}
-								className="border-b border-gray-100 pb-2 last:border-b-0"
-							>
-								{/* スレッド名・本文・日時を表示
-                    See: features/mypage.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる */}
-								<div className="text-xs text-gray-500 mb-0.5">
-									<span className="font-medium">スレッド ID:</span>{" "}
-									{post.threadId}
-									<span className="ml-2">
-										{new Date(post.createdAt).toLocaleString("ja-JP")}
-									</span>
-								</div>
-								<p className="text-sm text-gray-800 line-clamp-2">
-									{post.body}
-								</p>
-							</li>
-						))}
-					</ul>
-				)}
-			</section>
+			<PostHistorySection />
 
 			{/* =============================
           通知欄セクション（Phase 2 プレースホルダー）

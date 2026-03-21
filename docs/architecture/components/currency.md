@@ -74,3 +74,21 @@ Web APIRoute       →  CurrencyService.getBalance()（マイページ表示）
 ### `deduct` と `credit` を非対称に設計
 
 deductは残高チェックが必要なため失敗する可能性がある（Result型）。creditはマイナス制約に引っかからないため常に成功とし、API設計を単純に保つ。DB障害時のみ例外。
+
+### Currency v5: 初期残高 0 への変更（Sprint-84）
+
+従来 `INITIAL_BALANCE = 50` として新規ユーザーに登録時ボーナスを付与していた。v5 では初期残高を 0 に変更し、初回書き込み時に `welcome_bonus` として +50 を付与する方式に移行した。
+
+**変更理由:**
+- 書き込みしていない離脱ユーザーへの通貨付与が発生しなくなる
+- ウェルカムシーケンス（チュートリアルBOT体験）と連動したボーナス体験を提供できる
+- `CreditReason` に `"welcome_bonus"` を追加し、audit ログで初回書き込みボーナスを通常のインセンティブと区別できる
+
+**実装変更:**
+- `currency-service.ts`: `INITIAL_BALANCE = 0`
+- `domain/models/currency.ts`: `CreditReason` に `"welcome_bonus"` を追加
+- `PostService.createPost()`: 初回書き込み検出時に `CurrencyService.credit(userId, 50, "welcome_bonus")` を呼び出す
+
+See: features/currency.feature @新規ユーザー登録時の通貨残高は0である
+See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
+See: docs/architecture/components/posting.md §5 ウェルカムシーケンス

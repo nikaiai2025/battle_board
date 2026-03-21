@@ -48,6 +48,9 @@ import * as InMemoryIncentiveLogRepo from "./in-memory/incentive-log-repository"
 // IP BAN リポジトリ（TASK-105 で追加）
 // See: features/admin.feature @IP BAN シナリオ群
 import * as InMemoryIpBanRepo from "./in-memory/ip-ban-repository";
+// pending-tutorial リポジトリ（TASK-248 で追加）
+// See: features/welcome.feature
+import * as InMemoryPendingTutorialRepo from "./in-memory/pending-tutorial-repository";
 import * as InMemoryPostRepo from "./in-memory/post-repository";
 import * as InMemorySupabaseClient from "./in-memory/supabase-client";
 import * as InMemoryThreadRepo from "./in-memory/thread-repository";
@@ -112,6 +115,9 @@ export function resetAllStores(): void {
 	// 日次統計リポジトリのリセット（TASK-107 で追加）
 	// See: features/admin.feature @ダッシュボードシナリオ群
 	InMemoryDailyStatsRepo.reset();
+	// pending-tutorial リポジトリのリセット（TASK-248 で追加）
+	// See: features/welcome.feature
+	InMemoryPendingTutorialRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +143,8 @@ export {
 	InMemoryIncentiveLogRepo,
 	// IP BAN リポジトリ（TASK-105 で追加）
 	InMemoryIpBanRepo,
+	// pending-tutorial リポジトリ（TASK-248 で追加）
+	InMemoryPendingTutorialRepo,
 	InMemoryPostRepo,
 	InMemorySupabaseClient,
 	InMemoryThreadRepo,

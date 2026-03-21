@@ -352,6 +352,24 @@ export async function countByDate(date: string): Promise<number> {
 }
 
 /**
+ * 著者 ID（author_id）に紐づくレス総数を返す。
+ * 初回書き込み検出（ウェルカムシーケンス発動判定）に使用する。
+ * システムメッセージ・削除済みレスを含む全件をカウントする
+ * （「投稿経験があるか」を判定するため）。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > countByAuthorId
+ * See: features/welcome.feature @仮ユーザーが初めて書き込むとウェルカムシーケンスが発動する
+ *
+ * @param authorId - 著者ユーザーの UUID
+ * @returns レス総数（レコードが存在しない場合は 0）
+ */
+export async function countByAuthorId(authorId: string): Promise<number> {
+	assertUUID(authorId, "PostRepository.countByAuthorId.authorId");
+	return Array.from(store.values()).filter((p) => p.authorId === authorId)
+		.length;
+}
+
+/**
  * 指定日に書き込みがあったアクティブスレッド数を集計する。
  *
  * See: src/lib/infrastructure/repositories/post-repository.ts > countActiveThreadsByDate

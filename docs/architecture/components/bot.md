@@ -162,9 +162,48 @@ DailyResetResult {
 2. revealed -> lurking（BOTマーク解除）
 3. lurking のまま日次リセット: survival_days +1
 4. eliminated -> lurking（HP初期値復帰、survival_days=0、times_attacked=0、`next_post_at` を再設定）（TDR-010: 撃破からの復活時に次回投稿予定時刻を設定し、投稿サイクルを再開する）
+   - **チュートリアルBOT（`bot_profile_key = 'tutorial'`）は復活対象から除外する。** チュートリアルBOTは1回限りの消耗品であり、日次リセットで復活しない設計。
+   - `BotRepository.bulkReviveEliminated()` は `.or("bot_profile_key.is.null,bot_profile_key.neq.tutorial")` 条件で除外を実装する。
+   - See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
 5. attacks テーブルの前日分レコードをクリーンアップ
+6. 撃破済みチュートリアルBOTのクリーンアップ（`BotRepository.deleteEliminatedTutorialBots()`）
+   - 削除対象1: `bot_profile_key = 'tutorial' AND is_active = false`（撃破済み）
+   - 削除対象2: `bot_profile_key = 'tutorial' AND created_at < NOW() - 7日`（7日経過の未撃破）
+   - See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
 
-### 2.11 書き込み先決定（BehaviorStrategy に委譲）
+### 2.11 チュートリアルBOTスポーン（processPendingTutorials — Sprint-84新設）
+
+```
+processPendingTutorials(): ProcessTutorialsResult
+```
+```
+ProcessTutorialsResult {
+  spawned: number  // スポーンしたチュートリアルBOT数
+}
+```
+
+POST /api/internal/bot/execute の末尾で呼び出す。pending_tutorials テーブルに未処理レコードがある場合にチュートリアルBOTをスポーンし、即時書き込みを実行する。
+
+処理フロー:
+1. `PendingTutorialRepository.findAll()` で未処理の pending を取得
+2. 各 pending に対して:
+   a. `BotRepository.create()` でチュートリアルBOTを新規作成（`bot_profile_key = 'tutorial'`, `next_post_at = NOW()`）
+   b. `BotService.executeBotPost(newBotId)` で書き込み実行
+      - `TutorialContentStrategy` が `>>N !w  新参おるやん🤣` を生成
+      - `PostService.createPost(isBotWrite=true, botUserId=botId)` で投稿
+   c. `PendingTutorialRepository.delete(pendingId)` でクリーンアップ
+
+チュートリアルBOTの特性:
+- `bot_profile_key = 'tutorial'`（resolveStrategies がチュートリアル専用 Strategy 組を解決）
+- 書き込みは1回のみ（`ImmediateSchedulingStrategy` で delay=0、以降は再投稿しない）
+- 日次リセットで復活しない（§2.10 処理内容 Step 4 を参照）
+- 撃破後は翌日の daily-maintenance でクリーンアップされる（§2.10 処理内容 Step 6 を参照）
+- 撃破報酬は固定 +20（`bot_profiles.yaml`: `base_reward=20, daily_bonus=0, attack_bonus=0`）
+
+See: features/welcome.feature
+See: tmp/workers/bdd-architect_TASK-236/design.md §3 チュートリアルBOT（Phase C）
+
+### 2.12 書き込み先決定（BehaviorStrategy に委譲）
 
 ```
 selectTargetThread(botId: UUID): UUID       // 後方互換用ラッパー
@@ -182,9 +221,9 @@ type BotAction =
 
 `executeBotPost()` は `BotAction.type` に応じて `PostService.createPost()` または `PostService.createThread()` を呼び分ける。
 
-### 2.12 Strategy パターン設計（v6 新設）
+### 2.13 Strategy パターン設計（v6 新設）
 
-#### 2.12.1 Strategy インターフェース
+#### 2.13.1 Strategy インターフェース
 
 ```typescript
 /** コンテンツ生成戦略 -- 「何を書くか」を決定する */
@@ -230,7 +269,7 @@ interface SchedulingContext {
 }
 ```
 
-#### 2.12.2 Strategy 解決ルール（resolveStrategies）
+#### 2.13.2 Strategy 解決ルール（resolveStrategies）
 
 ```typescript
 interface BotStrategies {
@@ -250,23 +289,26 @@ function resolveStrategies(
 2. ユーザー作成ボット判定（`owner_id` が存在）-> 専用 Strategy 組（Phase 4）
 3. デフォルト: `FixedMessageContentStrategy` + `RandomThreadBehaviorStrategy` + `FixedIntervalSchedulingStrategy`
 
-#### 2.12.3 Strategy 実装一覧
+#### 2.13.3 Strategy 実装一覧
 
 | Strategy インターフェース | 実装クラス | Phase | 対応BOT種別 |
 |---|---|---|---|
 | ContentStrategy | `FixedMessageContentStrategy` | 2 (既存) | 荒らし役 |
+| ContentStrategy | `TutorialContentStrategy` | 2 (Sprint-84) | チュートリアルBOT |
 | ContentStrategy | `AiTopicContentStrategy` | 3 | ネタ師 |
 | ContentStrategy | `AiConversationContentStrategy` | 4 | 常連・火付け役 |
 | ContentStrategy | `UserPromptContentStrategy` | 4 | ユーザー作成ボット |
 | BehaviorStrategy | `RandomThreadBehaviorStrategy` | 2 (既存) | 荒らし役 |
+| BehaviorStrategy | `TutorialBehaviorStrategy` | 2 (Sprint-84) | チュートリアルBOT |
 | BehaviorStrategy | `ThreadCreatorBehaviorStrategy` | 3 | ネタ師 |
 | BehaviorStrategy | `ReplyBehaviorStrategy` | 4 | 常連・火付け役 |
 | BehaviorStrategy | `ConfigurableBehaviorStrategy` | 4 | ユーザー作成ボット |
 | SchedulingStrategy | `FixedIntervalSchedulingStrategy` | 2 (既存) | 荒らし役 |
+| SchedulingStrategy | `ImmediateSchedulingStrategy` | 2 (Sprint-84) | チュートリアルBOT（即時投稿、delay=0） |
 | SchedulingStrategy | `TopicDrivenSchedulingStrategy` | 3 | ネタ師 |
 | SchedulingStrategy | `GachaSchedulingStrategy` | 4 | ユーザー作成ボット |
 
-#### 2.12.4 プロバイダー抽象化レイヤー（AiApiClient）
+#### 2.13.4 プロバイダー抽象化レイヤー（AiApiClient）
 
 AI API を使用する ContentStrategy（`AiTopicContentStrategy`, `AiConversationContentStrategy`, `UserPromptContentStrategy`）は、サードパーティー API の差異を吸収する `AiApiClient` アダプターを通じて LLM を呼び出す。
 
@@ -296,7 +338,7 @@ interface AiGenerateParams {
 
 **APIキー管理**: 各プロバイダーのAPIキーは環境変数で管理する（`GOOGLE_AI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`）。GitHub Actions Secrets に格納し、クライアントサイドコードには含めない（CLAUDE.md 横断的制約）。
 
-#### 2.12.5 ネタ師の行動フロー（Phase 3 主要ユースケース）
+#### 2.13.5 ネタ師の行動フロー（Phase 3 主要ユースケース）
 
 ```
 GitHub Actions (cron)
@@ -326,7 +368,7 @@ BotService.executeBotPost(botId)
 - ネタ収集（Web スクレイピング + AI 要約）は外部の収集ジョブが事前に行い、結果を `collected_topics` テーブルにバッファする
 - 収集と投稿の分離により、外部 API 障害時もバッファ内のネタで投稿を継続可能
 
-#### 2.12.6 ユーザー作成ボットの管理構造（Phase 4）
+#### 2.13.6 ユーザー作成ボットの管理構造（Phase 4）
 
 ```
                   +--------------------+
@@ -355,7 +397,7 @@ BotService.executeBotPost(botId)
 - Strategy 解決時に `owner_id` の有無で分岐する
 - **プロンプトサニタイズ**: `UserPromptContentStrategy` 内で管理者プロンプト上書き + サニタイズを実行。ユーザー入力を直接 LLM に渡さない（CLAUDE.md 横断的制約）
 
-#### 2.12.7 bot_profiles.yaml 拡張スキーマ
+#### 2.13.7 bot_profiles.yaml 拡張スキーマ
 
 既存フィールド（`hp`, `max_hp`, `reward`, `fixed_messages`）に加え、以下のフィールドを追加する。全て**オプショナル**であり、未指定時は Phase 2 デフォルト値にフォールバックする。
 
@@ -418,7 +460,7 @@ ai_config:
     - "【速報】テクノロジーの話題があるらしい"  # AI API障害時のフォールバック
 ```
 
-#### 2.12.8 ファイル配置計画
+#### 2.13.8 ファイル配置計画
 
 ```
 src/lib/
@@ -481,7 +523,12 @@ AttackHandler       ->  BotService.isBot()
                         BotService.recordAttack()
 AccusationService   ->  BotService.isBot()
                         BotService.revealBot()
-GitHub Actions      ->  BotService.executeBotPost()
+CF Cron             ->  POST /api/internal/bot/execute
+                          -> BotService.executeBotPost()  （荒らし役BOTの定期書き込み）
+                          -> processPendingTutorials()     （チュートリアルBOTスポーン）
+                        ※ GitHub Actions bot-scheduler は Sprint-84 で無効化。
+                           荒らし役は CF Cron（5分間隔）に移行済み（TDR-013）。
+GitHub Actions      ->  BotService.executeBotPost()      （AI API BOT用、Phase 3以降）
                         BotService.selectTargetThread()  // 後方互換ラッパー
 daily-maintenance   ->  BotService.performDailyReset()
 ```
@@ -670,7 +717,16 @@ Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, An
 - ネタ師は Gemini（低コスト・高速）、常連は Claude/GPT（文脈理解力重視）のように使い分けができる
 - 特定プロバイダー障害時に他プロバイダーへの切り替えが容易
 
-### 6.10 ネタ収集と投稿の分離（v6）
+### 6.10 チュートリアルBOTの設計方針（Sprint-84）
+
+チュートリアルBOTは「初回書き込みユーザーにゲーム機能を体験させる」ためのウェルカムシーケンスの一部として設計された。通常のBOTとは以下の点で異なる。
+
+- **1回限りの消耗品**: 初回書き込みを検出した時点で `pending_tutorials` テーブルにキューイングし、次の CF Cron 実行時にスポーン・即時書き込み実行する。書き込み後は再投稿しない（`ImmediateSchedulingStrategy`, delay=0）。
+- **日次リセット除外**: 撃破されても翌日の `bulkReviveEliminated` で復活させない。チュートリアルBOTが毎日再出現するとゲームバランスが崩れるため。
+- **自動クリーンアップ**: 撃破後は翌日の `deleteEliminatedTutorialBots` で DB から削除する。7日経過した未撃破チュートリアルBOTも削除する（チュートリアル放置ユーザーへの配慮）。
+- **botUserId の追加**: チュートリアルBOTの書き込み `>>N !w  新参おるやん🤣` には `!w` コマンドが含まれる。BOT書き込み時の `resolvedAuthorId` は通常 null だが、`PostInput.botUserId` フィールドを追加することでコマンドパイプラインが BOT 自身の ID で実行される。GrassHandler の voter_id に FK 制約がないため、botId をそのまま利用できる。
+
+### 6.11 ネタ収集と投稿の分離（v6）
 
 ネタ師の「ネタ収集」と「投稿」を分離し、`collected_topics` テーブルをバッファとする。収集ジョブと投稿ジョブは独立した GitHub Actions ジョブとして実行する。
 

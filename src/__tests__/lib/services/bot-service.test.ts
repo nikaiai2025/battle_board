@@ -20,6 +20,7 @@ import {
 	type IAttackRepository,
 	type IBotPostRepository,
 	type IBotRepository,
+	type IPendingTutorialRepository,
 	type IThreadRepository,
 } from "../../../lib/services/bot-service";
 
@@ -95,6 +96,29 @@ function createMockBotRepository(
 		updateDailyId: vi.fn().mockResolvedValue(undefined),
 		updateNextPostAt: vi.fn().mockResolvedValue(undefined),
 		findDueForPost: vi.fn().mockResolvedValue([]),
+		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+		create: vi
+			.fn()
+			.mockResolvedValue(createLurkingBot({ botProfileKey: "tutorial" })),
+	};
+}
+
+/**
+ * モック PendingTutorialRepository を生成する
+ * See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+ */
+function createMockPendingTutorialRepository(
+	pendingList: Array<{
+		id: string;
+		userId: string;
+		threadId: string;
+		triggerPostNumber: number;
+		createdAt: Date;
+	}> = [],
+): IPendingTutorialRepository {
+	return {
+		findAll: vi.fn().mockResolvedValue(pendingList),
+		deletePendingTutorial: vi.fn().mockResolvedValue(undefined),
 	};
 }
 
@@ -1086,6 +1110,237 @@ describe("BotService", () => {
 
 			// deleteEliminatedTutorialBots が呼ばれていることを確認
 			expect(botRepo.deleteEliminatedTutorialBots).toHaveBeenCalled();
+		});
+	});
+
+	// =========================================================================
+	// processPendingTutorials
+	// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+	// =========================================================================
+
+	describe("processPendingTutorials()", () => {
+		it("pending が0件の場合は何もせず processed:0 を返す", async () => {
+			// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+			const pendingRepo = createMockPendingTutorialRepository([]);
+			const botRepo = createMockBotRepository();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				createMockCreatePostFn(),
+				undefined,
+				pendingRepo,
+			);
+
+			const result = await service.processPendingTutorials();
+
+			expect(result.processed).toBe(0);
+			expect(result.results).toEqual([]);
+			// BOT生成もpending削除も呼ばれない
+			expect(botRepo.create).not.toHaveBeenCalled();
+			expect(pendingRepo.deletePendingTutorial).not.toHaveBeenCalled();
+		});
+
+		it("pending が1件の場合: BOT生成 → executeBotPost → pending削除の一連フローが実行される", async () => {
+			// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+			// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+			const pendingList = [
+				{
+					id: "pending-001",
+					userId: "user-001",
+					threadId: "thread-001",
+					triggerPostNumber: 5,
+					createdAt: new Date("2026-03-21T10:00:00Z"),
+				},
+			];
+			const pendingRepo = createMockPendingTutorialRepository(pendingList);
+			const tutorialBot = createLurkingBot({
+				id: "tutorial-bot-001",
+				botProfileKey: "tutorial",
+				hp: 10,
+				maxHp: 10,
+				dailyId: "TutBt01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(tutorialBot);
+			(botRepo.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+				tutorialBot,
+			);
+			const mockCreatePost = createMockCreatePostFn();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				mockCreatePost,
+				undefined,
+				pendingRepo,
+			);
+
+			const result = await service.processPendingTutorials();
+
+			// BOT生成が呼ばれている
+			expect(botRepo.create).toHaveBeenCalledTimes(1);
+			expect(botRepo.create).toHaveBeenCalledWith(
+				expect.objectContaining({
+					botProfileKey: "tutorial",
+					hp: 10,
+					maxHp: 10,
+					isActive: true,
+				}),
+			);
+			// pending削除が呼ばれている
+			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(
+				"pending-001",
+			);
+			// 結果が正しい
+			expect(result.processed).toBe(1);
+			expect(result.results).toHaveLength(1);
+			expect(result.results[0].pendingId).toBe("pending-001");
+			expect(result.results[0].success).toBe(true);
+		});
+
+		it("pending が複数件の場合、全件が順次処理される", async () => {
+			const pendingList = [
+				{
+					id: "pending-001",
+					userId: "user-001",
+					threadId: "thread-001",
+					triggerPostNumber: 3,
+					createdAt: new Date("2026-03-21T10:00:00Z"),
+				},
+				{
+					id: "pending-002",
+					userId: "user-002",
+					threadId: "thread-002",
+					triggerPostNumber: 7,
+					createdAt: new Date("2026-03-21T10:01:00Z"),
+				},
+			];
+			const pendingRepo = createMockPendingTutorialRepository(pendingList);
+			const tutorialBot = createLurkingBot({
+				id: "tutorial-bot-001",
+				botProfileKey: "tutorial",
+				dailyId: "TutBt01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(tutorialBot);
+			(botRepo.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+				tutorialBot,
+			);
+			const mockCreatePost = createMockCreatePostFn();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				mockCreatePost,
+				undefined,
+				pendingRepo,
+			);
+
+			const result = await service.processPendingTutorials();
+
+			expect(botRepo.create).toHaveBeenCalledTimes(2);
+			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledTimes(2);
+			expect(result.processed).toBe(2);
+			expect(result.results).toHaveLength(2);
+		});
+
+		it("executeBotPost がエラーをスローした場合、そのpendingは失敗として記録されるが他のpendingは処理を続行する", async () => {
+			// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+			const pendingList = [
+				{
+					id: "pending-fail",
+					userId: "user-fail",
+					threadId: "thread-fail",
+					triggerPostNumber: 1,
+					createdAt: new Date("2026-03-21T10:00:00Z"),
+				},
+				{
+					id: "pending-ok",
+					userId: "user-ok",
+					threadId: "thread-ok",
+					triggerPostNumber: 2,
+					createdAt: new Date("2026-03-21T10:01:00Z"),
+				},
+			];
+			const pendingRepo = createMockPendingTutorialRepository(pendingList);
+			const tutorialBot = createLurkingBot({
+				id: "tutorial-bot-001",
+				botProfileKey: "tutorial",
+				dailyId: "TutBt01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(tutorialBot);
+			(botRepo.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+				tutorialBot,
+			);
+			// 1回目の createPost は失敗、2回目は成功
+			const mockCreatePost = vi
+				.fn()
+				.mockRejectedValueOnce(new Error("PostService 失敗"))
+				.mockResolvedValueOnce({
+					success: true,
+					postId: "post-002",
+					postNumber: 2,
+					systemMessages: [],
+				}) as unknown as CreatePostFn;
+
+			// console.error をモック化してノイズを抑制
+			const consoleSpy = vi
+				.spyOn(console, "error")
+				.mockImplementation(() => {});
+
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				mockCreatePost,
+				undefined,
+				pendingRepo,
+			);
+
+			const result = await service.processPendingTutorials();
+
+			expect(result.processed).toBe(2);
+			expect(result.results[0].success).toBe(false);
+			expect(result.results[0].error).toContain("PostService 失敗");
+			expect(result.results[1].success).toBe(true);
+			// 失敗したpendingは削除されない（リトライ可能にするため）
+			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledTimes(1);
+			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(
+				"pending-ok",
+			);
+
+			consoleSpy.mockRestore();
+		});
+
+		it("pendingTutorialRepository 未注入時は何もせず processed:0 を返す", async () => {
+			// pendingTutorialRepository が省略された場合
+			const service = new BotService(
+				createMockBotRepository(),
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const result = await service.processPendingTutorials();
+
+			expect(result.processed).toBe(0);
+			expect(result.results).toEqual([]);
 		});
 	});
 });

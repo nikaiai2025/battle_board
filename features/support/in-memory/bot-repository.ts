@@ -275,15 +275,54 @@ export async function bulkResetRevealed(): Promise<number> {
 }
 
 /**
+ * 撃破済みチュートリアルBOTおよび7日経過の未撃破チュートリアルBOTを削除する。
+ *
+ * 削除対象:
+ *   - 撃破済みチュートリアルBOT: botProfileKey = 'tutorial' AND isActive = false
+ *   - 7日経過の未撃破チュートリアルBOT: botProfileKey = 'tutorial' AND createdAt < NOW() - 7日
+ *
+ * See: src/lib/infrastructure/repositories/bot-repository.ts > deleteEliminatedTutorialBots
+ * See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+ *
+ * @returns 削除したボット数
+ */
+export async function deleteEliminatedTutorialBots(): Promise<number> {
+	const now = Date.now();
+	const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+	// 削除対象のインデックスを後方から収集して splice する
+	let count = 0;
+	for (let i = store.length - 1; i >= 0; i--) {
+		const bot = store[i];
+		if (bot.botProfileKey !== "tutorial") continue;
+
+		const isEliminated = !bot.isActive;
+		const isStale = bot.createdAt.getTime() < now - sevenDaysMs;
+
+		if (isEliminated || isStale) {
+			store.splice(i, 1);
+			count++;
+		}
+	}
+	return count;
+}
+
+/**
  * eliminated 状態の全ボットを lurking に復活させる。
  * HP を maxHp に戻し、survivalDays・timesAttacked を 0 にリセットする。
  * 日次リセット処理で使用する。
+ *
+ * チュートリアルBOT（botProfileKey = 'tutorial'）は復活対象から除外する。
+ * チュートリアルBOTは1回限りの消耗品であり、日次リセットで復活しない設計。
+ *
  * See: src/lib/infrastructure/repositories/bot-repository.ts
+ * See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
  */
 export async function bulkReviveEliminated(): Promise<number> {
 	let count = 0;
 	for (const bot of store) {
-		if (!bot.isActive) {
+		// チュートリアルBOTは復活させない（本番実装と一致）
+		if (!bot.isActive && bot.botProfileKey !== "tutorial") {
 			bot.isActive = true;
 			bot.isRevealed = false;
 			bot.revealedAt = null;

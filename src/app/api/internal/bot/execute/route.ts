@@ -28,9 +28,12 @@ const MAX_BOTS_PER_EXECUTION = 5;
  *   1. Bearer 認証チェック
  *   2. getActiveBotsDueForPost() で投稿対象BOTを取得
  *   3. 上限数まで各BOTに executeBotPost() を実行
- *   4. 結果をJSONで返す
+ *   4. processPendingTutorials() でチュートリアルBOT pending を処理
+ *   5. 結果をJSONで返す
  *
  * See: docs/architecture/architecture.md §13 TDR-010
+ * See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+ * See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
  */
 export async function POST(request: Request): Promise<NextResponse> {
 	// Step 1: Bearer 認証チェック
@@ -86,6 +89,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 			}
 		}
 
+		// Step 4: チュートリアルBOT pending 処理
+		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+		// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+		const tutorialResult = await botService.processPendingTutorials();
+
+		// Step 5: 結果をJSONで返す
 		return NextResponse.json({
 			totalDue: dueBots.length,
 			processed: botsToProcess.length,
@@ -93,6 +102,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 			failureCount,
 			skippedCount,
 			results,
+			tutorials: tutorialResult,
 		});
 	} catch (err) {
 		console.error("[POST /api/internal/bot/execute] Unhandled error:", err);

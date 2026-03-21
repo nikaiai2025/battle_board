@@ -21,12 +21,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetActiveBotsDueForPost = vi.fn();
 const mockExecuteBotPost = vi.fn();
+const mockProcessPendingTutorials = vi.fn();
 const mockVerifyInternalApiKey = vi.fn();
 
 vi.mock("@/lib/services/bot-service", () => ({
 	createBotService: vi.fn(() => ({
 		getActiveBotsDueForPost: mockGetActiveBotsDueForPost,
 		executeBotPost: mockExecuteBotPost,
+		processPendingTutorials: mockProcessPendingTutorials,
 	})),
 }));
 
@@ -62,6 +64,12 @@ function createUnauthenticatedRequest(): Request {
 describe("POST /api/internal/bot/execute", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// processPendingTutorials のデフォルト戻り値（既存テストへの影響を避けるため）
+		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+		mockProcessPendingTutorials.mockResolvedValue({
+			processed: 0,
+			results: [],
+		});
 	});
 
 	// =========================================================================
@@ -194,5 +202,57 @@ describe("POST /api/internal/bot/execute", () => {
 		expect(body.error).toBe("INTERNAL_ERROR");
 
 		consoleSpy.mockRestore();
+	});
+
+	// =========================================================================
+	// tutorials フィールド（チュートリアルBOT pending 処理）
+	// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
+	// =========================================================================
+
+	it("レスポンスに tutorials フィールドが含まれる（後方互換）", async () => {
+		mockVerifyInternalApiKey.mockReturnValue(true);
+		mockGetActiveBotsDueForPost.mockResolvedValue([]);
+		mockProcessPendingTutorials.mockResolvedValue({
+			processed: 0,
+			results: [],
+		});
+
+		const request = createAuthenticatedRequest();
+		const response = await POST(request);
+
+		expect(response.status).toBe(200);
+		const body = await response.json();
+		// tutorials フィールドが存在すること
+		expect(body).toHaveProperty("tutorials");
+		expect(body.tutorials.processed).toBe(0);
+		expect(body.tutorials.results).toEqual([]);
+	});
+
+	it("processPendingTutorials の結果が tutorials フィールドに反映される", async () => {
+		mockVerifyInternalApiKey.mockReturnValue(true);
+		mockGetActiveBotsDueForPost.mockResolvedValue([]);
+		mockProcessPendingTutorials.mockResolvedValue({
+			processed: 1,
+			results: [
+				{
+					pendingId: "pending-001",
+					success: true,
+					botId: "tutorial-bot-001",
+					postId: "post-tut-001",
+					postNumber: 6,
+				},
+			],
+		});
+
+		const request = createAuthenticatedRequest();
+		const response = await POST(request);
+
+		expect(response.status).toBe(200);
+		const body = await response.json();
+		expect(body.tutorials.processed).toBe(1);
+		expect(body.tutorials.results).toHaveLength(1);
+		expect(body.tutorials.results[0].pendingId).toBe("pending-001");
+		expect(body.tutorials.results[0].success).toBe(true);
 	});
 });

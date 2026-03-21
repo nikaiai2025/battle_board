@@ -32,6 +32,9 @@ import {
 } from "../support/mock-installer";
 import type { BattleBoardWorld } from "../support/world";
 import { accusationState } from "./ai_accusation.steps";
+// ウェルカムシーケンス抑止用ヘルパー（TASK-248 で追加）
+// See: features/welcome.feature
+import { seedDummyPost } from "./common.steps";
 
 // ---------------------------------------------------------------------------
 // サービス層の動的 require ヘルパー
@@ -183,6 +186,8 @@ async function ensureUserAndThread(
 		world.currentUserId = userId;
 		world.currentIpHash = ipHash;
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userId);
 	}
 
 	if (!world.currentThreadId) {
@@ -1257,6 +1262,8 @@ Given(
 			`bot-system-victim-${victimDailyId}`,
 		);
 		await InMemoryUserRepo.updateIsVerified(victimUserId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(victimUserId);
 		this.attackerUserIds.set(victimDailyId, victimUserId);
 		const postId = crypto.randomUUID();
 		InMemoryPostRepo._insert({
@@ -1467,6 +1474,8 @@ Given(
 			`bot-system-userB-${userBDailyId}`,
 		);
 		await InMemoryUserRepo.updateIsVerified(userBId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(userBId);
 		this.attackerUserIds.set(`userB_${userBDailyId}`, userBId);
 		InMemoryCurrencyRepo._upsert({
 			userId: userBId,
@@ -1807,6 +1816,8 @@ Given(
 			`bot-error-target-${postNumber}`,
 		);
 		await InMemoryUserRepo.updateIsVerified(targetUserId, true);
+		// ウェルカムシーケンス抑止（TASK-248）
+		seedDummyPost(targetUserId);
 		const postId = crypto.randomUUID();
 		InMemoryPostRepo._insert({
 			id: postId,

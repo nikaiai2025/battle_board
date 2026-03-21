@@ -31,6 +31,9 @@ import {
 	InMemoryUserRepo,
 } from "../support/mock-installer";
 import type { BattleBoardWorld } from "../support/world";
+// ウェルカムシーケンス抑止用ヘルパー（TASK-248 で追加）
+// See: features/welcome.feature
+import { seedDummyPost } from "./common.steps";
 
 // ---------------------------------------------------------------------------
 // サービス層の動的 require ヘルパー
@@ -102,6 +105,8 @@ async function ensureTargetUser(dailyId: string): Promise<string> {
 	const ipHash = `bdd-investigation-target-${dailyId}`;
 	const { userId } = await AuthService.issueEdgeToken(ipHash);
 	await InMemoryUserRepo.updateIsVerified(userId, true);
+	// ウェルカムシーケンス抑止（TASK-248）
+	seedDummyPost(userId);
 	targetAuthorId = userId;
 	targetDailyId = dailyId;
 	return userId;
@@ -181,6 +186,22 @@ async function executeCommandInThread(
 
 	assert(world.currentUserId, "ユーザーIDが設定されていません");
 	assert(world.currentEdgeToken, "ユーザーがログイン済みである必要があります");
+
+	// 通貨残高が未設定（0）の場合、デフォルト値を設定する。
+	// ウェルカムシーケンス抑止（seedDummyPost）により初回書き込みボーナス +50 が
+	// 付与されなくなったため、明示的に "通貨残高が N である" ステップを持たない
+	// シナリオでは通貨残高がデフォルト 0 となりコマンド実行に失敗する。
+	// See: features/investigation.feature Background（通貨残高ステップなし）
+	const currentBalance = await InMemoryCurrencyRepo.getBalance(
+		world.currentUserId,
+	);
+	if (currentBalance === 0) {
+		InMemoryCurrencyRepo._upsert({
+			userId: world.currentUserId,
+			balance: 100,
+			updatedAt: new Date(Date.now()),
+		});
+	}
 
 	// IncentiveService の new_thread_join ボーナスをブロックする
 	blockNewThreadJoinBonus(world.currentUserId, threadId);

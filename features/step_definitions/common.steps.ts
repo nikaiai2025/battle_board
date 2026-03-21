@@ -25,10 +25,45 @@ import * as CurrencyService from "../../src/lib/services/currency-service";
 import * as PostService from "../../src/lib/services/post-service";
 import {
 	InMemoryCurrencyRepo,
+	InMemoryPostRepo,
 	InMemoryThreadRepo,
 	InMemoryUserRepo,
 } from "../support/mock-installer";
 import type { BattleBoardWorld } from "../support/world";
+
+// ---------------------------------------------------------------------------
+// ウェルカムシーケンス抑止ヘルパー
+// ---------------------------------------------------------------------------
+
+/**
+ * ウェルカムシーケンス抑止用ダミー投稿をシードする。
+ * PostService.createPost の Step 6.5 は countByAuthorId===0 で初回書き込みを判定する。
+ * 共通 Given ステップでユーザー生成後にこの関数を呼ぶことで、
+ * welcome.feature 以外のシナリオでウェルカムシーケンスが発動しないようにする。
+ *
+ * isSystemMessage は true にすること:
+ *   - countByAuthorId は全件カウント（isSystemMessage フィルタなし）→ 1以上を返す → 抑止成功
+ *   - searchByAuthorId は isSystemMessage=true を除外するため、書き込み履歴に混入しない
+ *
+ * See: features/support/in-memory/post-repository.ts > countByAuthorId
+ * See: features/support/in-memory/post-repository.ts > searchByAuthorId
+ * See: features/welcome.feature
+ */
+export function seedDummyPost(userId: string): void {
+	InMemoryPostRepo._insert({
+		id: crypto.randomUUID(),
+		threadId: "00000000-0000-0000-0000-000000000000",
+		postNumber: 0,
+		authorId: userId,
+		displayName: "名無しさん",
+		dailyId: "SEEDPOST",
+		body: "__seed_for_welcome_bypass__",
+		inlineSystemInfo: null,
+		isSystemMessage: true,
+		isDeleted: false,
+		createdAt: new Date("2020-01-01"),
+	});
+}
 
 // ---------------------------------------------------------------------------
 // テスト用定数
@@ -69,6 +104,9 @@ Given("ユーザーがログイン済みである", async function (this: Battle
 	// TASK-041 で verifyEdgeToken に not_verified チェックが追加されたため必要。
 	// See: features/authentication.feature @認証フロー是正
 	await InMemoryUserRepo.updateIsVerified(userId, true);
+	// ウェルカムシーケンス抑止: ダミー投稿を1件シードする。
+	// See: features/welcome.feature
+	seedDummyPost(userId);
 });
 
 Given(
@@ -81,6 +119,9 @@ Given(
 		// isVerified=true に設定して「認証済み（書き込み可能）」状態にする。
 		// See: features/authentication.feature @認証フロー是正
 		await InMemoryUserRepo.updateIsVerified(userId, true);
+		// ウェルカムシーケンス抑止: ダミー投稿を1件シードする。
+		// See: features/welcome.feature
+		seedDummyPost(userId);
 	},
 );
 
@@ -132,6 +173,9 @@ Given(
 			this.currentUserId = userId;
 			this.currentIpHash = DEFAULT_IP_HASH;
 			await InMemoryUserRepo.updateIsVerified(userId, true);
+			// NOTE: ここでは seedDummyPost を呼ばない。
+			// welcome.feature がこのステップで自動生成されたユーザーに対して
+			// 初回書き込み判定（countByAuthorId===0）を期待するため。
 		}
 		InMemoryCurrencyRepo._upsert({
 			userId: this.currentUserId,
