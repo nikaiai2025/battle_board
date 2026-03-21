@@ -151,16 +151,17 @@ test.describe("板トップページ /battleboard/", () => {
  * See: features/thread.feature @url_structure
  */
 test.describe("スレッドページ /battleboard/{threadKey}/", () => {
-	test("シードデータのスレッドにアクセスでき、主要UI要素が表示される", async ({
+	test("シードデータのスレッドにアクセスでき、主要UI要素の確認と一覧への戻り遷移が行える", async ({
 		page,
 		seedThread,
+		cleanup,
 	}) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThread;
+		const { threadId, threadKey } = seedThread;
 
 		const response = await page.goto(`/battleboard/${threadKey}/`);
 		expect(response?.status()).toBe(200);
@@ -174,17 +175,6 @@ test.describe("スレッドページ /battleboard/{threadKey}/", () => {
 		// See: src/app/(web)/_components/PostForm.tsx > #post-body-input
 		await expect(page.locator("#post-body-input")).toBeVisible();
 
-		expect(jsErrors).toHaveLength(0);
-	});
-
-	test("一覧に戻るリンクが存在しクリック可能", async ({ page, seedThread }) => {
-		const jsErrors: string[] = [];
-		page.on("pageerror", (err) => {
-			jsErrors.push(err.message);
-		});
-
-		await page.goto(`/battleboard/${seedThread.threadKey}/`);
-
 		// See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx > #back-to-list
 		const backLink = page.locator("#back-to-list");
 		await expect(backLink).toBeVisible();
@@ -194,6 +184,8 @@ test.describe("スレッドページ /battleboard/{threadKey}/", () => {
 		expect(page.url()).toContain("/battleboard");
 
 		expect(jsErrors).toHaveLength(0);
+
+		await cleanup([threadId]);
 	});
 });
 
@@ -710,6 +702,7 @@ test.describe("旧スレッドURLリダイレクト /threads/[threadId]", () => 
 	test("旧スレッドURLにアクセスすると新URLへリダイレクトされる", async ({
 		page,
 		seedThread,
+		cleanup,
 	}) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
@@ -734,5 +727,7 @@ test.describe("旧スレッドURLリダイレクト /threads/[threadId]", () => 
 		await expect(page.locator("#thread-title")).toBeVisible();
 
 		expect(jsErrors).toHaveLength(0);
+
+		await cleanup([threadId]);
 	});
 });

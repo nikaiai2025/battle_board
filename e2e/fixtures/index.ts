@@ -188,7 +188,13 @@ export const test = base.extend<TestFixtures & TestOptions>({
 
 		const cleanupFn = async (threadIds?: string[]) => {
 			if (isProduction) {
-				if (!threadIds || threadIds.length === 0) return;
+				if (!threadIds || threadIds.length === 0) {
+					console.warn(
+						"[cleanup] 本番環境でcleanup()が引数なしで呼ばれました。" +
+							"スレッドを作成したテストでは cleanup([threadId]) を使用してください。",
+					);
+					return;
+				}
 				const token = await getAdminToken();
 				await cleanupProd(request, baseURL!, token, threadIds);
 			} else {

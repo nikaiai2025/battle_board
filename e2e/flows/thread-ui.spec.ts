@@ -8,6 +8,11 @@
  *
  * 環境差分はフィクスチャが吸収するため、ローカル・本番の両環境で実行される。
  *
+ * ライフサイクル:
+ *   - beforeAll: スレッドを1回だけ作成（describe単位で共有）
+ *   - afterAll: スレッドを1回だけ削除（管理者権限）
+ *   - 各テスト: 共有スレッドを参照のみ（読み取り + DOM操作）
+ *
  * @feature thread.feature
  * @scenario 本文中のアンカーをクリックすると参照先レスがポップアップ表示される
  * @scenario ポップアップ内のアンカーをクリックするとポップアップが重なる
@@ -21,17 +26,72 @@
  */
 
 import { expect, test } from "../fixtures";
+import {
+	cleanupLocal,
+	cleanupProd,
+	seedThreadWithAnchorPostsLocal,
+	seedThreadWithAnchorPostsProd,
+} from "../fixtures/data.fixture";
 
 // ---------------------------------------------------------------------------
-// 共通セットアップ
+// ファイルスコープ共有変数（beforeAll でセット、全テストが参照）
+// ---------------------------------------------------------------------------
+
+/** 7テストで共有するスレッドID（本番cleanup用）*/
+let sharedThreadId = "";
+/** 7テストで共有するスレッドキー（ページURL構築用）*/
+let sharedThreadKey = "";
+
+// ---------------------------------------------------------------------------
+// 環境判定ヘルパー
+// isProduction: process.env.PROD_BASE_URL が設定されている場合は本番環境
+// See: e2e/fixtures/index.ts の isProduction パターン
+// See: e2e/flows/basic-flow.spec.ts の test.afterAll
+// ---------------------------------------------------------------------------
+
+const isProduction = Boolean(process.env.PROD_BASE_URL);
+const baseURL = process.env.PROD_BASE_URL ?? "http://localhost:3000";
+const edgeToken = process.env.PROD_SMOKE_EDGE_TOKEN ?? "";
+
+// ---------------------------------------------------------------------------
+// 共通セットアップ — describe単位で1スレッドを共有
 // ---------------------------------------------------------------------------
 
 /**
- * 各テスト前にDBをクリーンアップする。
+ * テスト開始前に1回だけスレッドを作成する。
+ * beforeAll では カスタムフィクスチャが使えないため、seed関数を直接import して使用する。
  * See: docs/architecture/bdd_test_strategy.md §10.1.1
  */
-test.beforeEach(async ({ cleanup }) => {
-	await cleanup();
+test.beforeAll(async ({ request }) => {
+	let result: { threadId: string; threadKey: string };
+	if (isProduction) {
+		result = await seedThreadWithAnchorPostsProd(request, baseURL, edgeToken);
+	} else {
+		result = await seedThreadWithAnchorPostsLocal(request);
+	}
+	sharedThreadId = result.threadId;
+	sharedThreadKey = result.threadKey;
+});
+
+/**
+ * 全テスト終了後に1回だけスレッドを削除する（管理者権限）。
+ * beforeAll では カスタムフィクスチャが使えないため、cleanup関数を直接import して使用する。
+ * See: docs/architecture/bdd_test_strategy.md §10.3.4
+ */
+test.afterAll(async ({ request }) => {
+	if (isProduction) {
+		// 本番: 管理者セッショントークンを取得してcleanupProdを呼ぶ
+		const { adminLoginProd } = await import("../fixtures/auth.fixture");
+		const adminSessionToken = await adminLoginProd(request, baseURL);
+		await cleanupProd(request, baseURL, adminSessionToken, [
+			sharedThreadId,
+		]).catch((e) => console.warn("[afterAll cleanup] failed:", e));
+	} else {
+		// ローカル: 全件削除
+		await cleanupLocal(request).catch((e) =>
+			console.warn("[afterAll cleanup] failed:", e),
+		);
+	}
 });
 
 // ---------------------------------------------------------------------------
@@ -48,17 +108,14 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 	 */
 	test("本文中のアンカーをクリックすると参照先レスがポップアップ表示される", async ({
 		page,
-		seedThreadWithAnchorPosts,
 	}) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThreadWithAnchorPosts;
-
 		// スレッドページにアクセス
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/battleboard/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -92,16 +149,13 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 	 */
 	test("ポップアップ内のアンカーをクリックするとポップアップが重なる", async ({
 		page,
-		seedThreadWithAnchorPosts,
 	}) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThreadWithAnchorPosts;
-
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/battleboard/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -142,16 +196,13 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 	 */
 	test("ポップアップの外側をクリックすると最前面のポップアップが閉じる", async ({
 		page,
-		seedThreadWithAnchorPosts,
 	}) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThreadWithAnchorPosts;
-
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/battleboard/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -187,16 +238,13 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 	 */
 	test("存在しないレスへのアンカーではポップアップが表示されない", async ({
 		page,
-		seedThreadWithAnchorPosts,
 	}) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThreadWithAnchorPosts;
-
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/battleboard/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -226,18 +274,13 @@ test.describe("レス番号表示 (@post_number_display)", () => {
 	 * See: features/thread.feature @post_number_display
 	 * シナリオ: レス番号が数字のみで表示される
 	 */
-	test("レス番号が数字のみで表示される", async ({
-		page,
-		seedThreadWithAnchorPosts,
-	}) => {
+	test("レス番号が数字のみで表示される", async ({ page }) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThreadWithAnchorPosts;
-
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/battleboard/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -265,16 +308,13 @@ test.describe("レス番号表示 (@post_number_display)", () => {
 	 */
 	test("レス番号をクリックすると返信テキストがフォームに挿入される", async ({
 		page,
-		seedThreadWithAnchorPosts,
 	}) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThreadWithAnchorPosts;
-
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/battleboard/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -299,18 +339,13 @@ test.describe("レス番号表示 (@post_number_display)", () => {
 	 * See: features/thread.feature @post_number_display
 	 * シナリオ: 入力済みのフォームにレス番号クリックで追記される
 	 */
-	test("入力済みのフォームにレス番号クリックで追記される", async ({
-		page,
-		seedThreadWithAnchorPosts,
-	}) => {
+	test("入力済みのフォームにレス番号クリックで追記される", async ({ page }) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
 		});
 
-		const { threadKey } = seedThreadWithAnchorPosts;
-
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/battleboard/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
