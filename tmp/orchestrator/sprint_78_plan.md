@@ -31,4 +31,10 @@ pending BDDシナリオ11件をPlaywright E2Eテストとして実装し、pendi
 | TASK_ID | ステータス | 備考 |
 |---|---|---|
 | TASK-215 | completed | 設計書 `tmp/workers/bdd-architect_TASK-215/design.md` |
-| TASK-216 | assigned | |
+| TASK-216 | completed | 9 PASS + 2 fixme（BOT表示UI未実装） |
+| TASK-218 | completed | 既存E2E修正（auth-flow URL・seedThread衝突） |
+
+## テスト結果
+- playwright E2E (--project=e2e): 14 passed, 2 fixme, 0 failed
+- 本番スモーク: 30/35 PASS（5 skip: ローカル限定テスト）
+- vitest: 1527 全PASS / tsc: 0エラー / cucumber-js: 255 passed, 16 pending, 0 failed

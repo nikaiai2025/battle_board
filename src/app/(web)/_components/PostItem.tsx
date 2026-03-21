@@ -25,6 +25,7 @@
 
 import { detectUrls } from "../../../lib/domain/rules/url-detector";
 import AnchorLink from "./AnchorLink";
+import { useEliminatedBotToggle } from "./EliminatedBotToggleContext";
 import ImageThumbnail from "./ImageThumbnail";
 import { usePostFormContext } from "./PostFormContext";
 
@@ -228,6 +229,17 @@ export default function PostItem({ post }: PostItemProps) {
 	// See: features/thread.feature @post_number_display
 	const { insertText } = usePostFormContext();
 
+	// 撃破済みBOTレス表示トグルの状態を取得する
+	// See: features/bot_system.feature @撃破済みボットのレス表示をトグルで切り替えられる
+	// See: tmp/workers/bdd-architect_TASK-219/design.md §3.4 トグルOFF時の挙動
+	const { showEliminatedBotPosts } = useEliminatedBotToggle();
+
+	// 撃破済みBOTのレスかつトグルOFFの場合は非表示（DOMから除去）
+	// E2Eテスト: await expect(botPost).not.toBeVisible() が display:none で PASS する
+	if (post.botMark && !showEliminatedBotPosts) {
+		return null;
+	}
+
 	/**
 	 * レス番号クリック時のハンドラ
 	 * フォームに ">>N" 形式のアンカーテキストを挿入する
@@ -244,6 +256,7 @@ export default function PostItem({ post }: PostItemProps) {
 			className={`py-2 border-b border-gray-200 text-sm ${
 				isSystemMessage ? "bg-yellow-50" : ""
 			}`}
+			style={post.botMark ? { opacity: 0.5 } : undefined}
 		>
 			{/* レスヘッダー行: レス番号・表示名・日次ID・日時
           See: docs/specs/screens/thread-view.yaml > post-header */}

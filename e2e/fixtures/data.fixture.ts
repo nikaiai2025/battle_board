@@ -450,17 +450,23 @@ export async function seedEliminatedBotThreadLocal(
 	const botUserId = botUsers[0].id;
 
 	// 3. botsテーブルに撃破済みBOT登録
-	await request.post(`${base}/rest/v1/bots`, {
+	// botsテーブルには user_id / status カラムが存在しないため除外する。
+	// persona, daily_id, daily_id_date は必須カラム。
+	// is_active=false で撃破済み状態を表現する。
+	const botRes = await request.post(`${base}/rest/v1/bots`, {
 		headers,
 		data: {
-			user_id: botUserId,
 			name: "荒らし役",
-			status: "eliminated",
+			persona: "E2Eテスト用荒らし役",
 			hp: 0,
 			max_hp: 10,
 			is_active: false,
+			daily_id: `TEST${suffix}`.slice(0, 8),
+			daily_id_date: new Date().toISOString().slice(0, 10),
 		},
 	});
+	const botRows = (await botRes.json()) as Array<{ id: string }>;
+	const botId = botRows[0].id;
 
 	// 4. スレッド作成
 	const threadKey = `${Math.floor(suffix / 1000)}${rand}`;
@@ -512,9 +518,33 @@ export async function seedEliminatedBotThreadLocal(
 		},
 	];
 
-	await request.post(`${base}/rest/v1/posts`, {
+	// return=representation でpost_id(UUID)を取得する必要がある。
+	// bot_postsレコード作成のためにpostsのUUIDが必要。
+	// See: tmp/workers/bdd-architect_TASK-219/design.md §6 E2Eフィクスチャ不備の指摘
+	const postsRes = await request.post(`${base}/rest/v1/posts`, {
 		headers,
 		data: posts,
+	});
+	const insertedPosts = (await postsRes.json()) as Array<{
+		id: string;
+		post_number: number;
+	}>;
+
+	// 6. bot_posts紐付けレコード作成
+	// posts[1] (post_number: 2) がBOTレスなので、そのIDとbotIdを紐付ける
+	const botPost = insertedPosts.find((p) => p.post_number === 2);
+	if (!botPost) {
+		throw new Error(
+			"seedEliminatedBotThreadLocal: BOTレス(post_number:2)が見つかりません",
+		);
+	}
+
+	await request.post(`${base}/rest/v1/bot_posts`, {
+		headers: supabaseHeaders("return=minimal"),
+		data: {
+			post_id: botPost.id,
+			bot_id: botId,
+		},
 	});
 
 	return { threadId, threadKey, botPostNumber: 2 };

@@ -26,6 +26,8 @@ import { parsePaginationRange } from "@/lib/domain/rules/pagination-parser";
 import * as PostService from "@/lib/services/post-service";
 import AnchorPopup from "../../../_components/AnchorPopup";
 import { AnchorPopupProvider } from "../../../_components/AnchorPopupContext";
+import EliminatedBotToggle from "../../../_components/EliminatedBotToggle";
+import { EliminatedBotToggleProvider } from "../../../_components/EliminatedBotToggleContext";
 import PaginationNav from "../../../_components/PaginationNav";
 import PostForm from "../../../_components/PostForm";
 import { PostFormContextProvider } from "../../../_components/PostFormContext";
@@ -127,8 +129,12 @@ async function fetchThreadDetail(
 			// postCount <= 50 の場合は options を空にして全件取得
 		}
 
-		// レス一覧を取得する
-		const posts = await PostService.getPostList(thread.id, postListOptions);
+		// レス一覧を取得する（botMark情報を合成）
+		// See: tmp/workers/bdd-architect_TASK-219/design.md §4.1 page.tsx の変更
+		const posts = await PostService.getPostListWithBotMark(
+			thread.id,
+			postListOptions,
+		);
 
 		// PostService は Date 型で返すが、UI表示用に string へ変換する
 		return {
@@ -159,6 +165,9 @@ async function fetchThreadDetail(
 				inlineSystemInfo: p.inlineSystemInfo ?? null,
 				isSystemMessage: p.isSystemMessage,
 				isDeleted: p.isDeleted,
+				// botMark: 撃破済みBOT（is_active=false）の書き込みの場合にHP情報を含む
+				// See: tmp/workers/bdd-architect_TASK-219/design.md §4.1
+				botMark: p.botMark ?? null,
 				createdAt:
 					p.createdAt instanceof Date
 						? p.createdAt.toISOString()
@@ -256,88 +265,100 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 
 	return (
 		<main className="max-w-4xl mx-auto px-4 py-4">
-			{/* thread-header: スレッドヘッダ
-			    See: docs/specs/screens/thread-view.yaml > thread-header */}
-			<div id="thread-header" className="border-b border-gray-400 pb-2 mb-3">
-				{/* back-to-list: 一覧に戻るリンク
-				    新URL構造: /{boardId}/ に統一する。
-				    See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.7 */}
-				<Link
-					href={`/${boardId}/`}
-					id="back-to-list"
-					className="text-xs text-blue-600 hover:underline mb-1 inline-block"
-				>
-					← 一覧に戻る
-				</Link>
+			{/* EliminatedBotToggleProvider: 撃破済みBOTレス表示トグルのContext
+			    main直下に配置し、thread-header〜PostListLiveWrapper全体をラップする。
+			    See: features/bot_system.feature @撃破済みボットのレス表示をトグルで切り替えられる
+			    See: tmp/workers/bdd-architect_TASK-219/design.md §4.2 page.tsx のContext Provider追加 */}
+			<EliminatedBotToggleProvider>
+				{/* thread-header: スレッドヘッダ
+				    See: docs/specs/screens/thread-view.yaml > thread-header */}
+				<div id="thread-header" className="border-b border-gray-400 pb-2 mb-3">
+					{/* back-to-list: 一覧に戻るリンク
+					    新URL構造: /{boardId}/ に統一する。
+					    See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.7 */}
+					<Link
+						href={`/${boardId}/`}
+						id="back-to-list"
+						className="text-xs text-blue-600 hover:underline mb-1 inline-block"
+					>
+						← 一覧に戻る
+					</Link>
 
-				{/* thread-title: スレッドタイトル
-				    See: docs/specs/screens/thread-view.yaml > thread-title */}
-				<h1 id="thread-title" className="text-base font-bold text-gray-800">
-					{thread.title}
-				</h1>
-				<p className="text-xs text-gray-500">レス数: {thread.postCount}</p>
-			</div>
+					{/* thread-title: スレッドタイトル
+					    See: docs/specs/screens/thread-view.yaml > thread-title */}
+					<h1 id="thread-title" className="text-base font-bold text-gray-800">
+						{thread.title}
+					</h1>
+					<p className="text-xs text-gray-500">レス数: {thread.postCount}</p>
 
-			{/* pagination-nav (上部): スレッドヘッダ直下のページナビゲーション
-			    postCount <= 50 の場合は PaginationNav が null を返す（非表示）。
-			    See: features/thread.feature @pagination
-			    See: tmp/workers/bdd-architect_TASK-162/design.md §2.6
-			    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ */}
-			<PaginationNav
-				boardId={boardId}
-				threadKey={threadKey}
-				postCount={thread.postCount}
-			/>
+					{/* eliminated-bot-toggle: 撃破済みBOTレス表示トグル
+					    BDDシナリオ「全体メニューの撃破済みBOTレス表示トグル」に対応する。
+					    See: features/bot_system.feature @撃破済みボットのレス表示をトグルで切り替えられる
+					    See: tmp/workers/bdd-architect_TASK-219/design.md §3.1 配置とコンポーネント構成 */}
+					<EliminatedBotToggle />
+				</div>
 
-			{/* AnchorPopupProvider: アンカーポップアップのスタック管理Context
-			    設計書 §3.2 の通り、PostFormContextProvider の外側にラップする。
-			    initialPosts に SSR で取得したレス一覧を渡して allPosts キャッシュを初期化する。
-			    See: features/thread.feature @anchor_popup
-			    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
-			<AnchorPopupProvider initialPosts={posts}>
-				{/* PostFormContextProvider: PostItem のレス番号クリック時に PostForm にテキスト挿入する
-				    設計書 §6.2 の通り、PostForm と PostList をまとめてラップする。
-				    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ
-				    See: features/thread.feature @post_number_display */}
-				<PostFormContextProvider>
-					{/* post-form: 書き込みフォーム（Client Component）
-					    未認証時に401レスポンスを受けると AuthModal が表示される。
-					    See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点） */}
-					<PostForm threadId={thread.id} />
+				{/* pagination-nav (上部): スレッドヘッダ直下のページナビゲーション
+				    postCount <= 50 の場合は PaginationNav が null を返す（非表示）。
+				    See: features/thread.feature @pagination
+				    See: tmp/workers/bdd-architect_TASK-162/design.md §2.6
+				    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ */}
+				<PaginationNav
+					boardId={boardId}
+					threadKey={threadKey}
+					postCount={thread.postCount}
+				/>
 
-					{/* post-list: レス一覧（初期表示はSSR）
-					    See: docs/specs/screens/thread-view.yaml > post-list
-					    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
-					<PostList posts={posts} />
-
-					{/* PostListLiveWrapper: ポーリングで新着レスを追加表示（Client Component）
-					    SSRで表示済みのレス番号より大きいものだけを表示することで重複を防ぐ。
-					    pollingEnabled: 過去ページ表示時はポーリング無効。
-					    See: docs/architecture/components/web-ui.md §3.2 スレッドページ > ポーリング方式
-					    See: tmp/workers/bdd-architect_TASK-162/design.md §2.7 ポーリングとの共存 */}
-					<PostListLiveWrapper
-						threadId={thread.id}
-						initialLastPostNumber={lastPostNumber}
-						pollingEnabled={pollingEnabled}
-					/>
-				</PostFormContextProvider>
-
-				{/* AnchorPopup: アンカーポップアップ表示コンポーネント
-				    AnchorPopupProvider 内に1つだけ配置（ツリー末尾）。
+				{/* AnchorPopupProvider: アンカーポップアップのスタック管理Context
+				    設計書 §3.2 の通り、PostFormContextProvider の外側にラップする。
+				    initialPosts に SSR で取得したレス一覧を渡して allPosts キャッシュを初期化する。
 				    See: features/thread.feature @anchor_popup
 				    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
-				<AnchorPopup />
-			</AnchorPopupProvider>
+				<AnchorPopupProvider initialPosts={posts}>
+					{/* PostFormContextProvider: PostItem のレス番号クリック時に PostForm にテキスト挿入する
+					    設計書 §6.2 の通り、PostForm と PostList をまとめてラップする。
+					    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ
+					    See: features/thread.feature @post_number_display */}
+					<PostFormContextProvider>
+						{/* post-form: 書き込みフォーム（Client Component）
+						    未認証時に401レスポンスを受けると AuthModal が表示される。
+						    See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点） */}
+						<PostForm threadId={thread.id} />
 
-			{/* pagination-nav (下部): レス一覧直後のページナビゲーション（5ch慣習: 上下両方に表示）
-			    See: features/thread.feature @pagination
-			    See: tmp/workers/bdd-architect_TASK-162/design.md §2.6
-			    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ */}
-			<PaginationNav
-				boardId={boardId}
-				threadKey={threadKey}
-				postCount={thread.postCount}
-			/>
+						{/* post-list: レス一覧（初期表示はSSR）
+						    See: docs/specs/screens/thread-view.yaml > post-list
+						    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
+						<PostList posts={posts} />
+
+						{/* PostListLiveWrapper: ポーリングで新着レスを追加表示（Client Component）
+						    SSRで表示済みのレス番号より大きいものだけを表示することで重複を防ぐ。
+						    pollingEnabled: 過去ページ表示時はポーリング無効。
+						    See: docs/architecture/components/web-ui.md §3.2 スレッドページ > ポーリング方式
+						    See: tmp/workers/bdd-architect_TASK-162/design.md §2.7 ポーリングとの共存 */}
+						<PostListLiveWrapper
+							threadId={thread.id}
+							initialLastPostNumber={lastPostNumber}
+							pollingEnabled={pollingEnabled}
+						/>
+					</PostFormContextProvider>
+
+					{/* AnchorPopup: アンカーポップアップ表示コンポーネント
+					    AnchorPopupProvider 内に1つだけ配置（ツリー末尾）。
+					    See: features/thread.feature @anchor_popup
+					    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
+					<AnchorPopup />
+				</AnchorPopupProvider>
+
+				{/* pagination-nav (下部): レス一覧直後のページナビゲーション（5ch慣習: 上下両方に表示）
+				    See: features/thread.feature @pagination
+				    See: tmp/workers/bdd-architect_TASK-162/design.md §2.6
+				    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ */}
+				<PaginationNav
+					boardId={boardId}
+					threadKey={threadKey}
+					postCount={thread.postCount}
+				/>
+			</EliminatedBotToggleProvider>
 		</main>
 	);
 }

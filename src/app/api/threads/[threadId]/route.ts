@@ -16,8 +16,8 @@
  *   - スレッド不存在時は 404 + ErrorResponse
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import * as PostService from '@/lib/services/post-service'
+import { type NextRequest, NextResponse } from "next/server";
+import * as PostService from "@/lib/services/post-service";
 
 // ---------------------------------------------------------------------------
 // Route Handler
@@ -34,28 +34,29 @@ import * as PostService from '@/lib/services/post-service'
  *   404: ErrorResponse（スレッドが存在しない）
  */
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ threadId: string }> }
+	_req: NextRequest,
+	{ params }: { params: Promise<{ threadId: string }> },
 ): Promise<NextResponse> {
-  const { threadId } = await params
+	const { threadId } = await params;
 
-  // --- PostService への委譲 ---
-  const [thread, posts] = await Promise.all([
-    PostService.getThread(threadId),
-    PostService.getPostList(threadId),
-  ])
+	// --- PostService への委譲 ---
+	// ポーリングAPIもbotMarkを含むレスポンスを返す。
+	// PostListLiveWrapper はこのAPIでポーリングするため、
+	// botMarkが含まれなければ新着レスのopacity表示が機能しない。
+	// See: tmp/workers/bdd-architect_TASK-219/design.md §4.3 ポーリングAPI変更
+	const [thread, posts] = await Promise.all([
+		PostService.getThread(threadId),
+		PostService.getPostListWithBotMark(threadId),
+	]);
 
-  // スレッドが存在しない場合: 404
-  if (!thread) {
-    return NextResponse.json(
-      { error: 'NOT_FOUND', message: 'スレッドが見つかりません' },
-      { status: 404 }
-    )
-  }
+	// スレッドが存在しない場合: 404
+	if (!thread) {
+		return NextResponse.json(
+			{ error: "NOT_FOUND", message: "スレッドが見つかりません" },
+			{ status: 404 },
+		);
+	}
 
-  // 成功: 200 + { thread, posts }
-  return NextResponse.json(
-    { thread, posts },
-    { status: 200 }
-  )
+	// 成功: 200 + { thread, posts }
+	return NextResponse.json({ thread, posts }, { status: 200 });
 }

@@ -77,6 +77,16 @@ vi.mock("../../../lib/services/incentive-service", () => ({
 	evaluateOnPost: vi.fn().mockResolvedValue({ granted: [] }),
 }));
 
+// BotPostRepository モック（TASK-220: getPostListWithBotMark追加に伴うモック追加）
+vi.mock("../../../lib/infrastructure/repositories/bot-post-repository", () => ({
+	findByPostIds: vi.fn().mockResolvedValue([]),
+}));
+
+// BotRepository モック（TASK-220: getPostListWithBotMark追加に伴うモック追加）
+vi.mock("../../../lib/infrastructure/repositories/bot-repository", () => ({
+	findByIds: vi.fn().mockResolvedValue([]),
+}));
+
 import type { Thread } from "../../../lib/domain/models/thread";
 import * as ThreadRepository from "../../../lib/infrastructure/repositories/thread-repository";
 

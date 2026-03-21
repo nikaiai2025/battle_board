@@ -54,17 +54,11 @@ test.describe("撃破済みBOT表示（ローカル限定）", () => {
 	/**
 	 * B-3: 撃破済みボットのレスはWebブラウザで目立たない表示になる
 	 *
-	 * PostItem.tsx に撃破済みBOT表示の分岐が未実装のため test.fixme() でスキップ。
-	 * UIコンポーネントに撃破済みBOT表示が実装された後、このテストを有効化する。
-	 *
 	 * See: features/bot_system.feature
 	 * シナリオ: 撃破済みボットのレスはWebブラウザで目立たない表示になる
-	 * See: tmp/workers/bdd-architect_TASK-215/design.md §5.3
+	 * See: tmp/workers/bdd-architect_TASK-219/design.md §5.2 E2Eテスト
 	 */
-	test.fixme("撃破済みBOTのレスが目立たない表示になる", async ({
-		page,
-		request,
-	}) => {
+	test("撃破済みBOTのレスが目立たない表示になる", async ({ page, request }) => {
 		const jsErrors: string[] = [];
 		page.on("pageerror", (err) => {
 			jsErrors.push(err.message);
@@ -103,14 +97,11 @@ test.describe("撃破済みBOT表示（ローカル限定）", () => {
 	/**
 	 * B-4: 撃破済みボットのレス表示をトグルで切り替えられる
 	 *
-	 * PostItem.tsx に撃破済みBOT表示のトグルUIが未実装のため test.fixme() でスキップ。
-	 * UIコンポーネントにトグルが実装された後、このテストを有効化する。
-	 *
 	 * See: features/bot_system.feature
 	 * シナリオ: 撃破済みボットのレス表示をトグルで切り替えられる
-	 * See: tmp/workers/bdd-architect_TASK-215/design.md §5.3
+	 * See: tmp/workers/bdd-architect_TASK-219/design.md §5.2 E2Eテスト
 	 */
-	test.fixme("撃破済みBOTのレス表示をトグルで切り替えられる", async ({
+	test("撃破済みBOTのレス表示をトグルで切り替えられる", async ({
 		page,
 		request,
 	}) => {

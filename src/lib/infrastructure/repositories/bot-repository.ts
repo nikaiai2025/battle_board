@@ -113,6 +113,33 @@ async function incrementColumn(
 // ---------------------------------------------------------------------------
 
 /**
+ * 複数のbot_idに対応するボット情報を一括取得する。
+ * 撃破済みBOT表示のbotMark合成に使用する。
+ *
+ * See: features/bot_system.feature @撃破済みボットのレスはWebブラウザで目立たない表示になる
+ * See: tmp/workers/bdd-architect_TASK-219/design.md §1.3 BotRepository.findByIds
+ *
+ * @param botIds bot_idの配列
+ * @returns Bot配列（見つかったものだけ返される）
+ */
+export async function findByIds(botIds: string[]): Promise<Bot[]> {
+	if (botIds.length === 0) {
+		return [];
+	}
+
+	const { data, error } = await supabaseAdmin
+		.from("bots")
+		.select("*")
+		.in("id", botIds);
+
+	if (error) {
+		throw new Error(`BotRepository.findByIds failed: ${error.message}`);
+	}
+
+	return (data as BotRow[]).map(rowToBot);
+}
+
+/**
  * ボットを ID で取得する。
  * @param id ボットの UUID
  * @returns 該当ボット、または存在しない場合は null

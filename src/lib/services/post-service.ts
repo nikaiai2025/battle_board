@@ -25,6 +25,7 @@
  *     See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 
+import type { PostWithBotMark } from "../../types/post-with-bot-mark";
 import type { PostContext } from "../domain/models/incentive";
 import type { Post } from "../domain/models/post";
 import type { Thread, ThreadInput } from "../domain/models/thread";
@@ -35,6 +36,8 @@ import {
 	validatePostBody,
 	validateThreadTitle,
 } from "../domain/rules/validation";
+import * as BotPostRepository from "../infrastructure/repositories/bot-post-repository";
+import * as BotRepository from "../infrastructure/repositories/bot-repository";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
 import * as ThreadRepository from "../infrastructure/repositories/thread-repository";
 import * as UserRepository from "../infrastructure/repositories/user-repository";
@@ -875,4 +878,86 @@ export async function getThreadByThreadKey(
 	threadKey: string,
 ): Promise<Thread | null> {
 	return ThreadRepository.findByThreadKey(threadKey);
+}
+
+/**
+ * レス一覧にbotMark情報を合成して返却する。
+ * 撃破済み（is_active=false）のBOTの書き込みにのみbotMarkを付与する。
+ * 活動中（is_active=true）のBOTの情報は一切含めない（セキュリティ上の必須制約）。
+ *
+ * 合成ロジック:
+ *   1. posts = PostRepository.findByThreadId(threadId, options)
+ *   2. postIds = posts.map(p => p.id)
+ *   3. botPosts = BotPostRepository.findByPostIds(postIds)
+ *   4. botIds = unique(botPosts.map(bp => bp.botId))
+ *   5. bots = BotRepository.findByIds(botIds)
+ *   6. eliminatedBotIds = Set(bots.filter(b => !b.isActive).map(b => b.id))
+ *   7. botPostMap = Map(botPosts postId -> botId)（撃破済みBOTのみ）
+ *   8. posts に botMark を合成して返却
+ *
+ * セキュリティ制約:
+ *   is_active=true のBOTの書き込みにbotMarkを付与してはならない。
+ *   これはゲームの根幹「AIか人間か分からない」を破壊するため。
+ *
+ * See: features/bot_system.feature @撃破済みボットのレスはWebブラウザで目立たない表示になる
+ * See: tmp/workers/bdd-architect_TASK-219/design.md §1.4 合成ロジック
+ * See: tmp/workers/bdd-architect_TASK-219/design.md §1.5 セキュリティ
+ *
+ * @param threadId スレッドのUUID
+ * @param options PostListOptions
+ * @returns botMark付きPost配列
+ */
+export async function getPostListWithBotMark(
+	threadId: string,
+	options?: PostListOptions,
+): Promise<PostWithBotMark[]> {
+	// Step 1: レス一覧取得
+	const posts = await PostRepository.findByThreadId(threadId, options ?? {});
+
+	if (posts.length === 0) {
+		return [];
+	}
+
+	// Step 2: post_id 一覧を抽出
+	const postIds = posts.map((p) => p.id);
+
+	// Step 3: bot_posts 紐付けレコードを一括取得（N+1回避）
+	const botPosts = await BotPostRepository.findByPostIds(postIds);
+
+	if (botPosts.length === 0) {
+		// BOTの書き込みが一件もない場合、全レスのbotMarkをnullにして返却
+		return posts.map((p) => ({ ...p, botMark: null }));
+	}
+
+	// Step 4: 重複なしのbot_id一覧を抽出
+	const botIdSet = [...new Set(botPosts.map((bp) => bp.botId))];
+
+	// Step 5: ボット情報を一括取得
+	const bots = await BotRepository.findByIds(botIdSet);
+
+	// Step 6: 撃破済みBOT（is_active=false）のid一覧を Set で管理
+	// セキュリティ: is_active=true のBOTはeliminatedBotIdsに含めない
+	const eliminatedBotIds = new Set(
+		bots.filter((b) => !b.isActive).map((b) => b.id),
+	);
+
+	// Step 7: postId -> botId のマップを構築（撃破済みBOTのものだけフィルタ）
+	const botPostMap = new Map<string, string>();
+	for (const bp of botPosts) {
+		if (eliminatedBotIds.has(bp.botId)) {
+			botPostMap.set(bp.postId, bp.botId);
+		}
+	}
+
+	// Step 8: posts に botMark を合成
+	return posts.map((p) => {
+		const botId = botPostMap.get(p.id);
+		if (botId) {
+			const bot = bots.find((b) => b.id === botId);
+			if (bot) {
+				return { ...p, botMark: { hp: bot.hp, maxHp: bot.maxHp } };
+			}
+		}
+		return { ...p, botMark: null };
+	});
 }

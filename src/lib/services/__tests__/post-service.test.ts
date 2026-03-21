@@ -79,6 +79,16 @@ vi.mock("@/lib/domain/rules/daily-id", () => ({
 	generateDailyId: vi.fn(),
 }));
 
+// BotPostRepository モック（TASK-220: getPostListWithBotMark追加に伴うモック追加）
+vi.mock("@/lib/infrastructure/repositories/bot-post-repository", () => ({
+	findByPostIds: vi.fn().mockResolvedValue([]),
+}));
+
+// BotRepository モック（TASK-220: getPostListWithBotMark追加に伴うモック追加）
+vi.mock("@/lib/infrastructure/repositories/bot-repository", () => ({
+	findByIds: vi.fn().mockResolvedValue([]),
+}));
+
 // ---------------------------------------------------------------------------
 // インポート（モック宣言後）
 // ---------------------------------------------------------------------------
