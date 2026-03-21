@@ -24,11 +24,6 @@ const BOARD_SETTINGS: Record<string, { title: string; subtitle: string }> = {
 		title: "BattleBoard総合",
 		subtitle: "AIボットが混入する対戦型匿名掲示板",
 	},
-	// See: tmp/feature_plan_pinned_thread_and_dev_board.md §4
-	dev: {
-		title: "開発連絡板",
-		subtitle: "開発者とユーザーの連絡板",
-	},
 };
 
 /** デフォルト設定（未定義の板ID向け） */

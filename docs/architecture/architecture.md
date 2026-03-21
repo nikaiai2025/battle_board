@@ -1194,6 +1194,15 @@ supabase/
 - **影響範囲**: `wrangler.toml`（cron triggers 設定追加）、`bot-scheduler.yml`（対象BOTの絞り込み）、D-07 §12.2（定期ジョブ一覧）、D-08 bot.md
 - **関連**: TDR-010（GitHub Actions cron 設計。本TDRにより高頻度BOTは CF Cron に移行）
 
+### TDR-014: 開発連絡板（/dev/）を本番ロジックから完全分離する
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-22
+- **背景**: dev板は本番と同一の PostService を経由しており、本番のバグ発生時に開発連絡手段として機能しない
+- **決定**: dev板専用の Service / Repository / API ルートを新設し、本番コードへの依存を Supabase クライアント初期化のみに限定する。UIはCGI掲示板風のレトロデザインとし、Client Component・Tailwind を使用しない
+- **影響範囲**: `src/app/(web)/dev/page.tsx`（全面書き換え）、`src/app/api/dev/posts/route.ts`（新設）、`src/lib/services/dev-post-service.ts`（新設）、`src/lib/infrastructure/repositories/dev-post-repository.ts`（新設）、`dev_posts` テーブル（新設）
+- **詳細**: See features/dev_board.feature
+
 ---
 
 ## 14. 今後の拡張ポイント

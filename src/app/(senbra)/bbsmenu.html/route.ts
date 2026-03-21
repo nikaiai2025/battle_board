@@ -70,7 +70,6 @@ function buildBbsMenuHtml(baseUrl: string): string {
 <body>
 <B>BattleBoard</B><br>
 <A HREF="${baseUrl}/battleboard/">BattleBoard総合</A><br>
-<A HREF="${baseUrl}/dev/">開発連絡板</A><br>
 </body>
 </html>`;
 }
