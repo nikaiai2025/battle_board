@@ -431,18 +431,23 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	}
 
 	// Step 4: 日次リセットID 生成
+	// システムメッセージの場合は "SYSTEM" 固定（モデル定義 post.ts L22 参照）。
+	// 通常レスは authorIdSeed・boardId・日付のハッシュから生成する。
 	// See: docs/architecture/architecture.md §5.2 日次リセットID生成
+	// See: src/lib/domain/models/post.ts @dailyId
+	const isSystemMessage = input.isSystemMessage ?? false;
 	const dateJst = getTodayJst();
 	const boardId = "battleboard"; // 現時点では固定。将来的にはスレッドから取得
 	const authorIdSeed = authResult.authorIdSeed;
-	const dailyId = generateDailyId(authorIdSeed, boardId, dateJst);
+	const dailyId = isSystemMessage
+		? "SYSTEM"
+		: generateDailyId(authorIdSeed, boardId, dateJst);
 
 	// Step 5: コマンド解析 → コマンド実行（方式A: レス内マージ）
 	// システムメッセージにはコマンド解析をスキップする
 	// See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
 	// See: docs/architecture/components/posting.md §5 方式A
 	let commandResult: CommandExecutionResult | null = null;
-	const isSystemMessage = input.isSystemMessage ?? false;
 
 	// getCommandService() による lazy 初期化 (初回呼び出し時に自動生成)
 	// See: tmp/workers/bdd-architect_TASK-147/analysis.md §4.2 Step 3
