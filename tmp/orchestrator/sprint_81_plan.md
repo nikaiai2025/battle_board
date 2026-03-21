@@ -21,3 +21,9 @@ Sprint-80再検証（フェーズ5）で以下が検出された:
 | TASK_ID | ステータス | 備考 |
 |---|---|---|
 | TASK-232 | completed | cleanupDatabase FK制約修正（4テーブル追加）+ !w説明文修正。vitest 1535 PASS、API 29/29 PASS |
+
+## テスト結果
+- vitest: 72ファイル / 1535テスト / 全PASS
+- playwright API: 29/29 全PASS
+- 本番スモーク: 30/35 PASS（5 skip）
+- コミット: a54a86c
