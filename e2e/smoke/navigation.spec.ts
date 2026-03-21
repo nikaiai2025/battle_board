@@ -356,11 +356,12 @@ test.describe("認証コード検証ページ /auth/verify", () => {
 /**
  * 開発連絡板の到達性・UI要素を検証する。
  *
- * 認証不要のページ。既存の非認証テストと同パターン。
+ * 認証不要のページ。CGI掲示板風レトロデザイン（JavaScript不要）。
+ * 投稿フォームは HTML <form method="POST"> → /api/dev/posts → 302 リダイレクト。
  *
  * See: docs/architecture/bdd_test_strategy.md §10.2.3 各ページでの検証項目
  * See: src/app/(web)/dev/page.tsx
- * See: features/thread.feature @url_structure
+ * See: features/dev_board.feature
  */
 test.describe("開発連絡板 /dev", () => {
 	test("HTTPステータス200で応答し、主要UI要素が表示される", async ({
@@ -374,13 +375,17 @@ test.describe("開発連絡板 /dev", () => {
 		const response = await page.goto("/dev");
 		expect(response?.status()).toBe(200);
 
-		// See: src/app/(web)/dev/page.tsx > #thread-create-form（ThreadCreateForm で boardId="dev"）
-		await expect(page.locator("#thread-create-form")).toBeVisible();
+		// See: src/app/(web)/dev/page.tsx > .dev-title（ページタイトル「開発連絡板」）
+		await expect(page.locator(".dev-title")).toBeVisible();
 
-		// See: src/app/(web)/dev/page.tsx > #auth-prompt
-		await expect(page.locator("#auth-prompt")).toBeVisible();
+		// See: src/app/(web)/dev/page.tsx > form[action="/api/dev/posts"]（投稿フォーム）
+		await expect(page.locator('form[action="/api/dev/posts"]')).toBeVisible();
 
-		await expect(page.locator("main")).toBeVisible();
+		// See: src/app/(web)/dev/page.tsx > #body-input（本文テキストエリア）
+		await expect(page.locator("#body-input")).toBeVisible();
+
+		// See: src/app/(web)/dev/page.tsx > #submit-button（書き込むボタン）
+		await expect(page.locator("#submit-button")).toBeVisible();
 
 		expect(jsErrors).toHaveLength(0);
 	});
