@@ -667,10 +667,12 @@ Then(
 				this.postHistoryResult !== null,
 				"書き込み履歴の取得が実行されていません",
 			);
+			// PaginatedPostHistory の posts 配列を参照する（後方互換修正）
+			// See: tmp/workers/bdd-architect_TASK-237/design.md §4.2
 			assert.strictEqual(
-				this.postHistoryResult.length,
+				this.postHistoryResult.posts.length,
 				0,
-				`書き込み履歴が 0 件であることを期待しましたが ${this.postHistoryResult.length} 件でした`,
+				`書き込み履歴が 0 件であることを期待しましたが ${this.postHistoryResult.posts.length} 件でした`,
 			);
 			return;
 		}

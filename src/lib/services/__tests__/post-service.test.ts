@@ -26,6 +26,8 @@ vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
 	findById: vi.fn(),
 	findByAuthorId: vi.fn(),
 	softDelete: vi.fn(),
+	// Step 6.5: 初回書き込み検出（ウェルカムシーケンス）
+	countByAuthorId: vi.fn().mockResolvedValue(1), // 2回目以降として扱う（テスト対象外）
 }));
 
 vi.mock("@/lib/infrastructure/repositories/thread-repository", () => ({
@@ -88,6 +90,19 @@ vi.mock("@/lib/infrastructure/repositories/bot-post-repository", () => ({
 vi.mock("@/lib/infrastructure/repositories/bot-repository", () => ({
 	findByIds: vi.fn().mockResolvedValue([]),
 }));
+
+// CurrencyService モック（TASK-239: Step 6.5 ウェルカムシーケンス追加に伴うモック追加）
+vi.mock("@/lib/services/currency-service", () => ({
+	credit: vi.fn().mockResolvedValue(undefined),
+}));
+
+// PendingTutorialRepository モック（TASK-239: Step 6.5 ウェルカムシーケンス追加に伴うモック追加）
+vi.mock(
+	"@/lib/infrastructure/repositories/pending-tutorial-repository",
+	() => ({
+		create: vi.fn().mockResolvedValue(undefined),
+	}),
+);
 
 // ---------------------------------------------------------------------------
 // インポート（モック宣言後）

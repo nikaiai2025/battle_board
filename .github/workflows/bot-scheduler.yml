@@ -26,10 +26,11 @@
 name: Bot Scheduler
 
 on:
-  schedule:
-    # 毎時 :00, :30 に起動（UTC）
-    # TDR-010: 30分間隔を採用。15分間隔は無料枠（月2,000分）を超過するため不採用
-    - cron: '0,30 * * * *'
+  # schedule は CF Cron（5分間隔）に移行したため無効化（TDR-013）
+  # 荒らし役BOT は Cloudflare Workers の scheduled ハンドラで実行される
+  # AI API BOT が追加される際（Phase 3）に schedule を復活させる
+  # schedule:
+  #   - cron: '0,30 * * * *'
   workflow_dispatch: {}  # 手動実行（デバッグ・緊急トリガー用）
 
 jobs:

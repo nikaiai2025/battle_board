@@ -53,4 +53,5 @@ export type CreditReason =
 	| "compensation" // 人間への誤攻撃に対する賠償金（監査ログでbot_eliminationと区別）
 	| "initial_grant" // 新規登録時初期付与
 	| "incentive_thread_creation" // スレッド作成ログインボーナス
-	| "admin_grant"; // 管理者による手動付与
+	| "admin_grant" // 管理者による手動付与
+	| "welcome_bonus"; // 初回書き込みボーナス（welcome.feature）

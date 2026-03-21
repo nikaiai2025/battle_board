@@ -14,6 +14,7 @@
  */
 
 import type { Post } from "../../../src/lib/domain/models/post";
+import type { PostWithThread } from "../../../src/lib/infrastructure/repositories/post-repository";
 import { assertUUID } from "./assert-uuid";
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,86 @@ export async function findByAuthorId(
 		.filter((p) => p.authorId === authorId)
 		.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 		.slice(0, limit);
+}
+
+/**
+ * 著者 ID に紐づくレスをキーワード・日付範囲・ページネーション付きで検索する。
+ * スレッドリポジトリのインメモリストアを参照してスレッドタイトルを取得する。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > searchByAuthorId
+ * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+ * See: features/mypage.feature @書き込み履歴をキーワードや日付範囲で絞り込める
+ * See: tmp/workers/bdd-architect_TASK-237/design.md §9.2
+ */
+export async function searchByAuthorId(
+	authorId: string,
+	options: {
+		limit: number;
+		offset: number;
+		keyword?: string;
+		startDate?: string; // YYYY-MM-DD
+		endDate?: string; // YYYY-MM-DD
+	},
+): Promise<{ posts: PostWithThread[]; total: number }> {
+	assertUUID(authorId, "PostRepository.searchByAuthorId.authorId");
+
+	// インメモリ ThreadRepository から findById を取得する（require キャッシュ経由でモック版が返る）
+	// See: features/support/register-mocks.js（thread-repository.ts → in-memory/thread-repository.ts に差し替え済み）
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const ThreadRepository =
+		require("../../../src/lib/infrastructure/repositories/thread-repository") as typeof import("../../../src/lib/infrastructure/repositories/thread-repository");
+
+	// フィルタリング: author_id, is_deleted=false, is_system_message=false
+	let filtered = Array.from(store.values()).filter((p) => {
+		if (p.authorId !== authorId) return false;
+		if (p.isDeleted) return false;
+		if (p.isSystemMessage) return false;
+		return true;
+	});
+
+	// キーワードフィルタ（部分一致、大文字小文字区別なし）
+	if (options.keyword) {
+		const keywordLower = options.keyword.toLowerCase();
+		filtered = filtered.filter((p) =>
+			p.body.toLowerCase().includes(keywordLower),
+		);
+	}
+
+	// 日付範囲フィルタ
+	// startDate: YYYY-MM-DDTOO:00:00.000Z 以降
+	// endDate: YYYY-MM-DDT23:59:59.999Z 以前
+	if (options.startDate) {
+		const startMs = new Date(`${options.startDate}T00:00:00.000Z`).getTime();
+		filtered = filtered.filter((p) => p.createdAt.getTime() >= startMs);
+	}
+	if (options.endDate) {
+		const endMs = new Date(`${options.endDate}T23:59:59.999Z`).getTime();
+		filtered = filtered.filter((p) => p.createdAt.getTime() <= endMs);
+	}
+
+	// created_at DESC ソート
+	filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+	const total = filtered.length;
+
+	// ページネーション: offset から limit 件取得
+	const paginated = filtered.slice(
+		options.offset,
+		options.offset + options.limit,
+	);
+
+	// スレッドタイトルを取得して PostWithThread に変換する
+	const posts: PostWithThread[] = await Promise.all(
+		paginated.map(async (post) => {
+			const thread = await ThreadRepository.findById(post.threadId);
+			return {
+				...post,
+				threadTitle: thread?.title ?? "(削除されたスレッド)",
+			};
+		}),
+	);
+
+	return { posts, total };
 }
 
 /**

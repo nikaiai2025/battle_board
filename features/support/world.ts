@@ -15,7 +15,7 @@ import type { Thread } from "../../src/lib/domain/models/thread";
 import type { User } from "../../src/lib/domain/models/user";
 import type {
 	MypageInfo,
-	PostHistoryItem,
+	PaginatedPostHistory,
 } from "../../src/lib/services/mypage-service";
 
 // ---------------------------------------------------------------------------
@@ -171,9 +171,10 @@ export class BattleBoardWorld extends World {
 
 	/**
 	 * 書き込み履歴取得結果。
-	 * getPostHistory の戻り値を保持し、Then ステップでのアサーションに使用する。
+	 * getPostHistory の戻り値（PaginatedPostHistory）を保持し、Then ステップでのアサーションに使用する。
+	 * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
 	 */
-	postHistoryResult: PostHistoryItem[] | null = null;
+	postHistoryResult: PaginatedPostHistory | null = null;
 
 	// -------------------------------------------------------------------------
 	// ボットシステムコンテキスト

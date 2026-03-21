@@ -235,6 +235,15 @@ describe('撃破済みボット表示', () => { ... });
 - UIコンポーネント実装時に、対応する代替テストの作成を必須とする
 - ナビゲーションテスト（§10.2）の拡充により代替テストが包含される場合、Vitestコンポーネントテスト側は削除してよい（二重検証の回避）
 
+### 7.4 既存テストの組み合わせで充足する振る舞い
+
+以下の振る舞いは専用のBDDシナリオを持たないが、既存の単体テストの組み合わせで検証が充足しているため、追加テスト不要と判断したものである。
+
+| 振る舞い | 充足根拠 |
+|---|---|
+| BOTが `next_post_at` に基づき指定時刻に書き込む | ① APIルートの配線（認証・上限制御・レスポンス形式）: `bot-execute.test.ts` ② `next_post_at` 判定（過去/未来/null/境界値）・更新・日次リセット再設定: `bot-service-scheduling.test.ts` ③ cron起動→API呼び出し: インフラの責務（GitHub Actions / CF Cron Triggers）でありアプリテスト範囲外 |
+| BOTがコマンドを含む書き込みを行う（例: `!abeshinzo`） | `BotService.executeBotPost()` は `PostService.createPost(isBotWrite: true)` を呼び出し、PostService内のコマンド解析パス（Step 5）は `isBotWrite` で分岐しない共通処理である。コマンド実行自体は CommandService の単体テスト + BDDシナリオで検証済み |
+
 ---
 
 ## 8. 統合テスト方針

@@ -86,6 +86,8 @@ function createMockBotRepository(
 		incrementTimesAttacked: vi.fn().mockResolvedValue(undefined),
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
 		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
+		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+		deleteEliminatedTutorialBots: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		incrementTotalPosts: vi.fn().mockResolvedValue(undefined),
 		// See: features/bot_system.feature @AI告発成功でBOTの被告発回数がインクリメントされる
@@ -1060,6 +1062,30 @@ describe("BotService", () => {
 			await service.performDailyReset();
 
 			expect(botRepo.incrementSurvivalDays).not.toHaveBeenCalledWith("bot-003");
+		});
+
+		it("日次リセット後に撃破済みチュートリアルBOTのクリーンアップが実行される", async () => {
+			// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+			// See: tmp/workers/bdd-architect_TASK-236/design.md §3.8
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue(0);
+			const attackRepo = createMockAttackRepository();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				attackRepo,
+			);
+
+			await service.performDailyReset();
+
+			// deleteEliminatedTutorialBots が呼ばれていることを確認
+			expect(botRepo.deleteEliminatedTutorialBots).toHaveBeenCalled();
 		});
 	});
 });

@@ -129,6 +129,13 @@ export interface IBotRepository {
 	bulkResetRevealed(): Promise<number>;
 	bulkReviveEliminated(): Promise<number>;
 	/**
+	 * 撃破済みチュートリアルBOT および7日経過の未撃破チュートリアルBOTを削除する。
+	 * performDailyReset() の末尾で呼び出す。
+	 * See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+	 * See: tmp/workers/bdd-architect_TASK-236/design.md §3.8
+	 */
+	deleteEliminatedTutorialBots(): Promise<number>;
+	/**
 	 * 次回投稿予定時刻を更新する。
 	 * See: docs/architecture/architecture.md §13 TDR-010
 	 */
@@ -166,6 +173,8 @@ export type CreatePostFn = (input: {
 	ipHash: string;
 	displayName?: string;
 	isBotWrite: boolean;
+	/** BOT書き込み時のコマンド実行用ユーザーID（botId をそのまま使用）。PostInput.botUserId に対応。 */
+	botUserId?: string;
 }) => Promise<
 	| { success: true; postId: string; postNumber: number; systemMessages: [] }
 	| { success: false; error: string; code: string }
@@ -630,6 +639,12 @@ export class BotService {
 		// See: docs/specs/bot_state_transitions.yaml #daily_reset > attacks テーブル
 		await this.attackRepository.deleteByDateBefore(today);
 
+		// Step 6: 撃破済みチュートリアルBOTのクリーンアップ
+		// 撃破済みチュートリアルBOTおよび7日経過の未撃破チュートリアルBOTを削除する。
+		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+		// See: tmp/workers/bdd-architect_TASK-236/design.md §3.8
+		await this.botRepository.deleteEliminatedTutorialBots();
+
 		return {
 			botsRevealed,
 			botsRevived,
@@ -741,7 +756,10 @@ export class BotService {
 		const dailyId = await this.getDailyId(botId);
 
 		// Step 7: PostService.createPost を isBotWrite=true で呼び出す
+		// botUserId: botId を渡すことで、コマンドパイプライン（!w 等）が正常に動作する。
 		// See: docs/architecture/components/bot.md §3.1 依存先 > PostService
+		// See: features/welcome.feature @チュートリアルBOTが書き込みを行う
+		// See: tmp/workers/bdd-architect_TASK-236/design.md §3.5 PostInput.botUserId 方式
 		const result = await this.createPostFn({
 			threadId: resolvedThreadId,
 			body,
@@ -749,6 +767,7 @@ export class BotService {
 			ipHash: `bot-${botId}`,
 			displayName: "名無しさん",
 			isBotWrite: true,
+			botUserId: botId,
 		});
 
 		if (!("success" in result) || result.success !== true) {

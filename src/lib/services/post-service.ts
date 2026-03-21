@@ -38,6 +38,7 @@ import {
 } from "../domain/rules/validation";
 import * as BotPostRepository from "../infrastructure/repositories/bot-post-repository";
 import * as BotRepository from "../infrastructure/repositories/bot-repository";
+import * as PendingTutorialRepository from "../infrastructure/repositories/pending-tutorial-repository";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
 import * as ThreadRepository from "../infrastructure/repositories/thread-repository";
 import * as UserRepository from "../infrastructure/repositories/user-repository";
@@ -46,6 +47,7 @@ import type {
 	CommandExecutionResult,
 	CommandService as CommandServiceType,
 } from "./command-service";
+import * as CurrencyService from "./currency-service";
 import * as IncentiveService from "./incentive-service";
 
 // ---------------------------------------------------------------------------
@@ -71,6 +73,14 @@ export interface PostInput {
 	email?: string;
 	/** ボット書き込みフラグ（true の場合は認証スキップ） */
 	isBotWrite: boolean;
+	/**
+	 * BOT書き込み時のコマンド実行用ユーザーID（botId をそのまま使用）。
+	 * isBotWrite=true かつ botUserId が指定された場合、resolvedAuthorId をこの値で上書きする。
+	 * これにより、BOT書き込み時でもコマンドパイプライン（!w 等）が正常に動作する。
+	 * See: features/welcome.feature @チュートリアルBOTが書き込みを行う
+	 * See: tmp/workers/bdd-architect_TASK-236/design.md §3.5 PostInput.botUserId 方式
+	 */
+	botUserId?: string;
 	/**
 	 * システムメッセージフラグ（true の場合はコマンド解析・インセンティブ付与をスキップ）。
 	 * See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
@@ -288,11 +298,17 @@ async function resolveAuth(
  *   4. 日次リセットID 生成（generateDailyId）
  *   5. コマンド解析 → CommandService.executeCommand
  *   6. レス番号採番（PostRepository.getNextPostNumber）
+ *   6.5. 初回書き込み検出（ウェルカムシーケンス）
+ *        - ① CurrencyService.credit +50（welcome_bonus）
+ *        - ② welcomeMessagePending フラグセット
+ *        - ③ PendingTutorialRepository.create
  *   7. IncentiveService 呼び出し（書き込み報酬計算）
- *   8. inlineSystemInfo 構築（コマンド結果 + 書き込み報酬）
+ *   8. inlineSystemInfo 構築（コマンド結果 + 書き込み報酬 + ウェルカムボーナス）
  *   9. レス作成（PostRepository.create）
  *  10. スレッド更新（ThreadRepository.incrementPostCount + updateLastPostAt）
- *  11. PostResult 返却
+ *  11. IncentiveService 遅延評価ボーナス
+ *  11.5. ウェルカムメッセージ投稿（welcomeMessagePending=true の場合）
+ *  12. PostResult 返却
  *
  * See: features/posting.feature @無料ユーザーが書き込みを行う
  * See: features/posting.feature @有料ユーザーがユーザーネーム付きで書き込みを行う
@@ -391,6 +407,15 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		}
 	}
 
+	// Step 3a: BOT書き込み時の resolvedAuthorId 設定
+	// isBotWrite=true かつ botUserId が指定された場合、resolvedAuthorId を botUserId で設定する。
+	// これによりコマンドパイプライン（!w 等）で userId="" になる問題を解消する。
+	// See: features/welcome.feature @チュートリアルBOTが書き込みを行う
+	// See: tmp/workers/bdd-architect_TASK-236/design.md §3.5 PostInput.botUserId 方式
+	if (input.isBotWrite && input.botUserId) {
+		resolvedAuthorId = input.botUserId;
+	}
+
 	// Step 3b: last_ip_hash 更新（認証後・書き込み前）
 	// 書き込みリクエストのたびに last_ip_hash を更新する。
 	// 管理者が「このIPをBAN」する際の最新IP特定に使用する。
@@ -441,6 +466,47 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// Step 6: レス番号採番
 	// See: docs/architecture/architecture.md §7.2 同時実行制御（レス番号採番）
 	const postNumber = await PostRepository.getNextPostNumber(input.threadId);
+
+	// Step 6.5: 初回書き込み検出（ウェルカムシーケンス）
+	// 条件: ユーザー書き込み（!isSystemMessage && !isBotWrite）かつ認証済みユーザー（resolvedAuthorId != null）
+	// - ① 初回書き込みボーナス +50（CurrencyService.credit）→ inlineSystemInfo に追加
+	// - ② ウェルカムメッセージ pending フラグをセット（Step 11.5 で実際に投稿）
+	// - ③ pending_tutorials に INSERT（Cloudflare Cron によるチュートリアルBOTスポーン待ちキュー）
+	//
+	// isSystemMessage=true の場合は条件を満たさないため、Step 11.5 での createPost 再帰呼び出しで
+	// ウェルカムシーケンスは発動しない（無限ループ防止）。
+	//
+	// See: features/welcome.feature @仮ユーザーが初めて書き込むとウェルカムシーケンスが発動する
+	// See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
+	// See: tmp/workers/bdd-architect_TASK-236/design.md §2.1 初回書き込み検出ロジック
+	let welcomeBonusText: string | null = null;
+	let welcomeMessagePending = false;
+	let welcomeTargetPostNumber: number | null = null;
+
+	if (!isSystemMessage && !input.isBotWrite && resolvedAuthorId != null) {
+		try {
+			const postCount = await PostRepository.countByAuthorId(resolvedAuthorId);
+			if (postCount === 0) {
+				// ① 初回書き込みボーナス +50
+				await CurrencyService.credit(resolvedAuthorId, 50, "welcome_bonus");
+				welcomeBonusText = "🎉 初回書き込みボーナス！ +50";
+
+				// ② ウェルカムメッセージ（Step 11.5 で投稿）
+				welcomeMessagePending = true;
+				welcomeTargetPostNumber = postNumber;
+
+				// ③ pending_tutorials INSERT（Cloudflare Cron によるチュートリアルBOTスポーン待ち）
+				await PendingTutorialRepository.create({
+					userId: resolvedAuthorId,
+					threadId: input.threadId,
+					triggerPostNumber: postNumber,
+				});
+			}
+		} catch (err) {
+			// ウェルカムシーケンス失敗は書き込みを巻き戻さない
+			console.error("[PostService] ウェルカムシーケンス処理失敗:", err);
+		}
+	}
 
 	// Step 7: IncentiveService 同期ボーナス（Phase 1: INSERT前）
 	// 同期ボーナス（daily_login, reply, new_thread_join, streak, milestone_post）のみ計算し、
@@ -519,6 +585,13 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 			(g) => `📝 ${g.eventType} +${g.amount}`,
 		);
 		inlineSystemInfoParts.push(...rewardMessages);
+	}
+
+	// ウェルカムボーナスメッセージを追加（Step 6.5 で設定された場合）
+	// See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
+	// See: tmp/workers/bdd-architect_TASK-236/design.md §2.5 inlineSystemInfo へのボーナス表示統合
+	if (welcomeBonusText != null) {
+		inlineSystemInfoParts.push(welcomeBonusText);
 	}
 
 	// inlineSystemInfo を結合（改行区切り）
@@ -626,6 +699,31 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				"[PostService] IncentiveService.evaluateOnPost (deferred) failed:",
 				err,
 			);
+		}
+	}
+
+	// Step 11.5: ウェルカムメッセージ投稿（初回書き込み時のみ）
+	// Step 6.5 で welcomeMessagePending=true になった場合、「★システム」名義の独立システムレスを投稿する。
+	// isBotWrite=true は「認証スキップ」の意味で使用している（設計上の判断は design.md §2.1 参照）。
+	// isSystemMessage=true により Step 6.5 の条件（!isSystemMessage）を満たさず、無限ループにならない。
+	// 投稿失敗は元レスの成功を巻き戻さない（try-catch で保護）。
+	//
+	// See: features/welcome.feature @初回書き込みの直後にウェルカムメッセージが独立システムレスで表示される
+	// See: tmp/workers/bdd-architect_TASK-236/design.md §2.1 Step 11.5
+	if (welcomeMessagePending && welcomeTargetPostNumber != null) {
+		try {
+			await createPost({
+				threadId: input.threadId,
+				body: `>>${welcomeTargetPostNumber} Welcome to Underground...\nここはBOTと人間が入り混じる対戦型掲示板です`,
+				edgeToken: null,
+				ipHash: "system",
+				displayName: "★システム",
+				isBotWrite: true,
+				isSystemMessage: true,
+			});
+		} catch (err) {
+			// ウェルカムメッセージ投稿失敗は元レスの成功を巻き戻さない
+			console.error("[PostService] ウェルカムメッセージ投稿失敗:", err);
 		}
 	}
 

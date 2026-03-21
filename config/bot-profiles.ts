@@ -24,6 +24,19 @@ type BotProfilesYaml = Record<string, BotProfile>;
  * See: features/bot_system.feature @撃破報酬は基本報酬＋生存日数ボーナス＋被攻撃ボーナスで計算される
  */
 export const botProfilesConfig: BotProfilesYaml = {
+	// チュートリアルBOT: 撃破報酬固定 +20（daily_bonus=0, attack_bonus=0 により常に base_reward=20 が返る）
+	// See: features/welcome.feature @チュートリアルBOTを撃破すると固定20枚の報酬を得る
+	// See: config/bot_profiles.yaml (正本)
+	tutorial: {
+		hp: 10,
+		max_hp: 10,
+		reward: {
+			base_reward: 20,
+			daily_bonus: 0,
+			attack_bonus: 0,
+		},
+		fixed_messages: [], // チュートリアルBOTは固定文を使わない（本文はスポーン時に動的生成）
+	},
 	荒らし役: {
 		hp: 10,
 		max_hp: 10,

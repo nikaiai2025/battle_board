@@ -454,8 +454,14 @@ export async function bulkResetRevealed(): Promise<number> {
  * eliminated 状態の全ボットを lurking に復活させる。
  * HP を max_hp に戻し、survival_days・times_attacked を 0 にリセットする。
  * 日次リセット処理で使用する。
+ *
+ * チュートリアルBOT（bot_profile_key = 'tutorial'）は復活対象から除外する。
+ * チュートリアルBOTは1回限りの消耗品であり、日次リセットで復活しない設計。
+ *
  * See: docs/specs/bot_state_transitions.yaml #daily_reset > eliminated -> lurking
  * See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
+ * See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
+ * See: tmp/workers/bdd-architect_TASK-236/design.md §3.7 日次リセットでの復活除外
  *
  * @returns 復活させたボット数
  */
@@ -463,10 +469,12 @@ export async function bulkReviveEliminated(): Promise<number> {
 	// eliminated 状態 = is_active = false のボットを取得して max_hp を参照する必要がある。
 	// Supabase は UPDATE ... SET hp = max_hp のような自己参照 UPDATE をサポートしないため、
 	// 一度全件取得してから個別に更新する。
+	// チュートリアルBOT（bot_profile_key = 'tutorial'）は除外する。
 	const { data: eliminated, error: fetchError } = await supabaseAdmin
 		.from("bots")
 		.select("id, max_hp")
-		.eq("is_active", false);
+		.eq("is_active", false)
+		.or("bot_profile_key.is.null,bot_profile_key.neq.tutorial");
 
 	if (fetchError) {
 		throw new Error(
@@ -501,4 +509,56 @@ export async function bulkReviveEliminated(): Promise<number> {
 	}
 
 	return rows.length;
+}
+
+/**
+ * 撃破済みチュートリアルBOT および古い未撃破チュートリアルBOTを削除する。
+ * daily-maintenance（performDailyReset 末尾）で呼び出す。
+ *
+ * 削除対象:
+ *   - 撃破済みチュートリアルBOT: bot_profile_key = 'tutorial' AND is_active = false
+ *   - 7日経過の未撃破チュートリアルBOT: bot_profile_key = 'tutorial' AND created_at < NOW() - INTERVAL '7 days'
+ *
+ * See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+ * See: tmp/workers/bdd-architect_TASK-236/design.md §3.8 撃破済みチュートリアルBOTクリーンアップ
+ *
+ * @returns 削除したボット数
+ */
+export async function deleteEliminatedTutorialBots(): Promise<number> {
+	// 撃破済みチュートリアルBOTを削除（is_active = false）
+	const { data: eliminated, error: eliminatedError } = await supabaseAdmin
+		.from("bots")
+		.delete()
+		.eq("bot_profile_key", "tutorial")
+		.eq("is_active", false)
+		.select("id");
+
+	if (eliminatedError) {
+		throw new Error(
+			`BotRepository.deleteEliminatedTutorialBots (eliminated) failed: ${eliminatedError.message}`,
+		);
+	}
+
+	const eliminatedCount = ((eliminated as { id: string }[]) ?? []).length;
+
+	// 7日経過の未撃破チュートリアルBOTを削除
+	const sevenDaysAgo = new Date(
+		Date.now() - 7 * 24 * 60 * 60 * 1000,
+	).toISOString();
+	const { data: stale, error: staleError } = await supabaseAdmin
+		.from("bots")
+		.delete()
+		.eq("bot_profile_key", "tutorial")
+		.lt("created_at", sevenDaysAgo)
+		.select("id");
+
+	if (staleError) {
+		throw new Error(
+			`BotRepository.deleteEliminatedTutorialBots (stale) failed: ${staleError.message}`,
+		);
+	}
+
+	const staleCount = ((stale as { id: string }[]) ?? []).length;
+
+	return eliminatedCount + staleCount;
 }

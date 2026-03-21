@@ -294,7 +294,10 @@ When("課金ボタンを押す", async function (this: BattleBoardWorld) {
 
 /**
  * MypageService.getPostHistory を呼び出して書き込み履歴を取得する。
- * 結果は World の postHistoryResult に格納する。
+ * 結果は World の postHistoryResult（PaginatedPostHistory 型）に格納する。
+ *
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
+ * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
  */
 When(
 	"マイページの書き込み履歴を表示する",
@@ -302,6 +305,7 @@ When(
 		assert(this.currentUserId, "ユーザーがログイン済みである必要があります");
 		const MypageService = getMypageService();
 
+		// getPostHistory は PaginatedPostHistory を返す
 		const result = await MypageService.getPostHistory(this.currentUserId);
 		this.postHistoryResult = result;
 		this.lastResult = { type: "success", data: result };
@@ -589,11 +593,14 @@ Then("課金ボタンは無効化されている", async function (this: BattleB
 
 /**
  * postHistoryResult が存在し、件数が正であることを確認する。
+ * PaginatedPostHistory の posts 配列を参照する。
+ *
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
  */
 Then("自分の書き込み一覧が表示される", function (this: BattleBoardWorld) {
 	assert(this.postHistoryResult !== null, "書き込み履歴が取得されていません");
 	assert(
-		this.postHistoryResult.length > 0,
+		this.postHistoryResult.posts.length > 0,
 		`書き込み履歴が 1 件以上あることを期待しましたが 0 件でした`,
 	);
 });
@@ -604,19 +611,26 @@ Then("自分の書き込み一覧が表示される", function (this: BattleBoar
 // ---------------------------------------------------------------------------
 
 /**
- * postHistoryResult の各アイテムに threadId・body・createdAt が含まれることを確認する。
- * スレッド名（threadTitle）の代わりに threadId で検証する（サービス層にはtitle情報はない）。
+ * postHistoryResult の各アイテムに threadTitle・body・createdAt が含まれることを確認する。
+ * threadTitle は searchByAuthorId の threads JOIN により取得する。
+ *
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
+ * See: tmp/workers/bdd-architect_TASK-237/design.md §3.2 threads JOIN の根拠
  */
 Then(
 	"各書き込みのスレッド名、本文、書き込み日時が含まれる",
 	function (this: BattleBoardWorld) {
 		assert(this.postHistoryResult !== null, "書き込み履歴が取得されていません");
-		assert(this.postHistoryResult.length > 0, "書き込み履歴が存在していません");
+		assert(
+			this.postHistoryResult.posts.length > 0,
+			"書き込み履歴が存在していません",
+		);
 
-		for (const item of this.postHistoryResult) {
+		for (const item of this.postHistoryResult.posts) {
+			// スレッドタイトルが存在することを確認する（threads JOIN の結果）
 			assert(
-				typeof item.threadId === "string" && item.threadId.length > 0,
-				"threadId が存在しません",
+				typeof item.threadTitle === "string" && item.threadTitle.length > 0,
+				"threadTitle（スレッド名）が存在しません",
 			);
 			assert(
 				typeof item.body === "string" && item.body.length > 0,

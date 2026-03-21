@@ -1558,11 +1558,13 @@ Then(
 	async function (this: BattleBoardWorld, expectedCount: number) {
 		assert(this.currentUserId, "ユーザーIDが設定されていません");
 		const MypageService = getMypageService();
-		const history = await MypageService.getPostHistory(this.currentUserId);
+		// getPostHistory は PaginatedPostHistory を返すため .posts を経由する（後方互換修正）
+		// See: tmp/workers/bdd-architect_TASK-237/design.md §4.2
+		const result = await MypageService.getPostHistory(this.currentUserId);
 		assert.strictEqual(
-			history.length,
+			result.posts.length,
 			expectedCount,
-			`書き込み履歴が ${expectedCount} 件であることを期待しましたが ${history.length} 件でした`,
+			`書き込み履歴が ${expectedCount} 件であることを期待しましたが ${result.posts.length} 件でした`,
 		);
 	},
 );

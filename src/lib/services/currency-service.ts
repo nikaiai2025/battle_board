@@ -16,8 +16,12 @@
  *   - initializeBalance は新規ユーザー登録時に呼び出す（初期残高 INITIAL_BALANCE）
  */
 
-import * as CurrencyRepository from '../infrastructure/repositories/currency-repository'
-import type { DeductResult, DeductReason, CreditReason } from '../domain/models/currency'
+import type {
+	CreditReason,
+	DeductReason,
+	DeductResult,
+} from "../domain/models/currency";
+import * as CurrencyRepository from "../infrastructure/repositories/currency-repository";
 
 // ---------------------------------------------------------------------------
 // 定数
@@ -25,9 +29,11 @@ import type { DeductResult, DeductReason, CreditReason } from '../domain/models/
 
 /**
  * 新規ユーザー登録時の初期通貨付与額。
- * See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+ * v5変更: 登録時は 0。初回書き込み時に welcome_bonus +50 が付与される。
+ * See: features/currency.feature @新規ユーザー登録時の通貨残高は0である
+ * See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
  */
-export const INITIAL_BALANCE = 50
+export const INITIAL_BALANCE = 0;
 
 // ---------------------------------------------------------------------------
 // サービス関数
@@ -45,13 +51,13 @@ export const INITIAL_BALANCE = 50
  * @param reason - 付与理由（監査ログ用途。将来的に incentive_log テーブルへ記録予定）
  */
 export async function credit(
-  userId: string,
-  amount: number,
-  reason: CreditReason
+	userId: string,
+	amount: number,
+	reason: CreditReason,
 ): Promise<void> {
-  // reason は将来的な incentive_log 記録のために受け取るが、
-  // 現フェーズではリポジトリに渡さない（IncentiveService が担当予定）
-  await CurrencyRepository.credit(userId, amount)
+	// reason は将来的な incentive_log 記録のために受け取るが、
+	// 現フェーズではリポジトリに渡さない（IncentiveService が担当予定）
+	await CurrencyRepository.credit(userId, amount);
 }
 
 /**
@@ -70,13 +76,13 @@ export async function credit(
  * @returns DeductResult — 成功時は新残高、残高不足時は reason: 'insufficient_balance'
  */
 export async function deduct(
-  userId: string,
-  amount: number,
-  reason: DeductReason
+	userId: string,
+	amount: number,
+	reason: DeductReason,
 ): Promise<DeductResult> {
-  // reason は将来的な audit ログ記録のために受け取るが、
-  // 現フェーズではリポジトリに渡さない
-  return CurrencyRepository.deduct(userId, amount)
+	// reason は将来的な audit ログ記録のために受け取るが、
+	// 現フェーズではリポジトリに渡さない
+	return CurrencyRepository.deduct(userId, amount);
 }
 
 /**
@@ -90,19 +96,19 @@ export async function deduct(
  * @returns 現在の残高（レコードが存在しない場合は 0）
  */
 export async function getBalance(userId: string): Promise<number> {
-  return CurrencyRepository.getBalance(userId)
+	return CurrencyRepository.getBalance(userId);
 }
 
 /**
  * 新規ユーザーの通貨レコードを作成し、初期通貨 INITIAL_BALANCE を付与する。
  * AuthService.issueEdgeToken から呼び出される。
  *
- * See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+ * See: features/currency.feature @新規ユーザー登録時の通貨残高は0である
  * See: docs/architecture/components/currency.md §2 公開インターフェース
  *
  * @param userId - 新規ユーザーの UUID
  */
 export async function initializeBalance(userId: string): Promise<void> {
-  // CurrencyRepository.create で通貨レコードを作成し、初期残高 50 を設定する
-  await CurrencyRepository.create(userId, INITIAL_BALANCE)
+	// CurrencyRepository.create で通貨レコードを作成し、初期残高 0 で設定する（v5）
+	await CurrencyRepository.create(userId, INITIAL_BALANCE);
 }

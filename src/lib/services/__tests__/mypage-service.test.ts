@@ -28,6 +28,7 @@ vi.mock("@/lib/services/currency-service", () => ({
 
 vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
 	findByAuthorId: vi.fn(),
+	searchByAuthorId: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,7 @@ vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
 
 import type { Post } from "@/lib/domain/models/post";
 import type { User } from "@/lib/domain/models/user";
+import type { PostWithThread } from "@/lib/infrastructure/repositories/post-repository";
 import * as PostRepository from "@/lib/infrastructure/repositories/post-repository";
 import * as UserRepository from "@/lib/infrastructure/repositories/user-repository";
 import * as CurrencyService from "@/lib/services/currency-service";
@@ -43,6 +45,7 @@ import {
 	getMypage,
 	getPostHistory,
 	type MypageInfo,
+	type PaginatedPostHistory,
 	type PostHistoryItem,
 	type SetUsernameResult,
 	setUsername,
@@ -119,6 +122,12 @@ const SAMPLE_POST: Post = {
 	isSystemMessage: false,
 	isDeleted: false,
 	createdAt: new Date("2026-03-10T12:00:00Z"),
+};
+
+/** PostWithThread テストフィクスチャ（threadTitle 付き） */
+const SAMPLE_POST_WITH_THREAD: PostWithThread = {
+	...SAMPLE_POST,
+	threadTitle: "テストスレッド",
 };
 
 // ---------------------------------------------------------------------------
@@ -495,72 +504,249 @@ describe("MypageService", () => {
 	});
 
 	// =========================================================================
-	// getPostHistory: 書き込み履歴取得
+	// getPostHistory: 書き込み履歴取得（ページネーション・検索対応）
 	// =========================================================================
+	// See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+	// See: features/mypage.feature @書き込み履歴をキーワードや日付範囲で絞り込める
+	// See: tmp/workers/bdd-architect_TASK-237/design.md §4
 
 	describe("getPostHistory", () => {
 		// -----------------------------------------------------------------------
-		// 正常系
+		// 正常系: 基本動作
 		// -----------------------------------------------------------------------
 
 		describe("正常系: 書き込みがある場合", () => {
-			it("PostHistoryItem 配列を返す", async () => {
+			it("PaginatedPostHistory を返す", async () => {
 				// See: features/mypage.feature @自分の書き込み履歴を確認できる
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue([
-					SAMPLE_POST,
-				]);
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [SAMPLE_POST_WITH_THREAD],
+					total: 1,
+				});
 
 				const result = await getPostHistory("user-free-001");
 
-				expect(result).toHaveLength(1);
-				expect(result[0]).toMatchObject({
+				// PaginatedPostHistory 型の確認
+				expect(result).toMatchObject({
+					total: 1,
+					totalPages: 1,
+					page: 1,
+				});
+				expect(result.posts).toHaveLength(1);
+				expect(result.posts[0]).toMatchObject({
 					id: "post-001",
 					threadId: "thread-001",
+					threadTitle: "テストスレッド",
 					postNumber: 1,
 					body: "テスト書き込みです",
 				});
-				expect(result[0].createdAt).toBeInstanceOf(Date);
+				expect(result.posts[0].createdAt).toBeInstanceOf(Date);
 			});
 
-			it("PostRepository.findByAuthorId を userId で呼び出す", async () => {
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue([
-					SAMPLE_POST,
-				]);
+			it("PostRepository.searchByAuthorId を userId と page=1（offset=0）で呼び出す", async () => {
+				// See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [SAMPLE_POST_WITH_THREAD],
+					total: 1,
+				});
 
 				await getPostHistory("user-free-001");
 
-				expect(PostRepository.findByAuthorId).toHaveBeenCalledWith(
+				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
 					"user-free-001",
-					expect.any(Object),
+					expect.objectContaining({
+						limit: 50,
+						offset: 0,
+					}),
 				);
 			});
 
 			it("複数件の書き込みを返す", async () => {
-				const posts: Post[] = [
+				const posts: PostWithThread[] = [
 					{
-						...SAMPLE_POST,
+						...SAMPLE_POST_WITH_THREAD,
 						id: "post-001",
 						postNumber: 3,
 						createdAt: new Date("2026-03-13"),
 					},
 					{
-						...SAMPLE_POST,
+						...SAMPLE_POST_WITH_THREAD,
 						id: "post-002",
 						postNumber: 2,
 						createdAt: new Date("2026-03-12"),
 					},
 					{
-						...SAMPLE_POST,
+						...SAMPLE_POST_WITH_THREAD,
 						id: "post-003",
 						postNumber: 1,
 						createdAt: new Date("2026-03-11"),
 					},
 				];
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue(posts);
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts,
+					total: 3,
+				});
 
 				const result = await getPostHistory("user-free-001");
 
-				expect(result).toHaveLength(3);
+				expect(result.posts).toHaveLength(3);
+				expect(result.total).toBe(3);
+			});
+		});
+
+		// -----------------------------------------------------------------------
+		// 正常系: ページネーション計算
+		// -----------------------------------------------------------------------
+
+		describe("正常系: ページネーション計算", () => {
+			it("total=120 の場合 totalPages=3 を返す（ceil(120/50)=3）", async () => {
+				// See: features/mypage.feature @書き込み履歴が50件を超える場合はページネーションで表示される
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 120,
+				});
+
+				const result = await getPostHistory("user-free-001");
+
+				expect(result.totalPages).toBe(3);
+				expect(result.page).toBe(1);
+			});
+
+			it("total=50 の場合 totalPages=1 を返す（境界値）", async () => {
+				// See: features/mypage.feature @書き込み履歴が50件以下の場合は全件表示される
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 50,
+				});
+
+				const result = await getPostHistory("user-free-001");
+
+				expect(result.totalPages).toBe(1);
+			});
+
+			it("total=51 の場合 totalPages=2 を返す（境界値）", async () => {
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 51,
+				});
+
+				const result = await getPostHistory("user-free-001");
+
+				expect(result.totalPages).toBe(2);
+			});
+
+			it("2ページ目を指定すると offset=50 で searchByAuthorId を呼び出す", async () => {
+				// See: features/mypage.feature @2ページ目を表示すると51件目以降が表示される
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 120,
+				});
+
+				await getPostHistory("user-free-001", { page: 2 });
+
+				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
+					"user-free-001",
+					expect.objectContaining({
+						limit: 50,
+						offset: 50,
+					}),
+				);
+			});
+
+			it("3ページ目を指定すると offset=100 で呼び出す", async () => {
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 120,
+				});
+
+				await getPostHistory("user-free-001", { page: 3 });
+
+				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
+					"user-free-001",
+					expect.objectContaining({
+						limit: 50,
+						offset: 100,
+					}),
+				);
+			});
+
+			it("page を指定しない場合は page=1、offset=0 で呼び出す（デフォルト動作）", async () => {
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 0,
+				});
+
+				const result = await getPostHistory("user-free-001");
+
+				expect(result.page).toBe(1);
+				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
+					"user-free-001",
+					expect.objectContaining({ offset: 0 }),
+				);
+			});
+		});
+
+		// -----------------------------------------------------------------------
+		// 正常系: 検索パラメータの伝播
+		// -----------------------------------------------------------------------
+
+		describe("正常系: 検索パラメータの伝播", () => {
+			it("keyword を searchByAuthorId に渡す", async () => {
+				// See: features/mypage.feature @キーワードで書き込み履歴を検索する
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 0,
+				});
+
+				await getPostHistory("user-free-001", { keyword: "BattleBoard" });
+
+				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
+					"user-free-001",
+					expect.objectContaining({ keyword: "BattleBoard" }),
+				);
+			});
+
+			it("startDate と endDate を searchByAuthorId に渡す", async () => {
+				// See: features/mypage.feature @日付範囲で書き込み履歴を絞り込む
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 0,
+				});
+
+				await getPostHistory("user-free-001", {
+					startDate: "2026-03-10",
+					endDate: "2026-03-15",
+				});
+
+				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
+					"user-free-001",
+					expect.objectContaining({
+						startDate: "2026-03-10",
+						endDate: "2026-03-15",
+					}),
+				);
+			});
+
+			it("keyword + startDate + endDate を組み合わせて渡す", async () => {
+				// See: features/mypage.feature @キーワードと日付範囲を組み合わせて検索する
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 0,
+				});
+
+				await getPostHistory("user-free-001", {
+					keyword: "草",
+					startDate: "2026-03-10",
+					endDate: "2026-03-15",
+				});
+
+				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
+					"user-free-001",
+					expect.objectContaining({
+						keyword: "草",
+						startDate: "2026-03-10",
+						endDate: "2026-03-15",
+					}),
+				);
 			});
 		});
 
@@ -569,74 +755,35 @@ describe("MypageService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("エッジケース: 書き込みが 0 件", () => {
-			it("空配列を返す", async () => {
+			it("空配列・total=0・totalPages=0 を返す", async () => {
 				// See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue([]);
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 0,
+				});
 
 				const result = await getPostHistory("user-free-001");
 
-				expect(result).toHaveLength(0);
-				expect(result).toEqual([]);
-			});
-		});
-
-		// -----------------------------------------------------------------------
-		// エッジケース: 論理削除されたレスを除外する
-		// -----------------------------------------------------------------------
-
-		describe("エッジケース: 論理削除されたレスを除外する", () => {
-			it("isDeleted=true のレスは含まれない", async () => {
-				const posts: Post[] = [
-					{ ...SAMPLE_POST, id: "post-001", isDeleted: false },
-					{ ...SAMPLE_POST, id: "post-002", isDeleted: true },
-					{ ...SAMPLE_POST, id: "post-003", isDeleted: false },
-				];
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue(posts);
-
-				const result = await getPostHistory("user-free-001");
-
-				expect(result).toHaveLength(2);
-				expect(result.map((p) => p.id)).toEqual(["post-001", "post-003"]);
+				expect(result.posts).toHaveLength(0);
+				expect(result.posts).toEqual([]);
+				expect(result.total).toBe(0);
+				// ceil(0/50) = 0
+				expect(result.totalPages).toBe(0);
 			});
 
-			it("全件論理削除済みの場合は空配列を返す", async () => {
-				const posts: Post[] = [
-					{ ...SAMPLE_POST, id: "post-001", isDeleted: true },
-					{ ...SAMPLE_POST, id: "post-002", isDeleted: true },
-				];
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue(posts);
+			it("検索結果が 0 件の場合は空配列を返す（検索条件あり）", async () => {
+				// See: features/mypage.feature @検索結果が0件の場合はメッセージが表示される
+				vi.mocked(PostRepository.searchByAuthorId).mockResolvedValue({
+					posts: [],
+					total: 0,
+				});
 
-				const result = await getPostHistory("user-free-001");
+				const result = await getPostHistory("user-free-001", {
+					keyword: "存在しないワード12345",
+				});
 
-				expect(result).toHaveLength(0);
-			});
-		});
-
-		// -----------------------------------------------------------------------
-		// エッジケース: limit オプション
-		// -----------------------------------------------------------------------
-
-		describe("エッジケース: limit オプション", () => {
-			it("limit オプションを PostRepository に渡す", async () => {
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue([]);
-
-				await getPostHistory("user-free-001", { limit: 10 });
-
-				expect(PostRepository.findByAuthorId).toHaveBeenCalledWith(
-					"user-free-001",
-					{ limit: 10 },
-				);
-			});
-
-			it("limit 未指定の場合はデフォルト（オプション未指定）で呼び出す", async () => {
-				vi.mocked(PostRepository.findByAuthorId).mockResolvedValue([]);
-
-				await getPostHistory("user-free-001");
-
-				expect(PostRepository.findByAuthorId).toHaveBeenCalledWith(
-					"user-free-001",
-					{},
-				);
+				expect(result.posts).toHaveLength(0);
+				expect(result.total).toBe(0);
 			});
 		});
 
@@ -645,13 +792,13 @@ describe("MypageService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("異常系: DB 障害", () => {
-			it("PostRepository.findByAuthorId がエラーをスローした場合は伝播する", async () => {
-				vi.mocked(PostRepository.findByAuthorId).mockRejectedValue(
-					new Error("PostRepository.findByAuthorId failed: DB障害"),
+			it("PostRepository.searchByAuthorId がエラーをスローした場合は伝播する", async () => {
+				vi.mocked(PostRepository.searchByAuthorId).mockRejectedValue(
+					new Error("PostRepository.searchByAuthorId failed: DB障害"),
 				);
 
 				await expect(getPostHistory("user-free-001")).rejects.toThrow(
-					"PostRepository.findByAuthorId failed",
+					"PostRepository.searchByAuthorId failed",
 				);
 			});
 		});

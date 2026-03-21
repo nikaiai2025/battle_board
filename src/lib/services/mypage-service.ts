@@ -17,7 +17,6 @@
  *   - ユーザー不在時は null を返す（呼び出し元が 404 を判断する）
  */
 
-import type { Post } from "../domain/models/post";
 import type { User } from "../domain/models/user";
 import { getGrassIcon } from "../domain/rules/grass-icon";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
@@ -127,12 +126,15 @@ export type UpgradeToPremiumResult =
 /**
  * 書き込み履歴アイテム
  * See: features/mypage.feature @自分の書き込み履歴を確認できる
+ * See: docs/specs/openapi.yaml > PostHistory スキーマ
  */
 export interface PostHistoryItem {
 	/** レスID */
 	id: string;
 	/** スレッドID */
 	threadId: string;
+	/** スレッドタイトル（D-04 PostHistory.threadTitle に準拠） */
+	threadTitle: string;
 	/** レス番号 */
 	postNumber: number;
 	/** 本文 */
@@ -140,6 +142,51 @@ export interface PostHistoryItem {
 	/** 書き込み日時 */
 	createdAt: Date;
 }
+
+/**
+ * 書き込み履歴の検索・ページネーションオプション
+ * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+ * See: features/mypage.feature @書き込み履歴をキーワードや日付範囲で絞り込める
+ * See: tmp/workers/bdd-architect_TASK-237/design.md §4
+ */
+export interface PostHistoryOptions {
+	/** ページ番号（1始まり、デフォルト1） */
+	page?: number;
+	/** 本文部分一致キーワード（省略時はフィルタなし） */
+	keyword?: string;
+	/** 日付範囲の開始日（YYYY-MM-DD、省略時はフィルタなし） */
+	startDate?: string;
+	/** 日付範囲の終了日（YYYY-MM-DD、inclusive） */
+	endDate?: string;
+}
+
+/**
+ * ページネーション付き書き込み履歴レスポンス
+ * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+ * See: docs/specs/openapi.yaml > /api/mypage/history レスポンス
+ * See: tmp/workers/bdd-architect_TASK-237/design.md §4
+ */
+export interface PaginatedPostHistory {
+	/** 書き込み履歴アイテムリスト（ページ分のみ） */
+	posts: PostHistoryItem[];
+	/** 条件に合致する総件数 */
+	total: number;
+	/** 総ページ数（ceil(total / PAGE_SIZE)） */
+	totalPages: number;
+	/** 現在のページ番号 */
+	page: number;
+}
+
+// ---------------------------------------------------------------------------
+// ページネーション定数
+// ---------------------------------------------------------------------------
+
+/**
+ * 書き込み履歴の1ページあたりの表示件数。
+ * BDDシナリオ「50件ずつ表示される」に準拠する。
+ * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+ */
+const PAGE_SIZE = 50;
 
 // ---------------------------------------------------------------------------
 // ユーザーネームバリデーション定数
@@ -330,29 +377,49 @@ export async function upgradeToPremium(
 }
 
 /**
- * ユーザーの書き込み履歴を取得する。
+ * ユーザーの書き込み履歴をページネーション・検索付きで取得する。
+ *
+ * searchByAuthorId（threads JOIN + keyword + 日付範囲 + COUNT）を使用して
+ * 1クエリで結果と総件数を取得する。
  *
  * See: features/mypage.feature @自分の書き込み履歴を確認できる
  * See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される
+ * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+ * See: features/mypage.feature @書き込み履歴をキーワードや日付範囲で絞り込める
+ * See: tmp/workers/bdd-architect_TASK-237/design.md §4
  *
  * @param userId - 対象ユーザーの UUID
- * @param options.limit - 取得件数（デフォルト 50）
- * @returns PostHistoryItem 配列（created_at DESC ソート済み）
+ * @param options - ページネーション・検索オプション
+ * @returns PaginatedPostHistory（posts, total, totalPages, page）
  */
 export async function getPostHistory(
 	userId: string,
-	options: { limit?: number } = {},
-): Promise<PostHistoryItem[]> {
-	const posts: Post[] = await PostRepository.findByAuthorId(userId, options);
+	options: PostHistoryOptions = {},
+): Promise<PaginatedPostHistory> {
+	const page = options.page ?? 1;
+	const offset = (page - 1) * PAGE_SIZE;
 
-	// 論理削除されたレスは除外する（利用者の書き込み履歴として見せない）
-	return posts
-		.filter((post) => !post.isDeleted)
-		.map((post) => ({
+	// searchByAuthorId: threads JOIN + keyword + 日付範囲 + COUNT を1クエリで実行
+	// is_deleted=false, is_system_message=false は searchByAuthorId 内でフィルタ済み
+	const { posts, total } = await PostRepository.searchByAuthorId(userId, {
+		limit: PAGE_SIZE,
+		offset,
+		keyword: options.keyword,
+		startDate: options.startDate,
+		endDate: options.endDate,
+	});
+
+	return {
+		posts: posts.map((post) => ({
 			id: post.id,
 			threadId: post.threadId,
+			threadTitle: post.threadTitle,
 			postNumber: post.postNumber,
 			body: post.body,
 			createdAt: post.createdAt,
-		}));
+		})),
+		total,
+		totalPages: Math.ceil(total / PAGE_SIZE),
+		page,
+	};
 }

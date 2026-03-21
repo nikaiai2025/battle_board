@@ -574,22 +574,32 @@ paths:
   /api/mypage/history:
     get:
       operationId: getPostHistory
-      summary: 書き込み履歴取得
+      summary: 書き込み履歴取得（ページネーション・検索対応）
       tags: [マイページ]
       security:
         - edgeTokenCookie: []
       parameters:
-        - name: limit
+        - name: page
           in: query
           schema:
             type: integer
-            default: 50
-            maximum: 100
-        - name: offset
+            default: 1
+            minimum: 1
+        - name: keyword
           in: query
           schema:
-            type: integer
-            default: 0
+            type: string
+            maxLength: 200
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: 書き込み履歴
@@ -604,6 +614,11 @@ paths:
                       $ref: "#/components/schemas/PostHistory"
                   total:
                     type: integer
+                  totalPages:
+                    type: integer
+                  page:
+                    type: integer
+                required: [posts, total, totalPages, page]
 
   /api/mypage/notifications:
     get:

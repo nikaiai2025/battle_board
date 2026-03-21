@@ -656,16 +656,18 @@ describe("BotRepository", () => {
 
 	describe("bulkReviveEliminated", () => {
 		// See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
+		// See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
 
 		it("正常: eliminated ボットを復活させ復活数を返す", async () => {
-			// Supabase のチェーン: .from().select().eq() → 復活対象取得
-			const mockEqInner = vi.fn().mockResolvedValue({
+			// Supabase のチェーン: .from().select().eq().or() → 復活対象取得（tutorial 除外）
+			const mockOrInner = vi.fn().mockResolvedValue({
 				data: [
 					{ id: "bot-id-001", max_hp: 10 },
 					{ id: "bot-id-002", max_hp: 20 },
 				],
 				error: null,
 			});
+			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
 			// .from().update().eq() → 個別更新（2回呼ばれる）
@@ -675,10 +677,15 @@ describe("BotRepository", () => {
 			const count = await BotRepository.bulkReviveEliminated();
 
 			expect(count).toBe(2);
+			// tutorial 除外フィルタが正しく渡されていることを確認
+			expect(mockOrInner).toHaveBeenCalledWith(
+				"bot_profile_key.is.null,bot_profile_key.neq.tutorial",
+			);
 		});
 
 		it("正常: eliminated ボットが 0 件の場合は 0 を返す（DB更新なし）", async () => {
-			const mockEqInner = vi.fn().mockResolvedValue({ data: [], error: null });
+			const mockOrInner = vi.fn().mockResolvedValue({ data: [], error: null });
+			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
 			const count = await BotRepository.bulkReviveEliminated();
@@ -688,10 +695,30 @@ describe("BotRepository", () => {
 			expect(count).toBe(0);
 		});
 
+		it("正常: tutorial プロファイルの eliminated ボットは復活対象から除外される", async () => {
+			// tutorial ボットが is_active=false でも or フィルタにより取得されない
+			const mockOrInner = vi.fn().mockResolvedValue({
+				data: [], // tutorial ボットはフィルタで除外されるため 0 件
+				error: null,
+			});
+			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
+			mockSelect.mockReturnValue({ eq: mockEqInner });
+
+			const count = await BotRepository.bulkReviveEliminated();
+
+			expect(count).toBe(0);
+			// tutorial 除外フィルタが渡されていることを確認
+			expect(mockEqInner).toHaveBeenCalledWith("is_active", false);
+			expect(mockOrInner).toHaveBeenCalledWith(
+				"bot_profile_key.is.null,bot_profile_key.neq.tutorial",
+			);
+		});
+
 		it("異常系: 取得時 DB エラーが発生した場合はエラーをスローする", async () => {
-			const mockEqInner = vi
+			const mockOrInner = vi
 				.fn()
 				.mockResolvedValue({ data: null, error: { message: "fetch error" } });
+			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
 			await expect(BotRepository.bulkReviveEliminated()).rejects.toThrow(
@@ -700,10 +727,11 @@ describe("BotRepository", () => {
 		});
 
 		it("異常系: 更新時 DB エラーが発生した場合はエラーをスローする", async () => {
-			const mockEqInner = vi.fn().mockResolvedValue({
+			const mockOrInner = vi.fn().mockResolvedValue({
 				data: [{ id: "bot-id-001", max_hp: 10 }],
 				error: null,
 			});
+			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
 			mockUpdate.mockReturnValue({ eq: mockEq });
@@ -789,6 +817,187 @@ describe("BotRepository", () => {
 			await expect(
 				BotRepository.updateDailyId("bot-id-001", "NewId01", "2026-03-17"),
 			).rejects.toThrow("BotRepository.updateDailyId failed: update failed");
+		});
+	});
+
+	// =========================================================================
+	// deleteEliminatedTutorialBots
+	// =========================================================================
+
+	describe("deleteEliminatedTutorialBots", () => {
+		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+		// See: tmp/workers/bdd-architect_TASK-236/design.md §3.8
+
+		it("正常: 撃破済み2件 + 古い未撃破1件を削除し合計3を返す", async () => {
+			// Supabase のチェーン: .from().delete().eq("bot_profile_key","tutorial").eq("is_active",false).select("id")
+			// → 撃破済み2件
+			const mockDeleteSelectEliminated = vi.fn().mockResolvedValue({
+				data: [{ id: "bot-tutorial-001" }, { id: "bot-tutorial-002" }],
+				error: null,
+			});
+			const mockEqIsActiveFalse = vi
+				.fn()
+				.mockReturnValue({ select: mockDeleteSelectEliminated });
+			const mockEqBotProfileKeyEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqIsActiveFalse });
+			const mockDeleteEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqBotProfileKeyEliminated });
+
+			// Supabase のチェーン: .from().delete().eq("bot_profile_key","tutorial").lt("created_at", ...).select("id")
+			// → 古い未撃破1件
+			const mockDeleteSelectStale = vi.fn().mockResolvedValue({
+				data: [{ id: "bot-tutorial-003" }],
+				error: null,
+			});
+			const mockLtCreatedAt = vi
+				.fn()
+				.mockReturnValue({ select: mockDeleteSelectStale });
+			const mockEqBotProfileKeyStale = vi
+				.fn()
+				.mockReturnValue({ lt: mockLtCreatedAt });
+			const mockDeleteStale = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqBotProfileKeyStale });
+
+			// 1回目の from() 呼び出し: 撃破済み削除
+			// 2回目の from() 呼び出し: 古い未撃破削除
+			const { supabaseAdmin } = await import(
+				"../../../../lib/infrastructure/supabase/client"
+			);
+			vi.mocked(supabaseAdmin.from)
+				.mockReturnValueOnce({
+					delete: mockDeleteEliminated,
+				} as unknown as ReturnType<typeof supabaseAdmin.from>)
+				.mockReturnValueOnce({
+					delete: mockDeleteStale,
+				} as unknown as ReturnType<typeof supabaseAdmin.from>);
+
+			const count = await BotRepository.deleteEliminatedTutorialBots();
+
+			expect(count).toBe(3); // 撃破済み2 + 古い未撃破1
+		});
+
+		it("正常: 削除対象が 0 件の場合は 0 を返す", async () => {
+			const mockDeleteSelectEliminated = vi.fn().mockResolvedValue({
+				data: [],
+				error: null,
+			});
+			const mockEqIsActiveFalse = vi
+				.fn()
+				.mockReturnValue({ select: mockDeleteSelectEliminated });
+			const mockEqBotProfileKeyEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqIsActiveFalse });
+			const mockDeleteEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqBotProfileKeyEliminated });
+
+			const mockDeleteSelectStale = vi.fn().mockResolvedValue({
+				data: [],
+				error: null,
+			});
+			const mockLtCreatedAt = vi
+				.fn()
+				.mockReturnValue({ select: mockDeleteSelectStale });
+			const mockEqBotProfileKeyStale = vi
+				.fn()
+				.mockReturnValue({ lt: mockLtCreatedAt });
+			const mockDeleteStale = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqBotProfileKeyStale });
+
+			const { supabaseAdmin } = await import(
+				"../../../../lib/infrastructure/supabase/client"
+			);
+			vi.mocked(supabaseAdmin.from)
+				.mockReturnValueOnce({
+					delete: mockDeleteEliminated,
+				} as unknown as ReturnType<typeof supabaseAdmin.from>)
+				.mockReturnValueOnce({
+					delete: mockDeleteStale,
+				} as unknown as ReturnType<typeof supabaseAdmin.from>);
+
+			const count = await BotRepository.deleteEliminatedTutorialBots();
+
+			expect(count).toBe(0);
+		});
+
+		it("異常系: 撃破済み削除時 DB エラーが発生した場合はエラーをスローする", async () => {
+			const mockDeleteSelectEliminated = vi.fn().mockResolvedValue({
+				data: null,
+				error: { message: "delete eliminated error" },
+			});
+			const mockEqIsActiveFalse = vi
+				.fn()
+				.mockReturnValue({ select: mockDeleteSelectEliminated });
+			const mockEqBotProfileKeyEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqIsActiveFalse });
+			const mockDeleteEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqBotProfileKeyEliminated });
+
+			const { supabaseAdmin } = await import(
+				"../../../../lib/infrastructure/supabase/client"
+			);
+			vi.mocked(supabaseAdmin.from).mockReturnValueOnce({
+				delete: mockDeleteEliminated,
+			} as unknown as ReturnType<typeof supabaseAdmin.from>);
+
+			await expect(
+				BotRepository.deleteEliminatedTutorialBots(),
+			).rejects.toThrow(
+				"BotRepository.deleteEliminatedTutorialBots (eliminated) failed: delete eliminated error",
+			);
+		});
+
+		it("異常系: 古い未撃破削除時 DB エラーが発生した場合はエラーをスローする", async () => {
+			const mockDeleteSelectEliminated = vi.fn().mockResolvedValue({
+				data: [],
+				error: null,
+			});
+			const mockEqIsActiveFalse = vi
+				.fn()
+				.mockReturnValue({ select: mockDeleteSelectEliminated });
+			const mockEqBotProfileKeyEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqIsActiveFalse });
+			const mockDeleteEliminated = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqBotProfileKeyEliminated });
+
+			const mockDeleteSelectStale = vi.fn().mockResolvedValue({
+				data: null,
+				error: { message: "delete stale error" },
+			});
+			const mockLtCreatedAt = vi
+				.fn()
+				.mockReturnValue({ select: mockDeleteSelectStale });
+			const mockEqBotProfileKeyStale = vi
+				.fn()
+				.mockReturnValue({ lt: mockLtCreatedAt });
+			const mockDeleteStale = vi
+				.fn()
+				.mockReturnValue({ eq: mockEqBotProfileKeyStale });
+
+			const { supabaseAdmin } = await import(
+				"../../../../lib/infrastructure/supabase/client"
+			);
+			vi.mocked(supabaseAdmin.from)
+				.mockReturnValueOnce({
+					delete: mockDeleteEliminated,
+				} as unknown as ReturnType<typeof supabaseAdmin.from>)
+				.mockReturnValueOnce({
+					delete: mockDeleteStale,
+				} as unknown as ReturnType<typeof supabaseAdmin.from>);
+
+			await expect(
+				BotRepository.deleteEliminatedTutorialBots(),
+			).rejects.toThrow(
+				"BotRepository.deleteEliminatedTutorialBots (stale) failed: delete stale error",
+			);
 		});
 	});
 });

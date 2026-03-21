@@ -82,7 +82,8 @@ BattleBoard は「5chライクな匿名掲示板 + AIボット混在 + ゲーミ
 | **Supabase PostgreSQL** | データ永続化（スレッド・レス・ユーザー・通貨・ボット等） | RLS でアクセス制御 |
 | **Supabase Auth** | 管理者認証（メール+パスワード） | 一般ユーザー認証には使わない |
 | **Cloudflare Turnstile** | 一般ユーザーの CAPTCHA 検証 | `/auth-code` 認証コード有効化時のみ |
-| **GitHub Actions** | 運営ボットの定期実行、期限切れデータ掃除 | cron スケジュール |
+| **Cloudflare Cron Triggers** | 高頻度BOTの定期実行（5分間隔） | Workers の scheduled イベント。短時間完了BOTを担当（TDR-013） |
+| **GitHub Actions** | AI API使用BOTの定期実行、期限切れデータ掃除 | cron スケジュール。長時間実行ジョブを担当（TDR-013） |
 | **AI API** | 運営ボットの書き込み文章生成 | GitHub Actions から呼び出し。AiApiClient を通じて Google Gemini / OpenAI / Anthropic を使い分け（v6） |
 
 ### 2.3 横断的制約（CLAUDE.md より）
@@ -1003,11 +1004,21 @@ supabase/
 | 告発ログ | accusations テーブル | 告発履歴 |
 | 管理操作ログ | 別途監査テーブル（将来） | レス/スレッド削除記録 |
 
-### 12.2 GitHub Actions ジョブ
+### 12.2 定期ジョブ
+
+実行基盤をBOTの実行時間特性に応じて使い分ける（TDR-013）。
+
+#### Cloudflare Cron Triggers
 
 | ジョブ | スケジュール | 内容 |
 |---|---|---|
-| bot-scheduler | 毎時 :00, :30（`0,30 * * * *`） | 運営ボットの書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
+| bot-scheduler-fast | 5分間隔（`*/5 * * * *`） | 短時間BOT（テンプレート応答・チュートリアルBOT等）の書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
+
+#### GitHub Actions
+
+| ジョブ | スケジュール | 内容 |
+|---|---|---|
+| bot-scheduler | 毎時 :00, :30（`0,30 * * * *`） | AI API使用BOTの書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
 | daily-maintenance | 毎日 JST 0:00 | 日次リセットID・BOTマークリセット・生存日数加算 |
 | cleanup | 毎日 JST 3:00（初期値） | 期限切れ認証コード削除・不要データ掃除 |
 
@@ -1126,6 +1137,7 @@ supabase/
   - 常駐プロセス（別インフラ）: 秒単位精度が可能だが、CLAUDE.md 横断的制約によりインフラ追加はエスカレーション必須。Phase 2 では不要
 - **撃破との整合性**: 撃破時（`is_active = false`）は cron クエリの `is_active = true` 条件で自動除外される。`next_post_at` の変更は不要。日次リセットでの復活時に `next_post_at` を再設定する
 - **DEPLOY_URL の向き先**: Vercel を選択。Cloudflare Workers は通常ユーザー（専ブラ含む）のリクエストに専念させ、BOT cronの負荷を分離する。GitHub Secrets の `DEPLOY_URL` を変更するだけでCloudflareに切り替え可能
+- **補足（2026-03-21）**: TDR-013 により、高頻度BOT（5分間隔）は Cloudflare Cron Triggers に移行。本TDRの30分間隔は AI API 使用BOTに限定して維持する
 - **議論経緯**: `tmp/archive/discussion_bot_cron_design.md`
 - **影響範囲**: `bots` テーブル（`next_post_at` カラム追加）、D-08 bot.md §5（データモデル）、`.github/workflows/bot-scheduler.yml`
 
@@ -1164,6 +1176,23 @@ supabase/
 - **同時実行制御**: 明示的なロックは設けない。同時書き込みにより一時的に50件を超える場合があるが許容する（次回書き込み時に自動是正される）
 - **詳細**: `docs/research/thread_dormancy_design_2026-03-20.md`, D-05 `docs/specs/thread_state_transitions.yaml`
 - **影響範囲**: threads テーブル（`is_dormant` カラム追加）、PostService（休眠⇔復活ロジック追加: D-07 §7.1 step 2b）、ThreadRepository（クエリ条件追加）、subject.txt Route Handler（LIMIT廃止 → is_dormant 条件）
+
+### TDR-013: BOT cron実行基盤の Cloudflare Cron Triggers 併用
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-21
+- **背景**: TDR-010 で GitHub Actions cron の30分間隔を採用したが、以下の課題が顕在化した
+  1. チュートリアルBOT等、5分間隔の高頻度投稿ニーズが大きい。GitHub Actions の30分間隔では対応不可
+  2. GitHub Actions 無料枠（月2,000分）を cron ジョブが圧迫し、AI API 使用ジョブや CI/CD の実行余地が縮小する
+- **決定**: Cloudflare Cron Triggers を導入し、BOTの実行時間特性に応じて GitHub Actions と使い分ける
+  - **Cloudflare Cron Triggers（5分間隔）**: 短時間で完了するBOT（テンプレート応答・チュートリアルBOT等。AI API を使用しないもの）
+  - **GitHub Actions（30分間隔、TDR-010維持）**: 実行に長時間かかるBOT（AI API 呼び出しを含むもの）
+- **振り分け根拠**: AI API 呼び出しは応答待ち時間が長く（数秒〜十数秒）、Cloudflare Workers の実行時間制限（Free: 10ms CPU / Paid: 30s CPU）に収まるか未検証。GitHub Actions は実行時間制限が緩く（6時間）、AI API の応答待ちを安全に処理できる
+- **将来方針**: AI API 呼び出しが Cloudflare Workers の実行時間制限内で完了することが検証できた場合、GitHub Actions cron を廃止し Cloudflare Cron Triggers に一本化する。AI API の処理は I/O バウンド（CPU 時間は短い）であり、Paid プランの wall clock 制限（15分）内に収まる可能性は高い
+- **実装方針**: Cloudflare Cron Triggers は Workers の `scheduled` イベントハンドラで受け、既存の BOT 実行ロジック（BotService.executeBotPost）を内部呼び出しする。投稿判定ロジック（`next_post_at` 方式）は GitHub Actions と共通
+- **GitHub Actions 無料枠の改善効果**: 高頻度BOTを CF Cron に移行することで、GitHub Actions の cron 消費を削減し、AI API 使用ジョブへの枠配分を確保する
+- **影響範囲**: `wrangler.toml`（cron triggers 設定追加）、`bot-scheduler.yml`（対象BOTの絞り込み）、D-07 §12.2（定期ジョブ一覧）、D-08 bot.md
+- **関連**: TDR-010（GitHub Actions cron 設計。本TDRにより高頻度BOTは CF Cron に移行）
 
 ---
 

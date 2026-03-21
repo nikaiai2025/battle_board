@@ -15,6 +15,22 @@ import type { Post } from "../../domain/models/post";
 import { supabaseAdmin } from "../supabase/client";
 
 // ---------------------------------------------------------------------------
+// 型定義: PostWithThread（threads JOIN 結果）
+// ---------------------------------------------------------------------------
+
+/**
+ * Post + スレッドタイトル（threads INNER JOIN 結果）。
+ * searchByAuthorId の戻り値として使用する。
+ *
+ * See: features/mypage.feature @自分の書き込み履歴を確認できる
+ * See: tmp/workers/bdd-architect_TASK-237/design.md §3.2
+ */
+export interface PostWithThread extends Post {
+	/** スレッドタイトル（threads テーブルから JOIN して取得） */
+	threadTitle: string;
+}
+
+// ---------------------------------------------------------------------------
 // 型定義: posts テーブルの DB 行型
 // ---------------------------------------------------------------------------
 
@@ -231,6 +247,85 @@ export async function findByAuthorId(
 }
 
 /**
+ * 著者 ID（author_id）に紐づくレスをキーワード・日付範囲・ページネーション付きで検索する。
+ * マイページの書き込み履歴検索に使用する。threads INNER JOIN でスレッドタイトルを取得する。
+ *
+ * HIGH-003: ページネーション・キーワード・日付範囲フィルタに対応する searchByAuthorId を新設。
+ * findByAuthorId との責務分離: 既存呼び出し元への影響をゼロにするため別関数として定義する。
+ *
+ * See: features/mypage.feature @書き込み履歴は新しい順に50件ずつ表示される
+ * See: features/mypage.feature @書き込み履歴をキーワードや日付範囲で絞り込める
+ * See: tmp/workers/bdd-architect_TASK-237/design.md §3.2
+ *
+ * @param authorId - 著者ユーザーの UUID
+ * @param options.limit - 取得件数
+ * @param options.offset - スキップ件数（ページネーション用）
+ * @param options.keyword - 本文部分一致検索キーワード（省略時はフィルタなし）
+ * @param options.startDate - 日付範囲の開始日（YYYY-MM-DD、省略時はフィルタなし）
+ * @param options.endDate - 日付範囲の終了日（YYYY-MM-DD、inclusive）
+ * @returns { posts: PostWithThread[], total: number }
+ */
+export async function searchByAuthorId(
+	authorId: string,
+	options: {
+		limit: number;
+		offset: number;
+		keyword?: string;
+		startDate?: string; // YYYY-MM-DD
+		endDate?: string; // YYYY-MM-DD
+	},
+): Promise<{ posts: PostWithThread[]; total: number }> {
+	// 1. ベースクエリ構築: threads を INNER JOIN して1クエリで posts + thread title を取得する
+	// { count: "exact" } で COUNT を同時取得し、追加クエリを不要にする
+	// See: tmp/workers/bdd-architect_TASK-237/design.md §3.2 実装方針
+	let query = supabaseAdmin
+		.from("posts")
+		.select("*, threads!inner(title)", { count: "exact" })
+		.eq("author_id", authorId)
+		.eq("is_deleted", false) // 論理削除除外
+		.eq("is_system_message", false) // システムメッセージ除外
+		.order("created_at", { ascending: false });
+
+	// 2. キーワード検索（ILIKE による部分一致）
+	// %keyword% はB-treeインデックス非対応だが、author_id で行数が十分絞り込まれる
+	// See: tmp/workers/bdd-architect_TASK-237/design.md §3.4 インデックス設計
+	if (options.keyword) {
+		query = query.ilike("body", `%${options.keyword}%`);
+	}
+
+	// 3. 日付範囲フィルタ
+	// startDate は inclusive（当日 00:00:00 以上）
+	// endDate は inclusive（翌日 00:00:00 未満 = 当日 23:59:59.999 以下）
+	if (options.startDate) {
+		query = query.gte("created_at", `${options.startDate}T00:00:00.000Z`);
+	}
+	if (options.endDate) {
+		// endDate inclusive: 翌日 00:00:00 未満 = 当日 23:59:59.999Z まで
+		query = query.lt("created_at", `${options.endDate}T23:59:59.999Z`);
+	}
+
+	// 4. ページネーション: range(from, to) は inclusive
+	query = query.range(options.offset, options.offset + options.limit - 1);
+
+	const { data, count, error } = await query;
+
+	if (error) {
+		throw new Error(`PostRepository.searchByAuthorId failed: ${error.message}`);
+	}
+
+	// 5. JOIN 結果を展開してドメインモデルに変換する
+	// Supabase の resource embedding では threads は { title: string } 形式で返る
+	const posts = (data as (PostRow & { threads: { title: string } })[]).map(
+		(row) => ({
+			...rowToPost(row),
+			threadTitle: row.threads.title,
+		}),
+	);
+
+	return { posts, total: count ?? 0 };
+}
+
+/**
  * スレッドID とレス番号（postNumber）でレスを1件取得する。
  * コマンドの `>>N` 引数から対応するレスのUUIDを解決するために使用する。
  *
@@ -325,6 +420,30 @@ export async function create(
 	}
 
 	return rowToPost(data as PostRow);
+}
+
+/**
+ * 著者 ID（author_id）に紐づくレス総数を返す。
+ * 初回書き込み検出（ウェルカムシーケンス発動判定）に使用する。
+ * システムメッセージ・削除済みレスを含む全件をカウントする
+ * （「投稿経験があるか」を判定するため）。
+ *
+ * See: features/welcome.feature @仮ユーザーが初めて書き込むとウェルカムシーケンスが発動する
+ * See: tmp/workers/bdd-architect_TASK-236/design.md §2.1 初回書き込み検出ロジック
+ *
+ * @param authorId - 著者ユーザーの UUID
+ * @returns レス総数（レコードが存在しない場合は 0）
+ */
+export async function countByAuthorId(authorId: string): Promise<number> {
+	const { count, error } = await supabaseAdmin
+		.from("posts")
+		.select("*", { count: "exact", head: true })
+		.eq("author_id", authorId);
+
+	if (error) {
+		throw new Error(`PostRepository.countByAuthorId failed: ${error.message}`);
+	}
+	return count ?? 0;
 }
 
 /**

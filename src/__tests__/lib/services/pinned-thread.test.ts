@@ -49,6 +49,8 @@ vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 	}),
 	findByThreadId: vi.fn().mockResolvedValue([]),
 	getNextPostNumber: vi.fn().mockResolvedValue(1),
+	// Step 6.5: 初回書き込み検出（ウェルカムシーケンス）
+	countByAuthorId: vi.fn().mockResolvedValue(1), // 2回目以降として扱う
 }));
 
 // UserRepository モック
@@ -86,6 +88,19 @@ vi.mock("../../../lib/infrastructure/repositories/bot-post-repository", () => ({
 vi.mock("../../../lib/infrastructure/repositories/bot-repository", () => ({
 	findByIds: vi.fn().mockResolvedValue([]),
 }));
+
+// CurrencyService モック（TASK-239: Step 6.5 ウェルカムシーケンス追加に伴うモック追加）
+vi.mock("../../../lib/services/currency-service", () => ({
+	credit: vi.fn().mockResolvedValue(undefined),
+}));
+
+// PendingTutorialRepository モック（TASK-239: Step 6.5 ウェルカムシーケンス追加に伴うモック追加）
+vi.mock(
+	"../../../lib/infrastructure/repositories/pending-tutorial-repository",
+	() => ({
+		create: vi.fn().mockResolvedValue(undefined),
+	}),
+);
 
 import type { Thread } from "../../../lib/domain/models/thread";
 import * as ThreadRepository from "../../../lib/infrastructure/repositories/thread-repository";

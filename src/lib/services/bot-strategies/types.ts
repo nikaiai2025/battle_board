@@ -88,6 +88,8 @@ export interface ContentGenerationContext {
 	recentPosts?: RecentPostSummary[];
 	/** ユーザー作成ボット用: サニタイズ済みプロンプト（Phase 4）*/
 	sanitizedUserPrompt?: string;
+	/** チュートリアルBOT用: ターゲットレス番号（Phase C）*/
+	tutorialTargetPostNumber?: number;
 }
 
 /**
@@ -111,6 +113,8 @@ export interface BehaviorContext {
 	botId: string;
 	botProfileKey: string | null;
 	boardId: string;
+	/** チュートリアルBOT用: ターゲットスレッドID（Phase C）*/
+	tutorialThreadId?: string;
 }
 
 /**

@@ -52,9 +52,11 @@ describe("CurrencyService", () => {
 	// =========================================================================
 
 	describe("INITIAL_BALANCE 定数", () => {
-		it("初期付与額が 50 に設定されている", () => {
-			// See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
-			expect(INITIAL_BALANCE).toBe(50);
+		it("初期付与額が 0 に設定されている（v5変更: 登録時は付与なし）", () => {
+			// v5変更: 登録時は 0、初回書き込み時に welcome_bonus +50 が付与される
+			// See: features/currency.feature @新規ユーザー登録時の通貨残高は0である
+			// See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
+			expect(INITIAL_BALANCE).toBe(0);
 		});
 	});
 
@@ -106,6 +108,7 @@ describe("CurrencyService", () => {
 				"bot_elimination",
 				"initial_grant",
 				"incentive_thread_creation",
+				"welcome_bonus",
 			] as const)('reason="%s" で CurrencyRepository.credit を呼び出す', async (reason) => {
 				vi.mocked(CurrencyRepository.credit).mockResolvedValue(undefined);
 
@@ -303,11 +306,12 @@ describe("CurrencyService", () => {
 
 	describe("initializeBalance", () => {
 		describe("正常系", () => {
-			it("CurrencyRepository.create を userId と初期残高50で呼び出す", async () => {
-				// See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される
+			it("CurrencyRepository.create を userId と初期残高0（INITIAL_BALANCE）で呼び出す", async () => {
+				// v5変更: 登録時は 0 で作成する
+				// See: features/currency.feature @新規ユーザー登録時の通貨残高は0である
 				vi.mocked(CurrencyRepository.create).mockResolvedValue({
 					userId: "user-001",
-					balance: 50,
+					balance: 0,
 					updatedAt: new Date(),
 				});
 
@@ -317,13 +321,13 @@ describe("CurrencyService", () => {
 					"user-001",
 					INITIAL_BALANCE,
 				);
-				expect(CurrencyRepository.create).toHaveBeenCalledWith("user-001", 50);
+				expect(CurrencyRepository.create).toHaveBeenCalledWith("user-001", 0);
 			});
 
 			it("initializeBalance は void を返す（戻り値なし）", async () => {
 				vi.mocked(CurrencyRepository.create).mockResolvedValue({
 					userId: "user-001",
-					balance: 50,
+					balance: 0,
 					updatedAt: new Date(),
 				});
 
@@ -337,7 +341,7 @@ describe("CurrencyService", () => {
 			it("異なる userId ごとに個別のレコードが作成される", async () => {
 				vi.mocked(CurrencyRepository.create).mockResolvedValue({
 					userId: "user-002",
-					balance: 50,
+					balance: 0,
 					updatedAt: new Date(),
 				});
 
