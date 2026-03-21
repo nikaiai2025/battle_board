@@ -68,7 +68,7 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-84後):** 30/35 PASS（5件skip: ローカル限定テスト）
+- **本番スモークテスト (Sprint-85後):** 29/34 PASS（5件skip: ローカル限定テスト）
 
 ## 人間タスク（次回セッション開始時に確認）
 

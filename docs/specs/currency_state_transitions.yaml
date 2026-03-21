@@ -29,9 +29,9 @@ constraints:
     feature_ref: currency.feature#同時操作による通貨の二重消費が発生しない
 
   - name: initial_balance
-    description: 新規ユーザー登録時に初期通貨 50 が付与される
-    value: 50
-    feature_ref: currency.feature#新規ユーザー登録時に初期通貨 50 が付与される
+    description: 新規ユーザー登録時の初期通貨は0。初回書き込み時にwelcome_bonusとして+50が付与される
+    value: 0
+    feature_ref: currency.feature#新規ユーザー登録時の通貨残高は 0 である
 
 # =============================================
 # 通貨増加イベント（Phase 1: インセンティブ）

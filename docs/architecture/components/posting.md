@@ -67,6 +67,8 @@ PostResult {
 | AuthService | `createPost` 冒頭でedge-token検証。未認証時は認証フローをAuthServiceに委譲し、PostResultに認証情報を添付して早期リターン |
 | CommandService | 本文中にコマンドを検出した場合のみ呼び出す。失敗しても書き込みはコミット済み |
 | IncentiveService | 書き込み成功後に呼び出す。失敗しても書き込みを巻き戻さない |
+| CurrencyService | ウェルカムシーケンス Step 6.5 で welcome_bonus 付与に使用（`CurrencyService.credit(userId, 50, "welcome_bonus")`） |
+| PendingTutorialRepository | ウェルカムシーケンス Step 6.5 で pending_tutorials 登録に使用 |
 | PostRepository | 書き込みレコードのINSERT、スレッド内レスの取得 |
 | ThreadRepository | post_count / last_post_at の更新、スレッド取得、休眠⇔復活の更新（D-05参照） |
 | UserRepository | ユーザー特定・streak更新 |

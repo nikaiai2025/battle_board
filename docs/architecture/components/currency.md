@@ -53,6 +53,7 @@ CommandService     →  CurrencyService.deduct()
 AccusationService  →  CurrencyService.credit()（ボーナス付与）
 IncentiveService   →  CurrencyService.credit()
 BotService         →  CurrencyService.credit()（撃破ボーナス）
+PostService        →  CurrencyService.credit()（welcome_bonus: 初回書き込み時 +50）
 Web APIRoute       →  CurrencyService.getBalance()（マイページ表示）
 ```
 

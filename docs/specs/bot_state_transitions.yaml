@@ -168,8 +168,10 @@ transitions:
     trigger: 日次リセット（JST 0:00）— 撃破済みボット復活
     description: >
       撃破済みボットが翌日にHP初期値で復活し、新しい偽装IDで再び潜伏する。
+      チュートリアルBOTは復活せず、daily-maintenanceでクリーンアップされる。
     guard:
       - ボットの状態が eliminated である
+      - bot_profile_key != 'tutorial'（チュートリアルBOTは復活対象外）
     action:
       - is_active = true に更新
       - is_revealed = false に更新
@@ -350,11 +352,14 @@ daily_reset:
       action: BOTマーク解除（is_revealed=false, revealed_at=NULL）→ lurking
     - target: lurking/revealed状態のボット
       action: survival_days を +1
-    - target: eliminated状態のボット
+    - target: "eliminated状態のボット（bot_profile_key != 'tutorial'）"
       action: >
         復活処理（is_active=true, is_revealed=false, hp=max_hp,
         survival_days=0, times_attacked=0, eliminated_at=NULL,
         eliminated_by=NULL）→ lurking
+    - target: "eliminated状態のチュートリアルBOT（bot_profile_key = 'tutorial'）"
+      action: >
+        復活せずクリーンアップ（レコード削除）。See: welcome.feature @チュートリアルBOTは日次リセットで復活しない
     - target: attacks テーブル
       action: 同一ユーザー同一ボット攻撃制限のリセット（前日分レコードの処理）
   feature_ref: bot_system.feature#翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
