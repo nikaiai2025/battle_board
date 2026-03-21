@@ -50,8 +50,53 @@ async function cleanupDatabase(request: APIRequestContext): Promise<void> {
 		Prefer: "return=minimal",
 	};
 
-	// posts → threads の順で削除（外部キー制約を考慮）
+	// posts を参照する子テーブル → posts → threads の順で削除（外部キー制約を考慮）
 	// レスポンスステータスを検証してDELETE完了を保証する（非同期コミット漏れ対策）
+
+	// grass_reactions.target_post_id -> posts(id) の FK 制約があるため posts より先に削除する
+	const grassReactionsRes = await request.delete(
+		`${supabaseUrl}/rest/v1/grass_reactions?id=neq.00000000-0000-0000-0000-000000000000`,
+		{ headers },
+	);
+	if (!grassReactionsRes.ok()) {
+		throw new Error(
+			`cleanupDatabase: grass_reactions DELETE failed (status: ${grassReactionsRes.status()})`,
+		);
+	}
+
+	// attacks.post_id -> posts(id) の FK 制約があるため posts より先に削除する
+	const attacksRes = await request.delete(
+		`${supabaseUrl}/rest/v1/attacks?id=neq.00000000-0000-0000-0000-000000000000`,
+		{ headers },
+	);
+	if (!attacksRes.ok()) {
+		throw new Error(
+			`cleanupDatabase: attacks DELETE failed (status: ${attacksRes.status()})`,
+		);
+	}
+
+	// accusations.target_post_id -> posts(id) の FK 制約があるため posts より先に削除する
+	const accusationsRes = await request.delete(
+		`${supabaseUrl}/rest/v1/accusations?id=neq.00000000-0000-0000-0000-000000000000`,
+		{ headers },
+	);
+	if (!accusationsRes.ok()) {
+		throw new Error(
+			`cleanupDatabase: accusations DELETE failed (status: ${accusationsRes.status()})`,
+		);
+	}
+
+	// bot_posts.post_id -> posts(id) の FK 制約があるため posts より先に削除する
+	const botPostsRes = await request.delete(
+		`${supabaseUrl}/rest/v1/bot_posts?post_id=neq.00000000-0000-0000-0000-000000000000`,
+		{ headers },
+	);
+	if (!botPostsRes.ok()) {
+		throw new Error(
+			`cleanupDatabase: bot_posts DELETE failed (status: ${botPostsRes.status()})`,
+		);
+	}
+
 	const postsRes = await request.delete(
 		`${supabaseUrl}/rest/v1/posts?id=neq.00000000-0000-0000-0000-000000000000`,
 		{ headers },

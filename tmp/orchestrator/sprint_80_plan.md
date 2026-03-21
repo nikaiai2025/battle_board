@@ -29,4 +29,16 @@ Sprint-79完了後のフェーズ5検証で以下が検出された:
 ## テスト結果
 - vitest: 72ファイル / 1535テスト / 全PASS
 - tsc: 0エラー
-- APIテスト: TASK-226でauth-cookie + senbra-compat修正済み（コミット後に再検証）
+- 本番スモーク: 30/35 PASS（5 skip）
+- コミット: 288da80
+
+## フェーズ5再検証結果
+
+| TASK_ID | エージェント | 結果 | 備考 |
+|---|---|---|---|
+| TASK-228 | bdd-gate | **FAIL** | senbra-compat 18件失敗（grass_reactions FK制約違反） |
+| TASK-229 | bdd-code-reviewer | APPROVE | HIGH 0件、LOW 2件のみ |
+| TASK-230 | bdd-doc-reviewer | APPROVE | HIGH 0件、MEDIUM 1件（!w説明文不一致） |
+| TASK-231 | bdd-test-auditor | APPROVE | HIGH 0件、MEDIUM 1件（継続） |
+
+→ Sprint-81で修正

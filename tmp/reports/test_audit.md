@@ -1,9 +1,9 @@
 # テスト監査レポート
 
-> 実行日: 2026-03-21
-> 対象スプリント: Sprint-75 ~ Sprint-79
-> タスク: TASK-224
-> 前回監査: TASK-186（Sprint-67完了時点）
+> 実行日: 2026-03-22
+> 対象スプリント: Sprint-80（フェーズ5差し戻し修正）
+> タスク: TASK-231
+> 前回監査: TASK-224（Sprint-75~79完了時点）
 
 ## 1. Pendingシナリオ管理状況
 
@@ -16,6 +16,8 @@
 | 代替テスト作成済み | 13 / 16 |
 | 代替テスト未作成（技術的負債） | 0 |
 | インフラ制約pending（§7.3範囲外） | 3 |
+
+**前回 (TASK-224) から変化なし。** Sprint-80はテスト修正のみでpendingの追加・削除は発生していない。
 
 ### 分類別内訳
 
@@ -30,75 +32,51 @@
 
 ### 詳細: §7.3不適合一覧
 
-全件適合。全pendingステップに以下が記載されている:
-- pending理由（分類: DOM/CSS表示 / ブラウザ固有動作 / 外部OAuth / インフラ制約）
-- D-10 §7.3.1 への参照
-- 代替テストのファイルパス（§7.3.2 準拠の `return "pending"` 形式）
-
-**前回指摘 HIGH-01/02 の解消を確認:** thread.steps.ts の全pendingステップに `分類: DOM/CSS表示` / `分類: ブラウザ固有動作` と `代替検証: {ファイルパス}` が追加された。4ファイル全てが同一の標準形式に統一されている。
-
-### 詳細: 代替テストの実質性検証
-
-代替テストの中身を読み、BDDシナリオの意図を実質的にカバーしているか確認した。
-
-| 代替テスト | 判定 | 根拠 |
-|---|---|---|
-| e2e/flows/thread-ui.spec.ts | 実質あり | 7シナリオ分のE2E。アンカークリック→ポップアップ表示→内容確認→スタック→閉じるまで網羅。レス番号クリック→フォーム挿入も検証 |
-| e2e/flows/polling.spec.ts | 実質あり | DB直接INSERT後のポーリング検知。waitForResponseでポーリング実行を待機し、新レスDOM出現を確認 |
-| e2e/flows/bot-display.spec.ts | 実質あり | opacity検証 + トグルOFF/ON切替。BDDシナリオの「目立たない表示」「トグル切替」を直接アサート |
-| AnchorPopupContext.test.tsx | 実質あり | popupStack管理のロジック（push/closeTop/存在しないレス拒否）を検証 |
-| AnchorPopup.test.tsx | 実質あり | ポップアップ内のレス番号・表示名・日次ID・本文の表示をアサート |
-| AnchorLink.test.tsx | 実質あり | アンカークリックでopenPopupが呼ばれることを検証 |
-| PostFormInsertText.test.tsx | 実質あり | Context経由のinsertText→フォーム内容変化を検証（空フォーム・非空フォーム） |
-| PostItem.test.tsx | 実質あり | レス番号表示（">>"なし）とクリックハンドラを検証 |
-| PostListLiveWrapper.test.tsx | 実質あり | initialLastPostNumber prop変化時のstate同期を検証 |
-| registration-service.test.ts | 実質あり | registerWithDiscord/loginWithDiscord/handleOAuthCallbackの正常系・異常系を34テストで網羅 |
+全件適合。Sprint-80で新規pendingの追加はなく、既存pendingのコメント形式にも変更なし。
 
 ### 詳細: 技術的負債（代替テスト未作成）
 
-なし。前回MEDIUM-01（撃破済みボット表示テスト未作成）はe2e/flows/bot-display.spec.tsの作成により解消。
+なし。
 
 ## 2. テストピラミッド
 
-| 層 | ファイル数 | テスト数 | 判定 |
-|---|---|---|---|
-| 単体テスト (Vitest) | 72 | 1511 | OK |
-| BDDサービス層 (Cucumber) | 15 features | 277 scenarios (261 passed, 16 pending) | OK |
-| E2E (Playwright e2e) | 5 | 16 | OK |
-| APIテスト (Playwright api) | 2 | 29 | OK |
-| スモーク/ナビゲーション | 2 | 26 | OK |
+| 層 | ファイル数 | テスト数 | 前回比 | 判定 |
+|---|---|---|---|---|
+| 単体テスト (Vitest) | 72 | 1535 | +24 | OK |
+| BDDサービス層 (Cucumber) | 15 features | 277 scenarios (261 passed, 16 pending) | +/-0 | OK |
+| E2E (Playwright e2e) | 5 | 16 | +/-0 | OK |
+| APIテスト (Playwright api) | 2 | 29 | +/-0 | OK |
+| スモーク/ナビゲーション | 1 | 19 | +/-0 | OK |
 
 ### ピラミッドバランス判定
 
 ```
-        [Smoke: 26]
-       [E2E: 16]
-      [API: 29]
-   [BDD: 277 scenarios]
-  [Unit: 1511 tests]
+       [Smoke: 19]
+      [E2E: 16]
+     [API: 29]
+  [BDD: 277 scenarios]
+ [Unit: 1535 tests]
 ```
 
-正常なピラミッド形状。下層（単体+BDD）が厚く、上層（E2E+Smoke）が薄い。逆ピラミッドの兆候なし。
+正常なピラミッド形状。下層（単体 1535 + BDD 277）が厚く、上層（E2E 16 + Smoke 19）が薄い。逆ピラミッドの兆候なし。Sprint-80でVitest単体テストが24件増加し、下層がさらに強化された。
 
 ### ドメインルール単体テストカバレッジ
 
 `src/lib/domain/rules/` に11ファイル。直接の単体テストは10ファイル（2箇所に分散）。
 
-| ルールファイル | 直接テスト | テスト数 |
+| ルールファイル | 直接テスト | 状態 |
 |---|---|---|
-| daily-id.ts | rules/__tests__/daily-id.test.ts | 14 |
-| validation.ts | rules/__tests__/validation.test.ts | 55 |
-| anchor-parser.ts | rules/__tests__/anchor-parser.test.ts | 33 |
-| incentive-rules.ts | rules/__tests__/incentive-rules.test.ts | 62 |
-| command-parser.ts | rules/__tests__/command-parser.test.ts | 51 |
-| elimination-reward.ts | rules/__tests__/elimination-reward.test.ts | 12 |
-| accusation-rules.ts | src/__tests__/.../accusation-rules.test.ts | 20 |
-| grass-icon.ts | src/__tests__/.../grass-icon.test.ts | 30 |
-| pagination-parser.ts | src/__tests__/.../pagination-parser.test.ts | 32 |
-| url-detector.ts | src/__tests__/.../url-detector.test.ts | 46 |
-| **mypage-display-rules.ts** | **なし** | **0** |
-
-**所見 (MEDIUM):** `mypage-display-rules.ts` のみ直接の単体テストが存在しない。前回監査 TASK-186 (Sprint-67) でHIGH-03として初出後6スプリント継続。mypage-registration.test.ts (35テスト) がサービス層レベルで間接的にカバーしている。純粋関数のテスト欠落としてMEDIUMを維持する（前回HIGHからの降格理由は後述）。
+| daily-id.ts | rules/__tests__/daily-id.test.ts | OK |
+| validation.ts | rules/__tests__/validation.test.ts | OK |
+| anchor-parser.ts | rules/__tests__/anchor-parser.test.ts | OK |
+| incentive-rules.ts | rules/__tests__/incentive-rules.test.ts | OK |
+| command-parser.ts | rules/__tests__/command-parser.test.ts | OK |
+| elimination-reward.ts | rules/__tests__/elimination-reward.test.ts | OK |
+| accusation-rules.ts | src/__tests__/.../accusation-rules.test.ts | OK |
+| grass-icon.ts | src/__tests__/.../grass-icon.test.ts | OK |
+| pagination-parser.ts | src/__tests__/.../pagination-parser.test.ts | OK |
+| url-detector.ts | src/__tests__/.../url-detector.test.ts | OK |
+| **mypage-display-rules.ts** | **なし** | MEDIUM（継続） |
 
 ## 3. Featureカバレッジ
 
@@ -125,6 +103,8 @@
 
 未定義ステップ: **0件** (CRITICAL問題なし)
 
+前回から変化なし。Sprint-80はテスト修正のみであり、シナリオの追加・削除は発生していない。
+
 ## 4. ステップ定義の実質性
 
 ### assert(true) / expect(true) スタブアサーション
@@ -138,30 +118,54 @@
 
 **検証:** 該当ステップ（`Then "通知欄が表示される"`）は `assert(this.mypageResult !== null)` でmypageResultの存在を検証している。Phase 1では通知欄が「空の枠」として存在すればよいとの設計判断が明記されており、アサーションは現フェーズの要件に対して実質的。**スタブではない。**
 
-## 5. 前回監査との差分（TASK-186 → TASK-224）
+## 5. Sprint-80修正ファイルの個別検証
+
+Sprint-80で修正された3テストファイルの品質を検証した。
+
+### e2e/api/auth-cookie.spec.ts
+
+- **修正内容:** Max-Age期待値を `60*60*24*365`（365日）に修正（L431）
+- **アサーション品質:** 10テスト。Cookie属性（HttpOnly, SameSite=Lax, Path=/, Max-Age）のHTTPレベル検証、誤った認証コードの401応答、edge-tokenなしの400応答をカバー。正常系+異常系が適切にバランス
+- **トレーサビリティ:** ファイル冒頭JSDocに検証対象APIルートとD-10 §9.2への参照あり
+- **判定:** 問題なし
+
+### e2e/api/senbra-compat.spec.ts
+
+- **修正内容:** `cleanupDatabase` でDELETEのレスポンスステータスを検証するよう強化（L59-83）。非同期コミット漏れ対策
+- **アサーション品質:** 18テスト。Shift_JISエンコーディングのラウンドトリップ検証、DAT形式の5フィールド構成検証、bump順ソート、Range 206応答、bbs.cgi Shift_JIS POST等。専ブラ互換の核心部分を網羅
+- **トレーサビリティ:** ファイル冒頭JSDocに対応featureファイルとD-10 §9への参照あり
+- **判定:** 問題なし
+
+### src/__tests__/lib/services/handlers/hissi-handler.test.ts
+
+- **修正内容:** モック設定修正（`findByAuthorIdAndDate` のmock戻り値をDESC順に統一、`mockResolvedValueOnce` への変更）
+- **アサーション品質:** 15テスト。バリデーション5件（引数なし、レス不在、システムメッセージ、削除済み、authorId null）+ 正常系8件（0件/1件/3件/5件以上、フォーマット、dailyId、複数スレッド横断、時系列順）+ エラー時独立メッセージ非存在1件。エッジケース網羅が優秀
+- **トレーサビリティ:** ファイル冒頭JSDocに `investigation.feature` シナリオへの参照あり
+- **判定:** 問題なし
+
+## 6. 前回監査との差分（TASK-224 -> TASK-231）
 
 | 前回指摘 | 今回の状態 |
 |---|---|
-| HIGH-01: thread.steps.ts §7.3.1 分類キーワード欠落 | **解消** -- 全pendingに標準分類キーワード追加済み |
-| HIGH-02: thread.steps.ts §7.3.2 代替検証コメント行欠落 | **解消** -- `代替検証:` 形式に統一済み |
-| HIGH-03: mypage-display-rules.ts 単体テスト欠落 | **継続** -- MEDIUMに降格（理由: 間接カバーが確認され、テスト欠落による実害リスクが低い） |
-| MEDIUM-01: 撃破済みボット表示テスト未作成 | **解消** -- e2e/flows/bot-display.spec.ts 作成済み |
-| LOW-01: 代替テスト5ファイルに @feature/@scenario 注釈欠落 | **継続** -- See:形式でトレーサビリティ確保済みだが、JSDocタグ形式は未使用 |
+| MEDIUM-1: mypage-display-rules.ts 直接単体テスト不足 | **継続** -- 7スプリント継続（Sprint-67初出）。間接カバーあり |
+| LOW-1: 代替テスト5ファイルに @feature/@scenario 注釈欠落 | **継続** -- See:形式でトレーサビリティ確保済み |
 
-## 6. レビューサマリー
+Sprint-80の修正で新規指摘は発生せず、既存指摘の悪化もなし。
+
+## 7. レビューサマリー
 
 | 重要度 | 件数 | ステータス | 内容 |
 |---|---|---|---|
 | CRITICAL | 0 | pass | -- |
 | HIGH | 0 | pass | -- |
-| MEDIUM | 1 | info | mypage-display-rules.ts に直接単体テストなし（6スプリント継続、間接カバーあり） |
+| MEDIUM | 1 | info | mypage-display-rules.ts に直接単体テストなし（7スプリント継続、間接カバーあり） |
 | LOW | 1 | note | 代替テスト5ファイルで §7.3.3 の `@feature`/`@scenario` JSDocタグ未使用 |
 
 ### MEDIUM-1: mypage-display-rules.ts の直接単体テスト不足（継続）
 
 **対象:** `src/lib/domain/rules/mypage-display-rules.ts`
 
-**前回からの変化:** 前回HIGHからMEDIUMに降格。降格理由: (1) mypage-registration.test.ts (35テスト) がサービス層を経由して間接的にカバーしている。(2) 他の10ルールファイルは全て直接テストを持ち、本ファイルが唯一の例外であることから「テスト文化の欠如」ではなく「タスク優先順位の結果」と判断できる。
+**前回からの変化:** なし。Sprint-80の修正対象外。mypage-registration.test.ts がサービス層を経由して間接的にカバーしている状態が継続。
 
 **推奨:** 次回の軽量タスクとして対応。推定作業量: 30分以内。
 
@@ -175,11 +179,11 @@
 
 **判定: APPROVE**
 
-前回WARNING（HIGH 3件）から**APPROVE**に改善。
+Sprint-80差し戻し修正後も前回判定を維持。
 
-- HIGH-01/02（thread.steps.ts §7.3形式不備）: 解消
-- HIGH-03 → MEDIUM降格（mypage-display-rules.ts）: 間接カバー確認
-- MEDIUM-01（撃破済みBOT表示テスト未作成）: 解消（bot-display.spec.ts新規作成）
-- 新規CRITICAL/HIGH: なし
-- 全277シナリオ中261がPASS、16がpending管理下、0が未定義
+- CRITICAL/HIGH: 0件
+- Sprint-80修正の3ファイル: 全てアサーション品質・トレーサビリティに問題なし
+- テストピラミッド: 単体テスト +24件で下層強化。バランス健全
+- pendingシナリオ: 16件、全てD-10 §7.3適合。変化なし
+- Featureカバレッジ: 277シナリオ中261通常実行、16pending管理下、0未定義
 - スタブアサーション: 0件

@@ -1,156 +1,103 @@
-# コードレビューレポート: Sprint 75-79 (TASK-222)
+# コードレビューレポート: Sprint-80 再検証 (TASK-229)
 
-レビュー日: 2026-03-21
+レビュー日: 2026-03-22
 レビュアー: bdd-code-reviewer
-対象: Sprint-75 ~ Sprint-79 の変更ファイル全量
+対象: Sprint-80 差し戻し修正（前回 HIGH 2件の修正確認）
+
+前回レビュー: Sprint 75-79 (TASK-222) — HIGH 2件 / MEDIUM 4件 / LOW 4件
 
 ---
 
-## 指摘事項
+## 前回 HIGH 指摘の修正確認
 
-### [HIGH-001] HissiHandler: 同一データに対する冗長な2回のDBクエリ
+### [HIGH-001] HissiHandler: 冗長クエリ統合 — **修正確認OK**
 
-ファイル: `src/lib/services/handlers/hissi-handler.ts:158-171`
+ファイル: `src/lib/services/handlers/hissi-handler.ts:158-169`
 
-問題点: `findByAuthorIdAndDate` を同一の `authorId` と `today` に対して2回呼び出している。1回目は全件取得（件数カウント用）、2回目は limit=3 で最新3件取得。1回目で全件をメモリにロードしているため、2回目のクエリは不要であり `allPosts.slice(0, 3)` で代替できる。ユーザーが大量に書き込みしている場合、不要なDBラウンドトリップが発生する。
+修正内容:
+- 2回目の `findByAuthorIdAndDate(authorId, today, { limit: 3 })` を削除
+- `allPosts.slice(0, 3)` で代替（line 169）
+- コメント（line 166-168）で `findByAuthorIdAndDate` が `created_at DESC` ソート済みであること、および `post-repository.ts` での確認済みである旨を明記
 
-```typescript
-// 現状: 2回DBクエリを発行
-const allPosts = await this.postRepository.findByAuthorIdAndDate(authorId, today);
-const totalCount = allPosts.length;
-const displayPosts = await this.postRepository.findByAuthorIdAndDate(
-    authorId, today, { limit: 3 });
+テスト対応:
+- `hissi-handler.test.ts`: 全正常系テストで `mockResolvedValueOnce` を使用し、単一呼び出しのみを想定したモック設定に変更済み
+- 5件テスト（line 275-297）: 全件配列を1回返し、内部で `slice(0, 3)` されることを前提とした検証に更新
 
-// 改善案: 1回のクエリで済ませる
-const allPosts = await this.postRepository.findByAuthorIdAndDate(authorId, today);
-const totalCount = allPosts.length;
-const displayPosts = allPosts.slice(0, 3); // created_at DESC ソート済み
+判定: **RESOLVED**
+
+---
+
+### [HIGH-002] AttackHandler: CreditReason "compensation" 追加 — **修正確認OK**
+
+ファイル:
+- `src/lib/domain/models/currency.ts:53` — `"compensation"` を `CreditReason` 型に追加
+- `src/lib/services/handlers/attack-handler.ts:391-395` — フローC の賠償金付与で `"compensation"` を使用
+
+修正内容:
+- `CreditReason` 型に `| "compensation"` を追加（JSDoc: "人間への誤攻撃に対する賠償金（監査ログでbot_eliminationと区別）"）
+- フローB（BOT撃破、line 305）は `"bot_elimination"` を維持 — 正しい使い分け
+- フローC（人間への賠償金、line 395）は `"compensation"` に変更
+- ユビキタス言語辞書 (D-02) の「賠償金」(english: compensation) と一致
+
+テスト対応:
+- `attack-handler.test.ts`: フローC のテストで `currencyService.credit` のモック検証あり（line 534-538, 570-574）
+- `expect.any(String)` でのマッチングのため、"compensation" 固有の値検証はテスト上は暗黙的
+
+判定: **RESOLVED**
+
+---
+
+## Sprint-80 変更ファイルの新規指摘
+
+### [LOW-001] HissiHandler: クラスJSDocの処理フロー記述が実装と不整合
+
+ファイル: `src/lib/services/handlers/hissi-handler.ts:75`
+
+問題点: クラスJSDocのステップ5に「今日の日付で最新3件検索（findByAuthorIdAndDate、limit=3）」と記載されているが、実装はステップ5a（全件取得）+ ステップ5b（`allPosts.slice(0, 3)`）に変更済み。JSDocの処理フロー記述が実装と乖離している。
+
+```
+// 現状のJSDoc（line 74-75）:
+//   4. 今日の日付で全件検索（findByAuthorIdAndDate、limit なし）
+//   5. 今日の日付で最新3件検索（findByAuthorIdAndDate、limit=3）  ← 実装と不整合
+
+// 実装（line 158-169）:
+//   5a. 全件取得（limit なし）
+//   5b. allPosts.slice(0, 3) で最新3件を抽出
 ```
 
+機能への影響はない。ドキュメント整合性の問題のみ。
+
 ---
 
-### [HIGH-002] AttackHandler: 賠償金付与の CreditReason が不正確
+### [LOW-002] AttackHandler テスト: CreditReason の値検証が暗黙的
 
-ファイル: `src/lib/services/handlers/attack-handler.ts:391-395`
+ファイル: `src/__tests__/lib/services/handlers/attack-handler.test.ts:534-538`
 
-問題点: フローC（対象が人間の場合）の賠償金付与で `CreditReason` に `"bot_elimination"` を使用している。実態は人間への誤攻撃による賠償金であり、ボット撃破報酬ではない。通貨の監査ログ上で賠償金と撃破報酬が区別できなくなる。
+問題点: フローC のテストで `currencyService.credit` の第3引数を `expect.any(String)` で検証しており、`"compensation"` が正しく渡されていることの明示的な検証がない。型安全性（TypeScript の型チェック）により実行時に誤った値が渡されることは防がれるが、テストとしては `"compensation"` を明示する方がリグレッション検知力が高い。
 
 ```typescript
-// 現状: bot_elimination はボット撃破報酬の理由だが、賠償金に流用されている
-await this.currencyService.credit(
-  targetUserId,
-  actualCompensation,
-  "bot_elimination",  // 不正確
+// 現状（line 534-538）:
+expect(currencyService.credit).toHaveBeenCalledWith(
+  "target-user-001",
+  15,
+  expect.any(String),   // "compensation" を明示した方が堅牢
 );
 ```
 
-修正案: `CreditReason` 型 (`src/lib/domain/models/currency.ts`) に `"compensation"` を追加し、賠償金と撃破報酬を区別する。ドメインモデルの変更を伴うため影響範囲の確認が必要。
+機能への影響はない。テスト品質の改善提案。
 
 ---
 
-### [MEDIUM-001] ImageThumbnail: コンポーネント単体でのプロトコル検証が不在
+## 前回 MEDIUM/LOW 指摘のステータス
 
-ファイル: `src/app/(web)/_components/ImageThumbnail.tsx:56-63`
+Sprint-80 のスコープ外のため未修正。参考として前回のステータスを記載する。
 
-問題点: `url` prop を `<a href>` と `<img src>` にそのまま渡している。呼び出し元の `detectUrls` が `https?://` で始まるURLのみ検出するため、`javascript:` や `data:` URIが混入するリスクは現状では低い。ただし、コンポーネント自体は入力を検証しておらず、将来別のコンテキストから呼ばれた場合の防御層がない。
-
-React の JSX 自動エスケープは `<a href>` の `javascript:` URI には効かないため、防御的プログラミングとしてコンポーネント側でのプロトコル検証を推奨する。
-
-```typescript
-// 推奨: コンポーネント側の防御的チェック
-export default function ImageThumbnail({ url }: ImageThumbnailProps) {
-  if (!/^https?:\/\//i.test(url)) return null;
-  // ...
-}
-```
-
----
-
-### [MEDIUM-002] HissiHandler/KinouHandler: UTC基準の日付計算とJST基準の日次IDの不一致
-
-ファイル: `src/lib/services/handlers/hissi-handler.ts:154-156`, `src/lib/services/handlers/kinou-handler.ts:142-147`
-
-問題点: `HissiHandler` は「今日」を UTC で計算しているが、日次リセットID は JST 基準で生成される（PostService の `getTodayJst()`）。JST 0:00 ~ 8:59（= UTC 前日 15:00 ~ 23:59）の間に書き込みが行われた場合、UTC と JST で「今日」が異なり、検索結果にずれが生じる。
-
-`findByAuthorIdAndDate` が UTC の `created_at` で絞り込む設計であるためコード内部の整合性はとれているが、ユーザーの期待（日本時間で「今日」「昨日」）との乖離が存在する。コメントに意図が記載されているため設計判断として許容可能だが、ユーザー向けの説明や BDD シナリオでの明示が望ましい。
-
----
-
-### [MEDIUM-003] EliminatedBotToggleContext: Context value の参照安定性
-
-ファイル: `src/app/(web)/_components/EliminatedBotToggleContext.tsx:57-59`
-
-問題点: `EliminatedBotToggleProvider` の `value` プロパティが毎レンダー時に新しいオブジェクトリテラルとして生成される。`toggle` 関数も毎回新しい参照が作られるため、Context を参照する全子コンポーネントが不要に再レンダーされる。
-
-```typescript
-// 現状: 毎レンダーで新規オブジェクト生成
-<EliminatedBotToggleContext.Provider
-  value={{ showEliminatedBotPosts: show, toggle: () => setShow((v) => !v) }}
->
-
-// 改善案: useMemo + useCallback で参照安定化
-const toggle = useCallback(() => setShow((v) => !v), []);
-const value = useMemo(
-  () => ({ showEliminatedBotPosts: show, toggle }),
-  [show, toggle],
-);
-```
-
-現状のスレッドページ規模では実害は限定的だが、React Context のベストプラクティスとして修正が望ましい。
-
----
-
-### [MEDIUM-004] HissiHandler: N+1問題 -- ループ内でスレッド名を個別取得
-
-ファイル: `src/lib/services/handlers/hissi-handler.ts:197-201`
-
-問題点: 表示用レス（最大3件）に対し、各レスの `threadId` で `threadRepository.findById()` を個別呼び出ししている。最大3回のDBクエリが直列で発行される。
-
-```typescript
-for (const post of sortedPosts) {
-  const thread = await this.threadRepository.findById(post.threadId);
-  // ...
-}
-```
-
-件数が最大3件に制限されているため実害は限定的だが、一括取得メソッド（`findByIds` 等）があれば1回のクエリで済む。既存の `BotRepository.findByIds` と同パターン。
-
----
-
-### [LOW-001] url-detector: ReDoS 耐性は十分（問題なし）
-
-ファイル: `src/lib/domain/rules/url-detector.ts:46`
-
-確認結果: `URL_PATTERN = /https?:\/\/[^\s<>"']+/g` は否定文字クラスのみの繰り返しであり、バックトラッキングが発生するネスト量指定子を含まない。ReDoS に対して安全。
-
----
-
-### [LOW-002] PostService.getPostListWithBotMark: セキュリティ設計は適切（問題なし）
-
-ファイル: `src/lib/services/post-service.ts:910-963`
-
-確認結果: 活動中BOT（`is_active=true`）の情報漏洩防止ロジックが正しく実装されている。
-- Step 6: `bots.filter((b) => !b.isActive)` で撃破済みBOTのみを抽出
-- Step 7: 撃破済みBOTの書き込みのみが `botPostMap` に登録される
-- 活動中BOTの書き込みは `botMark=null` として返却される
-
-単体テストにも活動中BOTおよび暴露済み活動中BOTに対するセキュリティテストが存在し、検証済み。
-
----
-
-### [LOW-003] bot-post-repository: RLS保護テーブルへのアクセスは適切（問題なし）
-
-ファイル: `src/lib/infrastructure/repositories/bot-post-repository.ts:16, 92-112`
-
-確認結果: `findByPostIds` は `supabaseAdmin`（service_role キー）を使用してRLSをバイパスしている。これは設計上意図的であり、JSDoc に「RLS により anon/authenticated ロールからの全操作を全拒否」と明記されている。`supabaseAdmin` がクライアントサイドコードから import されていないことも確認済み。
-
----
-
-### [LOW-004] attack-repository: post_id nullable 化対応は適切（問題なし）
-
-ファイル: `src/lib/infrastructure/repositories/attack-repository.ts:51, 69, 99`
-
-確認結果: `AttackRow.post_id` が `string | null` に対応済み。`rowToAttack` で `row.post_id ?? null` の null セーフ処理あり。`AttackHandler` 側でも `ctx.postId || null` で空文字列を null に変換。
+| ID | 概要 | ステータス |
+|----|------|-----------|
+| MEDIUM-001 | ImageThumbnail プロトコル検証 | 未修正（スコープ外） |
+| MEDIUM-002 | UTC/JST 日付計算の不一致 | 未修正（スコープ外・設計判断として許容） |
+| MEDIUM-003 | Context value 参照安定性 | 未修正（スコープ外） |
+| MEDIUM-004 | N+1 ループ内スレッド名取得 | 未修正（スコープ外・最大3件で実害限定的） |
 
 ---
 
@@ -159,29 +106,17 @@ for (const post of sortedPosts) {
 | 重要度   | 件数  | ステータス |
 |----------|-------|-----------|
 | CRITICAL | 0     | pass      |
-| HIGH     | 2     | warn      |
-| MEDIUM   | 4     | info      |
-| LOW      | 4     | note      |
+| HIGH     | 0     | pass      |
+| MEDIUM   | 0     | pass      |
+| LOW      | 2     | note      |
 
-### HIGH 指摘
+### 前回 HIGH 指摘の修正結果
 
-| ID | ファイル | 概要 |
-|----|---------|------|
-| HIGH-001 | hissi-handler.ts | 同一データへの冗長な2回DBクエリ |
-| HIGH-002 | attack-handler.ts | 賠償金の CreditReason に bot_elimination を誤用 |
+| ID | 概要 | 修正結果 |
+|----|------|---------|
+| HIGH-001 | hissi-handler 冗長クエリ統合 | RESOLVED — `allPosts.slice(0, 3)` で代替。テスト更新済み |
+| HIGH-002 | attack-handler CreditReason "compensation" | RESOLVED — 型追加・使用箇所変更・D-02準拠 |
 
-### 判定: WARNING
+### 判定: APPROVE
 
-マージはブロックしない。HIGH 2件は次スプリントでの改善を推奨する。
-
-- HIGH-001: 単純な最適化で修正可能（DBクエリ1回に統合し `.slice(0, 3)` で代替）
-- HIGH-002: `CreditReason` ドメインモデルの拡張が必要。機能的な動作に支障はないが、監査ログの正確性に影響する
-
-### セキュリティ重点レビュー結果
-
-| 対象 | 結果 | 備考 |
-|------|------|------|
-| PostService.getPostListWithBotMark 活動中BOT情報漏洩 | **PASS** | is_active=true のBOTは botMark に含まれない。テストあり |
-| bot-post-repository RLS保護テーブルアクセス | **PASS** | supabaseAdmin 使用、クライアント側から未import |
-| ImageThumbnail XSS/SSRF対策 | **PASS (条件付き)** | detectUrls が https?:// に限定するため現状安全。コンポーネント側の防御は推奨 (MEDIUM-001) |
-| url-detector ReDoS耐性 | **PASS** | 否定文字クラスのみ、ネスト量指定子なし |
+CRITICAL/HIGH の指摘なし。前回指摘の HIGH 2件は適切に修正されている。LOW 2件はドキュメント/テスト品質の軽微な改善提案であり、マージをブロックしない。
