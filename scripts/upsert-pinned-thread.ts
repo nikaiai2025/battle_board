@@ -31,6 +31,8 @@ interface CommandConfig {
 	targetFormat?: string;
 	enabled: boolean;
 	stealth?: boolean;
+	/** true の場合、案内板のコマンド一覧から除外される */
+	hidden?: boolean;
 }
 
 interface CommandsYaml {
@@ -75,7 +77,7 @@ function loadCommandConfigs(
 	const content = fs.readFileSync(configPath, "utf-8");
 	const parsed = yaml.load(content) as CommandsYaml;
 	return Object.entries(parsed.commands)
-		.filter(([, config]) => config.enabled)
+		.filter(([, config]) => config.enabled && !config.hidden)
 		.map(([name, config]) => ({
 			name,
 			description: config.description,
