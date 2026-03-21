@@ -86,7 +86,7 @@ BOT_API_KEY=a1b2c3...
   .env.local
   .env*.local
   ```
-- [ ] `.env.example` をコミット（値は空欄のテンプレート）
+- [ ] `.env.local.example` をコミット（値は空欄のテンプレート）
   ```
   SUPABASE_URL=
   SUPABASE_ANON_KEY=

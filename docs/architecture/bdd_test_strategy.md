@@ -465,7 +465,7 @@ e2e/
 本番環境で実行する際の固有事項。ローカル実行には適用されない。
 
 - **Turnstile回避:** 本番コードにバイパス経路は追加しない。edge-token は本番DBに事前シード（runbook参照）、admin_session は email+password 認証で取得（Turnstile不介在）
-- **シークレット:** `.env.prod.smoke`（gitignore済み）に保管
+- **シークレット:** `.env.prod`（gitignore済み）に保管
 - **実行タイミング:** Gitプッシュ後、自動的にCloudflareにデプロイされる（数分のラグあり）。CFデプロイ完了を確認してから実行
 - **実行トリガー:** オーケストレーターが指示、または人間が手動実行
 - **CI/CD自動化:** オーケストレーターの定常作業として自動化。GithubAction利用は将来検討（前提: health/version エンドポイント新設）

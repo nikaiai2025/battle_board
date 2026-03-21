@@ -182,7 +182,50 @@ Get-Process -Name "node" | Where-Object { $_.CommandLine -like "*wrangler tail*"
 > - try-catch で握りつぶされた例外
 > - console 出力を含まない正常系の内部状態
 
-#### 2.3 デプロイ状態の確認
+#### 2.3 Cloudflare Workers 過去ログ（Observability API）
+
+`wrangler tail` はリアルタイムのみ。過去ログは Workers Observability Telemetry API で取得する。
+
+**前提:** `.env.prod` に `CLOUDFLARE_API_KEY`（Global API Key）が設定されていること。
+
+```bash
+# .env.prod から認証情報を読み込み
+source .env.prod
+
+# アカウントID・メールアドレスは wrangler whoami で確認
+ACCOUNT_ID=$(npx wrangler whoami 2>&1 | grep -oP '[a-f0-9]{32}')
+AUTH_EMAIL=$(npx wrangler whoami 2>&1 | grep -oP '[\w.-]+@[\w.-]+')
+
+# 過去ログのカウント取得（時間帯別）
+curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/observability/telemetry/query" \
+  -H "Content-Type: application/json" \
+  -H "X-Auth-Email: $AUTH_EMAIL" \
+  -H "X-Auth-Key: $CLOUDFLARE_API_KEY" \
+  -d '{
+    "queryId": "debug-query",
+    "timeframe": { "from": <開始epoch_ms>, "to": <終了epoch_ms> },
+    "parameters": {
+      "calculations": [{"operator": "count"}],
+      "filters": [
+        {"key": "$workers.scriptName", "operation": "=", "value": "battle-board", "type": "string"}
+      ]
+    }
+  }'
+```
+
+**フィルタ例:**
+
+| 目的 | filters に追加するオブジェクト |
+|---|---|
+| HTTP 500のみ | `{"key": "$workers.response.status", "operation": "=", "value": "500", "type": "number"}` |
+| 未捕捉例外のみ | `{"key": "$workers.outcome", "operation": "=", "value": "exception", "type": "string"}` |
+| URL別集計 | `groupBy` に `{"key": "$workers.httpUrl", "type": "string"}` を追加 |
+
+**制限事項:**
+- `queryId` は呼び出しごとに一意にする（同一IDを再利用するとキャッシュされた結果が返る）
+- timeframe は **ミリ秒** 単位の epoch（秒×1000）
+
+#### 2.4 デプロイ状態の確認
 
 ```bash
 # 最新のデプロイ情報
@@ -192,7 +235,7 @@ wrangler deployments list --name battle-board
 wrangler deployments view --name battle-board
 ```
 
-#### 2.4 この時点での判断
+#### 2.5 この時点での判断
 
 | 状況 | 次のアクション |
 |---|---|

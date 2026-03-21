@@ -22,7 +22,7 @@
 | 環境 | 設定場所 | 備考 |
 |---|---|---|
 | ローカル | `.env.local` | gitignore済み。Supabase Localの接続情報 |
-| 本番スモーク | `.env.prod.smoke` | gitignore済み。スモークテスト用シークレット（`seed-smoke-user.md` 参照） |
+| 本番 | `.env.prod` | gitignore済み。本番用シークレット（`seed-smoke-user.md` 参照） |
 | Vercel | Vercel ダッシュボード > Settings > Environment Variables | Build/Runtime両方に設定 |
 | Cloudflare | Cloudflare ダッシュボード > Workers & Pages > Settings > Variables | Build/Runtime両方に設定。`NEXT_PUBLIC_*` はBuild側にも必要 |
 

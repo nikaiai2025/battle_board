@@ -130,7 +130,7 @@ const result = await db.query(query, [userId]);
 [CRITICAL] ソースコード内にAPIキーがハードコードされています
 ファイル: src/api/client.ts:42
 問題点: APIキー "sk-abc..." が露出しています。これはGitの履歴に残ります。
-修正案: 環境変数に移動し、.gitignore および .env.example に追記してください。
+修正案: 環境変数に移動し、.gitignore および .env.local.example に追記してください。
 
   const apiKey = "sk-abc123";           // 不適切
   const apiKey = process.env.API_KEY;   // 適切

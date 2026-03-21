@@ -102,7 +102,7 @@ export async function authenticateLocal(
 /**
  * 本番環境で認証済み状態を作る。
  *
- * 事前シード済み edge-token（.env.prod.smoke）を Cookie に設定するのみ。
+ * 事前シード済み edge-token（.env.prod）を Cookie に設定するのみ。
  *
  * See: supabase/migrations/00017_seed_smoke_user.sql
  * See: docs/operations/runbooks/seed-smoke-user.md
@@ -239,7 +239,7 @@ export async function ensureAdminAndLogin(
 /**
  * 本番環境で管理者ログインし admin_session を取得する。
  *
- * See: .env.prod.smoke.example
+ * See: .env.prod.example
  */
 export async function adminLoginProd(
 	request: APIRequestContext,
@@ -250,7 +250,7 @@ export async function adminLoginProd(
 	if (!email || !password) {
 		throw new Error(
 			"PROD_ADMIN_EMAIL and PROD_ADMIN_PASSWORD are required. " +
-				"See: .env.prod.smoke.example",
+				"See: .env.prod.example",
 		);
 	}
 

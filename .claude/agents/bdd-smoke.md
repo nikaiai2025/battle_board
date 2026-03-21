@@ -38,7 +38,7 @@ npx playwright test --config=playwright.prod.config.ts
 ```
 
 **前提条件:**
-- `.env.prod.smoke` が存在し、シークレットが設定されていること
+- `.env.prod` が存在し、シークレットが設定されていること
 - シークレットの取得手順: `docs/operations/runbooks/seed-smoke-user.md`
 
 ### ステップ3: 結果レポート
@@ -74,5 +74,5 @@ npx playwright test --config=playwright.prod.config.ts
 - テストコードを書かない・修正しない
 - 障害の原因調査を行わない（FAILを報告するのみ）
 - 本番DBへの直接操作を行わない（テストが行う操作のみ）
-- `.env.prod.smoke` のシークレットをログや報告に含めない
+- `.env.prod` のシークレットをログや報告に含めない
 - スクリーンショット等のテスト成果物は `ゴミ箱/` 配下に出力される（`playwright.prod.config.ts` の `outputDir` で定義）

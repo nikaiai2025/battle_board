@@ -5,7 +5,7 @@
 本番スモークテスト（D-10 §11）のベーシックフローテスト（書き込み検証）で使用する専用ユーザー。
 マイグレーション `00017_seed_smoke_user.sql` で自動作成される。
 
-本 runbook の手作業は **トークン取得と `.env.prod.smoke` への転記のみ**（初回1回限り）。
+本 runbook の手作業は **トークン取得と `.env.prod` への転記のみ**（初回1回限り）。
 
 ## 仕組み
 
@@ -47,12 +47,12 @@ npx supabase db query "
 " --linked
 ```
 
-### ステップ3: `.env.prod.smoke` に記録
+### ステップ3: `.env.prod` に記録
 
-`.env.prod.smoke.example` をコピーし、ステップ2の出力値を転記する。
+`.env.prod.example` をコピーし、ステップ2の出力値を転記する。
 
 ```bash
-cp .env.prod.smoke.example .env.prod.smoke
+cp .env.prod.example .env.prod
 # PROD_SMOKE_EDGE_TOKEN= にステップ2の値を貼り付け
 ```
 

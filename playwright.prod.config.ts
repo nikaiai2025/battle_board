@@ -15,8 +15,8 @@ import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 
-// .env.prod.smoke から本番用シークレットを読み込む
-const envProdPath = path.resolve(__dirname, ".env.prod.smoke");
+// .env.prod から本番用シークレットを読み込む
+const envProdPath = path.resolve(__dirname, ".env.prod");
 if (fs.existsSync(envProdPath)) {
 	dotenv.config({ path: envProdPath });
 }
