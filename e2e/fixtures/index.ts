@@ -24,6 +24,8 @@ import {
 	cleanupProd,
 	seedThreadLocal,
 	seedThreadProd,
+	seedThreadWithAnchorPostsLocal,
+	seedThreadWithAnchorPostsProd,
 } from "./data.fixture";
 
 // ---------------------------------------------------------------------------
@@ -55,6 +57,15 @@ type TestFixtures = {
 	 * 戻り値の threadId / threadKey でテスト内からアクセスできる。
 	 */
 	seedThread: SeedResult;
+
+	/**
+	 * アンカー付きレスを含むテスト用スレッドをシードする。
+	 * @anchor_popup と @post_number_display のE2Eテスト用。
+	 *
+	 * See: features/thread.feature @anchor_popup
+	 * See: features/thread.feature @post_number_display
+	 */
+	seedThreadWithAnchorPosts: SeedResult;
 
 	/**
 	 * テストデータを削除する関数。
@@ -133,6 +144,24 @@ export const test = base.extend<TestFixtures & TestOptions>({
 			result = await seedThreadProd(request, baseURL!, authenticate.edgeToken);
 		} else {
 			result = await seedThreadLocal(request);
+		}
+		await use(result);
+	},
+
+	// --- seedThreadWithAnchorPosts ---
+	seedThreadWithAnchorPosts: async (
+		{ request, isProduction, baseURL, authenticate },
+		use,
+	) => {
+		let result: SeedResult;
+		if (isProduction) {
+			result = await seedThreadWithAnchorPostsProd(
+				request,
+				baseURL!,
+				authenticate.edgeToken,
+			);
+		} else {
+			result = await seedThreadWithAnchorPostsLocal(request);
 		}
 		await use(result);
 	},

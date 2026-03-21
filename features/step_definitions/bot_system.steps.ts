@@ -1734,6 +1734,7 @@ Given(
 	"ユーザーがWebブラウザでスレッドを閲覧している",
 	async function (this: BattleBoardWorld) {
 		// Web UI はBDDサービス層テストのスコープ外（Web限定シナリオ）。
+		// 代替検証: e2e/flows/bot-display.spec.ts（E2E）
 		return "pending";
 	},
 );
@@ -1742,6 +1743,7 @@ Then(
 	"撃破済みボットの過去のレスは目立たない文字色で表示される",
 	async function (this: BattleBoardWorld) {
 		// DOM/CSS表示: Cucumberサービス層では検証不可（D-10 §7.3.1）
+		// 代替検証: e2e/flows/bot-display.spec.ts（E2E）
 		return "pending";
 	},
 );
@@ -1750,14 +1752,14 @@ Then(
 // 撃破: トグル表示切り替え（Web限定シナリオ — pending）
 // See: features/bot_system.feature @撃破済みボットのレス表示をトグルで切り替えられる
 // 分類: DOM/CSS表示 — Cucumberサービス層では検証不可（D-10 §7.3.1）
-// 代替検証: UI未実装のため代替テスト未作成。UIコンポーネント実装時に
-//   src/__tests__/app/(web)/thread/eliminated-bot-display.test.tsx を作成すること
+// 代替検証: e2e/flows/bot-display.spec.ts（E2E）
 // ---------------------------------------------------------------------------
 
 When(
 	"全体メニューの「撃破済みBOTレス表示」トグルをOFFにする",
 	async function (this: BattleBoardWorld) {
 		// DOM/CSS表示: Cucumberサービス層では検証不可（D-10 §7.3.1）
+		// 代替検証: e2e/flows/bot-display.spec.ts（E2E）
 		return "pending";
 	},
 );
@@ -1766,12 +1768,14 @@ Then(
 	"撃破済みボットの過去のレスが非表示になる",
 	async function (this: BattleBoardWorld) {
 		// DOM/CSS表示: Cucumberサービス層では検証不可（D-10 §7.3.1）
+		// 代替検証: e2e/flows/bot-display.spec.ts（E2E）
 		return "pending";
 	},
 );
 
 When("トグルをONに戻す", async function (this: BattleBoardWorld) {
 	// DOM/CSS表示: Cucumberサービス層では検証不可（D-10 §7.3.1）
+	// 代替検証: e2e/flows/bot-display.spec.ts（E2E）
 	return "pending";
 });
 
@@ -1779,6 +1783,7 @@ Then(
 	"撃破済みボットの過去のレスが表示される（目立たない文字色）",
 	async function (this: BattleBoardWorld) {
 		// DOM/CSS表示: Cucumberサービス層では検証不可（D-10 §7.3.1）
+		// 代替検証: e2e/flows/bot-display.spec.ts（E2E）
 		return "pending";
 	},
 );

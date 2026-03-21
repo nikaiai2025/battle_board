@@ -1680,7 +1680,8 @@ When(
 /**
  * ポーリングによりレス{int}が自動的に画面に追加される。
  * 分類: ブラウザ固有動作（setInterval依存） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostListLiveWrapper.test.tsx
+ * 代替検証: e2e/flows/polling.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostListLiveWrapper.test.tsx（Vitest）
  *
  * See: features/thread.feature @pagination
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1711,7 +1712,8 @@ Given(
 /**
  * 画面は更新されない。
  * 分類: ブラウザ固有動作（setInterval依存） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostListLiveWrapper.test.tsx
+ * 代替検証: e2e/flows/polling.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostListLiveWrapper.test.tsx（Vitest）
  *
  * See: features/thread.feature @pagination
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1726,7 +1728,8 @@ Then("画面は更新されない", () => "pending");
 /**
  * スレッドにレス1 "{string}" とレス2 "{string}" が存在する。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1739,7 +1742,8 @@ Given(
 /**
  * レス2の本文中の "{string}" をクリックする。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1749,7 +1753,8 @@ When("レス2の本文中の {string} をクリックする", (_anchor: string) 
 /**
  * レス1の内容がポップアップで表示される。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1759,7 +1764,8 @@ Then("レス1の内容がポップアップで表示される", () => "pending")
 /**
  * ポップアップにはレス番号、表示名、日次ID、本文が含まれる。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1772,7 +1778,8 @@ Then(
 /**
  * スレッドにレス1、レス2 "{string}"、レス3 "{string}" が存在する。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1785,7 +1792,8 @@ Given(
 /**
  * レス3の "{string}" をクリックする。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1795,7 +1803,8 @@ When("レス3の {string} をクリックする", (_anchor: string) => "pending"
 /**
  * 表示されたポップアップ内の "{string}" をクリックする。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1808,7 +1817,8 @@ When(
 /**
  * 2つのポップアップが重なって表示される。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1818,7 +1828,8 @@ Then("2つのポップアップが重なって表示される", () => "pending")
 /**
  * 最前面にレス1のポップアップが表示される。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1828,7 +1839,8 @@ Then("最前面にレス1のポップアップが表示される", () => "pendin
 /**
  * 2つのポップアップが重なって表示されている。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1838,7 +1850,8 @@ Given("2つのポップアップが重なって表示されている", () => "pe
 /**
  * ポップアップの外側をクリックする。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1848,7 +1861,8 @@ When("ポップアップの外側をクリックする", () => "pending");
 /**
  * 最前面のポップアップが閉じる。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1858,7 +1872,8 @@ Then("最前面のポップアップが閉じる", () => "pending");
 /**
  * 背面のポップアップは残る。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1873,7 +1888,8 @@ Then("背面のポップアップは残る", () => "pending");
 /**
  * レスの本文中の "{string}" をクリックする。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1883,7 +1899,8 @@ When("レスの本文中の {string} をクリックする", (_anchor: string) =
 /**
  * ポップアップは表示されない。
  * 分類: DOM/CSS表示（ポップアップDOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/AnchorPopupContext.test.tsx（Vitest）
  *
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1898,7 +1915,8 @@ Then("ポップアップは表示されない", () => "pending");
 /**
  * スレッドにレス番号{int}のレスが存在する。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1911,7 +1929,8 @@ Given(
 /**
  * レス番号が {string} と表示される。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1921,7 +1940,8 @@ Then("レス番号が {string} と表示される", (_label: string) => "pending
 /**
  * レス番号に {string} は付与されない。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1931,7 +1951,8 @@ Then("レス番号に {string} は付与されない", (_prefix: string) => "pen
 /**
  * 書き込みフォームが空である。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1941,7 +1962,8 @@ Given("書き込みフォームが空である", () => "pending");
 /**
  * レス番号 "{string}" をクリックする。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1951,7 +1973,8 @@ When("レス番号 {string} をクリックする", (_postNumber: string) => "pe
 /**
  * 書き込みフォームに {string} が挿入される。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1961,7 +1984,8 @@ Then("書き込みフォームに {string} が挿入される", (_text: string) 
 /**
  * 書き込みフォームに {string} と入力されている。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
@@ -1974,7 +1998,8 @@ Given(
 /**
  * 書き込みフォームの内容が {string} になる。
  * 分類: DOM/CSS表示（フォームへのテキスト挿入DOM操作） — Cucumberサービス層では検証不可（D-10 §7.3.1）
- * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx
+ * 代替検証: e2e/flows/thread-ui.spec.ts（E2E）
+ * 代替検証: src/__tests__/app/(web)/_components/PostFormInsertText.test.tsx（Vitest）
  *
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3

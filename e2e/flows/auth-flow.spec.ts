@@ -70,8 +70,10 @@ test.describe("認証UI連結フロー（ローカル限定）", () => {
 		});
 
 		// Step 5: スレッドを開く → 本文(>>1)表示
+		// URL構造: /{boardId}/{threadKey} (例: /battleboard/1742259600)
 		await page.locator(`a:has-text("${TEST_THREAD_TITLE}")`).click();
-		await page.waitForURL(/\/threads\/.+/);
+		await page.waitForURL(/\/[^/]+\/\d+/, { waitUntil: "domcontentloaded" });
+
 		await expect(page.locator("#thread-title")).toHaveText(TEST_THREAD_TITLE);
 		await expect(page.locator("#post-1")).toBeVisible();
 		await expect(page.locator("#post-1")).toContainText(TEST_THREAD_BODY);

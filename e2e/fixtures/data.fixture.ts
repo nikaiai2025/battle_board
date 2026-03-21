@@ -49,13 +49,15 @@ export async function seedThreadLocal(
 	const headers = supabaseHeaders();
 	const base = supabaseUrl();
 	const suffix = Date.now();
+	// ランダム末尾3桁でthread_keyの一意性を保証（同一秒内の複数テスト対策）
+	const rand = Math.floor(Math.random() * 900) + 100;
 
 	// 1. シード用ユーザー作成（テスト認証ユーザーとは別）
 	const userRes = await request.post(`${base}/rest/v1/users`, {
 		headers,
 		data: {
-			auth_token: `seed-auth-${suffix}`,
-			author_id_seed: `seed-${suffix}`,
+			auth_token: `seed-auth-${suffix}-${rand}`,
+			author_id_seed: `seed-${suffix}-${rand}`,
 			is_premium: false,
 			is_verified: false,
 		},
@@ -64,7 +66,7 @@ export async function seedThreadLocal(
 	const seedUserId = users[0].id;
 
 	// 2. スレッド作成
-	const threadKey = String(Math.floor(suffix / 1000));
+	const threadKey = `${Math.floor(suffix / 1000)}${rand}`;
 	const threadRes = await request.post(`${base}/rest/v1/threads`, {
 		headers,
 		data: {
@@ -140,6 +142,428 @@ export async function seedThreadProd(
 		threadKey: string;
 	};
 	return { threadId: body.id, threadKey: body.threadKey };
+}
+
+// ---------------------------------------------------------------------------
+// seedThreadWithAnchorPosts — ローカル実装
+// ---------------------------------------------------------------------------
+
+/**
+ * ローカル環境でアンカー付きレスを含むテスト用スレッドをシードする。
+ *
+ * @anchor_popup と @post_number_display のE2Eテスト用。
+ * レス5件（アンカー >>1, >>2 を含む）を持つスレッドを作成する。
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: features/thread.feature @post_number_display
+ * See: tmp/workers/bdd-architect_TASK-215/design.md §3.1
+ */
+export async function seedThreadWithAnchorPostsLocal(
+	request: APIRequestContext,
+): Promise<{ threadId: string; threadKey: string }> {
+	const headers = supabaseHeaders();
+	const base = supabaseUrl();
+	const suffix = Date.now();
+	// ランダム末尾3桁でthread_keyの一意性を保証（同一秒内の複数テスト対策）
+	const rand = Math.floor(Math.random() * 900) + 100;
+
+	// 1. シード用ユーザー作成
+	const userRes = await request.post(`${base}/rest/v1/users`, {
+		headers,
+		data: {
+			auth_token: `seed-anchor-${suffix}-${rand}`,
+			author_id_seed: `seed-anchor-${suffix}-${rand}`,
+			is_premium: false,
+			is_verified: false,
+		},
+	});
+	const users = (await userRes.json()) as Array<{ id: string }>;
+	const seedUserId = users[0].id;
+
+	// 2. スレッド作成
+	const threadKey = `${Math.floor(suffix / 1000)}${rand}`;
+	const threadRes = await request.post(`${base}/rest/v1/threads`, {
+		headers,
+		data: {
+			board_id: "battleboard",
+			title: "[E2E] アンカーテスト用スレッド",
+			post_count: 5,
+			last_post_at: new Date().toISOString(),
+			thread_key: threadKey,
+			created_by: seedUserId,
+		},
+	});
+	const threads = (await threadRes.json()) as Array<{ id: string }>;
+	const threadId = threads[0].id;
+
+	// 3. レス5件をバッチINSERT
+	// レス1: 通常レス、レス2: >>1 アンカー、レス3: >>2 アンカー（ネスト用）
+	// レス4: >>999 存在しないアンカー、レス5: post_number_display検証用
+	const posts = [
+		{
+			thread_id: threadId,
+			post_number: 1,
+			author_id: seedUserId,
+			display_name: "名無しさん",
+			daily_id: "ABCDE",
+			body: "こんにちは",
+			is_system_message: false,
+			is_deleted: false,
+		},
+		{
+			thread_id: threadId,
+			post_number: 2,
+			author_id: seedUserId,
+			display_name: "名無しさん",
+			daily_id: "FGHIJ",
+			body: ">>1 よろしく",
+			is_system_message: false,
+			is_deleted: false,
+		},
+		{
+			thread_id: threadId,
+			post_number: 3,
+			author_id: seedUserId,
+			display_name: "名無しさん",
+			daily_id: "KLMNO",
+			body: ">>2 さらに返信",
+			is_system_message: false,
+			is_deleted: false,
+		},
+		{
+			thread_id: threadId,
+			post_number: 4,
+			author_id: seedUserId,
+			display_name: "名無しさん",
+			daily_id: "PQRST",
+			body: ">>999 テスト",
+			is_system_message: false,
+			is_deleted: false,
+		},
+		{
+			thread_id: threadId,
+			post_number: 5,
+			author_id: seedUserId,
+			display_name: "名無しさん",
+			daily_id: "UVWXY",
+			body: "テスト本文",
+			is_system_message: false,
+			is_deleted: false,
+		},
+	];
+
+	await request.post(`${base}/rest/v1/posts`, {
+		headers,
+		data: posts,
+	});
+
+	return { threadId, threadKey };
+}
+
+// ---------------------------------------------------------------------------
+// seedThreadWithAnchorPosts — 本番実装
+// ---------------------------------------------------------------------------
+
+/**
+ * 本番環境でアンカー付きレスを含むテスト用スレッドを作成する。
+ *
+ * 認証済みユーザーのedge-tokenで通常のAPIフローを使い書き込む。
+ *
+ * See: features/thread.feature @anchor_popup
+ * See: features/thread.feature @post_number_display
+ */
+export async function seedThreadWithAnchorPostsProd(
+	request: APIRequestContext,
+	baseURL: string,
+	edgeToken: string,
+): Promise<{ threadId: string; threadKey: string }> {
+	const cookieHeader = { Cookie: `edge-token=${edgeToken}` };
+	const jsonHeaders = {
+		"Content-Type": "application/json",
+		...cookieHeader,
+	};
+
+	// 1. スレッド作成（>>1 = "こんにちは"）
+	const createRes = await request.post(`${baseURL}/api/threads`, {
+		headers: jsonHeaders,
+		data: {
+			title: "[SMOKE] アンカーテスト用スレッド",
+			body: "こんにちは",
+			boardId: "battleboard",
+		},
+	});
+	if (!createRes.ok()) {
+		throw new Error(
+			`seedThreadWithAnchorPostsProd: thread creation failed: ${createRes.status()} ${await createRes.text()}`,
+		);
+	}
+	const thread = (await createRes.json()) as {
+		id: string;
+		threadKey: string;
+	};
+
+	// 2-5. レスを順番に書き込み
+	const replyBodies = [
+		">>1 よろしく",
+		">>2 さらに返信",
+		">>999 テスト",
+		"テスト本文",
+	];
+	for (const body of replyBodies) {
+		const res = await request.post(
+			`${baseURL}/api/threads/${thread.id}/posts`,
+			{
+				headers: jsonHeaders,
+				data: { body },
+			},
+		);
+		if (!res.ok()) {
+			throw new Error(
+				`seedThreadWithAnchorPostsProd: post failed: ${res.status()} ${await res.text()}`,
+			);
+		}
+	}
+
+	return { threadId: thread.id, threadKey: thread.threadKey };
+}
+
+// ---------------------------------------------------------------------------
+// seedThreadWithManyPosts — ローカル実装
+// ---------------------------------------------------------------------------
+
+/**
+ * ローカル環境で大量レスを含むテスト用スレッドをシードする。
+ *
+ * ポーリングテスト（@pagination B-1, B-2）用。
+ * 指定件数のレスをバッチINSERTする。
+ *
+ * See: features/thread.feature @pagination
+ * See: tmp/workers/bdd-architect_TASK-215/design.md §3.2
+ */
+export async function seedThreadWithManyPostsLocal(
+	request: APIRequestContext,
+	postCount: number,
+): Promise<{ threadId: string; threadKey: string; seedUserId: string }> {
+	const headers = supabaseHeaders();
+	const base = supabaseUrl();
+	const suffix = Date.now();
+	const rand = Math.floor(Math.random() * 900) + 100;
+
+	// 1. シード用ユーザー作成
+	const userRes = await request.post(`${base}/rest/v1/users`, {
+		headers,
+		data: {
+			auth_token: `seed-many-${suffix}-${rand}`,
+			author_id_seed: `seed-many-${suffix}-${rand}`,
+			is_premium: false,
+			is_verified: false,
+		},
+	});
+	const users = (await userRes.json()) as Array<{ id: string }>;
+	const seedUserId = users[0].id;
+
+	// 2. スレッド作成
+	const threadKey = `${Math.floor(suffix / 1000)}${rand}`;
+	const threadRes = await request.post(`${base}/rest/v1/threads`, {
+		headers,
+		data: {
+			board_id: "battleboard",
+			title: "[E2E] ポーリングテスト用スレッド",
+			post_count: postCount,
+			last_post_at: new Date().toISOString(),
+			thread_key: threadKey,
+			created_by: seedUserId,
+		},
+	});
+	const threads = (await threadRes.json()) as Array<{ id: string }>;
+	const threadId = threads[0].id;
+
+	// 3. レスをバッチINSERT（Supabase REST APIは配列POSTをサポート）
+	// 大量データを一括投入するため、100件ずつバッチ送信する
+	const batchSize = 100;
+	for (let batchStart = 0; batchStart < postCount; batchStart += batchSize) {
+		const batchEnd = Math.min(batchStart + batchSize, postCount);
+		const posts = Array.from({ length: batchEnd - batchStart }, (_, i) => ({
+			thread_id: threadId,
+			post_number: batchStart + i + 1,
+			author_id: seedUserId,
+			display_name: "名無しさん",
+			daily_id: "ABCDE",
+			body: `テストレス ${batchStart + i + 1}`,
+			is_system_message: false,
+			is_deleted: false,
+		}));
+		await request.post(`${base}/rest/v1/posts`, {
+			headers,
+			data: posts,
+		});
+	}
+
+	return { threadId, threadKey, seedUserId };
+}
+
+// ---------------------------------------------------------------------------
+// seedEliminatedBotThread — ローカル実装
+// ---------------------------------------------------------------------------
+
+/**
+ * ローカル環境で撃破済みBOTのレスを含むテスト用スレッドをシードする。
+ *
+ * 撃破済みBOT表示テスト（B-3, B-4）用。
+ * BOTユーザー・botsテーブル・attacksテーブルを含む完全な状態を構築する。
+ *
+ * See: features/bot_system.feature @撃破済みボットのレスはWebブラウザで目立たない表示になる
+ * See: tmp/workers/bdd-architect_TASK-215/design.md §3.3
+ */
+export async function seedEliminatedBotThreadLocal(
+	request: APIRequestContext,
+): Promise<{ threadId: string; threadKey: string; botPostNumber: number }> {
+	const headers = supabaseHeaders();
+	const base = supabaseUrl();
+	const suffix = Date.now();
+	const rand = Math.floor(Math.random() * 900) + 100;
+
+	// 1. 通常ユーザー作成
+	const userRes = await request.post(`${base}/rest/v1/users`, {
+		headers,
+		data: {
+			auth_token: `seed-bot-test-${suffix}-${rand}`,
+			author_id_seed: `seed-bot-test-${suffix}-${rand}`,
+			is_premium: false,
+			is_verified: false,
+		},
+	});
+	const users = (await userRes.json()) as Array<{ id: string }>;
+	const normalUserId = users[0].id;
+
+	// 2. BOTユーザー作成
+	const botUserRes = await request.post(`${base}/rest/v1/users`, {
+		headers,
+		data: {
+			auth_token: `seed-bot-user-${suffix}-${rand}`,
+			author_id_seed: `seed-bot-user-${suffix}-${rand}`,
+			is_premium: false,
+			is_verified: false,
+		},
+	});
+	const botUsers = (await botUserRes.json()) as Array<{ id: string }>;
+	const botUserId = botUsers[0].id;
+
+	// 3. botsテーブルに撃破済みBOT登録
+	await request.post(`${base}/rest/v1/bots`, {
+		headers,
+		data: {
+			user_id: botUserId,
+			name: "荒らし役",
+			status: "eliminated",
+			hp: 0,
+			max_hp: 10,
+			is_active: false,
+		},
+	});
+
+	// 4. スレッド作成
+	const threadKey = `${Math.floor(suffix / 1000)}${rand}`;
+	const threadRes = await request.post(`${base}/rest/v1/threads`, {
+		headers,
+		data: {
+			board_id: "battleboard",
+			title: "[E2E] BOT表示テスト用スレッド",
+			post_count: 3,
+			last_post_at: new Date().toISOString(),
+			thread_key: threadKey,
+			created_by: normalUserId,
+		},
+	});
+	const threads = (await threadRes.json()) as Array<{ id: string }>;
+	const threadId = threads[0].id;
+
+	// 5. レス投入（通常レス + BOTレス）
+	const posts = [
+		{
+			thread_id: threadId,
+			post_number: 1,
+			author_id: normalUserId,
+			display_name: "名無しさん",
+			daily_id: "ABCDE",
+			body: "通常ユーザーのレスです。",
+			is_system_message: false,
+			is_deleted: false,
+		},
+		{
+			thread_id: threadId,
+			post_number: 2,
+			author_id: botUserId,
+			display_name: "名無しさん",
+			daily_id: "ZZZZZ",
+			body: "なんJほんま覇権やな",
+			is_system_message: false,
+			is_deleted: false,
+		},
+		{
+			thread_id: threadId,
+			post_number: 3,
+			author_id: normalUserId,
+			display_name: "名無しさん",
+			daily_id: "ABCDE",
+			body: "通常ユーザーの2レス目です。",
+			is_system_message: false,
+			is_deleted: false,
+		},
+	];
+
+	await request.post(`${base}/rest/v1/posts`, {
+		headers,
+		data: posts,
+	});
+
+	return { threadId, threadKey, botPostNumber: 2 };
+}
+
+// ---------------------------------------------------------------------------
+// insertPostLocal — 単一レス追加（ポーリングテスト用）
+// ---------------------------------------------------------------------------
+
+/**
+ * ローカル環境で単一レスをDB直接INSERTする。
+ *
+ * ポーリングテストで「テスト中にレスが追加される」状態を作るために使用する。
+ *
+ * See: features/thread.feature @pagination
+ * See: tmp/workers/bdd-architect_TASK-215/design.md §3.2
+ */
+export async function insertPostLocal(
+	request: APIRequestContext,
+	threadId: string,
+	postNumber: number,
+	authorId: string,
+	body: string,
+): Promise<void> {
+	const headers = supabaseHeaders();
+	const base = supabaseUrl();
+
+	await request.post(`${base}/rest/v1/posts`, {
+		headers,
+		data: {
+			thread_id: threadId,
+			post_number: postNumber,
+			author_id: authorId,
+			display_name: "名無しさん",
+			daily_id: "NEWID",
+			body,
+			is_system_message: false,
+			is_deleted: false,
+		},
+	});
+
+	// thread.post_count も更新
+	await request.patch(`${base}/rest/v1/threads?id=eq.${threadId}`, {
+		headers: supabaseHeaders("return=minimal"),
+		data: {
+			post_count: postNumber,
+			last_post_at: new Date().toISOString(),
+		},
+	});
 }
 
 // ---------------------------------------------------------------------------

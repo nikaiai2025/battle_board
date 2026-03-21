@@ -416,6 +416,9 @@ e2e/
   flows/
     basic-flow.spec.ts   # ベーシックフローテスト
     auth-flow.spec.ts    # 認証テスト（ローカルのみ）
+    thread-ui.spec.ts    # アンカーポップアップ + レス番号表示
+    polling.spec.ts      # ポーリング検証（ローカルのみ）
+    bot-display.spec.ts  # 撃破済みBOT表示（ローカルのみ）
   api/                   # APIテスト（ローカル専用、§9）
   helpers/
     turnstile.ts         # Turnstileモック（ローカル専用）
