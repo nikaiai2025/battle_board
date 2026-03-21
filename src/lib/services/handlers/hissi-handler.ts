@@ -163,12 +163,10 @@ export class HissiHandler implements CommandHandler {
 		);
 		const totalCount = allPosts.length;
 
-		// ステップ5b: 表示用最新3件取得（created_at DESC）
-		const displayPosts = await this.postRepository.findByAuthorIdAndDate(
-			authorId,
-			today,
-			{ limit: 3 },
-		);
+		// ステップ5b: 表示用最新3件（全件取得済みのためsliceで代替。2回目のDBアクセス不要）
+		// findByAuthorIdAndDate は created_at DESC ソート済みのため先頭3件が最新3件
+		// See: src/lib/infrastructure/repositories/post-repository.ts（created_at DESC確認済み）
+		const displayPosts = allPosts.slice(0, 3);
 
 		// ステップ6: メッセージ生成
 		if (totalCount === 0) {

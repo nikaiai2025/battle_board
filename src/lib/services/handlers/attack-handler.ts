@@ -388,10 +388,11 @@ export class AttackHandler implements CommandHandler {
 
 		// C4: 賠償金付与（被攻撃者）
 		// See: docs/architecture/components/attack.md §3.4 C4
+		// "compensation" を使用（ボット撃破報酬 "bot_elimination" と監査ログで区別するため）
 		await this.currencyService.credit(
 			targetUserId,
 			actualCompensation,
-			"bot_elimination",
+			"compensation",
 		);
 
 		// C5: インライン・システム情報生成

@@ -5,7 +5,7 @@
 
 screen_id: SCR-002
 name: スレッド閲覧
-route: /threads/{threadId}
+route: /{boardId}/{threadKey}/[[...range]]
 description: >
   スレッド内のレスを書き込み順に表示する。書き込みフォーム、
   コマンド実行結果のシステムメッセージ表示を含む。
@@ -28,7 +28,7 @@ elements:
       - id: back-to-list
         type: link
         label: 一覧に戻る
-        href: /
+        href: /{boardId}/
 
   - id: post-list
     type: list
@@ -38,7 +38,7 @@ elements:
       - id: post-number
         type: text
         source: post.postNumber
-        format: ">>{postNumber}"
+        format: "{postNumber}"
         style: bold
 
       - id: post-header
@@ -133,3 +133,6 @@ elements:
       利用可能なコマンド:
       - !tell >>N — AI告発（通貨消費）
       - !attack >>N — BOTマーク付きボットへの攻撃（通貨消費）
+      - !w >>N — 今日の草履歴（指定レスの投稿者の当日書き込み一覧）
+      - !hissi >>N — 指定レスの投稿者の直近書き込み調査
+      - !kinou >>N — 指定レスの投稿者の昨日の書き込み調査

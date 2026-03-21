@@ -125,6 +125,11 @@
 
 未定義ステップ: **0件** (CRITICAL問題なし)
 
+Sprint-75~79での変動:
+- thread.feature: +4シナリオ (画像URLサムネイル @image_preview)。全4件が通常実行でPASS。
+- command_system.feature: +2シナリオ (Sprint-67で追加済み、本期間でステップ定義が安定)。
+- investigation.feature: +11シナリオ (調査コマンド)。全件通常実行でPASS。
+
 ## 4. ステップ定義の実質性
 
 ### assert(true) / expect(true) スタブアサーション

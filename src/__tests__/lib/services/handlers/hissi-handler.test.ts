@@ -227,11 +227,8 @@ describe("HissiHandler", () => {
 			body: "こんにちは",
 			createdAt: new Date("2026-03-20T05:23:15.000Z"),
 		});
-		// limit なし: 全件
-		// limit=3: 最新3件
-		vi.mocked(postRepo.findByAuthorIdAndDate)
-			.mockResolvedValueOnce([post1]) // 全件 (limit なし)
-			.mockResolvedValueOnce([post1]); // 最新3件 (limit=3)
+		// 全件取得 1回のみ（表示用最新3件はsliceで取得するため2回目のクエリは不要）
+		vi.mocked(postRepo.findByAuthorIdAndDate).mockResolvedValueOnce([post1]);
 
 		const result = await handler.execute({
 			args: [TARGET_POST_ID],
@@ -257,10 +254,9 @@ describe("HissiHandler", () => {
 			}),
 		);
 		// DESC で返ってくる想定 (3,2,1 の順)
+		// 全件取得 1回のみ（表示用最新3件はsliceで取得するため2回目のクエリは不要）
 		const postsDesc = [...posts].reverse();
-		vi.mocked(postRepo.findByAuthorIdAndDate)
-			.mockResolvedValueOnce(postsDesc)
-			.mockResolvedValueOnce(postsDesc);
+		vi.mocked(postRepo.findByAuthorIdAndDate).mockResolvedValueOnce(postsDesc);
 
 		const result = await handler.execute({
 			args: [TARGET_POST_ID],
@@ -286,12 +282,8 @@ describe("HissiHandler", () => {
 				createdAt: new Date(`2026-03-20T0${n + 4}:00:00.000Z`),
 			}),
 		);
-		// 最新3件 (DESC順: 5,4,3)
-		const latest3Posts = allPosts.slice(0, 3);
-
-		vi.mocked(postRepo.findByAuthorIdAndDate)
-			.mockResolvedValueOnce(allPosts)
-			.mockResolvedValueOnce(latest3Posts);
+		// 全件取得 1回のみ（表示用最新3件は実装内部で allPosts.slice(0, 3) により取得）
+		vi.mocked(postRepo.findByAuthorIdAndDate).mockResolvedValueOnce(allPosts);
 
 		const result = await handler.execute({
 			args: [TARGET_POST_ID],
@@ -316,9 +308,8 @@ describe("HissiHandler", () => {
 			createdAt: new Date("2026-03-20T05:23:15.000Z"), // JST 14:23:15
 			threadId: THREAD_1_ID,
 		});
-		vi.mocked(postRepo.findByAuthorIdAndDate)
-			.mockResolvedValueOnce([post1])
-			.mockResolvedValueOnce([post1]);
+		// 全件取得 1回のみ（表示用最新3件はsliceで取得するため2回目のクエリは不要）
+		vi.mocked(postRepo.findByAuthorIdAndDate).mockResolvedValueOnce([post1]);
 		vi.mocked(threadRepo.findById).mockResolvedValue(
 			makeThread({ id: THREAD_1_ID, title: "雑談スレ" }),
 		);
@@ -343,9 +334,8 @@ describe("HissiHandler", () => {
 
 	it("ヘッダに対象レスの dailyId が含まれる", async () => {
 		const post1 = makePost({ dailyId: "Ax8kP2" });
-		vi.mocked(postRepo.findByAuthorIdAndDate)
-			.mockResolvedValueOnce([post1])
-			.mockResolvedValueOnce([post1]);
+		// 全件取得 1回のみ（表示用最新3件はsliceで取得するため2回目のクエリは不要）
+		vi.mocked(postRepo.findByAuthorIdAndDate).mockResolvedValueOnce([post1]);
 
 		const result = await handler.execute({
 			args: [TARGET_POST_ID],
@@ -372,9 +362,11 @@ describe("HissiHandler", () => {
 			threadId: THREAD_2_ID,
 			createdAt: new Date("2026-03-20T08:00:00.000Z"),
 		});
-		vi.mocked(postRepo.findByAuthorIdAndDate)
-			.mockResolvedValueOnce([post1, post2])
-			.mockResolvedValueOnce([post1, post2]);
+		// 全件取得 1回のみ（表示用最新3件はsliceで取得するため2回目のクエリは不要）
+		vi.mocked(postRepo.findByAuthorIdAndDate).mockResolvedValueOnce([
+			post1,
+			post2,
+		]);
 		vi.mocked(threadRepo.findById)
 			.mockResolvedValueOnce(makeThread({ id: THREAD_1_ID, title: "雑談スレ" }))
 			.mockResolvedValueOnce(
@@ -416,9 +408,8 @@ describe("HissiHandler", () => {
 			createdAt: new Date("2026-03-20T01:00:00.000Z"), // JST 10:00
 		});
 		const postsDesc = [post3, post2, post1];
-		vi.mocked(postRepo.findByAuthorIdAndDate)
-			.mockResolvedValueOnce(postsDesc)
-			.mockResolvedValueOnce(postsDesc);
+		// 全件取得 1回のみ（表示用最新3件はsliceで取得するため2回目のクエリは不要）
+		vi.mocked(postRepo.findByAuthorIdAndDate).mockResolvedValueOnce(postsDesc);
 
 		const result = await handler.execute({
 			args: [TARGET_POST_ID],

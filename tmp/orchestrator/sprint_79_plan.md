@@ -38,4 +38,5 @@
 - vitest: 72ファイル / 1535テスト / 全PASS（+8件: getPostListWithBotMark）
 - tsc: 0エラー
 - playwright E2E (--project=e2e): 16 passed, 0 failed（bot-display 2件がfixme→PASS）
-- cucumber-js: 次スプリントで確認（BDDステップ定義はサービス層モックのため本タスクでは変動なし）
+- cucumber-js: 271シナリオ (255 passed, 16 pending, 0 failed)
+- **本番スモークテスト:** 30/35 PASS（5 skip: ローカル限定テスト）

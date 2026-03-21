@@ -10,7 +10,8 @@
 - TASK-219: 撃破済みBOT表示設計（bdd-architect）— データフロー・フロントエンド表示・トグルUI方式
 - TASK-220: 撃破済みBOT表示実装（bdd-coding）— バックエンドbotMark合成 + PostItem opacity + トグルUI
 - テスト: vitest 72ファイル/1535テスト全PASS / playwright E2E 16 passed(bot-display 2件fixme解除)
-- コミット: （Sprint-79）
+- 本番スモーク: 30/35 PASS（5 skip: ローカル限定テスト）
+- コミット: 2f69639
 
 ### Sprint-78の成果
 - E2Eテスト11件実装（thread-ui 7 + polling 2 + bot-display 2 fixme）+ 既存E2E修正
