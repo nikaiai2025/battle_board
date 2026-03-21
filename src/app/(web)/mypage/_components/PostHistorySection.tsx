@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { formatDateTime } from "../../../../lib/utils/date";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -330,9 +331,7 @@ export default function PostHistorySection() {
 									>
 										{post.threadTitle}
 									</a>
-									<span className="ml-2">
-										{new Date(post.createdAt).toLocaleString("ja-JP")}
-									</span>
+									<span className="ml-2">{formatDateTime(post.createdAt)}</span>
 								</div>
 								<p className="text-sm text-gray-800 line-clamp-2">
 									{post.body}

@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { formatDateTime } from "@/lib/utils/date";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -201,12 +202,12 @@ export default function AdminIpBansPage() {
 								>
 									{/* BAN日時 */}
 									<td className="px-3 py-2 text-xs whitespace-nowrap">
-										{new Date(ban.bannedAt).toLocaleString("ja-JP")}
+										{formatDateTime(ban.bannedAt)}
 									</td>
 									{/* 有効期限 */}
 									<td className="px-3 py-2 text-xs whitespace-nowrap">
 										{ban.expiresAt ? (
-											new Date(ban.expiresAt).toLocaleString("ja-JP")
+											formatDateTime(ban.expiresAt)
 										) : (
 											<span className="text-red-600 font-medium">無期限</span>
 										)}

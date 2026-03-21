@@ -21,9 +21,8 @@ import {
 	type PostFormContextType,
 } from "../../../../app/(web)/_components/PostFormContext";
 import type { Post } from "../../../../app/(web)/_components/PostItem";
-import PostItem, {
-	formatDateTime,
-} from "../../../../app/(web)/_components/PostItem";
+import PostItem from "../../../../app/(web)/_components/PostItem";
+import { formatDateTime } from "../../../../lib/utils/date";
 
 // ---------------------------------------------------------------------------
 // モック設定

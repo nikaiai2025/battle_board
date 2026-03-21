@@ -17,6 +17,7 @@
  */
 
 import type { MypageInfo } from "../../services/mypage-service";
+import { formatDateTime } from "../../utils/date";
 
 // ---------------------------------------------------------------------------
 // ユーザー種別判定
@@ -111,15 +112,18 @@ export function buildPatCopyValue(patToken: string | null): string | null {
  * PAT 最終使用日時を表示用文字列にフォーマットする。
  * null の場合は「未使用」を返す。
  *
+ * JST固定で出力する（formatDateTime と同一フォーマット）。
+ *
  * See: features/user_registration.feature @マイページでPATを確認できる
  * See: docs/architecture/components/user-registration.md §8.2 マイページ表示
+ * See: src/lib/utils/date.ts > formatDateTime
  *
  * @param patLastUsedAt - PAT 最終使用日時（ISO 8601 文字列）または null
- * @returns ロケール形式の日時文字列、または「未使用」
+ * @returns JST固定の日時文字列（YYYY/MM/DD(ddd) HH:mm:ss 形式）、または「未使用」
  */
 export function formatPatLastUsedAt(patLastUsedAt: string | null): string {
 	if (patLastUsedAt === null) return "未使用";
-	return new Date(patLastUsedAt).toLocaleString("ja-JP");
+	return formatDateTime(patLastUsedAt);
 }
 
 // ---------------------------------------------------------------------------

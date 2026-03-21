@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "@/lib/domain/models/user";
+import { formatDateTime } from "@/lib/utils/date";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -217,13 +218,7 @@ export default function AdminUsersPage() {
 									</td>
 									{/* 登録日時 */}
 									<td className="px-3 py-2 text-xs whitespace-nowrap">
-										{new Date(user.createdAt).toLocaleString("ja-JP", {
-											year: "numeric",
-											month: "2-digit",
-											day: "2-digit",
-											hour: "2-digit",
-											minute: "2-digit",
-										})}
+										{formatDateTime(user.createdAt)}
 									</td>
 									{/* ステータスバッジ */}
 									<td className="px-3 py-2">

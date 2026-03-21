@@ -25,6 +25,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import type { Post } from "@/lib/domain/models/post";
 import type { UserDetail } from "@/lib/services/admin-service";
+import { formatDateTime } from "@/lib/utils/date";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -377,7 +378,7 @@ export default function AdminUserDetailPage({
 					<div>
 						<span className="text-gray-500 text-xs">登録日時</span>
 						<p className="text-gray-700">
-							{new Date(userDetail.createdAt).toLocaleString("ja-JP")}
+							{formatDateTime(userDetail.createdAt)}
 						</p>
 					</div>
 					{/* BANステータス */}
@@ -589,9 +590,7 @@ export default function AdminUserDetailPage({
 											{post.threadId.slice(0, 8)}...
 										</span>
 									</span>
-									<span>
-										{new Date(post.createdAt).toLocaleString("ja-JP")}
-									</span>
+									<span>{formatDateTime(post.createdAt)}</span>
 									<span>レス#{post.postNumber}</span>
 								</div>
 								<p
