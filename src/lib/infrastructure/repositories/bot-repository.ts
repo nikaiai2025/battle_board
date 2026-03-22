@@ -43,20 +43,27 @@ interface BotRow {
 }
 
 /**
- * countLivingBots 区分Bのネスト select 結果型。
- * bot_posts → posts → threads の結合結果をアプリ層で集約するために使用する。
+ * countLivingBots 区分B — クエリ1の結果型。
+ * bots → bot_posts の one-to-many 結合結果。
  */
 interface ThreadFixedBotRow {
 	id: string;
 	bot_posts: Array<{
 		post_id: string;
-		posts: Array<{
-			thread_id: string;
-			threads: Array<{
-				is_dormant: boolean;
-			}>;
-		}>;
 	}>;
+}
+
+/**
+ * countLivingBots 区分B — クエリ2の結果型。
+ * posts → threads の many-to-one 結合結果。
+ * PostgREST は many-to-one FK を単一オブジェクト（or null）で返すが、
+ * SDK バージョンによっては配列で返す可能性があるため、
+ * Array.isArray() で安全にハンドリングする。
+ */
+interface PostWithThread {
+	id: string;
+	thread_id: string;
+	threads: { is_dormant: boolean } | Array<{ is_dormant: boolean }> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -557,31 +564,73 @@ export async function countLivingBots(): Promise<number> {
 	}
 
 	// 区分B: スレッド固定BOTのうちアクティブスレッドにいるもの
-	// Supabase JS SDK のネスト select で bot_posts → posts → threads を1クエリで結合し、
-	// アプリ層で is_dormant=false のスレッドを持つBOTをカウントする。
-	// N+1クエリ（1 + 3N）を1クエリに削減し、CF Workers のサブリクエスト上限を回避する。
-	const { data: threadFixedBots, error: errorB } = await supabaseAdmin
+	// 2クエリに分離し、PostgREST の many-to-one FK 戻り値の型不安定性を回避する。
+	// クエリ1: スレッド固定BOTのIDとbot_postsのpost_idを取得
+	const { data: threadFixedBots, error: errorB1 } = await supabaseAdmin
 		.from("bots")
-		.select("id, bot_posts(post_id, posts(thread_id, threads(is_dormant)))")
+		.select("id, bot_posts(post_id)")
 		.eq("is_active", true)
 		.in("bot_profile_key", ["tutorial", "aori"]);
 
-	if (errorB) {
+	if (errorB1) {
 		throw new Error(
-			`BotRepository.countLivingBots (category B) failed: ${errorB.message}`,
+			`BotRepository.countLivingBots (category B query 1) failed: ${errorB1.message}`,
 		);
+	}
+
+	const bots = (threadFixedBots ?? []) as ThreadFixedBotRow[];
+	if (bots.length === 0) {
+		return countA ?? 0;
+	}
+
+	// bot_posts から post_id 一覧を抽出（重複除去）
+	const allPostIds = [
+		...new Set(
+			bots.flatMap((bot) => (bot.bot_posts ?? []).map((bp) => bp.post_id)),
+		),
+	];
+
+	// allPostIds が空の場合は早期リターン（Supabase .in() に空配列を渡すとエラー）
+	if (allPostIds.length === 0) {
+		return countA ?? 0;
+	}
+
+	// クエリ2: post_id → posts → threads の is_dormant を取得
+	// posts.threads は many-to-one FK なので単一オブジェクトが返る想定だが、
+	// Array.isArray() で安全にハンドリングする。
+	const { data: postsData, error: errorB2 } = await supabaseAdmin
+		.from("posts")
+		.select("id, thread_id, threads(is_dormant)")
+		.in("id", allPostIds);
+
+	if (errorB2) {
+		throw new Error(
+			`BotRepository.countLivingBots (category B query 2) failed: ${errorB2.message}`,
+		);
+	}
+
+	// post_id → is_dormant のマップを構築
+	const postIdToDormant = new Map<string, boolean>();
+	for (const post of (postsData ?? []) as PostWithThread[]) {
+		const threads = post.threads;
+		let isDormant = true; // デフォルト: 不明な場合は休眠扱い（安全側に倒す）
+		if (threads != null) {
+			// PostgREST many-to-one: 通常は単一オブジェクト、念のため配列にも対応
+			if (Array.isArray(threads)) {
+				isDormant = threads.length === 0 || threads.every((t) => t.is_dormant);
+			} else {
+				isDormant = threads.is_dormant;
+			}
+		}
+		postIdToDormant.set(post.id, isDormant);
 	}
 
 	// 各BOTについて、書き込み先スレッドに is_dormant=false が1つ以上あればカウントする
 	let countB = 0;
-	for (const bot of (threadFixedBots ?? []) as ThreadFixedBotRow[]) {
-		const botPosts = bot.bot_posts ?? [];
-		const hasActiveThread = botPosts.some((bp) => {
-			const posts = bp.posts ?? [];
-			return posts.some((post) => {
-				const threads = post.threads ?? [];
-				return threads.some((thread) => !thread.is_dormant);
-			});
+	for (const bot of bots) {
+		const hasActiveThread = (bot.bot_posts ?? []).some((bp) => {
+			const isDormant = postIdToDormant.get(bp.post_id);
+			return isDormant === false;
 		});
 		if (hasActiveThread) {
 			countB++;

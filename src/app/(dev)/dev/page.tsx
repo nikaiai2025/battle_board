@@ -86,7 +86,7 @@ export default async function DevBoardPage({
 				a:visited { color: #551A8B; }
 				a:hover { text-decoration: none; }
 
-				/* ---- marquee ---- */
+				/* ---- marquee（CSS アニメーションで再現） ---- */
 				.dev-marquee {
 					background: #000080;
 					color: #ffff00;
@@ -97,6 +97,17 @@ export default async function DevBoardPage({
 					border-left: 2px solid #c0c0c0;
 					border-right: 2px solid #404040;
 					border-bottom: 2px solid #404040;
+					overflow: hidden;
+					white-space: nowrap;
+					container-type: inline-size;
+				}
+				.dev-marquee-inner {
+					display: inline-block;
+					animation: dev-marquee-scroll 3.5s linear infinite alternate;
+				}
+				@keyframes dev-marquee-scroll {
+					0%   { transform: translateX(0); }
+					100% { transform: translateX(calc(100cqw - 100%)); }
 				}
 
 				/* ============================================
@@ -250,6 +261,14 @@ export default async function DevBoardPage({
 					font-weight: bold;
 					color: #800000;
 					margin-bottom: 6px;
+				}
+				/* ---- blink（点滅）演出 ---- */
+				.dev-blink {
+					animation: dev-blink 1s infinite;
+				}
+				@keyframes dev-blink {
+					0%, 75%  { opacity: 1; }
+					76%, 100% { opacity: 0; }
 				}
 				.dev-title-sub {
 					font-weight: normal;
@@ -465,7 +484,9 @@ export default async function DevBoardPage({
 							<div className="dev-nav-section">- Links -</div>
 							<ul>
 								<li>
-									<a href="/">BattleBoard 本番</a>
+									<a href="/" className="dev-blink">
+										BattleBoard 本番
+									</a>
 								</li>
 								<li>
 									<a href="#">デプロイ状況</a>
@@ -531,10 +552,12 @@ export default async function DevBoardPage({
 						{/* ===== 右メイン（掲示板本体） ===== */}
 						<td className="dev-main">
 							{/* marquee お知らせテロップ */}
-							<marquee className="dev-marquee" scrollamount="3">
-								ようこそ開発連絡板へ!
-								バグ報告・作業連絡・雑談などご自由にどうぞ。荒らしはやめてね(^_^;)
-							</marquee>
+							<div className="dev-marquee">
+								<span className="dev-marquee-inner">
+									ようこそ開発連絡板へ!
+									バグ報告・作業連絡・雑談などご自由にどうぞ。荒らしはやめてね(^_^;)
+								</span>
+							</div>
 
 							{/* ページタイトル */}
 							<div className="dev-title">開発連絡板</div>
