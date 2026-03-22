@@ -27,6 +27,12 @@ import {
 } from "./accusation-service";
 import type * as CurrencyServiceType from "./currency-service";
 import { AbeshinzoHandler } from "./handlers/abeshinzo-handler";
+// TASK-270: !aori コマンド（煽りBOT召喚・ステルス）
+// See: features/command_aori.feature
+import {
+	AoriHandler,
+	type IAoriPendingRepository,
+} from "./handlers/aori-handler";
 import { AttackHandler } from "./handlers/attack-handler";
 import {
 	GrassHandler,
@@ -141,6 +147,15 @@ export interface CommandExecutionResult {
 export interface CommandContext {
 	/** コマンド引数（スペース区切りで分割済み。例: [">>5"]） */
 	args: string[];
+	/**
+	 * PostNumberResolver 解決前の元の引数。
+	 * args は >>N が UUID に置換されるが、rawArgs は元の >>N 形式を保持する。
+	 * PostNumberResolver が無効な場合は args と同一。
+	 * CommandService が自動設定するため、テストでは省略可能。
+	 *
+	 * See: features/command_aori.feature @コマンド文字列と引数が投稿本文から除去される
+	 */
+	rawArgs?: string[];
 	/** 実行元レスのID */
 	postId: string;
 	/** スレッドID */
@@ -338,6 +353,7 @@ export class CommandService {
 	 * @param postNumberResolver - PostNumberResolver（DI。>>N → UUID 解決）
 	 * @param hissiHandler - HissiHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
 	 * @param kinouHandler - KinouHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
+	 * @param pendingAsyncCommandRepository - PendingAsyncCommandRepository（DI。!aori 用。省略時は本番用を動的 require）
 	 *
 	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
 	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
@@ -355,6 +371,7 @@ export class CommandService {
 		postNumberResolver?: IPostNumberResolver | null,
 		hissiHandler?: HissiHandler | null,
 		kinouHandler?: KinouHandler | null,
+		pendingAsyncCommandRepository?: IAoriPendingRepository | null,
 	) {
 		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
 		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
@@ -492,6 +509,23 @@ export class CommandService {
 			resolvedKinouHandler = new KinouHandler(postRepository);
 		}
 
+		// AoriHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に aori コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// See: features/command_aori.feature
+		let resolvedAoriHandler: AoriHandler | null = null;
+		if (pendingAsyncCommandRepository !== undefined) {
+			// 明示的に DI された場合（null を含む）
+			resolvedAoriHandler = pendingAsyncCommandRepository
+				? new AoriHandler(pendingAsyncCommandRepository)
+				: null;
+		} else if (parsed.commands.aori?.enabled) {
+			// YAML で aori が有効化されており、DI がない場合のみ本番用生成
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const PendingAsyncCommandRepository: IAoriPendingRepository = require("../infrastructure/repositories/pending-async-command-repository");
+			resolvedAoriHandler = new AoriHandler(PendingAsyncCommandRepository);
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
@@ -508,6 +542,9 @@ export class CommandService {
 			// !iamsystem: ステルスでシステム偽装（依存サービスなし）
 			// See: features/command_iamsystem.feature
 			new IamsystemHandler(),
+			// !aori: 煽りBOT召喚（PendingAsyncCommandRepository の DI が必要）
+			// See: features/command_aori.feature
+			...(resolvedAoriHandler ? [resolvedAoriHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();
@@ -580,7 +617,10 @@ export class CommandService {
 		// Step 1.5: >>N → UUID 解決
 		// args 内の `>>N` パターンをスレッド内のpostNumberに対応するUUIDに置換する。
 		// ハンドラは解決済みUUIDを受け取る（ハンドラごとに解決ロジックを重複させない）。
+		// rawArgs: 解決前の元の引数を保持する（AoriHandler 等が postNumber を必要とする場合に使用）
 		// See: docs/architecture/components/command.md §2.3 解析ルール
+		// See: features/command_aori.feature @コマンド文字列と引数が投稿本文から除去される
+		const rawArgs = [...parsed.args];
 		if (this.postNumberResolver) {
 			const resolvedArgs: string[] = [];
 			for (const arg of parsed.args) {
@@ -661,6 +701,7 @@ export class CommandService {
 		// Step 5: ハンドラ実行
 		const ctx: CommandContext = {
 			args: parsed.args,
+			rawArgs,
 			postId: input.postId,
 			threadId: input.threadId,
 			userId: input.userId,

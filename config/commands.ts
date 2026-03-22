@@ -88,5 +88,14 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: true,
 		},
+		// TASK-270: !aori コマンド追加（煽りBOT召喚・ステルス）
+		// See: features/command_aori.feature
+		aori: {
+			description: "煽りBOTを召喚する",
+			cost: 10,
+			targetFormat: ">>postNumber",
+			enabled: true,
+			stealth: true,
+		},
 	},
 };

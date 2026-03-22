@@ -321,8 +321,13 @@ export async function deleteEliminatedTutorialBots(): Promise<number> {
 export async function bulkReviveEliminated(): Promise<number> {
 	let count = 0;
 	for (const bot of store) {
-		// チュートリアルBOTは復活させない（本番実装と一致）
-		if (!bot.isActive && bot.botProfileKey !== "tutorial") {
+		// チュートリアルBOT・煽りBOT（使い切りBOT）は復活させない（本番実装と一致）
+		// See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+		const NON_REVIVABLE_PROFILE_KEYS = ["tutorial", "aori"];
+		if (
+			!bot.isActive &&
+			!NON_REVIVABLE_PROFILE_KEYS.includes(bot.botProfileKey ?? "")
+		) {
 			bot.isActive = true;
 			bot.isRevealed = false;
 			bot.revealedAt = null;

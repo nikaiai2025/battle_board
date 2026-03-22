@@ -677,9 +677,9 @@ describe("BotRepository", () => {
 			const count = await BotRepository.bulkReviveEliminated();
 
 			expect(count).toBe(2);
-			// tutorial 除外フィルタが正しく渡されていることを確認
+			// tutorial・aori 除外フィルタが正しく渡されていることを確認
 			expect(mockOrInner).toHaveBeenCalledWith(
-				"bot_profile_key.is.null,bot_profile_key.neq.tutorial",
+				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)",
 			);
 		});
 
@@ -707,10 +707,10 @@ describe("BotRepository", () => {
 			const count = await BotRepository.bulkReviveEliminated();
 
 			expect(count).toBe(0);
-			// tutorial 除外フィルタが渡されていることを確認
+			// tutorial・aori 除外フィルタが渡されていることを確認
 			expect(mockEqInner).toHaveBeenCalledWith("is_active", false);
 			expect(mockOrInner).toHaveBeenCalledWith(
-				"bot_profile_key.is.null,bot_profile_key.neq.tutorial",
+				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)",
 			);
 		});
 

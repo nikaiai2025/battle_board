@@ -107,7 +107,22 @@ export async function POST(request: Request): Promise<NextResponse> {
 			);
 		}
 
-		// Step 5: 結果をJSONで返す
+		// Step 5: 煽りBOT pending 処理
+		// Step 4 と同じ個別 try-catch パターン（INCIDENT-CRON500 対応）
+		// See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+		let aoriResult: Awaited<
+			ReturnType<typeof botService.processAoriCommands>
+		> | null = null;
+		try {
+			aoriResult = await botService.processAoriCommands();
+		} catch (aoriErr) {
+			console.error(
+				"[POST /api/internal/bot/execute] processAoriCommands failed:",
+				aoriErr,
+			);
+		}
+
+		// Step 6: 結果をJSONで返す
 		return NextResponse.json({
 			totalDue: dueBots.length,
 			processed: botsToProcess.length,
@@ -116,6 +131,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 			skippedCount,
 			results,
 			tutorials: tutorialResult,
+			aori: aoriResult,
 		});
 	} catch (err) {
 		console.error("[POST /api/internal/bot/execute] Unhandled error:", err);

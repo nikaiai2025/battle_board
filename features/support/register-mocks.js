@@ -188,6 +188,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/pending-tutorial-repository.ts",
 		"./in-memory/pending-tutorial-repository.ts",
 	],
+	// pending-async-command リポジトリ（TASK-270 で追加）
+	// See: features/command_aori.feature
+	[
+		"src/lib/infrastructure/repositories/pending-async-command-repository.ts",
+		"./in-memory/pending-async-command-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

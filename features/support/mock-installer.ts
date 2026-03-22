@@ -48,6 +48,9 @@ import * as InMemoryIncentiveLogRepo from "./in-memory/incentive-log-repository"
 // IP BAN リポジトリ（TASK-105 で追加）
 // See: features/admin.feature @IP BAN シナリオ群
 import * as InMemoryIpBanRepo from "./in-memory/ip-ban-repository";
+// pending-async-command リポジトリ（TASK-270 で追加）
+// See: features/command_aori.feature
+import * as InMemoryPendingAsyncCommandRepo from "./in-memory/pending-async-command-repository";
 // pending-tutorial リポジトリ（TASK-248 で追加）
 // See: features/welcome.feature
 import * as InMemoryPendingTutorialRepo from "./in-memory/pending-tutorial-repository";
@@ -118,6 +121,9 @@ export function resetAllStores(): void {
 	// pending-tutorial リポジトリのリセット（TASK-248 で追加）
 	// See: features/welcome.feature
 	InMemoryPendingTutorialRepo.reset();
+	// pending-async-command リポジトリのリセット（TASK-270 で追加）
+	// See: features/command_aori.feature
+	InMemoryPendingAsyncCommandRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +149,8 @@ export {
 	InMemoryIncentiveLogRepo,
 	// IP BAN リポジトリ（TASK-105 で追加）
 	InMemoryIpBanRepo,
+	// pending-async-command リポジトリ（TASK-270 で追加）
+	InMemoryPendingAsyncCommandRepo,
 	// pending-tutorial リポジトリ（TASK-248 で追加）
 	InMemoryPendingTutorialRepo,
 	InMemoryPostRepo,

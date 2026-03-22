@@ -469,12 +469,13 @@ export async function bulkReviveEliminated(): Promise<number> {
 	// eliminated 状態 = is_active = false のボットを取得して max_hp を参照する必要がある。
 	// Supabase は UPDATE ... SET hp = max_hp のような自己参照 UPDATE をサポートしないため、
 	// 一度全件取得してから個別に更新する。
-	// チュートリアルBOT（bot_profile_key = 'tutorial'）は除外する。
+	// チュートリアルBOT・煽りBOT（使い切りBOT）は復活させない。
+	// See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
 	const { data: eliminated, error: fetchError } = await supabaseAdmin
 		.from("bots")
 		.select("id, max_hp")
 		.eq("is_active", false)
-		.or("bot_profile_key.is.null,bot_profile_key.neq.tutorial");
+		.or("bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)");
 
 	if (fetchError) {
 		throw new Error(

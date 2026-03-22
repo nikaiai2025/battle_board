@@ -21,6 +21,7 @@
  *         See: docs/architecture/components/bot.md §2.12 Strategy パターン設計
  */
 
+import { selectRandomTaunt } from "../../../config/aori-taunts";
 import { botProfilesConfig } from "../../../config/bot-profiles";
 import type { Bot } from "../domain/models/bot";
 import {
@@ -248,6 +249,38 @@ export interface TutorialResult {
 }
 
 /**
+ * PendingAsyncCommandRepository の依存インターフェース。
+ * processAoriCommands で使用する。
+ * See: features/command_aori.feature
+ */
+export interface IPendingAsyncCommandRepository {
+	findByCommandType(commandType: string): Promise<
+		Array<{
+			id: string;
+			commandType: string;
+			threadId: string;
+			targetPostNumber: number;
+			invokerUserId: string;
+			payload: Record<string, unknown> | null;
+			createdAt: Date;
+		}>
+	>;
+	deletePendingAsyncCommand(id: string): Promise<void>;
+}
+
+/**
+ * 煽りBOT Cron 処理の個別結果型。
+ * See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+ */
+export interface AoriResult {
+	pendingId: string;
+	success: boolean;
+	botId?: string;
+	postId?: string;
+	error?: string;
+}
+
+/**
  * Strategy 解決関数の型（DI用）。
  * テスト時にモックの Strategy を注入するために使用する。
  * See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
@@ -332,6 +365,8 @@ export class BotService {
 	 *   See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
 	 * @param pendingTutorialRepository - チュートリアルBOTスポーン待ちキュー（DI・省略可）
 	 *   See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	 * @param pendingAsyncCommandRepository - 非同期コマンドキュー（DI・省略可）
+	 *   See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
 	 */
 	constructor(
 		private readonly botRepository: IBotRepository,
@@ -342,6 +377,7 @@ export class BotService {
 		private readonly createPostFn?: CreatePostFn,
 		private readonly resolveStrategiesFn?: ResolveStrategiesFn,
 		private readonly pendingTutorialRepository?: IPendingTutorialRepository,
+		private readonly pendingAsyncCommandRepository?: IPendingAsyncCommandRepository,
 	) {
 		// ボットプロファイルデータをキャッシュする
 		// Cloudflare Workers 環境では fs.readFileSync が使えないため、
@@ -989,6 +1025,117 @@ export class BotService {
 	}
 
 	// ---------------------------------------------------------------------------
+	// 煽りBOT pending 処理
+	// See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * pending_async_commands テーブルから command_type='aori' のエントリを処理する。
+	 *
+	 * 処理フロー（エントリごと）:
+	 *   1. 煽り BOT を新規作成（使い切り設定）
+	 *   2. 煽り文句セットからランダム選択
+	 *   3. BOT として書き込み（">>{target} {煽り文句}" 形式）
+	 *   4. pending エントリを削除
+	 *
+	 * See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+	 */
+	async processAoriCommands(): Promise<{
+		processed: number;
+		results: AoriResult[];
+	}> {
+		// pendingAsyncCommandRepository が未注入の場合は何もしない
+		if (!this.pendingAsyncCommandRepository) {
+			return { processed: 0, results: [] };
+		}
+
+		const pendingList =
+			await this.pendingAsyncCommandRepository.findByCommandType("aori");
+
+		if (pendingList.length === 0) {
+			return { processed: 0, results: [] };
+		}
+
+		const results: AoriResult[] = [];
+
+		for (const pending of pendingList) {
+			try {
+				// Step 1: 煽り BOT 新規作成（使い切り設定）
+				// isActive: true + nextPostAt: null で「攻撃可能だが定期投稿しない」状態にする。
+				// findDueForPost は isActive && nextPostAt <= now でフィルタするため、
+				// nextPostAt=null なら定期投稿対象にならない。
+				// AttackHandler は !isActive を「撃破済み」と判定するため isActive=true が必要。
+				// See: features/command_aori.feature @煽りBOTは1回だけ書き込み、定期書き込みを行わない
+				const today = this.getTodayJst();
+				const newBot = await this.botRepository.create({
+					name: "名無しさん",
+					persona: "煽り",
+					hp: 10,
+					maxHp: 10,
+					dailyId: this.generateFakeDailyId(),
+					dailyIdDate: today,
+					isActive: true,
+					isRevealed: false,
+					revealedAt: null,
+					botProfileKey: "aori",
+					nextPostAt: null,
+				});
+
+				// Step 2: 煽り文句をランダム選択
+				const taunt = selectRandomTaunt();
+
+				// Step 3: BOT として書き込み
+				// See: features/command_aori.feature @BOTが煽り文句セット（100件）から1つを選択して投稿する
+				const body = `>>${pending.targetPostNumber} ${taunt}`;
+				const postResult = await this.createPostFn!({
+					threadId: pending.threadId,
+					body: body,
+					edgeToken: null,
+					ipHash: "bot-aori",
+					displayName: "名無しさん",
+					isBotWrite: true,
+					botUserId: newBot.id,
+				});
+
+				if (postResult && "success" in postResult && postResult.success) {
+					// bot_posts 紐付け + total_posts インクリメント
+					await this.botPostRepository.create(postResult.postId, newBot.id);
+					await this.botRepository.incrementTotalPosts(newBot.id);
+				}
+
+				// Step 4: pending 削除
+				await this.pendingAsyncCommandRepository.deletePendingAsyncCommand(
+					pending.id,
+				);
+
+				results.push({
+					pendingId: pending.id,
+					success: true,
+					botId: newBot.id,
+					postId:
+						postResult && "success" in postResult && postResult.success
+							? postResult.postId
+							: undefined,
+				});
+			} catch (err) {
+				const errorMessage =
+					err instanceof Error ? err.message : "Unknown error";
+				console.error(
+					`BotService.processAoriCommands: pending=${pending.id} failed`,
+					err,
+				);
+				results.push({
+					pendingId: pending.id,
+					success: false,
+					error: errorMessage,
+				});
+			}
+		}
+
+		return { processed: pendingList.length, results };
+	}
+
+	// ---------------------------------------------------------------------------
 	// §2.11 書き込み先スレッド選択（後方互換ラッパー）
 	// ---------------------------------------------------------------------------
 
@@ -1305,6 +1452,8 @@ export function createBotService(): BotService {
 	const { createPost } = require("./post-service");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const PendingTutorialRepository = require("../infrastructure/repositories/pending-tutorial-repository");
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const PendingAsyncCommandRepository = require("../infrastructure/repositories/pending-async-command-repository");
 
 	// IThreadRepository アダプタ: ThreadRepository.findByBoardId を IBotService.IThreadRepository に適合させる
 	// findByBoardId は options 引数が省略可能なため、boardId のみ渡すシグネチャで適合する
@@ -1321,6 +1470,15 @@ export function createBotService(): BotService {
 			PendingTutorialRepository.deletePendingTutorial(id),
 	};
 
+	// IPendingAsyncCommandRepository アダプタ
+	// See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+	const pendingAsyncCommandRepository: IPendingAsyncCommandRepository = {
+		findByCommandType: (commandType: string) =>
+			PendingAsyncCommandRepository.findByCommandType(commandType),
+		deletePendingAsyncCommand: (id: string) =>
+			PendingAsyncCommandRepository.deletePendingAsyncCommand(id),
+	};
+
 	return new BotService(
 		BotRepository,
 		BotPostRepository,
@@ -1330,5 +1488,6 @@ export function createBotService(): BotService {
 		createPost, // executeBotPost で PostService.createPost を呼び出すために使用
 		undefined, // resolveStrategiesFn（省略 → デフォルトの resolveStrategies を使用）
 		pendingTutorialRepository, // processPendingTutorials で使用
+		pendingAsyncCommandRepository, // processAoriCommands で使用
 	);
 }
