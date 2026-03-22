@@ -206,20 +206,20 @@ export async function getBalance(userId: string): Promise<number> {
  * 全ユーザーの通貨残高合計を集計する。
  * ダッシュボードの通貨流通量表示に使用する。
  *
- * MEDIUM-001: 全行フェッチ+JSリデュースをDB側SUM集計に変更。
- * Supabase PostgREST の集計構文 `balance.sum()` を使用し、
- * DB側でSUM集計することでJS側への全行転送を回避する。
+ * Supabase PostgREST の集計構文 `balance.sum()` は
+ * 「Use of aggregate functions is not allowed」エラーになるため、
+ * 全行の balance を取得してJS側で合算する方式を採用する。
+ * ユーザー数が少ないため性能問題は生じない。
  *
  * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
- * See: tmp/feature_plan_admin_expansion.md §5-e リアルタイム集計
  *
  * @returns 全ユーザー残高の合計
  */
 export async function sumAllBalances(): Promise<number> {
-	// PostgREST の集計構文でDB側SUM集計。全行フェッチを回避する。
+	// 全行の balance カラムを取得し、JS側で合算する。
 	const { data, error } = await supabaseAdmin
 		.from("currencies")
-		.select("balance.sum()");
+		.select("balance");
 
 	if (error) {
 		throw new Error(
@@ -227,8 +227,9 @@ export async function sumAllBalances(): Promise<number> {
 		);
 	}
 
-	// PostgREST 集計レスポンス: [{ sum: number | null }]
-	// レコードが0件の場合 sum は null になるため 0 にフォールバックする
-	const row = (data as { sum: number | null }[] | null)?.[0];
-	return row?.sum ?? 0;
+	// レコードが0件の場合は 0 を返す。
+	return (data as { balance: number }[]).reduce(
+		(sum, row) => sum + row.balance,
+		0,
+	);
 }

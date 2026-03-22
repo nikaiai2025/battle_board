@@ -4,7 +4,18 @@
 
 ## 現在のフェーズ
 
-**Sprint-104 完了 — !livingbot v2 スレッド内カウント追加**
+**Sprint-105 完了 — 管理者ログインページUI + 画面テーマ機能段階1**
+
+### Sprint-105の成果
+- TASK-283: テーマ機能段階1 設計（bdd-architect）— 設計書出力
+- TASK-284: 管理者ログインページ `/admin/login` UI実装 — `(admin-public)` ルートグループ配置（エスカレーション→案A採用）
+- TASK-285: テーマ機能段階1 実装 — DB/ドメイン/API/SSR/マイページUI/BDD/単体テスト
+  - 新規: theme.ts, theme-rules.ts, theme-service.ts, PUT /api/mypage/theme, 00025_theme_settings.sql
+  - SSR: Cookie→CSSクラス付与、マイページ: カード選択UI + 楽観的更新
+- BDD 340シナリオ中 324 passed / 16 pending / テーマ12シナリオ全PASS
+- vitest 1772 passed（+31テスト）
+- コミット: 6a4d818
+- 本番スモーク: 30/35 PASS（5件は設計上のスキップ）
 
 ### Sprint-104の成果
 - TASK-281: !livingbot v2 — スレッド内カウント追加
@@ -164,8 +175,9 @@
 
 ## テスト状況
 
-- vitest: 全PASS（schema-consistency 1件はマイグレーション未適用による既存問題）
-- cucumber-js: 328シナリオ / 312 passed / 0 failed / 16 pending
+- vitest: 1772 PASS（schema-consistency 1件はマイグレーション未適用による既存問題）
+- cucumber-js: 340シナリオ / 324 passed / 0 failed / 16 pending
+  - theme.feature 12シナリオ全PASS（Sprint-105で実装）
   - command_livingbot.feature 16シナリオ全PASS（Sprint-101でv1実装、Sprint-104でv2拡張）
   - command_newspaper.feature 5シナリオ全PASS（Sprint-97で実装）
   - command_aori.feature 7シナリオ全PASS（Sprint-96で実装）
@@ -180,7 +192,7 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-104後):** 30/35 PASS（5件は設計上のスキップ）
+- **本番スモークテスト (Sprint-105後):** 30/35 PASS（5件は設計上のスキップ）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -279,6 +291,7 @@ GEMINI_API_KEY の **GH Secrets** 設定が必要（人間タスク。Sprint-100
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-105 | 管理者ログインページUI + 画面テーマ機能段階1 | completed | `tmp/orchestrator/sprint_105_plan.md` |
 | Sprint-104 | !livingbot v2 スレッド内カウント追加 | completed | `tmp/orchestrator/sprint_104_plan.md` |
 | Sprint-103 | countLivingBots型不整合修正 + 固定案内板リンクCF/Vercel併記 | completed | `tmp/orchestrator/sprint_103_plan.md` |
 | Sprint-102 | countLivingBots N+1クエリ最適化（CF Workers サブリクエスト上限回避） | completed | `tmp/orchestrator/sprint_102_plan.md` |
