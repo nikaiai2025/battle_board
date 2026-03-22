@@ -42,6 +42,23 @@ interface BotRow {
 	created_at: string;
 }
 
+/**
+ * countLivingBots 区分Bのネスト select 結果型。
+ * bot_posts → posts → threads の結合結果をアプリ層で集約するために使用する。
+ */
+interface ThreadFixedBotRow {
+	id: string;
+	bot_posts: Array<{
+		post_id: string;
+		posts: Array<{
+			thread_id: string;
+			threads: Array<{
+				is_dormant: boolean;
+			}>;
+		}>;
+	}>;
+}
+
 // ---------------------------------------------------------------------------
 // DB → ドメインモデル 変換
 // ---------------------------------------------------------------------------
@@ -540,52 +557,33 @@ export async function countLivingBots(): Promise<number> {
 	}
 
 	// 区分B: スレッド固定BOTのうちアクティブスレッドにいるもの
-	// bot_posts -> posts -> threads の JOIN で特定する
-	// Supabase JS SDK では複数テーブルの JOIN + DISTINCT COUNT が困難なため、
-	// RPC 関数を使用するか、全件取得してアプリ層で処理する。
-	// スレッド固定BOTは少数（数体〜十数体）のため全件取得でパフォーマンス問題なし。
+	// Supabase JS SDK のネスト select で bot_posts → posts → threads を1クエリで結合し、
+	// アプリ層で is_dormant=false のスレッドを持つBOTをカウントする。
+	// N+1クエリ（1 + 3N）を1クエリに削減し、CF Workers のサブリクエスト上限を回避する。
 	const { data: threadFixedBots, error: errorB } = await supabaseAdmin
 		.from("bots")
-		.select("id")
+		.select("id, bot_posts(post_id, posts(thread_id, threads(is_dormant)))")
 		.eq("is_active", true)
 		.in("bot_profile_key", ["tutorial", "aori"]);
 
 	if (errorB) {
 		throw new Error(
-			`BotRepository.countLivingBots (category B fetch) failed: ${errorB.message}`,
+			`BotRepository.countLivingBots (category B) failed: ${errorB.message}`,
 		);
 	}
 
+	// 各BOTについて、書き込み先スレッドに is_dormant=false が1つ以上あればカウントする
 	let countB = 0;
-	for (const bot of (threadFixedBots ?? []) as { id: string }[]) {
-		// bot_posts からこのボットの書き込みを取得
-		const { data: botPosts, error: bpError } = await supabaseAdmin
-			.from("bot_posts")
-			.select("post_id")
-			.eq("bot_id", bot.id)
-			.limit(1);
-
-		if (bpError) continue;
-		if (!botPosts || botPosts.length === 0) continue;
-
-		// posts からスレッドIDを取得
-		const { data: post, error: postError } = await supabaseAdmin
-			.from("posts")
-			.select("thread_id")
-			.eq("id", (botPosts[0] as { post_id: string }).post_id)
-			.single();
-
-		if (postError || !post) continue;
-
-		// threads の is_dormant をチェック
-		const { data: thread, error: threadError } = await supabaseAdmin
-			.from("threads")
-			.select("is_dormant")
-			.eq("id", (post as { thread_id: string }).thread_id)
-			.single();
-
-		if (threadError || !thread) continue;
-		if (!(thread as { is_dormant: boolean }).is_dormant) {
+	for (const bot of (threadFixedBots ?? []) as ThreadFixedBotRow[]) {
+		const botPosts = bot.bot_posts ?? [];
+		const hasActiveThread = botPosts.some((bp) => {
+			const posts = bp.posts ?? [];
+			return posts.some((post) => {
+				const threads = post.threads ?? [];
+				return threads.some((thread) => !thread.is_dormant);
+			});
+		});
+		if (hasActiveThread) {
 			countB++;
 		}
 	}

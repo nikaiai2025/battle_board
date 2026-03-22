@@ -4,7 +4,14 @@
 
 ## 現在のフェーズ
 
-**Sprint-100 完了 — newspaper非同期処理GH Actions移行**
+**Sprint-101 完了 — !livingbotコマンド + ラストボットボーナス実装**
+
+### Sprint-101の成果
+- TASK-277: 設計（bdd-architect, Opus）— 生存BOTカウント2区分SQL + daily_eventsテーブル + AttackHandler統合
+- TASK-278: 実装（bdd-coding, Opus）— 14シナリオ全PASS、vitest全PASS
+- 新規: livingbot-handler.ts, daily-event-repository.ts, 00024_daily_events.sql, command_livingbot.steps.ts
+- コミット: 5f0df18
+- 本番スモーク: 18/18 PASS
 
 ### Sprint-100の成果
 - TASK-275/276: AI API呼び出しをVercel API Route内からGitHub Actions内に移動
@@ -136,7 +143,8 @@
 ## テスト状況
 
 - vitest: 全PASS（schema-consistency 1件はマイグレーション未適用による既存問題）
-- cucumber-js: 313シナリオ / 297 passed / 0 failed / 16 pending
+- cucumber-js: 326シナリオ / 310 passed / 0 failed / 16 pending
+  - command_livingbot.feature 14シナリオ全PASS（Sprint-101で実装）
   - command_newspaper.feature 5シナリオ全PASS（Sprint-97で実装）
   - command_aori.feature 7シナリオ全PASS（Sprint-96で実装）
   - command_iamsystem.feature 7シナリオ全PASS（Sprint-94で実装）
@@ -150,7 +158,7 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-98後):** 18/18 PASS（navigationテスト）
+- **本番スモークテスト (Sprint-101後):** 18/18 PASS（navigationテスト）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -249,6 +257,7 @@ GEMINI_API_KEY の **GH Secrets** 設定が必要（人間タスク。Sprint-100
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-101 | !livingbotコマンド + ラストボットボーナス実装 | completed | `tmp/orchestrator/sprint_101_plan.md` |
 | Sprint-100 | newspaper非同期処理GH Actions移行 | completed | `tmp/orchestrator/sprint_100_plan.md` |
 | Sprint-99 | ステルスコマンド本文除去バグ修正 | completed | `tmp/orchestrator/sprint_99_plan.md` |
 | Sprint-98 | Phase 5検証HIGH修正（Sprint-96/97差し戻し） | completed | `tmp/orchestrator/sprint_98_plan.md` |

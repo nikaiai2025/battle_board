@@ -22,18 +22,6 @@ if echo "$FIRST_LINE" | grep -qE '(npx\s+)?wrangler\s+deploy(\s|$)'; then
   exit 0
 fi
 
-# build:cf（Cloudflare用ビルド。ローカルの wrangler.toml [vars] が焼き込まれる）
-if echo "$FIRST_LINE" | grep -qE 'build:cf|build-cf'; then
-  jq -n '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: "Cloudflare用ビルド(build:cf)はローカル実行禁止。デプロイは git push → Cloudflare自動ビルドで行う。"
-    }
-  }'
-  exit 0
-fi
-
 # vercel deploy（手動デプロイ）
 if echo "$FIRST_LINE" | grep -qE '(npx\s+)?vercel\s+deploy'; then
   jq -n '{
