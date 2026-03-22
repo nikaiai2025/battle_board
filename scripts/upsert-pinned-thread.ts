@@ -109,8 +109,8 @@ function generateAnnouncementBody(
 		...commandLines,
 		"",
 		"【リンク】",
-		"  メインサイト（専ブラ対応）: https://battle-board.shika.workers.dev/",
-		"  サブサイト（Webのみ）: https://battleboard.vercel.app/",
+		"  メイン（専ブラ可）: https://battle-board.shika.workers.dev/battleboard",
+		"  サブ: https://battle-board-uma.vercel.app/battleboard",
 		"  マイページ: https://battle-board.shika.workers.dev/mypage",
 		"  開発連絡板: https://battle-board.shika.workers.dev/dev/",
 	].join("\n");
