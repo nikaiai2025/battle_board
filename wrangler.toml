@@ -29,6 +29,15 @@ binding = "ASSETS"
 binding = "WORKER_SELF_REFERENCE"
 service = "battle-board"
 
+# Observability（Free: 200Kイベント/日、超過時は記録停止・課金なし）
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+
 # 本番環境変数（デプロイ時にCloudflare Workersに反映される）
 [vars]
 NEXT_PUBLIC_BASE_URL = "https://battle-board.shika.workers.dev"
