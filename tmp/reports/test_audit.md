@@ -1,9 +1,9 @@
 # テスト監査レポート
 
 > 実行日: 2026-03-22
-> 対象スプリント: Sprint-80（フェーズ5差し戻し修正）
-> タスク: TASK-231
-> 前回監査: TASK-224（Sprint-75~79完了時点）
+> 対象スプリント: Sprint-96 / Sprint-97 (!aori + !newspaper 実装)
+> タスク: P5-TA-S97
+> 前回監査: TASK-231（Sprint-80完了時点）
 
 ## 1. Pendingシナリオ管理状況
 
@@ -11,58 +11,52 @@
 
 | 指標 | 値 |
 |---|---|
-| 総pendingシナリオ数 | 16 |
-| D-10 §7.3適合 | 16 / 16 |
-| 代替テスト作成済み | 13 / 16 |
-| 代替テスト未作成（技術的負債） | 0 |
-| インフラ制約pending（§7.3範囲外） | 3 |
+| 総pendingステップ数 | 12 |
+| D-10 S7.3適合 | 12 / 12 |
+| 代替テスト作成済み | 6 / 12 |
+| 代替テスト未作成（技術的負債） | 6 |
+| Phase未実装（S7.3範囲外） | 0 |
 
-**前回 (TASK-224) から変化なし。** Sprint-80はテスト修正のみでpendingの追加・削除は発生していない。
+### 対象featureのpending: 0件
 
-### 分類別内訳
+`command_aori.steps.ts` および `command_newspaper.steps.ts` には `return "pending"` が存在しない。全12シナリオが通常実行ステップで実装されている。
 
-| ファイル | カテゴリ | シナリオ数 | 代替テスト |
-|---|---|---|---|
-| thread.steps.ts | DOM/CSS表示 (@anchor_popup) | 4 | e2e/flows/thread-ui.spec.ts + Vitest 3ファイル |
-| thread.steps.ts | DOM/CSS表示 (@post_number_display) | 3 | e2e/flows/thread-ui.spec.ts + PostFormInsertText.test.tsx + PostItem.test.tsx |
-| thread.steps.ts | ブラウザ固有動作 (@pagination ポーリング) | 2 | e2e/flows/polling.spec.ts + PostListLiveWrapper.test.tsx |
-| bot_system.steps.ts | DOM/CSS表示 (撃破BOT表示) | 2 | e2e/flows/bot-display.spec.ts |
-| user_registration.steps.ts | 外部OAuth依存 (Discord) | 2 | registration-service.test.ts (サービス層で部分カバー) |
-| specialist_browser_compat.steps.ts | インフラ制約 (HTTP:80/WAF) | 3 | 該当なし（Sprint-20実機検証済み） |
+### プロジェクト全体のpending内訳
 
-### 詳細: §7.3不適合一覧
+前回(TASK-231)の16件から4件減少。原因は、前回カウントに含まれていたシナリオの一部がname除外（S6）対象であったための再集計差分であり、実質的な変化は以下の通り。
 
-全件適合。Sprint-80で新規pendingの追加はなく、既存pendingのコメント形式にも変更なし。
+| ファイル | ステップ数 | 理由 | 代替テスト | S7.3準拠 |
+|---|---|---|---|---|
+| bot_system.steps.ts | 6 | DOM/CSS表示（Web限定）: D-10 S7.3.1 | `e2e/flows/bot-display.spec.ts` 実在。ただし `test.fixme()` でスキップ中（UIコンポーネント未実装のため） | 適合 |
+| user_registration.steps.ts | 4 | Discord OAuth外部依存: サービス層でシミュレーション困難 | 代替テスト未作成 | 適合（理由記載あり。ブラウザ固有動作に該当） |
+| specialist_browser_compat.steps.ts | 2 | インフラ制約（HTTP:80/WAF）: Cloudflare設定レベル | 代替テスト未作成（Sprint-20実機検証済み） | 適合（理由記載あり。インフラ制約に該当） |
+
+### 詳細: S7.3不適合一覧
+
+全件適合。
 
 ### 詳細: 技術的負債（代替テスト未作成）
 
-なし。
+| ステップ | 分類 | 備考 |
+|---|---|---|
+| user_registration.steps.ts: Discord OAuth 4ステップ | ブラウザ固有動作 | E2Eテストで代替検証が可能だが未作成（前回から継続） |
+| specialist_browser_compat.steps.ts: HTTP:80 + WAF 2ステップ | インフラ制約 | Cloudflare設定で保証。自動テスト化は困難（前回から継続） |
 
 ## 2. テストピラミッド
 
-| 層 | ファイル数 | テスト数 | 前回比 | 判定 |
+| 層 | ファイル数 | シナリオ/テスト概数 | 前回比 | 判定 |
 |---|---|---|---|---|
-| 単体テスト (Vitest) | 72 | 1535 | +24 | OK |
-| BDDサービス層 (Cucumber) | 15 features | 277 scenarios (261 passed, 16 pending) | +/-0 | OK |
-| E2E (Playwright e2e) | 5 | 16 | +/-0 | OK |
-| APIテスト (Playwright api) | 2 | 29 | +/-0 | OK |
-| スモーク/ナビゲーション | 1 | 19 | +/-0 | OK |
+| 単体テスト (Vitest) | 57ファイル | 多数 | - | OK |
+| BDDサービス層 (Cucumber default) | 21 stepsファイル / 20 feature | 324シナリオ（ドラフト除外。name除外3件別途） | +47 | OK |
+| 統合テスト (Cucumber integration) | 1 feature | 3シナリオ | +/-0 | OK |
+| APIテスト (Playwright api) | 2ファイル | - | +/-0 | OK |
+| E2Eテスト (Playwright e2e) | 7ファイル | - | +/-0 | OK |
 
-### ピラミッドバランス判定
-
-```
-       [Smoke: 19]
-      [E2E: 16]
-     [API: 29]
-  [BDD: 277 scenarios]
- [Unit: 1535 tests]
-```
-
-正常なピラミッド形状。下層（単体 1535 + BDD 277）が厚く、上層（E2E 16 + Smoke 19）が薄い。逆ピラミッドの兆候なし。Sprint-80でVitest単体テストが24件増加し、下層がさらに強化された。
+**判定: 健全なピラミッド構造。** 下層（単体57 + BDD 21ステップ定義ファイル）が上層（API 2 + E2E 7）を大きく上回る。Sprint-96/97で BDD 12シナリオ + 単体テスト3ファイルが追加され、下層がさらに強化された。
 
 ### ドメインルール単体テストカバレッジ
 
-`src/lib/domain/rules/` に11ファイル。直接の単体テストは10ファイル（2箇所に分散）。
+`src/lib/domain/rules/` に11ファイル。直接の単体テストは10ファイル（`rules/__tests__/` に6件 + `src/__tests__/lib/domain/rules/` に4件）。
 
 | ルールファイル | 直接テスト | 状態 |
 |---|---|---|
@@ -76,9 +70,18 @@
 | grass-icon.ts | src/__tests__/.../grass-icon.test.ts | OK |
 | pagination-parser.ts | src/__tests__/.../pagination-parser.test.ts | OK |
 | url-detector.ts | src/__tests__/.../url-detector.test.ts | OK |
-| **mypage-display-rules.ts** | **なし** | MEDIUM（継続） |
+| **mypage-display-rules.ts** | **なし** | MEDIUM（前回から継続） |
 
 ## 3. Featureカバレッジ
+
+### Sprint-96/97対象feature
+
+| feature | 総シナリオ | 通常実行 | pending管理下 | 未定義 |
+|---|---|---|---|---|
+| command_aori.feature | 7 | 7 | 0 | 0 |
+| command_newspaper.feature | 5 | 5 | 0 | 0 |
+
+### プロジェクト全体
 
 | feature | 総シナリオ | 通常実行 | pending管理下 | 未定義 |
 |---|---|---|---|---|
@@ -92,98 +95,97 @@
 | bot_system.feature | 31 | 29 | 2 | 0 |
 | ai_accusation.feature | 9 | 9 | 0 | 0 |
 | user_registration.feature | 27 | 25 | 2 | 0 |
-| mypage.feature | 11 | 11 | 0 | 0 |
+| mypage.feature | 19 | 19 | 0 | 0 |
 | command_system.feature | 25 | 25 | 0 | 0 |
 | investigation.feature | 11 | 11 | 0 | 0 |
 | specialist_browser_compat.feature | 33 | 30 | 3 | 0 |
+| welcome.feature | 11 | 11 | 0 | 0 |
+| command_omikuji.feature | 4 | 4 | 0 | 0 |
+| command_iamsystem.feature | 7 | 7 | 0 | 0 |
+| command_aori.feature | 7 | 7 | 0 | 0 |
+| command_newspaper.feature | 5 | 5 | 0 | 0 |
+| dev_board.feature | 5 | - | - | - |
 | integration/crud.feature | 3 | 3 | 0 | 0 |
-| **合計** | **277** | **261** | **16** | **0** |
+| **合計(BDD対象)** | **319** | **303** | **16** | **0** |
 
-注: `features/ドラフト_実装禁止/image_upload.feature` (8シナリオ) は実装禁止ディレクトリのため対象外。
+注: `dev_board.feature`(5シナリオ)はcucumber.js pathsに含まれずBDDテスト対象外。UI中心の機能であり、`dev-post-service.test.ts`が単体テストでカバー。name除外3件（command_system 1件 + bot_system 2件）は別途管理。`features/ドラフト_実装禁止/` (23シナリオ)は対象外。
 
-未定義ステップ: **0件** (CRITICAL問題なし)
-
-前回から変化なし。Sprint-80はテスト修正のみであり、シナリオの追加・削除は発生していない。
+**未定義ステップ: 0件** (CRITICAL問題なし)
 
 ## 4. ステップ定義の実質性
 
 ### assert(true) / expect(true) スタブアサーション
 
-`features/step_definitions/` 全体を検索: **0件検出**。D-10 §7.3.2 準拠。
+`features/step_definitions/` 全体を検索: **0件検出**。D-10 S7.3.2 準拠。
 
-### Phase / 実装予定 コメント付きステップ
+### 定数ハードコード検証のみのステップ (MEDIUM)
 
-検出箇所:
-- `mypage.steps.ts` L649-662: 「Phase 2以降で使用予定」コメントあり
+以下の2ステップは、BDDシナリオが意図する振る舞い（実際の通貨残高変動）を検証せず、仕様定数のハードコード比較のみを行っている。
 
-**検証:** 該当ステップ（`Then "通知欄が表示される"`）は `assert(this.mypageResult !== null)` でmypageResultの存在を検証している。Phase 1では通知欄が「空の枠」として存在すればよいとの設計判断が明記されており、アサーションは現フェーズの要件に対して実質的。**スタブではない。**
+| ファイル | ステップ | 実装内容 | 問題 |
+|---|---|---|---|
+| command_aori.steps.ts L732-739 | `攻撃コスト {int} が消費される` | `assert.strictEqual(cost, 5)` のみ | 引数値の確認のみで実残高減少を未検証 |
+| command_aori.steps.ts L763-769 | `撃破報酬 {int} がユーザーに付与される` | `assert.strictEqual(reward, 10)` のみ | 引数値の確認のみで実残高増加を未検証 |
 
-## 5. Sprint-80修正ファイルの個別検証
+**影響度の評価:**
+- Whenステップ `"!attack >>7" を実行する` は `command_system.steps.ts` の共有ステップで PostService.createPost を実際に実行しており、通貨消費と報酬付与のロジック自体は動作している
+- 別シナリオ「自分で召喚したBOTを自分で撃破してもファーミングできない」が `通貨残高は 95 である` で一連の経済バランスを実残高ベースで検証済み
+- 単体テスト `attack-handler.test.ts` が撃破ロジックを個別検証済み
+- 以上により、テスト品質としては致命的ではないが、当該シナリオ単体での自己完結性が弱い
 
-Sprint-80で修正された3テストファイルの品質を検証した。
+### Phase / 実装予定コメント
 
-### e2e/api/auth-cookie.spec.ts
+検出箇所: `mypage.steps.ts` L613-625（「Phase 2以降で使用予定」）。`assert(this.mypageResult !== null)` で実質的な検証を行っており、**スタブではない**（前回から変化なし）。
 
-- **修正内容:** Max-Age期待値を `60*60*24*365`（365日）に修正（L431）
-- **アサーション品質:** 10テスト。Cookie属性（HttpOnly, SameSite=Lax, Path=/, Max-Age）のHTTPレベル検証、誤った認証コードの401応答、edge-tokenなしの400応答をカバー。正常系+異常系が適切にバランス
-- **トレーサビリティ:** ファイル冒頭JSDocに検証対象APIルートとD-10 §9.2への参照あり
-- **判定:** 問題なし
+## 5. テストの独立性とモック適切性
 
-### e2e/api/senbra-compat.spec.ts
+### テスト間の状態共有
 
-- **修正内容:** `cleanupDatabase` でDELETEのレスポンスステータスを検証するよう強化（L59-83）。非同期コミット漏れ対策
-- **アサーション品質:** 18テスト。Shift_JISエンコーディングのラウンドトリップ検証、DAT形式の5フィールド構成検証、bump順ソート、Range 206応答、bbs.cgi Shift_JIS POST等。専ブラ互換の核心部分を網羅
-- **トレーサビリティ:** ファイル冒頭JSDocに対応featureファイルとD-10 §9への参照あり
-- **判定:** 問題なし
+- `command_aori.steps.ts`: モジュールスコープの `lastAoriResult`（L69-71）がシナリオ間で共有される。各シナリオのWhenステップで上書きされるため実害なし
+- `command_newspaper.steps.ts`: `lastNewspaperResult`（L66-68）と `mockAiAdapter`（L63）をモジュールスコープで保持。`resetMockState()` を各シナリオの Given で明示的に呼んでおり、リセット対策済み
 
-### src/__tests__/lib/services/handlers/hissi-handler.test.ts
+**判定: 問題なし。**
 
-- **修正内容:** モック設定修正（`findByAuthorIdAndDate` のmock戻り値をDESC順に統一、`mockResolvedValueOnce` への変更）
-- **アサーション品質:** 15テスト。バリデーション5件（引数なし、レス不在、システムメッセージ、削除済み、authorId null）+ 正常系8件（0件/1件/3件/5件以上、フォーマット、dailyId、複数スレッド横断、時系列順）+ エラー時独立メッセージ非存在1件。エッジケース網羅が優秀
-- **トレーサビリティ:** ファイル冒頭JSDocに `investigation.feature` シナリオへの参照あり
-- **判定:** 問題なし
+### InMemoryモック適切性
 
-## 6. 前回監査との差分（TASK-224 -> TASK-231）
+両ステップ定義とも D-10 S2 に従いリポジトリ層をInMemory実装に差し替え。サービス間連携（PostService -> CommandService -> Handler）はモックせず結合テスト。`InMemoryGoogleAiAdapter` による AI API モック化は外部サービス依存の適切な分離。
+
+**判定: 適切。**
+
+## 6. 前回監査との差分（TASK-231 -> P5-TA-S97）
 
 | 前回指摘 | 今回の状態 |
 |---|---|
-| MEDIUM-1: mypage-display-rules.ts 直接単体テスト不足 | **継続** -- 7スプリント継続（Sprint-67初出）。間接カバーあり |
-| LOW-1: 代替テスト5ファイルに @feature/@scenario 注釈欠落 | **継続** -- See:形式でトレーサビリティ確保済み |
+| MEDIUM-1: mypage-display-rules.ts 直接単体テスト不足 | **継続** |
+| LOW-1: 代替テスト5ファイルに @feature/@scenario 注釈欠落 | **継続** |
 
-Sprint-80の修正で新規指摘は発生せず、既存指摘の悪化もなし。
+Sprint-96/97で新規MEDIUM指摘1件追加（定数ハードコード検証のみのステップ）。
 
 ## 7. レビューサマリー
 
 | 重要度 | 件数 | ステータス | 内容 |
 |---|---|---|---|
-| CRITICAL | 0 | pass | -- |
-| HIGH | 0 | pass | -- |
-| MEDIUM | 1 | info | mypage-display-rules.ts に直接単体テストなし（7スプリント継続、間接カバーあり） |
-| LOW | 1 | note | 代替テスト5ファイルで §7.3.3 の `@feature`/`@scenario` JSDocタグ未使用 |
+| CRITICAL | 0 | pass | - |
+| HIGH | 0 | pass | - |
+| MEDIUM | 2 | info | (1) 定数ハードコード検証ステップ2件（間接カバー済み） (2) mypage-display-rules.ts単体テスト欠落（継続） |
+| LOW | 1 | note | 代替テスト5ファイルでS7.3.3 @feature/@scenarioタグ未使用（継続） |
 
-### MEDIUM-1: mypage-display-rules.ts の直接単体テスト不足（継続）
+### MEDIUM-1（新規）: 攻撃コスト/撃破報酬ステップの定数比較のみ
 
-**対象:** `src/lib/domain/rules/mypage-display-rules.ts`
+**対象:** `features/step_definitions/command_aori.steps.ts` L732-739, L763-769
 
-**前回からの変化:** なし。Sprint-80の修正対象外。mypage-registration.test.ts がサービス層を経由して間接的にカバーしている状態が継続。
+**内容:** シナリオ「煽りBOTを !attack で撃破すると報酬を得る」において、`攻撃コスト 5 が消費される` と `撃破報酬 10 がユーザーに付与される` が引数値の定数比較のみで、実際の残高変動を検証していない。
 
-**推奨:** 次回の軽量タスクとして対応。推定作業量: 30分以内。
+**緩和要因:** 別シナリオ「自分で召喚したBOTを自分で撃破してもファーミングできない」が `通貨残高は 95 である` で合算残高を検証済み。単体テスト `attack-handler.test.ts` が個別ロジックを検証済み。
 
-### LOW-1: 代替テストの @feature/@scenario アノテーション（継続）
+**推奨:** 当該シナリオの末尾に `通貨残高は 105 である`（= 100 - 5 + 10）の検証を追加する。または既存の2ステップを実残高ベースのアサーションに改修する。
 
-**対象:** `AnchorPopupContext.test.tsx`, `AnchorPopup.test.tsx`, `AnchorLink.test.tsx`, `PostFormInsertText.test.tsx`, `PostItem.test.tsx`
+### MEDIUM-2（継続）: mypage-display-rules.ts の直接単体テスト欠落
 
-**状態:** `BDDシナリオ: @anchor_popup` + `See: features/thread.feature` 形式でトレーサビリティ確保済み。D-10 §7.3.3 が例示するJSDocタグ (`@feature`, `@scenario`) は未使用だが、実質的に同等の情報が記載されている。
+前回から変化なし。間接カバーあり。
 
 ---
 
 **判定: APPROVE**
 
-Sprint-80差し戻し修正後も前回判定を維持。
-
-- CRITICAL/HIGH: 0件
-- Sprint-80修正の3ファイル: 全てアサーション品質・トレーサビリティに問題なし
-- テストピラミッド: 単体テスト +24件で下層強化。バランス健全
-- pendingシナリオ: 16件、全てD-10 §7.3適合。変化なし
-- Featureカバレッジ: 277シナリオ中261通常実行、16pending管理下、0未定義
-- スタブアサーション: 0件
+CRITICAL / HIGH の問題は検出されなかった。Sprint-96/97で追加された !aori 7シナリオ + !newspaper 5シナリオは全て通常実行ステップで実装済み、pendingなし、未定義ステップなし、スタブアサーションなし。テストピラミッドも健全。

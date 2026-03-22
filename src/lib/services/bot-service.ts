@@ -1124,6 +1124,20 @@ export class BotService {
 					`BotService.processAoriCommands: pending=${pending.id} failed`,
 					err,
 				);
+
+				// pending 削除（エラー時も削除して無限リトライを防ぐ）
+				// See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+				try {
+					await this.pendingAsyncCommandRepository!.deletePendingAsyncCommand(
+						pending.id,
+					);
+				} catch (deleteErr) {
+					console.error(
+						`BotService.processAoriCommands: pending削除失敗 id=${pending.id}`,
+						deleteErr,
+					);
+				}
+
 				results.push({
 					pendingId: pending.id,
 					success: false,

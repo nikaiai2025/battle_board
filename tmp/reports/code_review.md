@@ -1,183 +1,186 @@
-# コードレビュー: specialist_browser_compat.feature 配置変更と参照リンク書き換え
+# Code Review Report: Sprint-96 (!aori) + Sprint-97 (!newspaper)
 
-レビュー日: 2026-03-22
-レビュー対象: specialist_browser_compat.feature の旧パス(`features/constraints/`)から新パス(`features/`)への移動に伴う参照書き換え
-
-## レビュー方法
-
-git statusがcleanのため、現在のコードベース全体に対して以下を確認した:
-1. featureファイルの実際の配置場所
-2. cucumber.js の paths/require 設定が新パスを正しく参照しているか
-3. ソースコード・テストファイル内の See参照コメントが新パスに更新されているか
-4. 旧パス(`features/constraints/`, `features/phase1/`, `features/phase2/`)の残存箇所
-5. コメント以外のコードロジック（import文、ファイルパス参照、assertion等）に意図しない変更がないか
+> Reviewer: bdd-code-reviewer
+> Task: P5-CR-S97
+> Date: 2026-03-22
+> Scope: Sprint-96 (!aori) 7 files + Sprint-97 (!newspaper) 7 files + 共通変更 3 files
 
 ---
 
-## カテゴリ1: 問題なし
+## 指摘事項
 
-### 1-1. featureファイルの配置
+### [HIGH-1] processAoriCommands のエラー時に pending が削除されない（無限リトライのリスク）
 
-- `features/specialist_browser_compat.feature` に存在（旧: `features/constraints/specialist_browser_compat.feature`）
-- 全20 feature ファイルがフラット構成（`features/*.feature` + `features/integration/crud.feature`）に統一済み
+ファイル: `src/lib/services/bot-service.ts` (行 1120-1132)
 
-### 1-2. cucumber.js の設定
+問題点: `processAoriCommands()` の catch ブロックでは `console.error` とエラー結果の追加のみを行い、`pending_async_commands` レコードの削除を行っていない。同じ Cron 呼び出しパターンを採用する `newspaper-service.ts` の `processNewspaperCommands()` では、エラー時にも pending 削除を明示的に行って無限リトライを防止している（行 189-198）。この不整合により、aori pending でエラーが発生した場合、毎回の Cron 実行で同一レコードの処理が繰り返し試行される。
 
-| 確認項目 | 結果 |
-|---|---|
-| default.paths | `"features/specialist_browser_compat.feature"` -- 新パスで正しい |
-| default.require | `"features/step_definitions/specialist_browser_compat.steps.ts"` -- 変更なし、正しい |
-| integration.paths | specialist_browser_compat は含まれない（元から除外） -- 影響なし |
-| name フィルタ | 変更なし -- 影響なし |
-
-### 1-3. ステップ定義 (specialist_browser_compat.steps.ts)
-
-- import文: `@cucumber/cucumber`, `../../src/lib/domain/models/post` 等 -- パス変更による影響なし
-- See参照: `features/specialist_browser_compat.feature` -- 新パスに更新済み
-- テストロジック: コメント変更のみであり、Given/When/Then のステップ実装に変更なし
-
-### 1-4. next.config.ts
-
-- See参照: `features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される` -- 新パス
-- コード: rewrites設定に変更なし。DATファイルリライトとkako形式リライトの設定値はそのまま
-
-### 1-5. src/app/(senbra)/test/bbs.cgi/route.ts (40行変更)
-
-- 全20箇所のSee参照が `features/specialist_browser_compat.feature` の新パスで統一
-- import文: 変更なし（`@/lib/` パスエイリアス使用、feature パスに依存しない）
-- コードロジック: POST handler, handleCreateThread, handleCreatePost, setEdgeTokenCookie 等の全関数ロジックに変更なし
-
-### 1-6. e2e/api/senbra-compat.spec.ts
-
-- See参照: `features/specialist_browser_compat.feature` -- 新パス
-- テストロジック: Playwright APIテストのassert/expect等に変更なし
-
-### 1-7. src/lib/infrastructure/encoding/shift-jis.ts
-
-- See参照: 7箇所すべて `features/specialist_browser_compat.feature` の新パス
-- コードロジック: decodeHtmlNumericReferences, ShiftJisEncoder.encode/decode/decodeFormData 等に変更なし
-
-### 1-8. src/lib/infrastructure/encoding/__tests__/shift-jis.test.ts
-
-- See参照: 冒頭の5シナリオ参照が新パス
-- テストロジック: describe/it ブロックの assertion に変更なし
-
-### 1-9. src/lib/services/auth-service.ts
-
-- See参照: 4箇所（authentication.feature参照含む）-- 新パス
-- コードロジック: VerifyResult型、reduceIp、expandIpv6 等に変更なし
-
-### 1-10. src/lib/constants/cookie-names.ts
-
-- See参照: `features/specialist_browser_compat.feature` -- 新パス
-- コードロジック: 定数定義 `EDGE_TOKEN_COOKIE`, `ADMIN_SESSION_COOKIE` に変更なし
-
-### 1-11. src/lib/infrastructure/repositories/auth-code-repository.ts
-
-- See参照: `features/specialist_browser_compat.feature @専ブラ認証フロー` -- 新パス
-- コードロジック: AuthCode interface、CRUD操作に変更なし
-
-### 1-12. その他ソースファイル (senbra配下のroute.ts群、adapter群、テスト群)
-
-以下のファイル群はSee参照コメントの更新のみであり、import文・コードロジック・assertion に変更なし:
-- `src/app/(senbra)/[boardId]/subject.txt/route.ts`
-- `src/app/(senbra)/[boardId]/dat/[threadKey]/route.ts`
-- `src/app/(senbra)/[boardId]/SETTING.TXT/route.ts`
-- `src/app/(senbra)/[boardId]/kako/[...path]/route.ts`
-- `src/app/(senbra)/test/read.cgi/[boardId]/[key]/route.ts`
-- `src/app/(senbra)/layout.tsx`
-- `src/app/(senbra)/bbsmenu.json/route.ts`
-- `src/app/(senbra)/bbsmenu.html/route.ts`
-- `src/app/(web)/auth/verify/page.tsx`
-- `src/app/api/auth/auth-code/route.ts`
-- `src/lib/infrastructure/adapters/*.ts` (4ファイル)
-- `src/lib/infrastructure/adapters/__tests__/*.test.ts` (4ファイル)
-- `src/__tests__/app/(senbra)/**/*.test.ts` (3ファイル)
-- `src/lib/services/__tests__/auth-service.test.ts`
-- `src/app/(senbra)/__tests__/route-handlers.test.ts`
-- `src/app/(web)/auth/verify/__tests__/verify-page-logic.test.ts`
-- `src/__tests__/app/(senbra)/test/bbs.cgi/pat-integration.test.ts`
-- `features/step_definitions/thread.steps.ts`
-- `features/step_definitions/authentication.steps.ts`
-- `features/support/in-memory/auth-code-repository.ts`
-- `features/user_registration.feature`
-- `e2e/flows/basic-flow.spec.ts`
-
----
-
-## カテゴリ2: 要確認（旧パス残存箇所）
-
-以下のファイルに旧ディレクトリ構成（`features/constraints/`, `features/phase1/`, `features/phase2/`）への参照が残存している。
-
-### [LOW] L-01: .claude/rules/Source_Layout.md に旧ディレクトリ構成が残存
-
-ファイル: `.claude/rules/Source_Layout.md` 57-71行
-
-```
-features/
-  phase1/
-    thread.feature
-    ...
-  phase2/
-    command_system.feature
-    ...
-  constraints/
-    specialist_browser_compat.feature
-```
-
-問題点: AIエージェントがこのファイルを参照してfeatureファイルのパスを推定した場合、存在しない旧パスを指定してしまう可能性がある。実際のディレクトリ構成はフラット（`features/*.feature`）に統一済み。
-
-修正案: Source_Layout.mdのfeatures配下のディレクトリ構成を実態に合わせて更新する。
-
-### [LOW] L-02: src/__tests__/lib/infrastructure/repositories/admin-user-repository.test.ts に旧パス参照
-
-ファイル: `src/__tests__/lib/infrastructure/repositories/admin-user-repository.test.ts` 4-10行, 143行, 255行
+修正案: newspaper-service.ts と同様のパターンで、catch ブロック内で pending 削除を行う。
 
 ```typescript
-// * @feature features/phase1/authentication.feature
-// * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
-// * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
-// * See: features/phase1/admin.feature @管理者がログイン済みである
+// 現状（bot-service.ts L1120-1132）:
+} catch (err) {
+    const errorMessage =
+        err instanceof Error ? err.message : "Unknown error";
+    console.error(
+        `BotService.processAoriCommands: pending=${pending.id} failed`,
+        err,
+    );
+    results.push({
+        pendingId: pending.id,
+        success: false,
+        error: errorMessage,
+    });
+}
+
+// 修正案:
+} catch (err) {
+    const errorMessage =
+        err instanceof Error ? err.message : "Unknown error";
+    console.error(
+        `BotService.processAoriCommands: pending=${pending.id} failed`,
+        err,
+    );
+    // エラー時も pending を削除して無限リトライを防止する
+    try {
+        await this.pendingAsyncCommandRepository.deletePendingAsyncCommand(
+            pending.id,
+        );
+    } catch (deleteErr) {
+        console.error(
+            `BotService.processAoriCommands: pending削除失敗 id=${pending.id}`,
+            deleteErr,
+        );
+    }
+    results.push({
+        pendingId: pending.id,
+        success: false,
+        error: errorMessage,
+    });
+}
 ```
 
-問題点: コメントのみだがSee参照として旧パスが6箇所残存。今回の書き換え対象から漏れている。実際のパスは `features/authentication.feature`, `features/admin.feature`。
+---
 
-修正案: See参照を `features/authentication.feature`, `features/admin.feature` に更新する。
+### [HIGH-2] GEMINI_API_KEY 未設定時に空文字列で GoogleAiAdapter を初期化している
 
-### [LOW] L-03: .claude/settings.json に旧パス参照
+ファイル: `src/app/api/internal/newspaper/process/route.ts` (行 44-45)
 
-ファイル: `.claude/settings.json` 12行
+問題点: `process.env.GEMINI_API_KEY ?? ""` で API キーが未設定の場合に空文字列をフォールバックとして渡している。これにより API キー未設定時にも処理が進み、Gemini API 呼び出しが曖昧な認証エラーで失敗する。失敗の原因が環境変数設定漏れであることが分かりにくい。API キーの未設定は運用ミスであり、明示的に早期検出してエラーメッセージを返すべきである。
 
-```json
-"Bash(for f in features/phase1/*.feature)",
+修正案: API キーが未設定の場合は処理に入る前にエラーを返す。
+
+```typescript
+const geminiApiKey = process.env.GEMINI_API_KEY;
+if (!geminiApiKey) {
+    console.error("[POST /api/internal/newspaper/process] GEMINI_API_KEY is not configured");
+    return NextResponse.json(
+        { error: "CONFIGURATION_ERROR", message: "GEMINI_API_KEY is not configured" },
+        { status: 500 },
+    );
+}
+const googleAiAdapter = new GoogleAiAdapter(geminiApiKey);
 ```
 
-問題点: permissions の allow リストに旧パス `features/phase1/*.feature` が残存。現在この glob に一致するファイルは存在しないため、このパーミッションは実質的に無効。直接的な実害はないが、メンテナンス上不整合。
+---
 
-### [LOW] L-04: supabase/migrations/00005_auth_verification.sql に旧パス参照
+### [MEDIUM-1] newspaper-service.ts のコマンドコスト 10 がハードコードされている
 
-ファイル: `supabase/migrations/00005_auth_verification.sql` 11-12行
+ファイル: `src/lib/services/newspaper-service.ts` (行 158)
 
-```sql
---   features/phase1/authentication.feature
---   features/constraints/specialist_browser_compat.feature
+問題点: `const commandCost = 10;` がハードコードされている。`commands.yaml` の `newspaper.cost: 10` と二重管理になっており、コスト変更時に不整合が生じるリスクがある。コメントで `// commands.yaml の newspaper.cost` と注釈があるが、コード上の同期保証はない。
+
+修正案: DI パラメータとして `INewspaperServiceDeps` に `commandCost: number` を追加し、route.ts から commands.yaml の設定値を注入する。
+
+---
+
+### [MEDIUM-2] _isRetryable のエラー判定がエラーメッセージの文字列マッチに依存している
+
+ファイル: `src/lib/infrastructure/adapters/google-ai-adapter.ts` (行 142-158)
+
+問題点: `_isRetryable` メソッドが `err.message.toLowerCase()` に対して `"429"`, `"500"`, `"503"` 等の文字列を `includes()` で検索している。`@google/genai` ライブラリのエラーメッセージフォーマットが変更された場合にリトライ判定が機能しなくなるリスクがある。また、エラーメッセージに偶然 `"500"` を含む文字列で誤判定するリスクもある。
+
+修正案: `@google/genai` のエラー型が `status` や `httpStatusCode` プロパティを提供している場合、それを優先的に参照する。文字列マッチは最終手段にとどめる。ライブラリのエラー型仕様が限定的な場合、現アプローチは許容範囲であるが、改善時に見直すこと。
+
+---
+
+### [MEDIUM-3] findByCommandType で取得件数に制限がない
+
+ファイル: `src/lib/infrastructure/repositories/pending-async-command-repository.ts` (行 96-110)
+
+問題点: `findByCommandType()` は `command_type` に一致する全レコードを取得する（`LIMIT` なし）。newspaper-service 側では `MAX_PROCESS_PER_EXECUTION = 1` で処理件数を制限しているが、aori 側の `processAoriCommands` にはそのような制限がない。pending が大量に蓄積した場合（例: 障害後のリカバリ時）、全件取得によりメモリ消費やタイムアウトの問題が発生しうる。
+
+修正案: `findByCommandType` に `limit` パラメータを追加し、呼び出し元で処理可能な件数を指定できるようにする。
+
+```typescript
+export async function findByCommandType(
+    commandType: string,
+    limit?: number,
+): Promise<PendingAsyncCommand[]> {
+    let query = supabaseAdmin
+        .from("pending_async_commands")
+        .select("*")
+        .eq("command_type", commandType)
+        .order("created_at", { ascending: true });
+    if (limit) {
+        query = query.limit(limit);
+    }
+    // ...
+}
 ```
 
-問題点: SQLマイグレーションファイルのコメント内に旧パスが残存。マイグレーションファイルはイミュータブルな性質上、既存マイグレーションの修正は推奨されない。
+---
 
-修正案: マイグレーションファイルの修正は不要（既に適用済みのマイグレーションの変更はリスクがある）。認識のみで可。
+### [MEDIUM-4] e2e ベーシックフローテストが !aori / !newspaper に未対応
 
-### [LOW] L-05: docs/ 配下の旧ドキュメントに旧パス参照
+ファイル: `e2e/flows/basic-flow.spec.ts`
 
-以下のドキュメントに旧パスが残存:
-- `docs/operations/incidents/chmate_debug_report_2026-03-14.md` (1箇所)
-- `docs/research/battleboard_eddist_adoption_report_2026-03-04.md` (1箇所)
+問題点: `.claude/rules/command-handler.md` のチェックリストに基づき、新規コマンドハンドラには `e2e/flows/basic-flow.spec.ts` のテストケースが必要である。Sprint-97 のエスカレーション（ESC-TASK-272-1）で「Phase 5 で対応」として記録されているが、テストケースの追加は未実施である。
 
-問題点: 過去の障害報告書・調査レポートであり、当時の状況を記録した文書。内容の正確性としては当時のパスが正しいため、更新は任意。
+修正案: 別タスクとして `e2e/flows/basic-flow.spec.ts` に `!aori` と `!newspaper` のベーシックフローテストケースを追加する。
 
-### 参考: tmp/ 配下の旧パス残存（対応不要）
+---
 
-`tmp/` 配下（タスク指示書、スプリント計画、エスカレーション、レポート等）に約50ファイルの旧パス参照が残存するが、これらは過去のタスク記録であり、更新の対象外とする。
+### [LOW-1] IAoriPendingRepository と INewspaperPendingRepository が同一シグネチャで重複定義されている
+
+ファイル:
+- `src/lib/services/handlers/aori-handler.ts` (行 29-37)
+- `src/lib/services/handlers/newspaper-handler.ts` (行 32-40)
+
+問題点: 両インターフェースは `create()` メソッドの型が完全に同一である。DRY 原則に基づけば、共通のインターフェースとして1箇所で定義すべきである。ただし、将来的にハンドラごとに必要なメソッドが分岐する可能性があるため、現時点での分離は許容範囲である。
+
+修正案: 共通の `create` シグネチャを1箇所で定義し、各ハンドラからインポートする。優先度は低い。
+
+---
+
+## 評価対象外（問題なしと判断した項目）
+
+### セキュリティ
+
+- **GEMINI_API_KEY**: サーバーサイド（`src/app/api/internal/`）でのみ `process.env.GEMINI_API_KEY` を参照。`NEXT_PUBLIC_` プレフィックスは使用されておらず、クライアントへの漏洩リスクなし。
+- **認証**: newspaper process エンドポイントは `verifyInternalApiKey()` で Bearer 認証を実施。bot execute エンドポイントと同一のセキュリティレベル。
+- **RLS**: `00023_pending_async_commands.sql` で anon / authenticated のアクセスを deny し、service_role のみ許可。適切な権限設計。
+- **プロンプトインジェクション**: newspaper コマンドはシステムがハードコードしたプロンプトのみを使用し、ユーザー入力は LLM に渡されない（feature ファイルの注記と整合）。
+
+### アーキテクチャ準拠
+
+- **配置**: ハンドラは `services/handlers/`、リポジトリは `infrastructure/repositories/`、アダプタは `infrastructure/adapters/`、設定は `config/`。Source_Layout.md 準拠。
+- **依存方向**: ハンドラ -> リポジトリの DI パターンで逆依存なし。newspaper-service.ts は IGoogleAiAdapter インターフェースを参照し、具象クラスには直接依存しない。
+- **DI/テスタビリティ**: AoriHandler, NewspaperHandler, processNewspaperCommands いずれも DI パラメータで外部依存を受け取り、テスト時にモック注入可能。InMemory 実装も提供済み。
+
+### コード品質
+
+- **commands.yaml / commands.ts の同期**: aori, newspaper の設定が両ファイルで一致。
+- **bulkReviveEliminated の除外条件**: `bot_profile_key.not.in.(tutorial,aori)` で煽り BOT を日次リセットから適切に除外。feature シナリオと整合。
+- **煽り文句セット**: 100 件が宣言どおり存在。readonly 配列で不変性を確保。
+- **newspaper-categories.ts**: feature の 7 カテゴリと完全一致。`as const` で型安全。
+- **リトライロジック**: 指数バックオフ（1s, 2s, 4s）、最大3回。設計書の仕様と一致。
+- **エラーハンドリング（newspaper-service.ts）**: AI API 失敗時の通貨返却、エラー通知投稿、pending 削除のフローが feature シナリオと整合。各ステップに個別 try-catch で防御。
+
+### ユビキタス言語
+
+- 「レス」「書き込み」「スレッド」「システムメッセージ」「通貨」等の用語が辞書 (D-02) と一致。
+- 「★システム」名義は D-02「独立システムレス」の定義に準拠。
 
 ---
 
@@ -186,14 +189,11 @@ features/
 | 重要度   | 件数  | ステータス |
 |----------|-------|-----------|
 | CRITICAL | 0     | pass      |
-| HIGH     | 0     | pass      |
-| MEDIUM   | 0     | pass      |
-| LOW      | 5     | note      |
+| HIGH     | 2     | warn      |
+| MEDIUM   | 4     | info      |
+| LOW      | 1     | note      |
 
-判定: **APPROVE**
+判定: **WARNING** -- マージ済みコードに対し、以下2件の HIGH を次スプリントで修正することを推奨する。
 
-59ファイルの変更は全てSee参照コメントの書き換えのみであり、**コードロジック（import文、関数実装、assertion、設定値、ルーティング）に意図しない変更は検出されなかった**。
-
-cucumber.js のpaths/require設定は正しく新パスを指しており、BDDテスト・単体テスト・e2eテストの実行に影響はない。
-
-LOW 5件は旧パスの残存であり、L-01（Source_Layout.md）と L-02（admin-user-repository.test.ts）は今回の書き換えから漏れた箇所として別途対応を推奨する。L-03〜L-05は実害なく、対応は任意。
+1. **HIGH-1**: processAoriCommands のエラー時 pending 未削除 -- 無限リトライにより Cron 処理のリソースが消費され続ける実害がある。
+2. **HIGH-2**: GEMINI_API_KEY 未設定時のサイレントフォールバック -- 運用時のトラブルシュート性を大きく損なう。

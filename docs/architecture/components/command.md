@@ -56,7 +56,7 @@ PostServiceはこの結果をもとに、必要であればシステムメッセ
 commands:
   tell:
     description: "指定レスをAIだと告発する"
-    cost: 50
+    cost: 10
     targetFormat: ">>postNumber"
     responseType: inline
     enabled: true
@@ -91,7 +91,7 @@ commands:
 | targetFormat | string \| null | 必要な引数の形式（null = 引数なし） |
 | responseType | "inline" \| "independent" | 結果の表示方式。inline=レス内マージ（方式A）、independent=独立システムレス（方式B）。エラー時は responseType に関わらず常にレス内マージ |
 | enabled | boolean | falseにするとコマンド無効化（存在しないコマンドと同等の扱い） |
-| stealth | boolean | trueの場合、コマンド文字列が本文から除去される（Phase 2ではすべてfalse） |
+| stealth | boolean | trueの場合、コマンド文字列が本文から除去される（詳細は§5 ステルスコマンドの設計原則を参照） |
 
 #### ロジック層: CommandHandler
 
