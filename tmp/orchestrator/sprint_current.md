@@ -4,7 +4,21 @@
 
 ## 現在のフェーズ
 
-**Sprint-101 完了 — !livingbotコマンド + ラストボットボーナス実装**
+**Sprint-103 完了 — countLivingBots型不整合修正 + 固定案内板リンクCF/Vercel併記**
+
+### Sprint-103の成果
+- TASK-280: countLivingBots ネストselect型不整合修正（PostgREST many-to-one が単一オブジェクトを返す問題）
+- 修正: 1ネストクエリ→2クエリ分離 + Array.isArray()安全ハンドリング
+- dev/page.tsx: marqueeタグをCSS animation化 + jsx-deprecated.d.ts削除
+- 固定案内板リンク: CFメイン・Vercelサブで併記（upsert-pinned-thread.ts）
+- コミット: 0a0962d, f5ff278
+- 本番スモーク: 30/35 PASS（5件は設計上のスキップ）
+
+### Sprint-102の成果
+- TASK-279: countLivingBots N+1クエリ最適化（1+3Nクエリ→ネストselect 1クエリ）
+- CF Workers サブリクエスト上限エラー（500）の根本原因修正
+- コミット: a880754
+- ※ ネストselect型不整合で「無反応」発生 → Sprint-103で修正
 
 ### Sprint-101の成果
 - TASK-277: 設計（bdd-architect, Opus）— 生存BOTカウント2区分SQL + daily_eventsテーブル + AttackHandler統合
@@ -257,6 +271,8 @@ GEMINI_API_KEY の **GH Secrets** 設定が必要（人間タスク。Sprint-100
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-103 | countLivingBots型不整合修正 + 固定案内板リンクCF/Vercel併記 | completed | `tmp/orchestrator/sprint_103_plan.md` |
+| Sprint-102 | countLivingBots N+1クエリ最適化（CF Workers サブリクエスト上限回避） | completed | `tmp/orchestrator/sprint_102_plan.md` |
 | Sprint-101 | !livingbotコマンド + ラストボットボーナス実装 | completed | `tmp/orchestrator/sprint_101_plan.md` |
 | Sprint-100 | newspaper非同期処理GH Actions移行 | completed | `tmp/orchestrator/sprint_100_plan.md` |
 | Sprint-99 | ステルスコマンド本文除去バグ修正 | completed | `tmp/orchestrator/sprint_99_plan.md` |

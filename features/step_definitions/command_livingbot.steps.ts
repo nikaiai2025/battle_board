@@ -64,6 +64,15 @@ const {
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-livingbot";
 const TEST_BOARD_ID = "battleboard";
 
+/**
+ * スレッド内BOT総数（撃破済み含む）の一時保持。
+ * 「当該スレッドにN体のBOTが書き込んでいる」ステップで設定し、
+ * 「そのうちN体は撃破済みである」ステップで撃破分を差し引く。
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.7
+ */
+// biome-ignore lint: mutable state for cross-step communication
+let _threadBotTotalCount = 0;
+
 // ---------------------------------------------------------------------------
 // ヘルパー関数
 // ---------------------------------------------------------------------------
@@ -287,6 +296,71 @@ Given("全てのBOTが撃破済みである", async function (this: BattleBoardW
 });
 
 // ===========================================================================
+// !livingbot — Given ステップ（スレッド内カウント v2追加）
+// ===========================================================================
+
+/**
+ * 当該スレッドにN体の生存BOTが書き込んでいる。
+ * _setLivingBotInThreadCount で静的値を設定する。
+ *
+ * See: features/command_livingbot.feature @掲示板全体とスレッド内の生存BOT数がマージ表示される
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.7
+ */
+Given(
+	"当該スレッドに{int}体の生存BOTが書き込んでいる",
+	async function (this: BattleBoardWorld, count: number) {
+		InMemoryBotRepo._setLivingBotInThreadCount(count);
+	},
+);
+
+/**
+ * 当該スレッドにはBOTの書き込みがない。
+ * _setLivingBotInThreadCount(0) を設定する。
+ *
+ * See: features/command_livingbot.feature @スレッド内にBOTの書き込みがない場合は0体と表示される
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.7
+ */
+Given(
+	"当該スレッドにはBOTの書き込みがない",
+	async function (this: BattleBoardWorld) {
+		InMemoryBotRepo._setLivingBotInThreadCount(0);
+	},
+);
+
+/**
+ * 当該スレッドにN体のBOTが書き込んでいる（撃破済み含む）。
+ * World に仮カウントを保持し、後続の「そのうちN体は撃破済みである」ステップで
+ * 実際のオーバーライド値を計算する。
+ *
+ * See: features/command_livingbot.feature @撃破済みBOTはスレッド内カウントにも含まれない
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.7
+ */
+Given(
+	"当該スレッドに{int}体のBOTが書き込んでいる",
+	async function (this: BattleBoardWorld, count: number) {
+		// 仮カウントをモジュール変数に保持（後続ステップで撃破分を差し引く）
+		_threadBotTotalCount = count;
+		InMemoryBotRepo._setLivingBotInThreadCount(count);
+	},
+);
+
+/**
+ * そのうちN体は撃破済みである。
+ * World に保持した仮カウントから撃破分を差し引いて _setLivingBotInThreadCount を更新する。
+ *
+ * See: features/command_livingbot.feature @撃破済みBOTはスレッド内カウントにも含まれない
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.7
+ */
+Given(
+	"そのうち{int}体は撃破済みである",
+	async function (this: BattleBoardWorld, eliminatedCount: number) {
+		const total = _threadBotTotalCount;
+		const living = total - eliminatedCount;
+		InMemoryBotRepo._setLivingBotInThreadCount(living);
+	},
+);
+
+// ===========================================================================
 // !livingbot — When ステップ
 // ===========================================================================
 
@@ -479,22 +553,30 @@ Then(
 );
 
 /**
- * 両方のレスに同じ生存BOT数が表示される。
+ * 両方のレスに同じ掲示板全体の生存BOT数が表示される。
+ * v2: 掲示板全体部分のみを比較する（スレッド内カウントはスレッドにより異なるため）。
  *
- * See: features/command_livingbot.feature @どのスレッドから実行しても同じ結果が返る
+ * See: features/command_livingbot.feature @掲示板全体のカウントはどのスレッドから実行しても同じ結果になる
  */
 Then(
-	"両方のレスに同じ生存BOT数が表示される",
+	"両方のレスに同じ掲示板全体の生存BOT数が表示される",
 	async function (this: BattleBoardWorld) {
 		assert.strictEqual(
 			this.livingBotResults.length,
 			2,
 			`2つの結果を期待しましたが ${this.livingBotResults.length} 件でした`,
 		);
+		// v2フォーマットから「掲示板全体: N体」部分を抽出して比較
+		const extractBoardCount = (msg: string): string => {
+			const match = msg.match(/掲示板全体: \d+体/);
+			return match ? match[0] : msg;
+		};
+		const boardCountA = extractBoardCount(this.livingBotResults[0]);
+		const boardCountB = extractBoardCount(this.livingBotResults[1]);
 		assert.strictEqual(
-			this.livingBotResults[0],
-			this.livingBotResults[1],
-			`スレッドAの結果: "${this.livingBotResults[0]}" とスレッドBの結果: "${this.livingBotResults[1]}" が一致しません`,
+			boardCountA,
+			boardCountB,
+			`スレッドAの掲示板全体: "${boardCountA}" とスレッドBの掲示板全体: "${boardCountB}" が一致しません`,
 		);
 	},
 );

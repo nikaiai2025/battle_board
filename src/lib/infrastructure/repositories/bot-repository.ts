@@ -641,6 +641,76 @@ export async function countLivingBots(): Promise<number> {
 }
 
 /**
+ * スレッド内の生存BOT数をカウントする。
+ *
+ * 当該スレッドに1件以上の書き込み（bot_posts経由）を持ち、
+ * かつ is_active=true のBOTの数（DISTINCT bot_id）。
+ *
+ * 3クエリ構成:
+ *   1. posts テーブルから当該スレッドの post_id 一覧を取得
+ *   2. bot_posts テーブルから該当 post_id の bot_id を取得（DISTINCT）
+ *   3. bots テーブルで is_active=true のBOTをカウント
+ *
+ * See: features/command_livingbot.feature @スレッド内にBOTの書き込みがない場合は0体と表示される
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.3
+ *
+ * @param threadId スレッドID
+ * @returns スレッド内の生存BOT数
+ */
+export async function countLivingBotsInThread(
+	threadId: string,
+): Promise<number> {
+	// Step 1: 当該スレッドの post_id 一覧を取得
+	const { data: posts, error: postsError } = await supabaseAdmin
+		.from("posts")
+		.select("id")
+		.eq("thread_id", threadId);
+
+	if (postsError) {
+		throw new Error(
+			`BotRepository.countLivingBotsInThread (posts) failed: ${postsError.message}`,
+		);
+	}
+
+	const postIds = (posts ?? []).map((p: { id: string }) => p.id);
+	// 空配列で .in() を呼ぶと PostgREST エラーになるため早期リターン
+	if (postIds.length === 0) return 0;
+
+	// Step 2: bot_posts から該当 post_id の bot_id を取得（DISTINCT）
+	const { data: botPosts, error: bpError } = await supabaseAdmin
+		.from("bot_posts")
+		.select("bot_id")
+		.in("post_id", postIds);
+
+	if (bpError) {
+		throw new Error(
+			`BotRepository.countLivingBotsInThread (bot_posts) failed: ${bpError.message}`,
+		);
+	}
+
+	const uniqueBotIds = [
+		...new Set((botPosts ?? []).map((bp: { bot_id: string }) => bp.bot_id)),
+	];
+	// 空配列で .in() を呼ぶと PostgREST エラーになるため早期リターン
+	if (uniqueBotIds.length === 0) return 0;
+
+	// Step 3: is_active=true のBOTをカウント
+	const { count, error: countError } = await supabaseAdmin
+		.from("bots")
+		.select("*", { count: "exact", head: true })
+		.in("id", uniqueBotIds)
+		.eq("is_active", true);
+
+	if (countError) {
+		throw new Error(
+			`BotRepository.countLivingBotsInThread (bots) failed: ${countError.message}`,
+		);
+	}
+
+	return count ?? 0;
+}
+
+/**
  * 撃破済みチュートリアルBOT および古い未撃破チュートリアルBOTを削除する。
  * daily-maintenance（performDailyReset 末尾）で呼び出す。
  *

@@ -26,6 +26,14 @@ const store: Bot[] = [];
 let _livingBotCountOverride: number | null = null;
 
 /**
+ * スレッド内生存BOTカウントの静的オーバーライド値。
+ * null の場合はデフォルト 0 を返す（InMemoryではbot_posts→postsのJOINを省略）。
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.6
+ */
+// biome-ignore lint: mutable override variable for BDD test control
+let _livingBotInThreadCountOverride: number | null = null;
+
+/**
  * 生存BOTカウントを静的値でオーバーライドする。
  * InMemoryストアだけでは表現しにくいシナリオで使用する。
  *
@@ -43,11 +51,31 @@ export function _clearLivingBotCountOverride(): void {
 }
 
 /**
+ * スレッド内の生存BOTカウントを静的値でオーバーライドする。
+ * InMemoryではbot_posts→postsのJOINを省略しており、
+ * BDDテストの目的は「ハンドラが正しいカウントをフォーマットして返すこと」の検証。
+ *
+ * See: features/command_livingbot.feature @スレッド内にBOTの書き込みがない場合は0体と表示される
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.6
+ */
+export function _setLivingBotInThreadCount(count: number): void {
+	_livingBotInThreadCountOverride = count;
+}
+
+/**
+ * スレッド内生存BOTカウントのオーバーライドをクリアする。
+ */
+export function _clearLivingBotInThreadCountOverride(): void {
+	_livingBotInThreadCountOverride = null;
+}
+
+/**
  * ストアを初期化する（Beforeフックから呼び出す）。
  */
 export function reset(): void {
 	store.length = 0;
 	_livingBotCountOverride = null;
+	_livingBotInThreadCountOverride = null;
 }
 
 /**
@@ -358,6 +386,30 @@ export async function countLivingBots(): Promise<number> {
 		return _livingBotCountOverride;
 	}
 	return store.filter((b) => b.isActive).length;
+}
+
+/**
+ * スレッド内の生存BOT数をカウントする。
+ *
+ * 2つの動作モード:
+ * - オーバーライド: _setLivingBotInThreadCount() で設定された静的値を返す
+ * - デフォルト: 0を返す（InMemoryではbot_posts→postsのJOINを省略）
+ *
+ * See: features/command_livingbot.feature @スレッド内にBOTの書き込みがない場合は0体と表示される
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §6.6
+ *
+ * @param threadId スレッドID
+ * @returns スレッド内の生存BOT数
+ */
+export async function countLivingBotsInThread(
+	threadId: string,
+): Promise<number> {
+	assertUUID(threadId, "BotRepository.countLivingBotsInThread.threadId");
+	if (_livingBotInThreadCountOverride !== null) {
+		return _livingBotInThreadCountOverride;
+	}
+	// デフォルト: 0（InMemoryではbot_posts→postsのJOINを省略）
+	return 0;
 }
 
 /**

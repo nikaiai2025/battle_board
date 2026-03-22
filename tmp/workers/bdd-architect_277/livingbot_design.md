@@ -1,7 +1,8 @@
 # !livingbot コマンド + ラストボットボーナス 設計書
 
 > TASK-277 成果物 / 2026-03-23
-> 対象BDD: `features/command_livingbot.feature` 14シナリオ
+> v2 追記: スレッド内カウント拡張 / 2026-03-23
+> 対象BDD: `features/command_livingbot.feature` v2（16シナリオ）
 
 ---
 
@@ -430,3 +431,198 @@ locked_files:
   → [14,15,16] InMemory実装
   → [17] ステップ定義 → [18,19,20] テスト
 ```
+
+---
+
+## 6. スレッド内カウント拡張設計（v2追記）
+
+> feature v2 で追加された「スレッド内の生存BOT数」表示の設計。
+> 既存の掲示板全体カウント（§1〜§5）は変更なし。
+
+### 6.1 出力フォーマット変更
+
+```
+v1: 🤖 掲示板全体の生存BOT: {boardCount}体
+v2: 🤖 生存BOT — 掲示板全体: {boardCount}体 / このスレッド: {threadCount}体
+```
+
+### 6.2 スレッド内カウントの定義
+
+当該スレッドに1件以上の書き込み（`bot_posts` 経由）を持ち、
+かつ `is_active=true` のBOTの数（`DISTINCT bot_id`）。
+
+掲示板全体カウントとの違い:
+
+| 観点 | 掲示板全体 | スレッド内 |
+|---|---|---|
+| 範囲 | 全アクティブスレッド | コマンド実行スレッドのみ |
+| 定期活動BOT | 常にカウント | 当該スレッドに書き込みがある場合のみ |
+| スレッド固定BOT | スレッド休眠時は除外 | 当該スレッドのBOTなら書き込み有無でカウント |
+| 撃破済みBOT | 除外 | 除外 |
+
+### 6.3 SQLクエリ設計（本番 BotRepository）
+
+新メソッド: `BotRepository.countLivingBotsInThread(threadId: string): Promise<number>`
+
+```sql
+SELECT COUNT(DISTINCT bp.bot_id)
+FROM bot_posts bp
+  JOIN posts p ON p.id = bp.post_id
+  JOIN bots b ON b.id = bp.bot_id
+WHERE p.thread_id = :threadId
+  AND b.is_active = true;
+```
+
+Supabase SDK 実装:
+
+```typescript
+export async function countLivingBotsInThread(threadId: string): Promise<number> {
+  // Step 1: 当該スレッドの bot_posts を取得（posts 経由）
+  const { data: posts, error: postsError } = await supabaseAdmin
+    .from("posts")
+    .select("id")
+    .eq("thread_id", threadId);
+
+  if (postsError) {
+    throw new Error(
+      `BotRepository.countLivingBotsInThread (posts) failed: ${postsError.message}`
+    );
+  }
+
+  const postIds = (posts ?? []).map((p: { id: string }) => p.id);
+  if (postIds.length === 0) return 0;
+
+  // Step 2: bot_posts から該当 post_id の bot_id を取得
+  const { data: botPosts, error: bpError } = await supabaseAdmin
+    .from("bot_posts")
+    .select("bot_id")
+    .in("post_id", postIds);
+
+  if (bpError) {
+    throw new Error(
+      `BotRepository.countLivingBotsInThread (bot_posts) failed: ${bpError.message}`
+    );
+  }
+
+  const uniqueBotIds = [...new Set((botPosts ?? []).map((bp: { bot_id: string }) => bp.bot_id))];
+  if (uniqueBotIds.length === 0) return 0;
+
+  // Step 3: is_active=true のBOTをカウント
+  const { count, error: countError } = await supabaseAdmin
+    .from("bots")
+    .select("*", { count: "exact", head: true })
+    .in("id", uniqueBotIds)
+    .eq("is_active", true);
+
+  if (countError) {
+    throw new Error(
+      `BotRepository.countLivingBotsInThread (bots) failed: ${countError.message}`
+    );
+  }
+
+  return count ?? 0;
+}
+```
+
+パフォーマンス考慮: スレッド内のBOT書き込みは通常少数（0〜10件程度）のため、
+3クエリでも問題ない。将来大量のBOT書き込みが発生する場合は RPC 関数化を検討する。
+
+### 6.4 ILivingBotBotRepository 拡張
+
+```typescript
+// livingbot-handler.ts
+export interface ILivingBotBotRepository {
+  countLivingBots(): Promise<number>;
+  countLivingBotsInThread(threadId: string): Promise<number>;  // v2追加
+}
+```
+
+### 6.5 LivingBotHandler 変更
+
+```typescript
+export class LivingBotHandler implements CommandHandler {
+  readonly commandName = "livingbot";
+
+  constructor(private readonly botRepository: ILivingBotBotRepository) {}
+
+  async execute(ctx: CommandContext): Promise<CommandHandlerResult> {
+    const boardCount = await this.botRepository.countLivingBots();
+    const threadCount = await this.botRepository.countLivingBotsInThread(ctx.threadId);
+    return {
+      success: true,
+      systemMessage: `🤖 生存BOT — 掲示板全体: ${boardCount}体 / このスレッド: ${threadCount}体`,
+    };
+  }
+}
+```
+
+変更点:
+- `ctx.threadId` を使用（`CommandContext` に既存のフィールド）
+- 2つのリポジトリメソッドを呼び出し、結合した文字列を返す
+
+### 6.6 InMemory 実装（BDDテスト用）
+
+掲示板全体カウントの `_livingBotCountOverride` と同パターンで、
+スレッド内カウント用のオーバーライドを追加する。
+
+```typescript
+// features/support/in-memory/bot-repository.ts に追加
+
+let _livingBotInThreadCountOverride: number | null = null;
+
+export function _setLivingBotInThreadCount(count: number): void {
+  _livingBotInThreadCountOverride = count;
+}
+
+export function _clearLivingBotInThreadCountOverride(): void {
+  _livingBotInThreadCountOverride = null;
+}
+
+export async function countLivingBotsInThread(threadId: string): Promise<number> {
+  if (_livingBotInThreadCountOverride !== null) {
+    return _livingBotInThreadCountOverride;
+  }
+  // デフォルト: 0（InMemoryではbot_posts→postsのJOINを省略）
+  return 0;
+}
+```
+
+`reset()` で `_livingBotInThreadCountOverride = null` にクリアする。
+
+設計判断: 本番の `countLivingBotsInThread` は `bot_posts → posts → bots` の
+3テーブルJOINが必要。InMemory版で完全再現すると `InMemoryBotPostRepo` +
+`InMemoryPostRepo` への依存が発生し、モジュール結合が強まる。
+BDDテストの目的は「ハンドラが正しいカウントをフォーマットして返すこと」であり、
+JOINの正確性は単体テスト（`bot-repository.test.ts`）で保証する。
+
+### 6.7 BDDステップ定義の追加・変更
+
+| # | ステップテキスト | 種別 | 実装概要 |
+|---|---|---|---|
+| 26 | `当該スレッドに{int}体の生存BOTが書き込んでいる` | Given | `_setLivingBotInThreadCount(N)` |
+| 27 | `当該スレッドにはBOTの書き込みがない` | Given | `_setLivingBotInThreadCount(0)` |
+| 28 | `当該スレッドに{int}体のBOTが書き込んでいる` | Given | `_setLivingBotInThreadCount(N)` + World に仮カウント保持 |
+| 29 | `そのうち{int}体は撃破済みである` | Given | World の仮カウントから撃破分を引いて `_setLivingBotInThreadCount` 更新 |
+| 12' | `両方のレスに同じ掲示板全体の生存BOT数が表示される` | Then | `livingBotResults` から「掲示板全体: N体」部分を抽出して比較 |
+
+既存ステップ #12「両方のレスに同じ生存BOT数が表示される」は
+ステップテキストを v2 用に更新する。実装は `livingBotResults` の
+掲示板全体部分のみを比較するよう変更する。
+
+### 6.8 実装タスク追加分
+
+§5.1 に以下を追加:
+
+| # | 作業 | 対象ファイル |
+|---|---|---|
+| 21 | `BotRepository.countLivingBotsInThread()` 追加 | `src/lib/infrastructure/repositories/bot-repository.ts` |
+| 22 | `ILivingBotBotRepository` に `countLivingBotsInThread` 追加 | `src/lib/services/handlers/livingbot-handler.ts` |
+| 23 | `LivingBotHandler.execute()` を v2 フォーマットに変更 | `src/lib/services/handlers/livingbot-handler.ts` |
+| 24 | InMemory `bot-repository.ts` に `countLivingBotsInThread` 追加 | `features/support/in-memory/bot-repository.ts` |
+| 25 | ステップ定義にスレッド内カウント用ステップ追加 | `features/step_definitions/command_livingbot.steps.ts` |
+| 26 | 単体テスト（BotRepository.countLivingBotsInThread） | `src/__tests__/lib/infrastructure/repositories/bot-repository.test.ts` |
+| 27 | 単体テスト（LivingBotHandler v2フォーマット） | `src/__tests__/lib/services/handlers/livingbot-handler.test.ts` |
+
+### 6.9 locked_files 追加分
+
+§5.2 の既存リストに変更なし（同一ファイルへの追加変更のため）。
