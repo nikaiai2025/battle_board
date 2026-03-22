@@ -12,7 +12,8 @@
  * 設計方針:
  *   - Server Component として実装し、admin_session を Next.js cookies() API で読む
  *   - ナビゲーションは Server Component 内に直接記述する（軽量なため別コンポーネント化しない）
- *   - login ページはこのレイアウトから除外される（Next.js の layout ネスト構造を利用）
+ *   - /admin/login は (admin-public) ルートグループに配置し、本レイアウトの認証ガードを回避する
+ *     （無限リダイレクト防止。See: tmp/escalations/escalation_ESC-TASK-284-1.md 案A）
  *
  * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
  */
@@ -43,13 +44,10 @@ const NAV_LINKS = [
 /**
  * 管理画面共通レイアウト（Server Component）
  *
- * login ページはこのレイアウトの外側（/admin/login/page.tsx は独立している前提）。
- * Next.js App Router では layout.tsx は同階層・子階層の page.tsx に適用される。
- * ただし /admin/login も /admin の子であるため、login ページでも本レイアウトが適用される。
- * login 後リダイレクトで /admin に来た際にセッション検証が通ることを前提とする。
+ * /admin/login は (admin-public) ルートグループに配置されているため、
+ * 本レイアウトの認証ガードは適用されない（無限リダイレクト防止）。
  *
- * See: features/admin.feature @管理者がログイン済みである
- * See: tmp/feature_plan_admin_expansion.md §6-a ルーティング構成
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
  */
 export default async function AdminLayout({
 	children,

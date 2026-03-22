@@ -14,10 +14,22 @@
  * ハイフン区切りで統一する。
  * 使用箇所: Route Handlers (api/threads, api/mypage等) / 専ブラRoute (bbs.cgi) / BbsCgiParser
  */
-export const EDGE_TOKEN_COOKIE = 'edge-token'
+export const EDGE_TOKEN_COOKIE = "edge-token";
 
 /**
  * 管理者セッションのCookie名。
  * 使用箇所: api/admin/* Route Handlers
  */
-export const ADMIN_SESSION_COOKIE = 'admin_session'
+export const ADMIN_SESSION_COOKIE = "admin_session";
+
+/**
+ * テーマID Cookie。SSRでのテーマクラス付与に使用。
+ * See: features/theme.feature
+ */
+export const THEME_COOKIE = "bb-theme";
+
+/**
+ * フォントID Cookie。SSRでのフォント適用に使用。
+ * See: features/theme.feature
+ */
+export const FONT_COOKIE = "bb-font";

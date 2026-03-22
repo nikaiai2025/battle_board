@@ -56,6 +56,8 @@ function makeTemporaryUserInfo(): MypageInfo {
 		// See: features/reactions.feature §成長ビジュアル
 		grassCount: 0,
 		grassIcon: "🌱",
+		themeId: "default",
+		fontId: "gothic",
 	};
 }
 
@@ -76,6 +78,8 @@ function makeRegisteredUserInfo(
 		// See: features/reactions.feature §成長ビジュアル
 		grassCount: 0,
 		grassIcon: "🌱",
+		themeId: "default",
+		fontId: "gothic",
 		...overrides,
 	};
 }

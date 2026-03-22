@@ -64,6 +64,14 @@ interface UserRow {
 	is_banned: boolean;
 	/** 最終アクセスIPハッシュ。hashIp(reduceIp(ip)) 済みの値。未更新は NULL */
 	last_ip_hash: string | null;
+	// ---------------------------------------------------------------------------
+	// テーマ設定カラム（新設）
+	// See: supabase/migrations/00025_theme_settings.sql
+	// ---------------------------------------------------------------------------
+	/** テーマID。NULLの場合はデフォルトテーマ */
+	theme_id: string | null;
+	/** フォントID。NULLの場合はゴシックフォント */
+	font_id: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +109,10 @@ function rowToUser(row: UserRow): User {
 		// See: supabase/migrations/00010_ban_system.sql
 		isBanned: row.is_banned ?? false,
 		lastIpHash: row.last_ip_hash ?? null,
+		// テーマ設定フィールド
+		// See: features/theme.feature
+		themeId: row.theme_id ?? null,
+		fontId: row.font_id ?? null,
 	};
 }
 
@@ -179,6 +191,8 @@ export async function create(
 		| "grassCount"
 		| "isBanned"
 		| "lastIpHash"
+		| "themeId"
+		| "fontId"
 	> & { isVerified?: boolean },
 ): Promise<User> {
 	const { data, error } = await supabaseAdmin
@@ -576,5 +590,36 @@ export async function updatePatLastUsedAt(userId: string): Promise<void> {
 		throw new Error(
 			`UserRepository.updatePatLastUsedAt failed: ${error.message}`,
 		);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// テーマ設定メソッド（新設）
+// See: features/theme.feature @テーマ設定が保存される
+// See: supabase/migrations/00025_theme_settings.sql
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザーのテーマ・フォント設定を更新する。
+ * ThemeService.updateTheme から呼び出される。
+ *
+ * See: features/theme.feature @テーマ設定が保存される
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param themeId - テーマID
+ * @param fontId - フォントID
+ */
+export async function updateTheme(
+	userId: string,
+	themeId: string,
+	fontId: string,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({ theme_id: themeId, font_id: fontId })
+		.eq("id", userId);
+
+	if (error) {
+		throw new Error(`UserRepository.updateTheme failed: ${error.message}`);
 	}
 }

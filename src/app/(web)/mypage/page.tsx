@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { FONT_CATALOG, THEME_CATALOG } from "@/lib/domain/models/theme";
 import {
 	buildPatCopyValue,
 	canUpgrade,
@@ -76,6 +77,11 @@ export default function MypagePage() {
 	const [isRegeneratingPat, setIsRegeneratingPat] = useState(false);
 	const [patCopied, setPatCopied] = useState(false);
 
+	// テーマ設定の状態
+	// See: features/theme.feature
+	const [selectedThemeId, setSelectedThemeId] = useState<string>("default");
+	const [selectedFontId, setSelectedFontId] = useState<string>("gothic");
+
 	// ---------------------------------------------------------------------------
 	// データ取得
 	// ---------------------------------------------------------------------------
@@ -102,6 +108,10 @@ export default function MypagePage() {
 			const data = (await res.json()) as MypageInfo;
 			setMypageInfo(data);
 			setUsernameInput(data.username ?? "");
+			// テーマ設定の初期値を API レスポンスから設定
+			// See: features/theme.feature
+			setSelectedThemeId(data.themeId);
+			setSelectedFontId(data.fontId);
 		} catch {
 			setError("ネットワークエラーが発生しました。");
 		}
@@ -271,6 +281,56 @@ export default function MypagePage() {
 	};
 
 	// ---------------------------------------------------------------------------
+	// テーマ設定ハンドラ
+	// See: features/theme.feature @テーマ設定が保存される
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * テーマを切り替える（楽観的更新 + API保存）。
+	 * See: features/theme.feature @ダークテーマに切り替える
+	 * See: features/theme.feature @デフォルトテーマに戻す
+	 */
+	const handleThemeChange = async (newThemeId: string) => {
+		const prevThemeId = selectedThemeId;
+		setSelectedThemeId(newThemeId); // 楽観的更新
+
+		try {
+			const res = await fetch("/api/mypage/theme", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ themeId: newThemeId, fontId: selectedFontId }),
+			});
+			if (!res.ok) {
+				setSelectedThemeId(prevThemeId); // ロールバック
+			}
+		} catch {
+			setSelectedThemeId(prevThemeId);
+		}
+	};
+
+	/**
+	 * フォントを切り替える（楽観的更新 + API保存）。
+	 * See: features/theme.feature @フォントをゴシックに戻す
+	 */
+	const handleFontChange = async (newFontId: string) => {
+		const prevFontId = selectedFontId;
+		setSelectedFontId(newFontId); // 楽観的更新
+
+		try {
+			const res = await fetch("/api/mypage/theme", {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ themeId: selectedThemeId, fontId: newFontId }),
+			});
+			if (!res.ok) {
+				setSelectedFontId(prevFontId); // ロールバック
+			}
+		} catch {
+			setSelectedFontId(prevFontId);
+		}
+	};
+
+	// ---------------------------------------------------------------------------
 	// ローディング・エラー表示
 	// ---------------------------------------------------------------------------
 
@@ -400,6 +460,88 @@ export default function MypagePage() {
 						ログアウト
 					</button>
 				)}
+			</section>
+
+			{/* =============================
+          テーマ設定セクション
+          See: features/theme.feature @マイページにテーマ設定セクションが表示される
+          See: docs/specs/screens/mypage.yaml @theme-section
+          ============================= */}
+			<section
+				data-testid="theme-section"
+				className="bg-white border border-gray-300 rounded p-4 space-y-4"
+			>
+				<h2 className="text-base font-bold text-gray-700">テーマ設定</h2>
+
+				{/* テーマ一覧
+            See: features/theme.feature @テーマ一覧とフォント一覧が表示される */}
+				<div>
+					<h3 className="text-sm font-medium text-gray-600 mb-2">テーマ</h3>
+					<div className="flex flex-wrap gap-2">
+						{THEME_CATALOG.map((theme) => {
+							const isSelected = selectedThemeId === theme.id;
+							const isLocked = !theme.isFree && !mypageInfo.isPremium;
+							return (
+								<button
+									key={theme.id}
+									data-testid={`theme-card-${theme.id}`}
+									type="button"
+									aria-pressed={isSelected}
+									disabled={isLocked}
+									onClick={() => {
+										void handleThemeChange(theme.id);
+									}}
+									className={`px-4 py-2 text-sm rounded border ${
+										isSelected
+											? "border-blue-500 bg-blue-50 text-blue-700 font-bold"
+											: isLocked
+												? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+												: "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+									}`}
+								>
+									{theme.name}
+									{isSelected && " \u2713"}
+									{isLocked && " \uD83D\uDD12"}
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
+				{/* フォント一覧
+            See: features/theme.feature @テーマ一覧とフォント一覧が表示される */}
+				<div>
+					<h3 className="text-sm font-medium text-gray-600 mb-2">フォント</h3>
+					<div className="flex flex-wrap gap-2">
+						{FONT_CATALOG.map((font) => {
+							const isSelected = selectedFontId === font.id;
+							const isLocked = !font.isFree && !mypageInfo.isPremium;
+							return (
+								<button
+									key={font.id}
+									data-testid={`font-card-${font.id}`}
+									type="button"
+									aria-pressed={isSelected}
+									disabled={isLocked}
+									onClick={() => {
+										void handleFontChange(font.id);
+									}}
+									className={`px-4 py-2 text-sm rounded border ${
+										isSelected
+											? "border-blue-500 bg-blue-50 text-blue-700 font-bold"
+											: isLocked
+												? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+												: "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+									}`}
+								>
+									{font.name}
+									{isSelected && " \u2713"}
+									{isLocked && " \uD83D\uDD12"}
+								</button>
+							);
+						})}
+					</div>
+				</div>
 			</section>
 
 			{/* =============================

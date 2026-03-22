@@ -82,6 +82,8 @@ const FREE_USER: User = {
 	// See: features/admin.feature @ユーザーBAN
 	isBanned: false,
 	lastIpHash: null,
+	themeId: null,
+	fontId: null,
 };
 
 const PREMIUM_USER: User = {
@@ -108,6 +110,8 @@ const PREMIUM_USER: User = {
 	// See: features/admin.feature @ユーザーBAN
 	isBanned: false,
 	lastIpHash: null,
+	themeId: null,
+	fontId: null,
 };
 
 const SAMPLE_POST: Post = {

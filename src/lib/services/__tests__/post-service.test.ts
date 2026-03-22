@@ -153,6 +153,8 @@ const mockUser: User = {
 	// See: features/admin.feature @ユーザーBAN
 	isBanned: false,
 	lastIpHash: null,
+	themeId: null,
+	fontId: null,
 };
 
 const mockPremiumUser: User = {
@@ -179,6 +181,8 @@ const mockPremiumUser: User = {
 	// See: features/admin.feature @ユーザーBAN
 	isBanned: false,
 	lastIpHash: null,
+	themeId: null,
+	fontId: null,
 };
 
 const mockPost: Post = {

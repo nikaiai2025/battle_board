@@ -14,12 +14,13 @@
  * See: docs/architecture/components/web-ui.md §3.1 スレッド一覧ページ
  */
 
-import { cookies } from 'next/headers'
-import Header from './_components/Header'
-import { EDGE_TOKEN_COOKIE } from '@/lib/constants/cookie-names'
+import { cookies } from "next/headers";
+import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import { resolveFont, resolveTheme } from "@/lib/domain/rules/theme-rules";
+import Header from "./_components/Header";
 
 interface WebLayoutProps {
-  children: React.ReactNode
+	children: React.ReactNode;
 }
 
 /**
@@ -33,21 +34,37 @@ interface WebLayoutProps {
  * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
  */
 export default async function WebLayout({ children }: WebLayoutProps) {
-  // edge-token Cookie の存在をチェックして認証状態を判定する。
-  // DB呼び出しは行わない（トークン有効性の検証は API 境界で実施）。
-  const cookieStore = await cookies()
-  const isAuthenticated = cookieStore.has(EDGE_TOKEN_COOKIE)
+	// edge-token Cookie の存在をチェックして認証状態を判定する。
+	// DB呼び出しは行わない（トークン有効性の検証は API 境界で実施）。
+	const cookieStore = await cookies();
+	const isAuthenticated = cookieStore.has(EDGE_TOKEN_COOKIE);
 
-  return (
-    <div className="min-h-screen bg-white">
-      {/* ヘッダー: 全 Web ページに表示
+	// テーマ/フォントをCookieから取得し解決する
+	// 未設定や不正値はデフォルトにフォールバック
+	// NOTE: isPremium の判定はCookieからはできないため、ここでは
+	//       有料テーマのCSSクラスも素通りさせる（isPremium=true として解決）。
+	//       有料→無料のダウングレード時は GET /api/mypage が解決済みIDを返し、
+	//       フロントが Cookie を更新するフローで整合性を保つ。
+	// See: features/theme.feature
+	// See: tmp/workers/bdd-architect_283/theme_design.md §6
+	const themeId = cookieStore.get("bb-theme")?.value ?? null;
+	const fontId = cookieStore.get("bb-font")?.value ?? null;
+	const theme = resolveTheme(themeId, true);
+	const font = resolveFont(fontId, true);
+
+	return (
+		<div
+			className={`min-h-screen ${theme.cssClass}`}
+			style={{ fontFamily: font.cssFontFamily }}
+		>
+			{/* ヘッダー: 全 Web ページに表示
           isAuthenticated は edge-token Cookie の存在で判定（動的）。
           See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
       */}
-      <Header isAuthenticated={isAuthenticated} />
+			<Header isAuthenticated={isAuthenticated} />
 
-      {/* ページコンテンツ */}
-      {children}
-    </div>
-  )
+			{/* ページコンテンツ */}
+			{children}
+		</div>
+	);
 }

@@ -85,6 +85,8 @@ export async function create(
 		| "grassCount"
 		| "isBanned"
 		| "lastIpHash"
+		| "themeId"
+		| "fontId"
 	> & {
 		isVerified?: boolean;
 		supabaseAuthId?: string | null;
@@ -98,6 +100,10 @@ export async function create(
 		isBanned?: boolean;
 		/** 最終アクセスIPハッシュ。省略時は null。See: features/admin.feature */
 		lastIpHash?: string | null;
+		/** テーマID。省略時は null。See: features/theme.feature */
+		themeId?: string | null;
+		/** フォントID。省略時は null。See: features/theme.feature */
+		fontId?: string | null;
 	},
 ): Promise<User> {
 	const newUser: User = {
@@ -121,6 +127,10 @@ export async function create(
 		// See: features/admin.feature @ユーザーBAN / IP BAN
 		isBanned: user.isBanned ?? false,
 		lastIpHash: user.lastIpHash ?? null,
+		// テーマ設定フィールド。省略時は null（デフォルトテーマ適用）
+		// See: features/theme.feature
+		themeId: user.themeId ?? null,
+		fontId: user.fontId ?? null,
 	};
 	store.set(newUser.id, newUser);
 	return newUser;
@@ -426,5 +436,29 @@ export async function updateGrassCount(
 	const user = store.get(userId);
 	if (user) {
 		store.set(userId, { ...user, grassCount });
+	}
+}
+
+// ---------------------------------------------------------------------------
+// テーマ設定メソッド（新設）
+// See: features/theme.feature @テーマ設定が保存される
+// See: src/lib/infrastructure/repositories/user-repository.ts > updateTheme
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザーのテーマ・フォント設定を更新する。
+ *
+ * See: src/lib/infrastructure/repositories/user-repository.ts > updateTheme
+ * See: features/theme.feature @テーマ設定が保存される
+ */
+export async function updateTheme(
+	userId: string,
+	themeId: string,
+	fontId: string,
+): Promise<void> {
+	assertUUID(userId, "UserRepository.updateTheme.userId");
+	const user = store.get(userId);
+	if (user) {
+		store.set(userId, { ...user, themeId, fontId });
 	}
 }

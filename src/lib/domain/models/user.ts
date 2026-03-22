@@ -111,4 +111,15 @@ export interface User {
 	 * See: tmp/feature_plan_admin_expansion.md §2-d IP BAN 対象の特定方法
 	 */
 	lastIpHash: string | null;
+
+	// ---------------------------------------------------------------------------
+	// テーマ設定フィールド（新設）
+	// See: features/theme.feature
+	// See: supabase/migrations/00025_theme_settings.sql
+	// ---------------------------------------------------------------------------
+
+	/** テーマID。NULLの場合はデフォルトテーマ。See: features/theme.feature */
+	themeId: string | null;
+	/** フォントID。NULLの場合はゴシックフォント。See: features/theme.feature */
+	fontId: string | null;
 }

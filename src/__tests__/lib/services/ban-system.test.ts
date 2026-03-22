@@ -120,6 +120,8 @@ function makeUser(overrides: Partial<User> = {}): User {
 		grassCount: 0,
 		isBanned: false,
 		lastIpHash: "test-ip-hash-001",
+		themeId: null,
+		fontId: null,
 		...overrides,
 	};
 }

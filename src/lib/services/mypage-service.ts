@@ -19,6 +19,7 @@
 
 import type { User } from "../domain/models/user";
 import { getGrassIcon } from "../domain/rules/grass-icon";
+import { resolveFont, resolveTheme } from "../domain/rules/theme-rules";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
 import * as UserRepository from "../infrastructure/repositories/user-repository";
 import * as CurrencyService from "./currency-service";
@@ -96,6 +97,16 @@ export interface MypageInfo {
 	 * See: src/lib/domain/rules/grass-icon.ts
 	 */
 	grassIcon: string;
+
+	// ---------------------------------------------------------------------------
+	// テーマ設定フィールド（新設）
+	// See: features/theme.feature
+	// ---------------------------------------------------------------------------
+
+	/** 適用中のテーマID。解決済み（フォールバック適用後）の値 */
+	themeId: string;
+	/** 適用中のフォントID。解決済みの値 */
+	fontId: string;
 }
 
 /**
@@ -256,6 +267,10 @@ export async function getMypage(userId: string): Promise<MypageInfo | null> {
 		// See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
 		grassCount,
 		grassIcon,
+		// テーマ設定: resolveTheme/resolveFont でフォールバック適用後のIDを返す
+		// See: features/theme.feature
+		themeId: resolveTheme(user.themeId, user.isPremium).id,
+		fontId: resolveFont(user.fontId, user.isPremium).id,
 	};
 }
 

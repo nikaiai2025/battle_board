@@ -64,6 +64,40 @@ elements:
         # See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
         # 本登録ユーザーのみ表示。仮ユーザーはログアウトするとユーザーIDを喪失するため非表示。
 
+  # --- テーマ設定セクション ---
+  # See: features/theme.feature
+  - id: theme-section
+    type: section
+    label: テーマ設定
+    children:
+      - id: theme-list
+        type: card-group
+        label: テーマ
+        source: THEME_CATALOG
+        itemTemplate:
+          - id: theme-card
+            type: button
+            data-testid: theme-card-{themeId}
+            label: "{themeName}"
+            state:
+              selected: themeId == user.themeId
+              locked: "!theme.isFree && !user.isPremium"
+            action: PUT /api/mypage/theme
+
+      - id: font-list
+        type: card-group
+        label: フォント
+        source: FONT_CATALOG
+        itemTemplate:
+          - id: font-card
+            type: button
+            data-testid: font-card-{fontId}
+            label: "{fontName}"
+            state:
+              selected: fontId == user.fontId
+              locked: "!font.isFree && !user.isPremium"
+            action: PUT /api/mypage/theme
+
   # --- ユーザーネーム設定 ---
   - id: username-section
     type: section

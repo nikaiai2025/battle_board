@@ -140,6 +140,8 @@ function createTemporaryUser(overrides: Partial<User> = {}): User {
 		// See: features/admin.feature @ユーザーBAN
 		isBanned: false,
 		lastIpHash: null,
+		themeId: null,
+		fontId: null,
 		...overrides,
 	};
 }

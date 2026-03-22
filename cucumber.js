@@ -86,6 +86,9 @@ module.exports = {
 			// TASK-278: !livingbot コマンド + ラストボットボーナス BDD シナリオ追加
 			// See: features/command_livingbot.feature
 			"features/command_livingbot.feature",
+			// TASK-285: テーマ機能 BDD シナリオ追加
+			// See: features/theme.feature
+			"features/theme.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -144,6 +147,9 @@ module.exports = {
 			// TASK-278: !livingbot コマンド + ラストボットボーナス BDD ステップ定義
 			// See: features/command_livingbot.feature
 			"features/step_definitions/command_livingbot.steps.ts",
+			// TASK-285: テーマ機能 BDD ステップ定義
+			// See: features/theme.feature
+			"features/step_definitions/theme.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録
