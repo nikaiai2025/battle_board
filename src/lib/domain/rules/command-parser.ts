@@ -161,9 +161,14 @@ export function parseCommand(
 			args = forwardArg ? [forwardArg] : [];
 		}
 
-		// raw フィールド: "!コマンド名 引数..." の形式
-		const raw =
-			args.length > 0 ? `!${commandName} ${args.join(" ")}` : `!${commandName}`;
+		// raw フィールド: 元の本文中の実マッチテキストをそのまま使用する
+		// match[0] は COMMAND_PATTERN の実マッチテキスト（lookbehind は zero-width のため含まれない）
+		// 再構築すると空白の正規化（全角スペース・複数スペース・スペースなし）により
+		// post-service.ts の String.replace() が不一致になるバグを防ぐ。
+		// 前方引数パターン（>>N !cmd）の場合、match[0] は "!cmd" のみになる（>>N は残留が正しい）。
+		// See: features/command_aori.feature @stealth
+		// See: features/command_iamsystem.feature @stealth
+		const raw = match[0];
 
 		return {
 			name: commandName,
