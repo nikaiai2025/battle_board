@@ -692,6 +692,30 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		}
 	}
 
+	// Step 9c: ラストボットボーナス祝福メッセージ投稿
+	// lastBotBonusNotice がある場合、eliminationNotice とは別の独立レスとして投稿する。
+	// See: features/command_livingbot.feature @その日最後のBOTを撃破するとラストボットボーナス+100が付与される
+	const lastBotBonusBody = commandResult?.lastBotBonusNotice ?? null;
+	if (lastBotBonusBody) {
+		try {
+			await createPost({
+				threadId: input.threadId,
+				body: lastBotBonusBody,
+				edgeToken: null,
+				ipHash: "system",
+				displayName: "★システム",
+				isBotWrite: true,
+				isSystemMessage: true,
+			});
+		} catch (err) {
+			// 祝福メッセージ挿入失敗は元レスの成功を巻き戻さない
+			console.error(
+				"[PostService] ラストボットボーナス祝福メッセージ挿入失敗:",
+				err,
+			);
+		}
+	}
+
 	// Step 10: スレッド更新
 	// See: docs/architecture/architecture.md §7.1 Step 2
 	await ThreadRepository.incrementPostCount(input.threadId);

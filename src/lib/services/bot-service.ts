@@ -137,6 +137,12 @@ export interface IBotRepository {
 	 */
 	deleteEliminatedTutorialBots(): Promise<number>;
 	/**
+	 * 掲示板全体の生存BOT数をカウントする。
+	 * See: features/command_livingbot.feature
+	 * See: tmp/workers/bdd-architect_277/livingbot_design.md §1.3
+	 */
+	countLivingBots(): Promise<number>;
+	/**
 	 * 次回投稿予定時刻を更新する。
 	 * See: docs/architecture/architecture.md §13 TDR-010
 	 */
@@ -269,6 +275,21 @@ export interface IPendingAsyncCommandRepository {
 }
 
 /**
+ * DailyEventRepository の依存インターフェース。
+ * checkLastBotBonus で使用する。
+ * See: features/command_livingbot.feature
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §3.4
+ */
+export interface IDailyEventRepository {
+	existsForToday(eventType: string, dateJst: string): Promise<boolean>;
+	create(
+		eventType: string,
+		dateJst: string,
+		triggeredBy: string,
+	): Promise<{ id: string }>;
+}
+
+/**
  * 煽りBOT Cron 処理の個別結果型。
  * See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
  */
@@ -367,6 +388,8 @@ export class BotService {
 	 *   See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
 	 * @param pendingAsyncCommandRepository - 非同期コマンドキュー（DI・省略可）
 	 *   See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+	 * @param dailyEventRepository - 日次イベントリポジトリ（DI・省略可）
+	 *   See: features/command_livingbot.feature @ラストボットボーナス
 	 */
 	constructor(
 		private readonly botRepository: IBotRepository,
@@ -378,6 +401,7 @@ export class BotService {
 		private readonly resolveStrategiesFn?: ResolveStrategiesFn,
 		private readonly pendingTutorialRepository?: IPendingTutorialRepository,
 		private readonly pendingAsyncCommandRepository?: IPendingAsyncCommandRepository,
+		private readonly dailyEventRepository?: IDailyEventRepository,
 	) {
 		// ボットプロファイルデータをキャッシュする
 		// Cloudflare Workers 環境では fs.readFileSync が使えないため、
@@ -650,6 +674,44 @@ export class BotService {
 			postId,
 			damage,
 		});
+	}
+
+	// ---------------------------------------------------------------------------
+	// §ラストボットボーナス判定
+	// See: features/command_livingbot.feature @ラストボットボーナス
+	// See: tmp/workers/bdd-architect_277/livingbot_design.md §3.5
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * ラストボットボーナスの発火条件を判定する。
+	 *
+	 * 発火条件:
+	 *   1. countLivingBots() === 0（全BOT撃破後）
+	 *   2. 当日のラストボットボーナスが未発生（1日1回制限）
+	 *
+	 * See: features/command_livingbot.feature @その日最後のBOTを撃破するとラストボットボーナス+100が付与される
+	 * See: features/command_livingbot.feature @同日にラストボットボーナスが既に発生済みの場合は再発火しない
+	 *
+	 * @param attackerId - 撃破者のユーザーID
+	 * @returns triggered=true の場合はラストボットボーナスを付与すべき
+	 */
+	async checkLastBotBonus(attackerId: string): Promise<{ triggered: boolean }> {
+		if (!this.dailyEventRepository) {
+			return { triggered: false };
+		}
+
+		const livingCount = await this.botRepository.countLivingBots();
+		if (livingCount > 0) return { triggered: false };
+
+		const today = this.getTodayJst();
+		const alreadyTriggered = await this.dailyEventRepository.existsForToday(
+			"last_bot_bonus",
+			today,
+		);
+		if (alreadyTriggered) return { triggered: false };
+
+		await this.dailyEventRepository.create("last_bot_bonus", today, attackerId);
+		return { triggered: true };
 	}
 
 	// ---------------------------------------------------------------------------

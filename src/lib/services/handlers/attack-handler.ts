@@ -57,6 +57,11 @@ export interface IAttackBotService {
 		postId: string | null,
 		damage: number,
 	): Promise<void>;
+	/**
+	 * ラストボットボーナス判定。
+	 * See: features/command_livingbot.feature @ラストボットボーナス
+	 */
+	checkLastBotBonus(attackerId: string): Promise<{ triggered: boolean }>;
 }
 
 /**
@@ -316,12 +321,28 @@ export class AttackHandler implements CommandHandler {
 				`撃破者：名無しさん(ID:${ctx.dailyId}) に撃破報酬 +${damageResult.reward}`,
 			].join("\n");
 
+			// ラストボットボーナス判定
+			// See: features/command_livingbot.feature @その日最後のBOTを撃破するとラストボットボーナス+100が付与される
+			let lastBotBonusNotice: string | null = null;
+			const lastBotCheck = await this.botService.checkLastBotBonus(ctx.userId);
+			if (lastBotCheck.triggered) {
+				// +100 ボーナス付与
+				await this.currencyService.credit(ctx.userId, 100, "last_bot_bonus");
+				// 祝福メッセージ（独立レス）
+				lastBotBonusNotice = [
+					"🎉 本日のBOTが全滅しました！",
+					`最終撃破者：名無しさん(ID:${ctx.dailyId}) にラストボットボーナス +100`,
+				].join("\n");
+			}
+
 			return {
 				success: true,
 				// systemMessage にはインライン表示（HP変化）のみを設定する
 				systemMessage: inlineMsg,
 				// eliminationNotice を PostService に伝播して独立レスを投稿させる
 				eliminationNotice: eliminationNoticeBody,
+				// ラストボットボーナス祝福メッセージ
+				lastBotBonusNotice,
 			};
 		}
 

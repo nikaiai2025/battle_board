@@ -19,10 +19,35 @@ import { assertUUID } from "./assert-uuid";
 const store: Bot[] = [];
 
 /**
+ * 生存BOTカウントの静的オーバーライド値。
+ * null の場合はストアからのデフォルトカウントを使用する。
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §1.5
+ */
+let _livingBotCountOverride: number | null = null;
+
+/**
+ * 生存BOTカウントを静的値でオーバーライドする。
+ * InMemoryストアだけでは表現しにくいシナリオで使用する。
+ *
+ * See: features/command_livingbot.feature @休眠スレッドにいるスレッド固定BOTはカウントされない
+ */
+export function _setLivingBotCount(count: number): void {
+	_livingBotCountOverride = count;
+}
+
+/**
+ * 生存BOTカウントのオーバーライドをクリアする。
+ */
+export function _clearLivingBotCountOverride(): void {
+	_livingBotCountOverride = null;
+}
+
+/**
  * ストアを初期化する（Beforeフックから呼び出す）。
  */
 export function reset(): void {
 	store.length = 0;
+	_livingBotCountOverride = null;
 }
 
 /**
@@ -152,7 +177,18 @@ export async function eliminate(
 	assertUUID(botId, "BotRepository.eliminate.botId");
 	assertUUID(eliminatedBy, "BotRepository.eliminate.eliminatedBy");
 	const bot = store.find((b) => b.id === botId);
-	if (bot) {
+	if (bot && bot.isActive) {
+		bot.isActive = false;
+		bot.eliminatedAt = new Date(Date.now());
+		bot.eliminatedBy = eliminatedBy;
+		// オーバーライド値が設定されている場合はデクリメントする。
+		// ラストボットボーナス判定（checkLastBotBonus）が countLivingBots() で
+		// 正しい値を取得できるようにする。
+		// See: features/command_livingbot.feature @その日最後のBOTを撃破するとラストボットボーナス+100が付与される
+		if (_livingBotCountOverride !== null && _livingBotCountOverride > 0) {
+			_livingBotCountOverride--;
+		}
+	} else if (bot) {
 		bot.isActive = false;
 		bot.eliminatedAt = new Date(Date.now());
 		bot.eliminatedBy = eliminatedBy;
@@ -305,6 +341,23 @@ export async function deleteEliminatedTutorialBots(): Promise<number> {
 		}
 	}
 	return count;
+}
+
+/**
+ * 掲示板全体の生存BOT数をカウントする。
+ *
+ * 2つの動作モード:
+ * - デフォルト: ストアから isActive === true のBOTを全件カウント
+ * - オーバーライド: _setLivingBotCount() で設定された静的値を返す
+ *
+ * See: features/command_livingbot.feature
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §1.5
+ */
+export async function countLivingBots(): Promise<number> {
+	if (_livingBotCountOverride !== null) {
+		return _livingBotCountOverride;
+	}
+	return store.filter((b) => b.isActive).length;
 }
 
 /**

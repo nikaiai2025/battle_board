@@ -14,7 +14,7 @@
  * 環境変数:
  *   DEPLOY_URL     — Vercel デプロイ URL（例: https://battle-board.vercel.app）
  *   BOT_API_KEY    — Internal API 認証キー
- *   GEMINI_API_KEY — Google AI API キー
+ *   GEMINI_API_KEYS — Google AI API キー（カンマ区切りで複数指定可）
  *
  * See: features/command_newspaper.feature
  * See: tmp/workers/bdd-architect_275/newspaper_gh_actions_migration.md §1
@@ -29,7 +29,7 @@ import { GoogleAiAdapter } from "../src/lib/infrastructure/adapters/google-ai-ad
 
 const DEPLOY_URL = process.env.DEPLOY_URL;
 const BOT_API_KEY = process.env.BOT_API_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEYS_RAW = process.env.GEMINI_API_KEYS;
 
 // 必須環境変数の存在確認
 if (!DEPLOY_URL) {
@@ -40,8 +40,18 @@ if (!BOT_API_KEY) {
 	console.error("[newspaper-worker] BOT_API_KEY is not set");
 	process.exit(1);
 }
-if (!GEMINI_API_KEY) {
-	console.error("[newspaper-worker] GEMINI_API_KEY is not set");
+if (!GEMINI_API_KEYS_RAW) {
+	console.error("[newspaper-worker] GEMINI_API_KEYS is not set");
+	process.exit(1);
+}
+
+// カンマ区切りの API キーをパースし、空要素を除外
+const GEMINI_API_KEYS = GEMINI_API_KEYS_RAW.split(",")
+	.map((k) => k.trim())
+	.filter((k) => k.length > 0);
+
+if (GEMINI_API_KEYS.length === 0) {
+	console.error("[newspaper-worker] GEMINI_API_KEYS contains no valid keys");
 	process.exit(1);
 }
 
@@ -109,7 +119,8 @@ async function main(): Promise<void> {
 	// 安全ガード: 上限件数以内に制限する
 	const toProcess = pendingList.slice(0, MAX_PROCESS_PER_EXECUTION);
 
-	const adapter = new GoogleAiAdapter(GEMINI_API_KEY!);
+	console.log(`[newspaper-worker] Loaded ${GEMINI_API_KEYS.length} API key(s)`);
+	const adapter = new GoogleAiAdapter(GEMINI_API_KEYS);
 
 	// Step 2: 各 pending を処理
 	for (const pending of toProcess) {

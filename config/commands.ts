@@ -107,5 +107,14 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: false,
 		},
+		// TASK-278: !livingbot コマンド追加（生存BOT数表示）
+		// See: features/command_livingbot.feature
+		livingbot: {
+			description: "掲示板全体の生存BOT数を表示する",
+			cost: 5,
+			targetFormat: null,
+			enabled: true,
+			stealth: false,
+		},
 	},
 };

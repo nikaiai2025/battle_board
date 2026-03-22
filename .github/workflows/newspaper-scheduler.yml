@@ -36,5 +36,5 @@ jobs:
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
           BOT_API_KEY: ${{ secrets.BOT_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
         run: npx tsx scripts/newspaper-worker.ts

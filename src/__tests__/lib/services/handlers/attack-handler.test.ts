@@ -146,6 +146,9 @@ function createMockBotService(
 			),
 		canAttackToday: vi.fn().mockResolvedValue(options.canAttack ?? true),
 		recordAttack: vi.fn().mockResolvedValue(undefined),
+		// ラストボットボーナス判定（デフォルト: 発火しない）
+		// See: features/command_livingbot.feature @ラストボットボーナス
+		checkLastBotBonus: vi.fn().mockResolvedValue({ triggered: false }),
 	};
 }
 

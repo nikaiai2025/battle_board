@@ -513,6 +513,87 @@ export async function bulkReviveEliminated(): Promise<number> {
 }
 
 /**
+ * 掲示板全体の生存BOT数をカウントする。
+ *
+ * カウントルール（区分AとBの和集合）:
+ *   A. 定期活動BOT: is_active=true かつ非スレッド固定（bot_profile_key NOT IN ('tutorial','aori')）
+ *   B. スレッド固定BOT: is_active=true かつ bot_profile_key IN ('tutorial','aori')
+ *      かつ書き込み先スレッドが is_dormant=false
+ *
+ * See: features/command_livingbot.feature
+ * See: tmp/workers/bdd-architect_277/livingbot_design.md §1.3
+ *
+ * @returns 生存BOT数
+ */
+export async function countLivingBots(): Promise<number> {
+	// 区分A: 定期活動BOT
+	const { count: countA, error: errorA } = await supabaseAdmin
+		.from("bots")
+		.select("*", { count: "exact", head: true })
+		.eq("is_active", true)
+		.or("bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)");
+
+	if (errorA) {
+		throw new Error(
+			`BotRepository.countLivingBots (category A) failed: ${errorA.message}`,
+		);
+	}
+
+	// 区分B: スレッド固定BOTのうちアクティブスレッドにいるもの
+	// bot_posts -> posts -> threads の JOIN で特定する
+	// Supabase JS SDK では複数テーブルの JOIN + DISTINCT COUNT が困難なため、
+	// RPC 関数を使用するか、全件取得してアプリ層で処理する。
+	// スレッド固定BOTは少数（数体〜十数体）のため全件取得でパフォーマンス問題なし。
+	const { data: threadFixedBots, error: errorB } = await supabaseAdmin
+		.from("bots")
+		.select("id")
+		.eq("is_active", true)
+		.in("bot_profile_key", ["tutorial", "aori"]);
+
+	if (errorB) {
+		throw new Error(
+			`BotRepository.countLivingBots (category B fetch) failed: ${errorB.message}`,
+		);
+	}
+
+	let countB = 0;
+	for (const bot of (threadFixedBots ?? []) as { id: string }[]) {
+		// bot_posts からこのボットの書き込みを取得
+		const { data: botPosts, error: bpError } = await supabaseAdmin
+			.from("bot_posts")
+			.select("post_id")
+			.eq("bot_id", bot.id)
+			.limit(1);
+
+		if (bpError) continue;
+		if (!botPosts || botPosts.length === 0) continue;
+
+		// posts からスレッドIDを取得
+		const { data: post, error: postError } = await supabaseAdmin
+			.from("posts")
+			.select("thread_id")
+			.eq("id", (botPosts[0] as { post_id: string }).post_id)
+			.single();
+
+		if (postError || !post) continue;
+
+		// threads の is_dormant をチェック
+		const { data: thread, error: threadError } = await supabaseAdmin
+			.from("threads")
+			.select("is_dormant")
+			.eq("id", (post as { thread_id: string }).thread_id)
+			.single();
+
+		if (threadError || !thread) continue;
+		if (!(thread as { is_dormant: boolean }).is_dormant) {
+			countB++;
+		}
+	}
+
+	return (countA ?? 0) + countB;
+}
+
+/**
  * 撃破済みチュートリアルBOT および古い未撃破チュートリアルBOTを削除する。
  * daily-maintenance（performDailyReset 末尾）で呼び出す。
  *

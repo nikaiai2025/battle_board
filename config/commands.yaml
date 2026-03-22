@@ -74,6 +74,14 @@ commands:
     targetFormat: ">>postNumber"
     enabled: true
     stealth: true
+  # TASK-278: !livingbot コマンド追加（生存BOT数表示）
+  # See: features/command_livingbot.feature
+  livingbot:
+    description: "掲示板全体の生存BOT数を表示する"
+    cost: 5
+    targetFormat: null
+    enabled: true
+    stealth: false
   # TASK-272: !newspaper コマンド追加（AIニュース取得・非ステルス）
   # See: features/command_newspaper.feature
   newspaper:

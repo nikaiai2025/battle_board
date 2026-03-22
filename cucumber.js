@@ -83,6 +83,9 @@ module.exports = {
 			// TASK-272: !newspaper コマンド BDD シナリオ追加
 			// See: features/command_newspaper.feature
 			"features/command_newspaper.feature",
+			// TASK-278: !livingbot コマンド + ラストボットボーナス BDD シナリオ追加
+			// See: features/command_livingbot.feature
+			"features/command_livingbot.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -138,6 +141,9 @@ module.exports = {
 			// TASK-272: !newspaper コマンド BDD ステップ定義
 			// See: features/command_newspaper.feature
 			"features/step_definitions/command_newspaper.steps.ts",
+			// TASK-278: !livingbot コマンド + ラストボットボーナス BDD ステップ定義
+			// See: features/command_livingbot.feature
+			"features/step_definitions/command_livingbot.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

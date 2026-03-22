@@ -52,6 +52,12 @@ import {
 	type IKinouPostRepository,
 	KinouHandler,
 } from "./handlers/kinou-handler";
+// TASK-278: !livingbot コマンド（生存BOT数表示）
+// See: features/command_livingbot.feature
+import {
+	type ILivingBotBotRepository,
+	LivingBotHandler,
+} from "./handlers/livingbot-handler";
 // TASK-272: !newspaper コマンド（AIニュース取得・非ステルス）
 // See: features/command_newspaper.feature
 import {
@@ -144,6 +150,13 @@ export interface CommandExecutionResult {
 	 * See: features/command_iamsystem.feature @成功時にコマンド文字列が投稿本文から除去される
 	 */
 	rawCommand?: string;
+
+	/**
+	 * ラストボットボーナス祝福メッセージ（★システム名義の独立レス）。
+	 * null / undefined なら独立レス投稿なし。
+	 * See: features/command_livingbot.feature @その日最後のBOTを撃破するとラストボットボーナス+100が付与される
+	 */
+	lastBotBonusNotice?: string | null;
 }
 
 /**
@@ -200,6 +213,13 @@ export interface CommandHandlerResult {
 	 * See: features/command_iamsystem.feature
 	 */
 	postFieldOverrides?: PostFieldOverrides | null;
+
+	/**
+	 * ラストボットボーナス祝福メッセージ（★システム名義の独立レス）。
+	 * null / undefined なら独立レス投稿なし。
+	 * See: features/command_livingbot.feature @その日最後のBOTを撃破するとラストボットボーナス+100が付与される
+	 */
+	lastBotBonusNotice?: string | null;
 }
 
 /**
@@ -378,6 +398,7 @@ export class CommandService {
 		hissiHandler?: HissiHandler | null,
 		kinouHandler?: KinouHandler | null,
 		pendingAsyncCommandRepository?: IAoriPendingRepository | null,
+		livingBotHandler?: LivingBotHandler | null,
 	) {
 		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
 		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
@@ -548,6 +569,19 @@ export class CommandService {
 			);
 		}
 
+		// LivingBotHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に livingbot コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// See: features/command_livingbot.feature
+		let resolvedLivingBotHandler: LivingBotHandler | null = null;
+		if (livingBotHandler !== undefined) {
+			resolvedLivingBotHandler = livingBotHandler ?? null;
+		} else if (parsed.commands.livingbot?.enabled) {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const botRepository: ILivingBotBotRepository = require("../infrastructure/repositories/bot-repository");
+			resolvedLivingBotHandler = new LivingBotHandler(botRepository);
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
@@ -570,6 +604,9 @@ export class CommandService {
 			// !newspaper: AIニュース取得（PendingAsyncCommandRepository の DI が必要）
 			// See: features/command_newspaper.feature
 			...(resolvedNewspaperHandler ? [resolvedNewspaperHandler] : []),
+			// !livingbot: 生存BOT数表示（BotRepository の DI が必要）
+			// See: features/command_livingbot.feature
+			...(resolvedLivingBotHandler ? [resolvedLivingBotHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();
@@ -755,6 +792,9 @@ export class CommandService {
 			postFieldOverrides: result.postFieldOverrides ?? null,
 			isStealth: config.stealth,
 			rawCommand: parsed.raw,
+			// ラストボットボーナス祝福メッセージの伝播
+			// See: features/command_livingbot.feature @ラストボットボーナス
+			lastBotBonusNotice: result.lastBotBonusNotice ?? null,
 		};
 	}
 }

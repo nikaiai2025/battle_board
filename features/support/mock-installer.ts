@@ -38,6 +38,9 @@ import * as InMemoryBotPostRepo from "./in-memory/bot-post-repository";
 // See: features/bot_system.feature
 import * as InMemoryBotRepo from "./in-memory/bot-repository";
 import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
+// daily-event リポジトリ（TASK-278 で追加）
+// See: features/command_livingbot.feature
+import * as InMemoryDailyEventRepo from "./in-memory/daily-event-repository";
 // 日次統計リポジトリ（TASK-107 で追加）
 // See: features/admin.feature @ダッシュボードシナリオ群
 import * as InMemoryDailyStatsRepo from "./in-memory/daily-stats-repository";
@@ -124,6 +127,9 @@ export function resetAllStores(): void {
 	// pending-async-command リポジトリのリセット（TASK-270 で追加）
 	// See: features/command_aori.feature
 	InMemoryPendingAsyncCommandRepo.reset();
+	// daily-event リポジトリのリセット（TASK-278 で追加）
+	// See: features/command_livingbot.feature
+	InMemoryDailyEventRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +148,8 @@ export {
 	// ボットリポジトリ（TASK-096 で追加）
 	InMemoryBotRepo,
 	InMemoryCurrencyRepo,
+	// daily-event リポジトリ（TASK-278 で追加）
+	InMemoryDailyEventRepo,
 	// 日次統計リポジトリ（TASK-107 で追加）
 	InMemoryDailyStatsRepo,
 	// Edge-token リポジトリ（TASK-085 で追加）

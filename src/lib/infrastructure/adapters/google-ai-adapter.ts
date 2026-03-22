@@ -61,10 +61,15 @@ const INITIAL_DELAY_MS = 1000;
  * See: tmp/workers/bdd-architect_271/newspaper_design.md §1.4
  */
 export class GoogleAiAdapter implements IGoogleAiAdapter {
-	private readonly ai: GoogleGenAI;
+	private readonly apiKeys: string[];
 
-	constructor(private readonly apiKey: string) {
-		this.ai = new GoogleGenAI({ apiKey: this.apiKey });
+	constructor(apiKeys: string | string[]) {
+		this.apiKeys = Array.isArray(apiKeys) ? apiKeys : [apiKeys];
+	}
+
+	/** API キーをランダムに1つ選択する */
+	private _pickApiKey(): string {
+		return this.apiKeys[Math.floor(Math.random() * this.apiKeys.length)];
 	}
 
 	/**
@@ -108,7 +113,8 @@ export class GoogleAiAdapter implements IGoogleAiAdapter {
 		userPrompt: string;
 		modelId: string;
 	}): Promise<GoogleAiResult> {
-		const response = await this.ai.models.generateContent({
+		const ai = new GoogleGenAI({ apiKey: this._pickApiKey() });
+		const response = await ai.models.generateContent({
 			model: params.modelId,
 			contents: params.userPrompt,
 			config: {

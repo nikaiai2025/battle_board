@@ -257,6 +257,23 @@ export class BattleBoardWorld extends World {
 	grassCountBaseline: Map<string, number> = new Map();
 
 	// -------------------------------------------------------------------------
+	// !livingbot コマンドコンテキスト
+	// See: features/command_livingbot.feature
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 複数スレッドからの !livingbot 実行結果を保持する（比較検証用）。
+	 * See: features/command_livingbot.feature @どのスレッドから実行しても同じ結果が返る
+	 */
+	livingBotResults: string[] = [];
+
+	/**
+	 * ラストボットボーナスの lastBotBonusNotice を保持する。
+	 * See: features/command_livingbot.feature @ラストボットボーナス
+	 */
+	lastBotBonusNotice: string | null = null;
+
+	// -------------------------------------------------------------------------
 	// 時刻制御
 	// See: docs/architecture/bdd_test_strategy.md §5 時刻制御の方針
 	// -------------------------------------------------------------------------
@@ -312,6 +329,10 @@ export class BattleBoardWorld extends World {
 		// See: features/reactions.feature
 		this.lastGrassResult = null;
 		this.grassCountBaseline = new Map();
+		// !livingbot コマンドコンテキストのリセット
+		// See: features/command_livingbot.feature
+		this.livingBotResults = [];
+		this.lastBotBonusNotice = null;
 		// 管理者コンテキストのリセット
 		// See: features/admin.feature
 		this.currentAdminId = null;

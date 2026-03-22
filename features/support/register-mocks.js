@@ -194,6 +194,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/pending-async-command-repository.ts",
 		"./in-memory/pending-async-command-repository.ts",
 	],
+	// daily-event リポジトリ（TASK-278 で追加）
+	// See: features/command_livingbot.feature
+	[
+		"src/lib/infrastructure/repositories/daily-event-repository.ts",
+		"./in-memory/daily-event-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

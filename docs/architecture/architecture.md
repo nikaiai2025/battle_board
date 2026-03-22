@@ -1017,8 +1017,27 @@ supabase/
 | ジョブ | スケジュール | 内容 |
 |---|---|---|
 | bot-scheduler | 毎時 :00, :30（`0,30 * * * *`） | AI API使用BOTの書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
+| newspaper-scheduler | 毎時 :05, :35（`5,35 * * * *`） | !newspaper pending の非同期処理（AI API使用） |
 | daily-maintenance | 毎日 JST 0:00 | 日次リセットID・BOTマークリセット・生存日数加算 |
 | cleanup | 毎日 JST 3:00（初期値） | 期限切れ認証コード削除・不要データ掃除 |
+
+#### 非同期処理の実行トポロジ
+
+非同期コマンド・定期ジョブにおいて、**AI API 呼び出しがどこで実行されるか**を定義する。
+
+**原則（TDR-013 準拠）:** AI API 呼び出しを伴う処理は Vercel/CF Workers 内で実行しない。GitHub Actions 内で完結させる（Vercel Hobby 10秒 / CF Workers 30秒のタイムアウトに収まらないため）。Vercel への API 呼び出しは生成済みテキストの DB 書き込み等の軽量処理に限定する。
+
+| 処理 | トリガー | AI API | 実行場所 | API向き先 | 秘密情報の配置 |
+|---|---|---|---|---|---|
+| テンプレートBOT投稿 | CF Cron (5分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: CF変数 |
+| チュートリアルBOT処理 | CF Cron (5分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: CF変数 |
+| 煽りBOT処理 (!aori) | GH Actions (30分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
+| 新聞配達 (!newspaper) | GH Actions (30分) | **あり** (Gemini) | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: **GH Secrets** |
+| AI BOT投稿 (将来) | GH Actions (30分) | **あり** | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: GH Secrets |
+| daily-maintenance | GH Actions (日次) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
+| cleanup | GH Actions (日次) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
+
+「実行場所」= AI生成等の重い処理が走る環境。「API向き先」= DB書き込み等の軽量処理を受ける環境。
 
 ---
 
@@ -1216,7 +1235,7 @@ supabase/
   - OpenAI: Web検索ツールのAPI提供状況が限定的
   - 複数プロバイダ同時導入: 初期からプロバイダ抽象化を構築するのはYAGNI
 - **将来の拡張**: ユーザー作成ボット（Phase 4）ではモデル選択をユーザーに開放する構想あり。データ構造はこれを見据えて設計するが、選択UIやプロバイダ切り替えロジックは Phase 4 以降で実装
-- **影響範囲**: `ai-adapters/`（Gemini クライアント実装）、`config/` or DB（モデル識別子フィールド追加）、環境変数（`GEMINI_API_KEY`）
+- **影響範囲**: `ai-adapters/`（Gemini クライアント実装）、`config/` or DB（モデル識別子フィールド追加）、環境変数（`GEMINI_API_KEYS`）
 - **関連**: TDR-008（Strategy パターン）、§2.2 AI API 構成要素
 
 ---

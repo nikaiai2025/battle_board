@@ -100,6 +100,7 @@ function createMockBotRepository(
 		create: vi
 			.fn()
 			.mockResolvedValue(createLurkingBot({ botProfileKey: "tutorial" })),
+		countLivingBots: vi.fn().mockResolvedValue(0),
 	};
 }
 

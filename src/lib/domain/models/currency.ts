@@ -54,4 +54,5 @@ export type CreditReason =
 	| "initial_grant" // 新規登録時初期付与
 	| "incentive_thread_creation" // スレッド作成ログインボーナス
 	| "admin_grant" // 管理者による手動付与
-	| "welcome_bonus"; // 初回書き込みボーナス（welcome.feature）
+	| "welcome_bonus" // 初回書き込みボーナス（welcome.feature）
+	| "last_bot_bonus"; // ラストボットボーナス（command_livingbot.feature）

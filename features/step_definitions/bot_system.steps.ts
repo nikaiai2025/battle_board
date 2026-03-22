@@ -26,6 +26,7 @@ import {
 	InMemoryBotPostRepo,
 	InMemoryBotRepo,
 	InMemoryCurrencyRepo,
+	InMemoryDailyEventRepo,
 	InMemoryPostRepo,
 	InMemoryThreadRepo,
 	InMemoryUserRepo,
@@ -71,6 +72,13 @@ function createBotService() {
 		InMemoryBotRepo,
 		InMemoryBotPostRepo,
 		InMemoryAttackRepo,
+		undefined, // botProfilesData
+		undefined, // threadRepository
+		undefined, // createPostFn
+		undefined, // resolveStrategiesFn
+		undefined, // pendingTutorialRepository
+		undefined, // pendingAsyncCommandRepository
+		InMemoryDailyEventRepo, // dailyEventRepository（ラストボットボーナス判定用）
 	);
 }
 
@@ -88,8 +96,13 @@ function createBotServiceWithThread() {
 		InMemoryBotRepo,
 		InMemoryBotPostRepo,
 		InMemoryAttackRepo,
-		undefined,
-		InMemoryThreadRepo,
+		undefined, // botProfilesData
+		InMemoryThreadRepo, // threadRepository
+		undefined, // createPostFn
+		undefined, // resolveStrategiesFn
+		undefined, // pendingTutorialRepository
+		undefined, // pendingAsyncCommandRepository
+		InMemoryDailyEventRepo, // dailyEventRepository（ラストボットボーナス判定用）
 	);
 }
 
@@ -352,6 +365,33 @@ async function executeAttackCommand(
 		} catch (err) {
 			// 撃破通知レス挿入失敗は攻撃レスの成功を巻き戻さない
 			console.error("[BDD executeAttackCommand] 撃破通知レス挿入失敗:", err);
+		}
+	}
+
+	// ラストボットボーナス祝福メッセージ独立レス投稿（lastBotBonusNotice が存在する場合）
+	// AttackHandler が返す lastBotBonusNotice を PostService.createPost() で
+	// ★システム名義の独立レスとして投稿する。
+	// See: features/command_livingbot.feature @その日最後のBOTを撃破するとラストボットボーナス+100が付与される
+	// See: src/lib/services/post-service.ts（PostService 本体での対応箇所）
+	if (result.lastBotBonusNotice) {
+		world.lastBotBonusNotice = result.lastBotBonusNotice;
+		try {
+			const PostService = getPostService();
+			await PostService.createPost({
+				threadId: world.currentThreadId!,
+				body: result.lastBotBonusNotice,
+				edgeToken: null,
+				ipHash: "system",
+				displayName: "★システム",
+				isBotWrite: true,
+				isSystemMessage: true,
+			});
+		} catch (err) {
+			// 祝福メッセージレス挿入失敗は攻撃レスの成功を巻き戻さない
+			console.error(
+				"[BDD executeAttackCommand] ラストボットボーナス祝福レス挿入失敗:",
+				err,
+			);
 		}
 	}
 }

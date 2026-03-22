@@ -223,10 +223,10 @@ Task toolで以下のsubagent_typeを指定してワーカーを起動する:
 
 **実装フェーズ（ステップ3〜7）:**
 - `bdd-architect`: アーキテクトAI（設計・仕様書作成）
-- `bdd-coding`: コーディングAI（実装・単体テスト）
+- `bdd-coding`: コーディングAI（実装・単体テスト）。複雑で難易度の高い実装のときは`Opus`モデルで起動してもよい
 
 **検証フェーズ:**
-- `bdd-gate`: BDDゲートAI。ローカル環境で全テストスイート（単体・BDD・統合・API・E2E）を実行し
+- `bdd-gate`: BDDゲートAI。ローカル環境で全テストスイート（単体・BDD・統合・API・E2E）を実行
 - `bdd-code-reviewer`: コードレビューAI（コード品質検査）
 - `bdd-doc-reviewer`: ドキュメントレビューAI（ドキュメント整合性検査）
 - `bdd-test-auditor`: テスト監査AI（pending管理・テストピラミッド健全性・トレーサビリティ）
