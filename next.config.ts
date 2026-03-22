@@ -5,7 +5,7 @@
  * Next.jsは拡張子付きURLを静的ファイルリクエストとして処理するため、
  * ルートハンドラに到達しない問題をrewritesで解決する。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
  */
 
 import type { NextConfig } from "next";

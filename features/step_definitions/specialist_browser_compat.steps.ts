@@ -16,7 +16,7 @@
  *   - bbsmenu.html: 1件
  *   - インフラ制約: 0件（HTTPS/WAF は cucumber.js の name フィルタで除外）
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  * See: docs/architecture/bdd_test_strategy.md §1 サービス層テスト
  * See: docs/architecture/components/senbra-adapter.md
  */
@@ -138,15 +138,15 @@ Before(() => {
 
 // ---------------------------------------------------------------------------
 // Given: エンコーディング
-// See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
-// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+// See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 // ---------------------------------------------------------------------------
 
 /**
  * 専ブラが任意のエンドポイントにリクエストする。
  * Shift_JISエンコードの検証のため、簡単なテキストをエンコードして状態に保存する。
  *
- * See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+ * See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
  */
 When(
 	"専ブラが任意のエンドポイントにリクエストする",
@@ -161,7 +161,7 @@ When(
 /**
  * レスポンスはShift_JIS（CP932）でエンコードされている。
  *
- * See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+ * See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
  */
 Then(
 	"レスポンスはShift_JIS（CP932）でエンコードされている",
@@ -183,7 +183,7 @@ Then(
  * Route Handlerのレスポンスヘッダを検証する代わりに、
  * BbsCgiResponseBuilderが生成するHTMLのContent-Type metaタグを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+ * See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
  */
 Then(
 	"Content-Typeヘッダに {string} が含まれる",
@@ -205,7 +205,7 @@ Then(
  * 専ブラがShift_JISエンコードされた書き込みデータをPOSTする。
  * テスト用のShift_JISエンコードデータを作成する。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ * See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  */
 When(
 	"専ブラがShift_JISエンコードされた書き込みデータをPOSTする",
@@ -226,7 +226,7 @@ When(
 /**
  * サーバーはShift_JISとしてデコードし内部UTF-8に変換する。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ * See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  */
 Then(
 	"サーバーはShift_JISとしてデコードし内部UTF-8に変換する",
@@ -250,7 +250,7 @@ Then(
 /**
  * 書き込み内容が文字化けなく保存される。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ * See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  */
 Then("書き込み内容が文字化けなく保存される", function (this: BattleBoardWorld) {
 	assert(this.lastResult !== null, "操作結果が存在しません");
@@ -274,9 +274,9 @@ Then("書き込み内容が文字化けなく保存される", function (this: B
 
 // ---------------------------------------------------------------------------
 // Given: エンコーディング（HTML数値参照・異体字セレクタ・ZWJ）
-// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
-// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
-// See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+// See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
 // ---------------------------------------------------------------------------
 
 /**
@@ -330,7 +330,7 @@ async function createPostWithBody(
  * 本文に絵文字 "😅" を含む書き込みが存在する。
  * Shift_JIS範囲外の文字（絵文字等）がHTML数値参照に変換されることを検証するシナリオで使用する。
  *
- * See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+ * See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
  */
 Given(
 	"本文に絵文字 {string} を含む書き込みが存在する",
@@ -343,7 +343,7 @@ Given(
  * 本文に異体字セレクタ付き絵文字 "🕳️" を含む書き込みが存在する。
  * DAT出力時に異体字セレクタが除去されることを検証するシナリオで使用する。
  *
- * See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+ * See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
  */
 Given(
 	"本文に異体字セレクタ付き絵文字 {string} を含む書き込みが存在する",
@@ -356,7 +356,7 @@ Given(
  * 本文に結合絵文字 "👨‍👩‍👧" を含む書き込みが存在する。
  * ZWJ(U+200D)がHTML数値参照として保持されることを検証するシナリオで使用する。
  *
- * See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+ * See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
  */
 Given(
 	"本文に結合絵文字 {string} を含む書き込みが存在する",
@@ -369,7 +369,7 @@ Given(
  * 本文フィールドにZWJのHTML数値参照 "&#8205;" が含まれる。
  * 既存の "本文フィールドに {string} が含まれる" ステップの別文言として機能する。
  *
- * See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+ * See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
  */
 Then(
 	"本文フィールドにZWJのHTML数値参照 {string} が含まれる",
@@ -389,13 +389,13 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Given: subject.txt のスレッド設定
-// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
 // ---------------------------------------------------------------------------
 
 /**
  * スレッドキー "1234567890" のスレッド "テストスレ" が存在し 5件のレスがある。
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
  */
 Given(
 	"スレッドキー {string} のスレッド {string} が存在し {int}件のレスがある",
@@ -426,7 +426,7 @@ Given(
  * 専ブラが /{板ID}/subject.txt にGETリクエストする。
  * SubjectFormatterを直接呼び出してsubject.txtテキストを生成する。
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
  */
 When(
 	/^専ブラが \/[^/]+\/subject\.txt にGETリクエストする$/,
@@ -444,8 +444,8 @@ When(
  * subject.txt / SETTING.TXT 両方のシナリオで使用する。
  * lastSubjectTxt または lastDatText のいずれかに含まれていれば検証成功とする。
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
- * See: features/constraints/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
  */
 Then(
 	"{string} を含むテキストが返される",
@@ -466,7 +466,7 @@ Then(
 /**
  * 1行1スレッドの形式である。
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
  */
 Then("1行1スレッドの形式である", function (this: BattleBoardWorld) {
 	assert(lastSubjectTxt !== null, "subject.txtテキストが生成されていません");
@@ -484,7 +484,7 @@ Then("1行1スレッドの形式である", function (this: BattleBoardWorld) {
 /**
  * レス数が実際の件数と一致する。
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
  */
 Then("レス数が実際の件数と一致する", async function (this: BattleBoardWorld) {
 	assert(lastSubjectTxt !== null, "subject.txtテキストが生成されていません");
@@ -511,13 +511,13 @@ Then("レス数が実際の件数と一致する", async function (this: BattleB
 
 // ---------------------------------------------------------------------------
 // Given/When: bump順テスト
-// See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+// See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
 // ---------------------------------------------------------------------------
 
 /**
  * スレッド "古いスレ" とスレッド "新しいスレ" が存在する。
  *
- * See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+ * See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
  */
 Given(
 	"スレッド {string} とスレッド {string} が存在する",
@@ -549,7 +549,7 @@ Given(
  * "新しいスレ" の最終書き込みが "古いスレ" より新しい。
  * （上のGivenステップで既に設定済みのため、ここでは検証のみ）
  *
- * See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+ * See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
  */
 Given(
 	"{string} の最終書き込みが {string} より新しい",
@@ -576,7 +576,7 @@ Given(
 /**
  * 専ブラが subject.txt を取得する。
  *
- * See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+ * See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
  */
 When(
 	"専ブラが subject.txt を取得する",
@@ -591,7 +591,7 @@ When(
 /**
  * "新しいスレ" の行が "古いスレ" の行より先に出現する。
  *
- * See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+ * See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
  */
 Then(
 	"{string} の行が {string} の行より先に出現する",
@@ -611,13 +611,13 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Given/When: DATファイルのシナリオ
-// See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+// See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
 // ---------------------------------------------------------------------------
 
 /**
  * スレッドキー "1234567890" のスレッドに1件以上のレスがある。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
  */
 Given(
 	"スレッドキー {string} のスレッドに1件以上のレスがある",
@@ -666,7 +666,7 @@ Given(
  * World に currentThreadId が設定されている場合はそちらを優先する。
  * なければ threadKey でリポジトリを検索する。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
  */
 When(
 	/^専ブラが \/([^/]+)\/dat\/(\d+)\.dat にGETリクエストする$/,
@@ -697,7 +697,7 @@ When(
 /**
  * 各行が "名前<>メール<>日付とID<>本文<>スレッドタイトル" 形式である。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
  */
 Then(
 	"各行が {string} 形式である",
@@ -718,13 +718,13 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Given/When: DATの1行目のみスレッドタイトル
-// See: features/constraints/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
+// See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
 // ---------------------------------------------------------------------------
 
 /**
  * スレッド "テストスレ" に3件のレスがある。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
+ * See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
  */
 Given(
 	"スレッド {string} に3件のレスがある",
@@ -770,13 +770,13 @@ Given(
 /**
  * 専ブラが当該DATファイルを取得する。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
- * See: features/constraints/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
- * See: features/constraints/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
- * See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
- * See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
- * See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
- * See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+ * See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
+ * See: features/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
+ * See: features/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
+ * See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+ * See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+ * See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+ * See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
  */
 When(
 	"専ブラが当該DATファイルを取得する",
@@ -790,7 +790,7 @@ When(
 		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
 		const datUtf8 = datFormatter.buildDat(posts, this.currentThreadTitle);
 		// encode → decode のラウンドトリップを通して、専ブラに送信される実際の内容（HTML数値参照変換・異体字セレクタ除去済み）を取得する
-		// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+		// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 		const sjisBuffer = encoder.encode(datUtf8);
 		lastDatText = encoder.decode(sjisBuffer);
 	},
@@ -799,7 +799,7 @@ When(
 /**
  * 1行目の末尾フィールドに "テストスレ" が含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
+ * See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
  */
 Then(
 	"1行目の末尾フィールドに {string} が含まれる",
@@ -827,7 +827,7 @@ Then(
 /**
  * 2行目以降の末尾フィールドは空である。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
+ * See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
  */
 Then("2行目以降の末尾フィールドは空である", function (this: BattleBoardWorld) {
 	assert(lastDatText !== null, "DATテキストが生成されていません");
@@ -852,13 +852,13 @@ Then("2行目以降の末尾フィールドは空である", function (this: Bat
 
 // ---------------------------------------------------------------------------
 // Given/When: 改行がbrタグに変換される
-// See: features/constraints/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
+// See: features/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
 // ---------------------------------------------------------------------------
 
 /**
  * 改行を含む本文 "1行目\n2行目" の書き込みが存在する。
  *
- * See: features/constraints/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
+ * See: features/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
  */
 Given(
 	"改行を含む本文 {string} の書き込みが存在する",
@@ -904,7 +904,7 @@ Given(
 /**
  * 本文フィールドに "1行目<br>2行目" が含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
+ * See: features/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
  */
 Then(
 	"本文フィールドに {string} が含まれる",
@@ -926,7 +926,7 @@ Then(
 /**
  * DATファイル上では1レスが1物理行に収まっている。
  *
- * See: features/constraints/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
+ * See: features/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
  */
 Then(
 	"DATファイル上では1レスが1物理行に収まっている",
@@ -947,13 +947,13 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Given: HTML特殊文字エスケープ
-// See: features/constraints/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
+// See: features/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
 // ---------------------------------------------------------------------------
 
 /**
  * 本文に "<script>" を含む書き込みが存在する。
  *
- * See: features/constraints/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
+ * See: features/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
  */
 Given(
 	"本文に {string} を含む書き込みが存在する",
@@ -996,14 +996,14 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given: 日次リセットID
-// See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+// See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
 // ---------------------------------------------------------------------------
 
 /**
  * ユーザーの日次リセットID が "AbCd1234" である。
  * 特定の日次リセットIDを持つ書き込みを作成する。
  *
- * See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+ * See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
  */
 Given(
 	"ユーザーの日次リセットID が {string} である",
@@ -1047,7 +1047,7 @@ Given(
 /**
  * 当該ユーザーの書き込みを含むDATファイルを取得する。
  *
- * See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+ * See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
  */
 When(
 	"当該ユーザーの書き込みを含むDATファイルを取得する",
@@ -1066,7 +1066,7 @@ When(
 /**
  * 日付フィールドに "ID:AbCd1234" が含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+ * See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
  */
 Then(
 	"日付フィールドに {string} が含まれる",
@@ -1087,7 +1087,7 @@ Then(
 /**
  * 日付フォーマットは "YYYY/MM/DD(曜日) HH:MM:SS.ff ID:xxxxxxxx" 形式である。
  *
- * See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+ * See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
  */
 Then(
 	"日付フォーマットは {string} 形式である",
@@ -1114,15 +1114,15 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Given/When/Then: bbs.cgi 書き込みシナリオ
-// See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
-// See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
-// See: features/constraints/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
+// See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+// See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+// See: features/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
 // ---------------------------------------------------------------------------
 
 /**
  * ユーザーが専ブラで認証済みである。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
  */
 Given(
 	"ユーザーが専ブラで認証済みである",
@@ -1155,7 +1155,7 @@ Given(
  * bbs.cgiに所定のPOSTパラメータ（bbs, key, FROM, mail, MESSAGE, submit）を送信する。
  * BbsCgiParser + PostServiceを直接呼び出してシミュレートする。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
  */
 When(
 	"bbs.cgiに所定のPOSTパラメータ（bbs, key, FROM, mail, MESSAGE, submit）を送信する",
@@ -1223,7 +1223,7 @@ When(
 /**
  * 書き込みがスレッドに追加される。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
  */
 Then("書き込みがスレッドに追加される", async function (this: BattleBoardWorld) {
 	assert(this.lastResult !== null, "操作結果が存在しません");
@@ -1240,7 +1240,7 @@ Then("書き込みがスレッドに追加される", async function (this: Batt
 /**
  * レスポンスのtitleタグに "書きこみました" が含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
  */
 Then(
 	"レスポンスのtitleタグに {string} が含まれる",
@@ -1262,7 +1262,7 @@ Then(
 /**
  * bbs.cgiにsubjectパラメータ付きでPOSTする（新規スレッド作成）。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
  */
 When(
 	"bbs.cgiにsubjectパラメータ付きでPOSTする",
@@ -1319,7 +1319,7 @@ When(
 /**
  * 新しいスレッドが作成される。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
  */
 Then("新しいスレッドが作成される", async function (this: BattleBoardWorld) {
 	assert(this.lastResult !== null, "操作結果が存在しません");
@@ -1336,7 +1336,7 @@ Then("新しいスレッドが作成される", async function (this: BattleBoar
 /**
  * subject.txtに新スレッドが追加される。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
  */
 Then(
 	"subject.txtに新スレッドが追加される",
@@ -1357,7 +1357,7 @@ Then(
 /**
  * 本文が空の状態でbbs.cgiにPOSTする（エラーシナリオ）。
  *
- * See: features/constraints/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
+ * See: features/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
  */
 When(
 	"本文が空の状態でbbs.cgiにPOSTする",
@@ -1423,7 +1423,7 @@ When(
 /**
  * エラー理由がbodyに含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
+ * See: features/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
  */
 Then("エラー理由がbodyに含まれる", function (this: BattleBoardWorld) {
 	assert(lastBbsCgiHtml !== null, "bbs.cgi HTMLレスポンスが生成されていません");
@@ -1439,14 +1439,14 @@ Then("エラー理由がbodyに含まれる", function (this: BattleBoardWorld) 
 
 // ---------------------------------------------------------------------------
 // Given/When/Then: 差分同期（Range/304）
-// See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
-// See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+// See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+// See: features/specialist_browser_compat.feature @更新がない場合は304を返す
 // ---------------------------------------------------------------------------
 
 /**
  * スレッドのDATファイルが15024バイトである。
  *
- * See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+ * See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
  */
 Given(
 	"スレッドのDATファイルが{int}バイトである",
@@ -1501,7 +1501,7 @@ Given(
  * 専ブラが "Range: bytes=15024-" ヘッダ付きでDATファイルをリクエストする。
  * DatFormatterとShiftJisEncoderを直接使用して差分応答をシミュレートする。
  *
- * See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+ * See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
  */
 When(
 	"専ブラが {string} ヘッダ付きでDATファイルをリクエストする",
@@ -1545,7 +1545,7 @@ When(
 /**
  * 新しいレスが追加されている。
  *
- * See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+ * See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
  */
 When("新しいレスが追加されている", async function (this: BattleBoardWorld) {
 	const PostService = getPostService();
@@ -1595,7 +1595,7 @@ When("新しいレスが追加されている", async function (this: BattleBoar
 /**
  * ステータスコード 206 Partial Content が返される。
  *
- * See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+ * See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
  */
 Then(
 	"ステータスコード {int} Partial Content が返される",
@@ -1618,7 +1618,7 @@ Then(
 /**
  * 15024バイト目以降の差分データのみがレスポンスされる。
  *
- * See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+ * See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
  */
 Then(
 	"{int}バイト目以降の差分データのみがレスポンスされる",
@@ -1647,7 +1647,7 @@ Then(
 /**
  * スレッドのDATファイルに前回リクエスト以降の更新がない。
  *
- * See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+ * See: features/specialist_browser_compat.feature @更新がない場合は304を返す
  */
 Given(
 	"スレッドのDATファイルに前回リクエスト以降の更新がない",
@@ -1696,7 +1696,7 @@ Given(
  * 専ブラが If-Modified-Since ヘッダ付きでリクエストする。
  * last_post_at と If-Modified-Since を比較して304判定をシミュレートする。
  *
- * See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+ * See: features/specialist_browser_compat.feature @更新がない場合は304を返す
  */
 When(
 	"専ブラが If-Modified-Since ヘッダ付きでリクエストする",
@@ -1731,7 +1731,7 @@ When(
 /**
  * ステータスコード 304 Not Modified が返される。
  *
- * See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+ * See: features/specialist_browser_compat.feature @更新がない場合は304を返す
  */
 Then(
 	"ステータスコード {int} Not Modified が返される",
@@ -1754,7 +1754,7 @@ Then(
 /**
  * レスポンスボディは空である。
  *
- * See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+ * See: features/specialist_browser_compat.feature @更新がない場合は304を返す
  */
 Then("レスポンスボディは空である", function (this: BattleBoardWorld) {
 	assert(this.lastResult !== null, "操作結果が存在しません");
@@ -1768,14 +1768,14 @@ Then("レスポンスボディは空である", function (this: BattleBoardWorld
 
 // ---------------------------------------------------------------------------
 // When/Then: SETTING.TXT
-// See: features/constraints/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
+// See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
 // ---------------------------------------------------------------------------
 
 /**
  * 専ブラが /{板ID}/SETTING.TXT にGETリクエストする。
  * SETTING.TXTの固定テキストをShift_JISエンコードして確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
+ * See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
  */
 When(
 	/^専ブラが \/[^/]+\/SETTING\.TXT にGETリクエストする$/,
@@ -1802,7 +1802,7 @@ When(
 /**
  * "BBS_NONAME_NAME=名無しさん" が含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
+ * See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
  */
 Then(
 	"{string} が含まれる",
@@ -1817,14 +1817,14 @@ Then(
 
 // ---------------------------------------------------------------------------
 // When/Then: bbsmenu.html
-// See: features/constraints/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
+// See: features/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
 // ---------------------------------------------------------------------------
 
 /**
  * 専ブラが /bbsmenu.html にGETリクエストする。
  * bbsmenu.htmlの固定HTMLを生成して検証する。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
  */
 When(
 	/^専ブラが \/bbsmenu\.html にGETリクエストする$/,
@@ -1850,7 +1850,7 @@ When(
 /**
  * 板へのリンクを含むHTMLが返される。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
  */
 Then("板へのリンクを含むHTMLが返される", function (this: BattleBoardWorld) {
 	assert(lastBbsCgiHtml !== null, "bbsmenu.html HTMLが生成されていません");
@@ -1864,7 +1864,7 @@ Then("板へのリンクを含むHTMLが返される", function (this: BattleBoa
 /**
  * リンク先が板のルートURLを指している。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
  */
 Then("リンク先が板のルートURLを指している", function (this: BattleBoardWorld) {
 	assert(lastBbsCgiHtml !== null, "bbsmenu.html HTMLが生成されていません");
@@ -1877,7 +1877,7 @@ Then("リンク先が板のルートURLを指している", function (this: Batt
 
 // ---------------------------------------------------------------------------
 // When/Then: bbsmenu.json
-// See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+// See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
 // ---------------------------------------------------------------------------
 
 /**
@@ -1900,7 +1900,7 @@ Before(() => {
  * 専ブラが /bbsmenu.json にGETリクエストする。
  * buildBbsMenuJson() の出力を直接検証する。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
  */
 When(
 	/^専ブラが \/bbsmenu\.json にGETリクエストする$/,
@@ -1929,7 +1929,7 @@ When(
 /**
  * JSON形式のレスポンスが返される。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
  */
 Then("JSON形式のレスポンスが返される", function (this: BattleBoardWorld) {
 	assert(
@@ -1946,7 +1946,7 @@ Then("JSON形式のレスポンスが返される", function (this: BattleBoardW
 /**
  * menu_list配列に板情報が含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
  */
 Then("menu_list配列に板情報が含まれる", function (this: BattleBoardWorld) {
 	assert(
@@ -1984,7 +1984,7 @@ Then("menu_list配列に板情報が含まれる", function (this: BattleBoardWo
 /**
  * 各板にurl, board_name, directory_nameが含まれる。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
  */
 Then(
 	"各板にurl, board_name, directory_nameが含まれる",
@@ -2026,7 +2026,7 @@ Then(
 /**
  * Content-Typeが "application/json" である。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
  */
 Then(
 	"Content-Typeが {string} である",
@@ -2044,7 +2044,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // G4: 専ブラ認証フロー
-// See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+// See: features/specialist_browser_compat.feature @専ブラ認証フロー
 // ---------------------------------------------------------------------------
 // 専ブラはTurnstileウィジェットを表示できないため、Webブラウザで認証を完了し
 // write_tokenをメール欄に貼り付ける方式で認証を橋渡しする。
@@ -2076,8 +2076,8 @@ import {
  * ユーザーが専ブラで未認証である。
  * edge-token を持っていない状態（isVerified=false）。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
- * See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+ * See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+ * See: features/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
  */
 Given(
 	"ユーザーが専ブラで未認証である",
@@ -2102,8 +2102,8 @@ Given(
  * 未認証（isVerified=false）のユーザーが書き込みを試みる。
  * PostService.createPost は authRequired を返し、認証コードを発行する。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
- * See: features/constraints/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
+ * See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+ * See: features/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
  */
 When("bbs.cgiに書き込みをPOSTする", async function (this: BattleBoardWorld) {
 	const PostService = getPostService();
@@ -2148,7 +2148,7 @@ When("bbs.cgiに書き込みをPOSTする", async function (this: BattleBoardWor
  * レスポンスに認証コードと認証ページURLが含まれる。
  * authRequired が返されていることを確認する（認証コードが発行されている）。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+ * See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
  */
 Then(
 	"レスポンスに認証コードと認証ページURLが含まれる",
@@ -2173,7 +2173,7 @@ Then(
  * edge-token Cookie が発行される（専ブラシナリオ用）。
  * authRequired 時に edge-token が設定されていることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+ * See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
  */
 Then("edge-token Cookieが発行される", function (this: BattleBoardWorld) {
 	assert(
@@ -2189,7 +2189,7 @@ Then("edge-token Cookieが発行される", function (this: BattleBoardWorld) {
  * ユーザーが認証ページで認証を完了し write_token を取得している。
  * verifyAuthCode を呼び出して認証を完了させ、write_token を World に保存する。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  */
 Given(
 	"ユーザーが認証ページで認証を完了しwrite_tokenを取得している",
@@ -2197,7 +2197,7 @@ Given(
 		const AuthService = getAuthService();
 
 		// 前のシナリオで Date.now が freeze されている場合に備えて実時刻に戻す
-		// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+		// See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
 		this.restoreDateNow();
 
 		// Turnstile を成功状態に設定する
@@ -2237,7 +2237,7 @@ Given(
  * bbs.cgi のメール欄に "#<write_token>" を含めて POST する。
  * write_token を AuthService.verifyWriteToken で検証し、成功したら書き込みを行う。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  */
 When(
 	"bbs.cgiのメール欄に {string} を含めてPOSTする",
@@ -2346,7 +2346,7 @@ When(
  * write_token が検証される。
  * 書き込みが成功していることで write_token 検証が通ったことを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  */
 Then("write_tokenが検証される", function (this: BattleBoardWorld) {
 	assert(
@@ -2359,7 +2359,7 @@ Then("write_tokenが検証される", function (this: BattleBoardWorld) {
  * edge-token Cookie が有効化される（write_token検証後）。
  * 書き込みが成功していることで edge-token が有効化されたことを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  */
 Then("edge-token Cookieが有効化される", function (this: BattleBoardWorld) {
 	assert(
@@ -2375,7 +2375,7 @@ Then("edge-token Cookieが有効化される", function (this: BattleBoardWorld)
  * メール欄の write_token は書き込みデータに含まれない。
  * 書き込み成功時に email フィールドに write_token が含まれていないことを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  */
 Then(
 	"メール欄のwrite_tokenは書き込みデータに含まれない",
@@ -2398,7 +2398,7 @@ Then(
  * ユーザーが Web ブラウザで認証を完了している。
  * isVerified=true のユーザーを作成する。
  *
- * See: features/constraints/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
+ * See: features/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
  */
 Given(
 	"ユーザーがWebブラウザで認証を完了している",
@@ -2406,7 +2406,7 @@ Given(
 		const AuthService = getAuthService();
 
 		// 前のシナリオで Date.now が freeze されている場合に備えて実時刻に戻す
-		// See: features/constraints/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
+		// See: features/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
 		this.restoreDateNow();
 
 		// Turnstile を成功状態に設定する
@@ -2438,7 +2438,7 @@ Given(
  * 専ブラが Web ブラウザと Cookie を共有している。
  * Cookie 共有をシミュレート: 同じ edge-token を this.currentEdgeToken として保持している。
  *
- * See: features/constraints/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
+ * See: features/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
  */
 Given(
 	"専ブラがWebブラウザとCookieを共有している",
@@ -2453,16 +2453,16 @@ Given(
 
 // ---------------------------------------------------------------------------
 // Given/When/Then: エンコーディング — HTML数値参照・異体字セレクタ・ZWJ
-// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
-// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
-// See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+// See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
 // ---------------------------------------------------------------------------
 
 /**
  * 全角？への置換は行われない。
  * CP932非対応文字がHTML数値参照に変換されており、全角？（U+FF1F）が含まれないことを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+ * See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
  */
 Then("全角？への置換は行われない", function (this: BattleBoardWorld) {
 	assert(lastDatText !== null, "DATテキストが生成されていません");
@@ -2484,7 +2484,7 @@ Then("全角？への置換は行われない", function (this: BattleBoardWorld
  * 本文フィールドに異体字セレクタ(U+FE0F, U+FE0E)が含まれない。
  * DAT出力時に異体字セレクタが除去されていることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+ * See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
  */
 Then(
 	/^本文フィールドに異体字セレクタ\(U\+FE0F, U\+FE0E\)が含まれない$/,
@@ -2519,7 +2519,7 @@ Then(
  * 基底文字のHTML数値参照 "&#128371;" は保持される。
  * 異体字セレクタ除去後も基底文字（絵文字本体）のHTML数値参照が保持されることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+ * See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
  */
 Then(
 	"基底文字のHTML数値参照 {string} は保持される",
@@ -2542,7 +2542,7 @@ Then(
  * 結合絵文字の構成要素（各絵文字）がHTML数値参照として保持されることを確認する。
  * 👨(&#128104;)、👩(&#128105;)、👧(&#128103;) が含まれることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+ * See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
  */
 Then("各構成文字のHTML数値参照も保持される", function (this: BattleBoardWorld) {
 	assert(lastDatText !== null, "DATテキストが生成されていません");
@@ -2576,7 +2576,7 @@ Then("各構成文字のHTML数値参照も保持される", function (this: Bat
  * bbs.cgi のメール欄に無効な write_token を含めて POST する。
  * 無効なトークンで書き込みを試みる。
  *
- * See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+ * See: features/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
  */
 When(
 	"bbs.cgiのメール欄に無効なwrite_tokenを含めてPOSTする",
@@ -2619,9 +2619,9 @@ When(
 
 // ---------------------------------------------------------------------------
 // Given/When/Then: URL体系互換（5ch URLスキーム）
-// See: features/constraints/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
-// See: features/constraints/specialist_browser_compat.feature @板トップURLがアクセス可能である
-// See: features/constraints/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
+// See: features/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
+// See: features/specialist_browser_compat.feature @板トップURLがアクセス可能である
+// See: features/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
 // ---------------------------------------------------------------------------
 
 /**
@@ -2643,7 +2643,7 @@ Before(() => {
  * スレッドキー {string} のスレッドが存在する。
  * read.cgiシナリオで使用する（レス数・タイトル指定なしのシンプルな前提条件）。
  *
- * See: features/constraints/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
+ * See: features/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
  */
 Given(
 	"スレッドキー {string} のスレッドが存在する",
@@ -2666,7 +2666,7 @@ Given(
  * リダイレクト先（Location ヘッダ）を this.lastResult.data.redirectTarget に保存し、
  * thread.steps.ts の共通 Then ステップ（"/xxx/yyy/ にリダイレクトされる"）で検証する。
  *
- * See: features/constraints/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
+ * See: features/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
  */
 When(
 	/^\/test\/read\.cgi\/[^/]+\/(\S+?)\/ にGETリクエストする$/,
@@ -2714,7 +2714,7 @@ When(
  * Next.js Server Component は Route Handler として直接呼び出せないため、
  * サービス層テストとして PostService.getThreadList() で確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @板トップURLがアクセス可能である
+ * See: features/specialist_browser_compat.feature @板トップURLがアクセス可能である
  * See: tmp/workers/bdd-architect_TASK-162/design.md §1.2 板URLの直接表示
  */
 When(
@@ -2748,7 +2748,7 @@ When(
  * 専ブラが /{板ID}/kako/ 配下のDATファイルをリクエストする。
  * Route Handlerの GET 関数を直接呼び出して404応答を検証する。
  *
- * See: features/constraints/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
+ * See: features/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
  */
 When(
 	/^専ブラが \/[^/]+\/kako\/ 配下のDATファイルをリクエストする$/,
@@ -2777,7 +2777,7 @@ When(
  * ステータスコード 404 が返される。
  * kako 404 シナリオ用（既存の 206/304 ステップとは別のステップ文言）。
  *
- * See: features/constraints/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
+ * See: features/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
  */
 Then("ステータスコード 404 が返される", function (this: BattleBoardWorld) {
 	assert(lastUrlCompatResponse !== null, "URLリクエストが実行されていません");
@@ -2792,7 +2792,7 @@ Then("ステータスコード 404 が返される", function (this: BattleBoard
  * 専ブラが解釈可能な形式で応答する。
  * Content-Type に Shift_JIS が含まれることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
+ * See: features/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
  */
 Then("専ブラが解釈可能な形式で応答する", function (this: BattleBoardWorld) {
 	assert(lastUrlCompatResponse !== null, "URLリクエストが実行されていません");
@@ -2806,7 +2806,7 @@ Then("専ブラが解釈可能な形式で応答する", function (this: BattleB
 
 // ---------------------------------------------------------------------------
 // Given/When/Then: Cookie保存・再送信シナリオ
-// See: features/constraints/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
+// See: features/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
 // ---------------------------------------------------------------------------
 
 /**
@@ -2814,7 +2814,7 @@ Then("専ブラが解釈可能な形式で応答する", function (this: BattleB
  * AuthServiceでwrite_tokenを発行・検証してユーザーをisVerified=true状態にする。
  * 以降の When ステップで currentEdgeToken を使って再書き込みを行う。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
+ * See: features/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
  */
 Given(
 	"ユーザーがwrite_tokenで書き込みに成功しedge-token Cookieが発行されている",
@@ -2887,7 +2887,7 @@ Given(
  * 前のGivenで取得したedge-tokenをCookieとして送信し、再認証なしで書き込む。
  * これはChMateがSet-Cookieを受け取って次回リクエストでCookieを送信する動作をシミュレートする。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
+ * See: features/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
  */
 When(
 	"専ブラがwrite_tokenなしでbbs.cgiに再度POSTする",
@@ -2933,7 +2933,7 @@ When(
  * サービス層テストではHTTPレベルのCookieヘッダを直接検証できないため、
  * currentEdgeTokenが存在し、書き込みに使用された（successであること）を確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
+ * See: features/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
  */
 Then(
 	"リクエストのCookieヘッダにedge-tokenが含まれる",
@@ -2953,7 +2953,7 @@ Then(
  * 再認証は要求されない。
  * 前のWhenの結果がauthRequiredではなくsuccessであることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
+ * See: features/specialist_browser_compat.feature @専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
  */
 Then("再認証は要求されない", function (this: BattleBoardWorld) {
 	assert(this.lastResult !== null, "操作結果が存在しません");
@@ -2971,7 +2971,7 @@ Then("再認証は要求されない", function (this: BattleBoardWorld) {
 
 // ---------------------------------------------------------------------------
 // Given/When/Then: Set-Cookie非互換属性シナリオ
-// See: features/constraints/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
+// See: features/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
 // ---------------------------------------------------------------------------
 
 /**
@@ -2989,7 +2989,7 @@ Before(() => {
  * route.tsのsetEdgeTokenCookie関数を直接呼び出してSet-Cookieヘッダを取得する。
  * 専ブラ非互換属性（Secure/SameSite）が含まれないことを検証するためのWhenステップ。
  *
- * See: features/constraints/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
+ * See: features/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
  * See: src/app/(senbra)/test/bbs.cgi/route.ts > setEdgeTokenCookie
  * See: github.com/edginer/eddist > eddist-server/src/shiftjis.rs > add_set_cookie
  */
@@ -3020,7 +3020,7 @@ When(
  * Set-CookieヘッダにSecure属性が含まれない。
  * ChMateはSecure属性付きCookieを保存しないため、この属性が不在であることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
+ * See: features/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
  */
 Then(
 	"Set-CookieヘッダにSecure属性が含まれない",
@@ -3041,7 +3041,7 @@ Then(
  * Set-CookieヘッダにSameSite属性が含まれない。
  * ChMateはSameSite属性付きCookieを保存しないため、この属性が不在であることを確認する。
  *
- * See: features/constraints/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
+ * See: features/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
  */
 Then(
 	"Set-CookieヘッダにSameSite属性が含まれない",
@@ -3062,7 +3062,7 @@ Then(
  * HttpOnly属性はJavaScriptからのCookieアクセスを防ぐセキュリティ属性であり、
  * 専ブラ互換性に影響しないため設定する。
  *
- * See: features/constraints/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
+ * See: features/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
  */
 Then(
 	"Set-CookieヘッダにHttpOnly属性が含まれる",
@@ -3083,7 +3083,7 @@ Then(
  * Path=/はすべてのパスでCookieが送信されるよう設定し、
  * bbs.cgi/subject.txt等の複数エンドポイントでCookieが機能するようにする。
  *
- * See: features/constraints/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
+ * See: features/specialist_browser_compat.feature @edge-token CookieのSet-Cookieヘッダに専ブラ非互換属性を含まない
  */
 Then("Set-CookieヘッダにPath=\\/が含まれる", function (this: BattleBoardWorld) {
 	assert(lastSetCookieHeader !== null, "Set-Cookieヘッダが生成されていません");
@@ -3101,9 +3101,9 @@ Then("Set-CookieヘッダにPath=\\/が含まれる", function (this: BattleBoar
 // 代替検証: Sprint-20で実機検証済み（ChMateのHTTP:80要件確定）
 //   HTTP:80直接応答とWAFはCloudflareインフラ設定で保証される。
 //   自動テスト化は本番Smoke（D-10 §14）拡充時に検討する。
-// See: features/constraints/specialist_browser_compat.feature @専ブラの5chプロトコル通信がHTTP:80で直接応答される
-// See: features/constraints/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
-// See: features/constraints/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
+// See: features/specialist_browser_compat.feature @専ブラの5chプロトコル通信がHTTP:80で直接応答される
+// See: features/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
+// See: features/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
 // See: docs/research/chmate_debug_report_2026-03-14.md（パケットキャプチャによる確定診断）
 // ---------------------------------------------------------------------------
 
@@ -3112,7 +3112,7 @@ Then("Set-CookieヘッダにPath=\\/が含まれる", function (this: BattleBoar
  * HTTP:80の直接応答はCloudflare Workers/Pagesのインフラ設定で保証するものであり、
  * BDD単体テストでは検証不可能。Sprint-20で実機検証済み。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラの5chプロトコル通信がHTTP:80で直接応答される
+ * See: features/specialist_browser_compat.feature @専ブラの5chプロトコル通信がHTTP:80で直接応答される
  */
 When("専ブラがHTTP:80で subject.txt にGETリクエストする", () => {
 	// インフラ制約: HTTP:80直接応答はCloudflare Workers設定で保証する。
@@ -3124,7 +3124,7 @@ When("専ブラがHTTP:80で subject.txt にGETリクエストする", () => {
 /**
  * HTTPSリダイレクトなしで直接レスポンスが返される（インフラ制約・Pending）。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラの5chプロトコル通信がHTTP:80で直接応答される
+ * See: features/specialist_browser_compat.feature @専ブラの5chプロトコル通信がHTTP:80で直接応答される
  */
 Then("HTTPSリダイレクトなしで直接レスポンスが返される", () => "pending");
 
@@ -3133,21 +3133,21 @@ Then("HTTPSリダイレクトなしで直接レスポンスが返される", () 
  * HTTP→HTTPSリダイレクトが発生するとChMateはPOSTペイロードを消失する。
  * この制約はCloudflare Workers/PagesのHTTP:80設定で保証する。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
+ * See: features/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
  */
 When("専ブラがHTTP:80でbbs.cgiにPOSTする", () => "pending");
 
 /**
  * HTTPSリダイレクトなしでPOSTが直接処理される（インフラ制約・Pending）。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
+ * See: features/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
  */
 Then("HTTPSリダイレクトなしでPOSTが直接処理される", () => "pending");
 
 /**
  * POSTペイロードが保持される（インフラ制約・Pending）。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
+ * See: features/specialist_browser_compat.feature @bbs.cgiへのHTTP:80 POSTが直接処理される
  */
 Then("POSTペイロードが保持される", () => "pending");
 
@@ -3156,7 +3156,7 @@ Then("POSTペイロードが保持される", () => "pending");
  * ChMate等の専ブラは "Monazilla/1.00" をUser-Agentに含む。
  * WAF設定はCloudflareインフラレベルで管理される。Sprint-20で実機検証済み。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
+ * See: features/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
  */
 When(
 	"{string} をUser-Agentに含むリクエストが送信される",
@@ -3170,13 +3170,13 @@ When(
 /**
  * リクエストは正常に処理される（WAF非ブロックシナリオ・Pending）。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
+ * See: features/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
  */
 Then("リクエストは正常に処理される", () => "pending");
 
 /**
  * WAFやCDNによるブロックが発生しない（インフラ制約・Pending）。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
+ * See: features/specialist_browser_compat.feature @専ブラ特有のUser-AgentがWAFにブロックされない
  */
 Then("WAFやCDNによるブロックが発生しない", () => "pending");

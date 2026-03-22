@@ -1,5 +1,5 @@
-# features/constraints/specialist_browser_compat.feature
-# ステータス: ドラフト v4
+# features/specialist_browser_compat.feature
+# ステータス: 承認済み v4
 #
 # NOTE: このファイルはユーザーストーリーではなく「プロトコル準拠の制約条件」を
 # Gherkin形式で記述したもの。5ch専用ブラウザ（ChMate, Siki等）との互換性を

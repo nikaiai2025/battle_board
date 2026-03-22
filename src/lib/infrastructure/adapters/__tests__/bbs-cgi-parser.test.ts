@@ -1,6 +1,6 @@
 /**
  * BbsCgiParser 単体テスト
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario 専ブラからの書き込みが正常に処理される
  *   @scenario 専ブラからの新規スレッド作成が正常に処理される
  *   @scenario 書き込みエラー時に専ブラが認識できるエラーレスポンスが返される

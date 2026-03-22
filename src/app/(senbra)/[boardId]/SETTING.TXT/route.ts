@@ -4,7 +4,7 @@
  * 5ch専用ブラウザが板の設定情報を取得するためのエンドポイント。
  * 固定テキストをShift_JIS（CP932）エンコードして返す。
  *
- * See: features/constraints/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
+ * See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
  * See: docs/specs/openapi.yaml > /{boardId}/SETTING.TXT
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
@@ -37,7 +37,7 @@ const DEFAULT_BOARD_SETTINGS = {
  *
  * 5ch互換のSETTING.TXT形式のテキストをShift_JISエンコードして返す。
  *
- * See: features/constraints/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
+ * See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
  *
  * @param _req - リクエスト（未使用）
  * @param params - ルートパラメータ（boardId）

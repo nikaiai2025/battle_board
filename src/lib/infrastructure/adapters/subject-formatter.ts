@@ -4,7 +4,7 @@
  * 5ch専用ブラウザが要求するsubject.txt形式（1スレッド1行）のテキストを生成する。
  * UTF-8文字列を返す。Shift_JISへの変換は呼び出し元（Route Handler）が担う。
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario subject.txtが所定のフォーマットで返される
  *   @scenario 複数スレッドがbump順（最終書き込み順）で並ぶ
  * See: docs/architecture/components/senbra-adapter.md §2 SubjectFormatter, §3 公開インターフェース

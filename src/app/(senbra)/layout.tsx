@@ -5,7 +5,7 @@
  * 専ブラはHTMLページとしてではなく、DAT/テキスト/HTMLレスポンスを直接処理するため、
  * このレイアウトはHTMLシェルを提供せず、childrenをそのまま返す最小限の構成にする。
  *
- * See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+ * See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
  * See: docs/architecture/components/senbra-adapter.md §1 分割方針
  */
 

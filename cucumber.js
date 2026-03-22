@@ -52,7 +52,7 @@ module.exports = {
 			"features/currency.feature",
 			"features/incentive.feature",
 			"features/admin.feature",
-			"features/constraints/specialist_browser_compat.feature",
+			"features/specialist_browser_compat.feature",
 			"features/mypage.feature",
 			"features/command_system.feature",
 			"features/ai_accusation.feature",

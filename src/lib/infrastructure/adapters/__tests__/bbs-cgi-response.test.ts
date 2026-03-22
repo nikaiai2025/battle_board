@@ -6,7 +6,7 @@
  *   - buildError() — エラーレスポンスHTML生成
  *   - buildAuthRequired() — 認証案内レスポンスHTML生成（baseUrl引数で絶対URL生成）
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario 書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
  *   @scenario 専ブラからの初回書き込みで認証案内が返される
  *   @scenario 認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
@@ -79,13 +79,13 @@ describe("BbsCgiResponseBuilder", () => {
 
   // ---------------------------------------------------------------------------
   // buildAuthRequired()
-  // See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+  // See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
   // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
   // ---------------------------------------------------------------------------
 
   // ---------------------------------------------------------------------------
   // buildAuthRequired()
-  // See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+  // See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
   // See: tmp/auth_spec_review_report.md §3.2 write_token 方式
   // ---------------------------------------------------------------------------
 

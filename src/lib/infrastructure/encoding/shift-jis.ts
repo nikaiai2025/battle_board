@@ -4,7 +4,7 @@
  * Application Layer（サービス層）にはShift_JIS関連の処理を一切漏出させない設計のため、
  * このモジュールはPresentation Layer（専ブラ互換Route Handler）からのみ使用する。
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
  *   @scenario 専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  * See: docs/architecture/components/senbra-adapter.md §2 ShiftJisEncoder
@@ -31,7 +31,7 @@ import iconv from "iconv-lite";
  *
  * NOTE: &#x形式（16進数）はChMateが使用しないため対象外とする。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ * See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  *
  * @param text - デコード対象のUTF-8文字列（HTML数値参照を含む可能性がある）
  * @returns HTML数値参照をUTF-8文字に逆変換し、U+FFFDを除去した文字列
@@ -94,7 +94,7 @@ function urlDecodeToBytes(str: string): Uint8Array {
  * Shift_JIS/DATの文脈では不要なため除去する。
  * HTML数値参照に変換すると専ブラで文字化けマークとして表示されるため、除去が正しい処理。
  *
- * See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+ * See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
  */
 const VARIATION_SELECTORS = new Set([0xfe0f, 0xfe0e]);
 
@@ -129,7 +129,7 @@ export class ShiftJisEncoder {
 	 * NOTE: BOT絵文字（🤖等）はDAT出力時にDatFormatterで[BOT]に事前置換される。
 	 * それ以外のCP932非対応文字（ユーザー入力の任意の絵文字等）はここでHTML数値参照に変換される。
 	 *
-	 * See: features/constraints/specialist_browser_compat.feature
+	 * See: features/specialist_browser_compat.feature
 	 *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
 	 *   @scenario Shift_JIS範囲外の文字がHTML数値参照として保持される
 	 *
@@ -153,7 +153,7 @@ export class ShiftJisEncoder {
 	 * Cloudflare WorkersではPOSTボディがUint8Arrayとして渡される場合があるため、
 	 * BufferとUint8Arrayの両方を受け付ける。
 	 *
-	 * See: features/constraints/specialist_browser_compat.feature
+	 * See: features/specialist_browser_compat.feature
 	 *   @scenario 専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 	 *
 	 * @param buffer - デコード対象のShift_JIS(CP932) Buffer または Uint8Array
@@ -180,7 +180,7 @@ export class ShiftJisEncoder {
 	 * 4. rawバイト列をShift-JIS→UTF-8にデコード
 	 * 5. UTF-8のURLSearchParamsを構築して返す
 	 *
-	 * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+	 * See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 	 *
 	 * @param bodyBuffer - application/x-www-form-urlencoded 形式のリクエストボディ（Shift-JIS URL-エンコード済み）
 	 * @returns デコード済みUTF-8のURLSearchParams
@@ -245,7 +245,7 @@ export class ShiftJisEncoder {
 	 * 2. CP932非対応文字 (U+10000以上のサロゲートペア、U+200D等) → HTML数値参照 (&#NNNNN;)
 	 * 3. CP932対応文字 → そのまま出力
 	 *
-	 * See: features/constraints/specialist_browser_compat.feature
+	 * See: features/specialist_browser_compat.feature
 	 *   @scenario Shift_JIS範囲外の文字がHTML数値参照として保持される
 	 *   @scenario 異体字セレクタがDAT出力時に除去される
 	 *   @scenario ゼロ幅接合子(ZWJ)がHTML数値参照として保持される

@@ -108,7 +108,7 @@ export async function deleteExpired(): Promise<number> {
  * AuthService.verifyAuthCode が認証成功後に専ブラ向け write_token を発行する際に呼ばれる。
  *
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts > updateWriteToken
- * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 export async function updateWriteToken(
@@ -128,7 +128,7 @@ export async function updateWriteToken(
  * AuthService.verifyWriteToken が専ブラ認証フローでトークン検証する際に呼ばれる。
  *
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts > findByWriteToken
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: tmp/escalations/escalation_ESC-TASK-041-1.md — ESC解決用追加
  */
 export async function findByWriteToken(

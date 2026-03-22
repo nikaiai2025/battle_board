@@ -1,5 +1,5 @@
 # features/command_system.feature
-# ステータス: ドラフト v5
+# ステータス: 承認済み v5
 #
 # Phase 2スコープ: !tell, !w のみ実装
 # ステルス系コマンド（US-015: !disguise等）は後続フェーズで対応

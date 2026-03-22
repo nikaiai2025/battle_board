@@ -12,7 +12,7 @@
  *   - 外部依存（ThreadRepository, PostRepository, PostService）はすべてvitest.mock
  *   - ShiftJisEncoderの実際の変換を使用してエンコーディング検証を行う
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  * See: docs/architecture/components/senbra-adapter.md
  */
 
@@ -1048,8 +1048,8 @@ describe("bbs.cgi Route Handler", () => {
 
 	// ---------------------------------------------------------------------------
 	// write_token 関連テスト
-	// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
-	// See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+	// See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+	// See: features/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
 	// See: tmp/auth_spec_review_report.md §3.2 write_token 方式
 	// ---------------------------------------------------------------------------
 

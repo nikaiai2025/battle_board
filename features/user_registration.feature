@@ -1,5 +1,5 @@
 # features/user_registration.feature
-# ステータス: ドラフト v1
+# ステータス: 承認済み v1
 #
 # 設計背景:
 #   Phase 1-2 では edge-token + 認証コードによる「仮ユーザー」のみが存在した。
@@ -16,7 +16,7 @@
 #   状態遷移 → D-05 docs/specs/user_registration_state_transitions.yaml
 #   既存認証 → features/authentication.feature
 #   既存マイページ → features/mypage.feature
-#   専ブラ互換 → features/constraints/specialist_browser_compat.feature
+#   専ブラ互換 → features/specialist_browser_compat.feature
 #
 # 既存 BDD への影響:
 #   mypage.feature の「無料ユーザーが課金ボタンで有料ステータスに切り替わる」は

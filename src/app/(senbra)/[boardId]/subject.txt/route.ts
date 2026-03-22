@@ -4,8 +4,8 @@
  * 5ch専用ブラウザが板のスレッド一覧を取得するためのエンドポイント。
  * bump順（最終書き込み順）でスレッドを列挙したテキストをShift_JIS（CP932）エンコードして返す。
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
- * See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
  * See: docs/specs/openapi.yaml > /{boardId}/subject.txt
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
@@ -57,8 +57,8 @@ function resolveLatestPostAt(threads: { lastPostAt: Date }[]): Date {
  * bump順（last_post_at DESC）でソートされたスレッド一覧を
  * subject.txt形式（{threadKey}.dat<>{title} ({postCount})\n）で返す。
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
- * See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
  *
  * @param req - リクエスト（If-Modified-Since ヘッダを参照）
  * @param params - ルートパラメータ（boardId）

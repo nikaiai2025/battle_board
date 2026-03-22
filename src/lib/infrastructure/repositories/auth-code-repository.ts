@@ -25,7 +25,7 @@ import { supabaseAdmin } from "../supabase/client";
  * write_token は専ブラ向け認証橋渡しトークン（G4 対応）。
  * 認証完了時に生成される 32 文字 hex で、専ブラの mail 欄に #<write_token> 形式で使用する。
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
- * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  */
 export interface AuthCode {
 	/** 内部識別子 (UUID) */
@@ -250,7 +250,7 @@ export async function deleteExpired(): Promise<number> {
  * AuthService.verifyAuthCode が認証に成功した後、専ブラ向け write_token を発行する際に呼ばれる。
  * write_token はワンタイム使用・有効期限 10 分の 32 文字 hex トークン。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  *
  * @param id - 対象認証コードの UUID
@@ -282,8 +282,8 @@ export async function updateWriteToken(
  * AuthService.verifyWriteToken が専ブラ認証フローでトークン検証する際に呼ばれる。
  * write_token はワンタイム使用のため、検索後に clearWriteToken で消費すること。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
- * See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  * See: tmp/escalations/escalation_ESC-TASK-041-1.md — ESC解決用追加
  *
@@ -317,7 +317,7 @@ export async function findByWriteToken(
  * 認証コードレコードの write_token と write_token_expires_at を null にする（ワンタイム消費）。
  * AuthService.verifyWriteToken がトークン検証成功後に呼ばれ、再利用を防ぐ。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式 > ワンタイム
  * See: tmp/escalations/escalation_ESC-TASK-041-1.md — ESC解決用追加
  *

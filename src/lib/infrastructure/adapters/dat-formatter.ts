@@ -4,7 +4,7 @@
  * 5ch専用ブラウザが要求するDAT形式（1レス=1行、<br>区切り）のテキストを生成する。
  * UTF-8文字列を返す。Shift_JISへの変換は呼び出し元（Route Handler）が担う。
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario DATファイルが所定のフォーマットで返される
  *   @scenario DATファイルの1行目のみスレッドタイトルを含む
  *   @scenario レス内の改行がHTMLのbrタグに変換される

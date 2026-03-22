@@ -11,7 +11,7 @@
  *   Shift_JISデコードは呼び出し元（Route Handler）がBufferをデコードしてから
  *   URLSearchParamsを構築する責任を持つ。本クラスはデコード済み文字列を受け取る。
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario 専ブラからの書き込みが正常に処理される
  *   @scenario 専ブラからの新規スレッド作成が正常に処理される
  *   @scenario 専ブラのコマンド文字列がゲームコマンドとして解釈される

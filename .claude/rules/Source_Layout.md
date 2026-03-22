@@ -55,20 +55,26 @@ BDDシナリオ（受け入れ基準）を起点に実装する。
 
 ```
 features/                             # BDDシナリオ（人間が書く。AIは変更不可）
-  phase1/
-    thread.feature                    # スレッド作成・閲覧
-    posting.feature                   # 書き込み
-    authentication.feature            # 認証
-    currency.feature                  # 通貨
-    incentive.feature                 # インセンティブ
-    admin.feature                     # 管理
-    mypage.feature                    # マイページ
-  phase2/
-    command_system.feature            # コマンド基盤
-    ai_accusation.feature             # AI告発
-    bot_system.feature                # ボットシステム
-  constraints/
-    specialist_browser_compat.feature # 専ブラ互換
+  thread.feature                      # スレッド作成・閲覧
+  posting.feature                     # 書き込み
+  authentication.feature              # 認証
+  currency.feature                    # 通貨
+  incentive.feature                   # インセンティブ
+  admin.feature                       # 管理
+  mypage.feature                      # マイページ
+  command_system.feature              # コマンド基盤
+  command_aori.feature                # あおりコマンド
+  command_iamsystem.feature           # Iamsystemコマンド
+  command_newspaper.feature           # 新聞コマンド
+  command_omikuji.feature             # おみくじコマンド
+  ai_accusation.feature               # AI告発
+  bot_system.feature                  # ボットシステム
+  reactions.feature                   # リアクション
+  investigation.feature               # 調査
+  user_registration.feature           # ユーザー登録
+  welcome.feature                     # ウェルカム
+  dev_board.feature                   # 開発ボード
+  specialist_browser_compat.feature   # 専ブラ互換
 
 features/step_definitions/            # ステップ定義（AIが実装）
   thread.steps.ts

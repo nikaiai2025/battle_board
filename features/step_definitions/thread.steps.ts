@@ -1223,7 +1223,7 @@ When(
  * サービス層テスト: getThreadList の結果が正常に返ることを確認する。
  *
  * See: features/thread.feature @url_structure
- * See: features/constraints/specialist_browser_compat.feature @板トップURLがアクセス可能である
+ * See: features/specialist_browser_compat.feature @板トップURLがアクセス可能である
  */
 Then("スレッド一覧が表示される", function (this: BattleBoardWorld) {
 	assert(

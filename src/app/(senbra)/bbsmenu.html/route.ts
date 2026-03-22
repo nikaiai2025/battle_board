@@ -4,7 +4,7 @@
  * 5ch専用ブラウザが板メニューに登録するためのHTMLを返す。
  * レスポンスはShift_JIS（CP932）エンコーディング。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
  * See: docs/specs/openapi.yaml > /bbsmenu.html
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
@@ -29,7 +29,7 @@ function getBaseUrl(): string {
  * 固定のHTML文字列をShift_JISエンコードして返す。
  * 板一覧のHTMLには専ブラが認識できる形式でリンクを含める。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
  *
  * @returns Shift_JISエンコードされた板一覧HTML
  */

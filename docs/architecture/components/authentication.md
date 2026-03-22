@@ -58,7 +58,7 @@ VerifyAuthCodeResult:
 Turnstile検証はAuthService内でTurnstileClientを呼び出す。外部から見れば「コードとTurnstileトークンを渡すと有効化され、write_tokenが返される」インターフェース。
 検証成功時に `users.is_verified = true` に更新し、write_tokenを `auth_codes` テーブルに保存する。
 See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
-See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+See: features/specialist_browser_compat.feature @専ブラ認証フロー
 
 ```
 verifyWriteToken(writeToken: string): VerifyWriteTokenResult
@@ -71,8 +71,8 @@ VerifyWriteTokenResult:
 
 専ブラの mail 欄に `#<write_token>` 形式で貼り付けて送信する場合に、bbs.cgi ルートが呼び出す。
 ワンタイム消費（検証成功時に `auth_codes.write_token = null` に更新）。
-See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
-See: features/constraints/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
+See: features/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+See: features/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
 
 ### 2.2 日次リセットID生成
 
@@ -172,7 +172,7 @@ write_token の仕様:
 - 使用後は `auth_codes.write_token = null` に更新して再利用を防ぐ
 - Cookie 共有の専ブラ（認証後そのまま書き込める場合）では write_token は不要
 
-See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+See: features/specialist_browser_compat.feature @専ブラ認証フロー
 
 ---
 

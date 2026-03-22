@@ -1,6 +1,6 @@
 /**
  * SubjectFormatter 単体テスト
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario subject.txtが所定のフォーマットで返される
  *   @scenario 複数スレッドがbump順（最終書き込み順）で並ぶ
  */

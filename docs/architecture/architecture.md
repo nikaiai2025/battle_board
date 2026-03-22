@@ -86,11 +86,9 @@ BattleBoard は「5chライクな匿名掲示板 + AIボット混在 + ゲーミ
 | **GitHub Actions** | AI API使用BOTの定期実行、期限切れデータ掃除 | cron スケジュール。長時間実行ジョブを担当（TDR-013） |
 | **AI API** | 運営ボットの書き込み文章生成 | GitHub Actions から呼び出し。AiApiClient を通じて Google Gemini / OpenAI / Anthropic を使い分け（v6） |
 
-### 2.3 横断的制約（CLAUDE.md より）
+### 2.3 横断的制約
 
-- インフラは **Vercel / Cloudflare + Supabase + GitHub Actions を使用**（新たにインフラを追加する場合はエスカレーション必須）
 - AIボットの書き込みは**ユーザーの書き込みと同一APIを通じて行い、直接DBを書き換えない**
-- 環境変数（APIキー等）を**クライアントサイドコードに含めない**
 
 ### 2.4 環境戦略
 
@@ -1202,6 +1200,24 @@ supabase/
 - **決定**: dev板専用の Service / Repository / API ルートを新設し、本番コードへの依存を Supabase クライアント初期化のみに限定する。UIはCGI掲示板風のレトロデザインとし、Client Component・Tailwind を使用しない
 - **影響範囲**: `src/app/(web)/dev/page.tsx`（全面書き換え）、`src/app/api/dev/posts/route.ts`（新設）、`src/lib/services/dev-post-service.ts`（新設）、`src/lib/infrastructure/repositories/dev-post-repository.ts`（新設）、`dev_posts` テーブル（新設）
 - **詳細**: See features/dev_board.feature
+
+### TDR-015: BOTコンテンツ生成の初期モデルに Gemini 3 Flash を採用
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-22
+- **背景**: コマンドによるAI生成コンテンツ（!newspaper, !hiroyuki 等）の導入により、AI APIによるコンテンツ生成が必要になる。§2.2 で AiApiClient による複数プロバイダ使い分けを想定済み（v6）だが、初期実装でどのプロバイダを採用するかが未決定であった
+- **決定**: 初期実装では Google Gemini 3 Flash Preview（`gemini-3-flash-preview`）に統一する。データ構造（`pending_async_commands.model_id` 等）には将来のマルチモデル対応のためプロバイダ識別子を含めるが、実行時のプロバイダ分岐や抽象化レイヤーは構築しない
+- **理由**:
+  - Google Search Grounding が組み込みツールとして利用可能。!newspaper のWeb検索+生成が1 API callで完結し、別途検索APIの追加が不要
+  - 無料枠が十分: 月5,000検索クエリ無料、モデルの入出力も無料枠あり。MVP段階のコスト負担なし
+  - 1プロバイダに統一することでAPI統合・エラーハンドリング・認証管理の複雑度を最小化（KISS原則）
+- **代替案**:
+  - Claude API: Web検索機能がなく、!newspaper に別途検索APIが必要。インフラ追加が発生する
+  - OpenAI: Web検索ツールのAPI提供状況が限定的
+  - 複数プロバイダ同時導入: 初期からプロバイダ抽象化を構築するのはYAGNI
+- **将来の拡張**: ユーザー作成ボット（Phase 4）ではモデル選択をユーザーに開放する構想あり。データ構造はこれを見据えて設計するが、選択UIやプロバイダ切り替えロジックは Phase 4 以降で実装
+- **影響範囲**: `ai-adapters/`（Gemini クライアント実装）、`config/` or DB（モデル識別子フィールド追加）、環境変数（`GEMINI_API_KEY`）
+- **関連**: TDR-008（Strategy パターン）、§2.2 AI API 構成要素
 
 ---
 

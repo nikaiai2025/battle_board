@@ -301,7 +301,7 @@ export async function issueAuthCode(
  * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
  * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
  * See: features/authentication.feature @期限切れ認証コードでは認証できない
- * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  * See: docs/architecture/components/authentication.md §2.1 verifyAuthCode
  *
@@ -358,7 +358,7 @@ export async function verifyAuthCode(
 
 	// Step 7: write_token を生成して auth_codes に保存（専ブラ向け認証橋渡しトークン）
 	// See: tmp/auth_spec_review_report.md §3.2 write_token 方式
-	// See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+	// See: features/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
 	const writeToken = randomBytes(16).toString("hex"); // 32文字 hex
 	const writeTokenExpiresAt = new Date(Date.now() + 600 * 1000); // 10分後
 	await AuthCodeRepository.updateWriteToken(
@@ -380,8 +380,8 @@ export async function verifyAuthCode(
  *   3. ワンタイム消費（write_token を null に更新）
  *   4. 対応ユーザーの is_verified = true に更新
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
- * See: features/constraints/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
+ * See: features/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  *
  * @param writeToken - 専ブラの mail 欄から受け取った write_token（32文字 hex）

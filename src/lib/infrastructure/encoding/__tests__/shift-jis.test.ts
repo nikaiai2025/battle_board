@@ -1,7 +1,7 @@
 /**
  * ShiftJisEncoder / decodeHtmlNumericReferences 単体テスト
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる
  *   @scenario 専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  *   @scenario Shift_JIS範囲外の文字がHTML数値参照として保持される
@@ -68,7 +68,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("絵文字(😅 U+1F605)がHTML数値参照(&#128517;)に変換される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			// 😅 = U+1F605 = 128517（十進数）
 			const encoder = new ShiftJisEncoder();
 			const result = encoder.encode("テスト😅");
@@ -80,7 +80,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("BOT絵文字(🤖)がHTML数値参照(&#129302;)に変換される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			// 🤖 = U+1F916 = 129302（十進数）
 			const encoder = new ShiftJisEncoder();
 			const result = encoder.encode("テスト🤖");
@@ -92,7 +92,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("サロゲートペア絵文字（😀🦾🦿🧠）がすべてHTML数値参照に変換される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			const encoder = new ShiftJisEncoder();
 			// 😀=U+1F600=128512, 🦾=U+1F9BE=129470, 🦿=U+1F9BF=129471, 🧠=U+1F9E0=129504
 			const result = encoder.encode("😀🦾🦿🧠");
@@ -129,7 +129,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("絵文字と通常文字が混在するテキストで絵文字のみHTML数値参照に変換される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			const encoder = new ShiftJisEncoder();
 			// 😀=U+1F600=128512, 🌍=U+1F30D=127757
 			const result = encoder.encode("こんにちは😀世界🌍テスト");
@@ -205,7 +205,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		// --- Cloudflare Workers対応: Uint8Array受け付け ---
-		// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+		// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 
 		it("Uint8Array形式のShift_JISデータをUTF-8文字列に変換する（Cloudflare Workers対応）", () => {
 			// Cloudflare WorkersではBufferではなくUint8Arrayが使われる場合がある
@@ -225,7 +225,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("Uint8Array形式の日本語Shift_JISデータを正しくデコードする", () => {
-			// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+			// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 			// 専ブラからのPOSTデータ（本番環境でUint8Arrayとして渡される）が文字化けしないことを検証
 			const encoder = new ShiftJisEncoder();
 			const original = "書き込みテスト";
@@ -241,7 +241,7 @@ describe("ShiftJisEncoder", () => {
 	});
 
 	describe("decodeFormData()", () => {
-		// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+		// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 
 		it("URL-エンコード済みShift-JISのMESSAGEパラメータを正しくデコードする（テスト → テスト）", () => {
 			// 専ブラは "テスト" をShift-JISバイト(%83e%83X%83g)でURLエンコードして送信する
@@ -348,7 +348,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("サロゲートペア絵文字をHTML数値参照に変換する", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			// 🤖=U+1F916=129302, 😀=U+1F600=128512
 			const encoder = new ShiftJisEncoder();
 			expect(encoder.sanitizeForCp932("🤖")).toBe("&#129302;");
@@ -360,7 +360,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("CP932非対応BMP文字（❤ U+2764）をHTML数値参照(&#10084;)に変換する", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			const encoder = new ShiftJisEncoder();
 			expect(encoder.sanitizeForCp932("❤")).toBe("&#10084;");
 		});
@@ -376,7 +376,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("混在テキストで非対応文字のみHTML数値参照に変換する", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			// 🤖=U+1F916=129302
 			const encoder = new ShiftJisEncoder();
 			expect(encoder.sanitizeForCp932("テスト🤖終わり")).toBe(
@@ -385,7 +385,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("全角？（U+FF1F）への置換は行われない", () => {
-			// See: features/constraints/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @Shift_JIS範囲外の文字がHTML数値参照として保持される
 			const encoder = new ShiftJisEncoder();
 			// 😅=U+1F605=128517
 			const result = encoder.sanitizeForCp932("😅");
@@ -394,10 +394,10 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		// --- 異体字セレクタ除去 ---
-		// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+		// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
 
 		it("U+FE0F（絵文字スタイル指示）が除去される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+			// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
 			const encoder = new ShiftJisEncoder();
 			// "🕳️" = U+1F573 U+FE0F。基底文字だけが残り、U+FE0Fは除去される
 			const text = "\u{1F573}\u{FE0F}"; // 🕳️
@@ -409,7 +409,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("U+FE0E（テキストスタイル指示）が除去される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+			// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
 			const encoder = new ShiftJisEncoder();
 			const text = "\u{1F573}\u{FE0E}"; // 🕳 + テキストスタイル指示
 			const result = encoder.sanitizeForCp932(text);
@@ -420,7 +420,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("異体字セレクタ付き絵文字（🕳️）の変換: 基底文字のHTML数値参照は保持, U+FE0Fは除去", () => {
-			// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+			// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
 			// "🕳️" = 基底文字 U+1F573（穴の絵文字）+ U+FE0F（絵文字スタイル指示）
 			// U+1F573 = 128371（十進数）
 			const encoder = new ShiftJisEncoder();
@@ -433,7 +433,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("テキストに挟まれた異体字セレクタも除去される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+			// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
 			const encoder = new ShiftJisEncoder();
 			// "テスト🕳️終わり"
 			const text = "テスト\u{1F573}\u{FE0F}終わり";
@@ -442,10 +442,10 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		// --- ZWJ保持 ---
-		// See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+		// See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
 
 		it("ZWJ(U+200D)がHTML数値参照(&#8205;)として保持される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
 			// ZWJ = U+200D = 8205（十進数）
 			const encoder = new ShiftJisEncoder();
 			const zwj = "\u{200D}"; // ZWJ
@@ -454,7 +454,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("結合絵文字（👨‍👩‍👧）のZWJがHTML数値参照として保持される", () => {
-			// See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
 			// 👨‍👩‍👧 = U+1F468 ZWJ U+1F469 ZWJ U+1F467
 			// U+1F468=128104, U+1F469=128105, U+1F467=128103, ZWJ=8205
 			const encoder = new ShiftJisEncoder();
@@ -471,7 +471,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("ZWJを除去すると絵文字が分解されるため除去しない（仕様確認）", () => {
-			// See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+			// See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
 			// ZWJは異体字セレクタとは異なり、除去すると絵文字が分解されるため除去しない
 			const encoder = new ShiftJisEncoder();
 			const zwj = "\u{200D}";
@@ -483,7 +483,7 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		// --- ラウンドトリップ方式への変更で偽陽性が解消されることを検証するテスト ---
-		// See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+		// See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
 
 		it("丸数字（①②③④⑤）がCP932でエンコード可能なためそのまま保持される（偽陽性バグの回帰テスト）", () => {
 			// NEC特殊文字の丸数字はCP932マッピング有り。旧バイト値判定では偽陽性で置換になる可能性があった
@@ -542,13 +542,13 @@ describe("ShiftJisEncoder", () => {
  * 専ブラ（ChMate等）がShift_JIS非対応文字をHTML数値参照として送信するため、
  * bbs.cgi受信パスで逆変換してDBにはUTF-8ネイティブ文字を保存する。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ * See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
  */
 describe("decodeHtmlNumericReferences()", () => {
 	// --- 基本変換 ---
 
 	it("通常絵文字のHTML数値参照（&#128512;）をUTF-8文字（😀）に変換する", () => {
-		// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+		// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 		// 😀 = U+1F600 = 128512（十進数）
 		expect(decodeHtmlNumericReferences("&#128512;")).toBe("😀");
 	});
@@ -572,7 +572,7 @@ describe("decodeHtmlNumericReferences()", () => {
 	// --- 異体字セレクタの除去 ---
 
 	it("異体字セレクタU+FE0F（&#65039;）は除去される", () => {
-		// See: features/constraints/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
+		// See: features/specialist_browser_compat.feature @異体字セレクタがDAT出力時に除去される
 		// 🕳️ = U+1F573 + U+FE0F(65039)
 		// ChMateが &#128371;&#65039; と送信した場合、VSを除去して基底文字のみ返す
 		expect(decodeHtmlNumericReferences("&#128371;&#65039;")).toBe("🕳");
@@ -591,7 +591,7 @@ describe("decodeHtmlNumericReferences()", () => {
 	// --- ZWJ（ゼロ幅接合子）の保持 ---
 
 	it("ZWJ（&#8205;）はUTF-8文字（U+200D）として保持される", () => {
-		// See: features/constraints/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
+		// See: features/specialist_browser_compat.feature @ゼロ幅接合子(ZWJ)がHTML数値参照として保持される
 		// ZWJ = U+200D = 8205。結合絵文字の構成要素として除去しない
 		expect(decodeHtmlNumericReferences("&#8205;")).toBe("\u200D");
 	});
@@ -664,7 +664,7 @@ describe("decodeHtmlNumericReferences()", () => {
 	});
 
 	// --- U+FFFD (Replacement Character) 除去 ---
-	// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+	// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 
 	it("U+FFFD (Replacement Character) が除去される", () => {
 		// ChMateがVariation Selector (U+FE0F等) をHTML数値参照ではなくUTF-8生バイトで送信した場合、

@@ -20,13 +20,13 @@
  *   7. BbsCgiResponseBuilderでHTMLレスポンスを生成する
  *   8. ShiftJisEncoderでUTF-8 → Shift_JIS にエンコードして返す
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
- * See: features/constraints/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
- * See: features/constraints/specialist_browser_compat.feature @専ブラのコマンド文字列がゲームコマンドとして解釈される
- * See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
- * See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+ * See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+ * See: features/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
+ * See: features/specialist_browser_compat.feature @専ブラのコマンド文字列がゲームコマンドとして解釈される
+ * See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
  * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
  * See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
  * See: features/user_registration.feature @無効な PAT では書き込みが拒否される
@@ -71,7 +71,7 @@ const PAT_PATTERN = /#pat_([0-9a-f]{32})/i;
  * mail欄から write_token を検出・除去するための正規表現。
  * write_token は '#' に続く 32 文字の hex 文字列。
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式 > 正規表現: /#([0-9a-f]{32})/i
  */
 const WRITE_TOKEN_PATTERN = /#([0-9a-f]{32})/i;
@@ -163,7 +163,7 @@ function removePat(mail: string): string {
  * 例: "#a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4" → "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
  * 例: "sage" → null
  *
- * See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  *
  * @param mail - mail欄の文字列
@@ -182,7 +182,7 @@ function extractWriteToken(mail: string): string | null {
  * 例: "#a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4" → ""
  * 例: "sage" → "sage"
  *
- * See: features/constraints/specialist_browser_compat.feature @メール欄のwrite_tokenは書き込みデータに含まれない
+ * See: features/specialist_browser_compat.feature @メール欄のwrite_tokenは書き込みデータに含まれない
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式 > DATに漏洩させない
  *
  * @param mail - mail欄の文字列
@@ -216,8 +216,8 @@ function buildShiftJisHtmlResponse(html: string, status = 200): Response {
  * Shift_JISデコード → UTF-8変換はRoute Handler層で行い、
  * Application Layer（PostService）にはUTF-8文字列のみを渡す。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
  * See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界（Inbound）
  *
  * @param req - リクエスト（application/x-www-form-urlencoded、Shift_JISエンコード）
@@ -243,7 +243,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 	// NG: encoder.decode(bodyBuffer) → new URLSearchParams() の順では、
 	//   URLSearchParams が %83 をUTF-8バイトとして誤解釈し文字化けが発生する。
 	//
-	// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+	// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 	// See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界（Inbound）
 	let bodyParams: URLSearchParams;
 	try {
@@ -265,7 +265,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 	// 変換して送信する。ここでUTF-8ネイティブ文字に逆変換することで、DBには常にUTF-8の
 	// 文字が保存される。異体字セレクタ（U+FE0F, U+FE0E）は除去する。
 	//
-	// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+	// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 	// See: tmp/workers/bdd-architect_TASK-075/analysis.md §4 修正方針1
 	const parsed = {
 		...parsedRaw,
@@ -364,8 +364,8 @@ export async function POST(req: NextRequest): Promise<Response> {
 	// ③ mail欄から write_token を検出する
 	// write_token が含まれる場合は検証し、除去した上で後続処理に渡す。
 	// DAT漏洩防止のため write_token は PostService に渡す前に必ず除去する。
-	// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
-	// See: features/constraints/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
+	// See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+	// See: features/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
 	// See: tmp/auth_spec_review_report.md §3.2 write_token 方式
 	const detectedWriteToken = extractWriteToken(parsed.mail);
 
@@ -429,7 +429,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 /**
  * 新規スレッドを作成して専ブラ互換HTMLレスポンスを返す。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+ * See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
  *
  * @param parsed - BbsCgiパース済みリクエスト
  * @param subject - スレッドタイトル（UTF-8）
@@ -493,9 +493,9 @@ async function handleCreateThread(
  * NOTE: この関数に渡される parsed.mail は write_token 除去済みであること。
  * write_token の検出・除去は呼び出し元の POST ハンドラーで行う。
  *
- * See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
- * See: features/constraints/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
- * See: features/constraints/specialist_browser_compat.feature @メール欄のwrite_tokenは書き込みデータに含まれない
+ * See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+ * See: features/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
+ * See: features/specialist_browser_compat.feature @メール欄のwrite_tokenは書き込みデータに含まれない
  *
  * @param parsed - BbsCgiパース済みリクエスト（mail欄はwrite_token除去済み）
  * @param ipHash - クライアントIPハッシュ

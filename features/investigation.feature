@@ -1,5 +1,5 @@
 # features/investigation.feature
-# ステータス: ドラフト v1
+# ステータス: 承認済み v1
 #
 # 調査系コマンド（!hissi, !kinou）を集約する。
 # 対象ユーザーの書き込み履歴や過去のIDなど、情報開示を行うコマンド群。

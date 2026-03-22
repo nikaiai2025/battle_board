@@ -4,13 +4,13 @@
  * 5ch専用ブラウザがスレッドのレスデータを取得するためのエンドポイント。
  * Range差分応答（206 Partial Content）とIf-Modified-Since（304 Not Modified）に対応。
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
- * See: features/constraints/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
- * See: features/constraints/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
- * See: features/constraints/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
- * See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
- * See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
- * See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+ * See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
+ * See: features/specialist_browser_compat.feature @レス内の改行がHTMLのbrタグに変換される
+ * See: features/specialist_browser_compat.feature @レス内のHTML特殊文字がエスケープされる
+ * See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+ * See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+ * See: features/specialist_browser_compat.feature @更新がない場合は304を返す
  * See: docs/specs/openapi.yaml > /{boardId}/dat/{threadKey}.dat
  * See: docs/architecture/components/senbra-adapter.md §4 Range差分応答の実装方針
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存

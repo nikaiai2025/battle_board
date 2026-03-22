@@ -7,7 +7,7 @@
  * 専ブラが解釈可能な形式で404を返すため、
  * Shift_JIS（CP932）エンコードのテキストボディを付加する。
  *
- * See: features/constraints/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
+ * See: features/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
  * See: docs/architecture/components/senbra-adapter.md
  */
 
@@ -24,7 +24,7 @@ const encoder = new ShiftJisEncoder()
  * 専ブラが解釈可能な形式（Shift_JISエンコードテキスト）でボディを付加し、
  * 不要なリトライを防ぐ。
  *
- * See: features/constraints/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
+ * See: features/specialist_browser_compat.feature @過去ログ(kako)リクエストに適切に応答する
  *
  * @param req - リクエスト
  * @param params - ルートパラメータ（boardId, path）

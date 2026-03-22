@@ -2,7 +2,7 @@
  * 単体テスト: auth-service.ts（AuthService）
  *
  * See: features/authentication.feature
- * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  * See: docs/architecture/components/authentication.md §2 公開インターフェース
  *
  * テスト方針:
@@ -46,7 +46,7 @@ vi.mock("@/lib/infrastructure/repositories/auth-code-repository", () => ({
 	markVerified: vi.fn(),
 	updateWriteToken: vi.fn(),
 	// write_token 検証用（verifyWriteToken が使用）
-	// See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+	// See: features/specialist_browser_compat.feature @専ブラ認証フロー
 	findByWriteToken: vi.fn(),
 	clearWriteToken: vi.fn(),
 }));
@@ -752,7 +752,7 @@ describe("AuthService", () => {
 			});
 
 			it("認証成功後に AuthCodeRepository.updateWriteToken を呼び出す", async () => {
-				// See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+				// See: features/specialist_browser_compat.feature @専ブラ認証フロー
 				const authCode = makeAuthCode({ id: "code-id-001" });
 				const edgeToken = makeEdgeToken({
 					token: "valid-edge-token",
@@ -941,11 +941,11 @@ describe("AuthService", () => {
 	// =========================================================================
 
 	describe("verifyWriteToken", () => {
-		// See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+		// See: features/specialist_browser_compat.feature @専ブラ認証フロー
 		// verifyWriteToken は AuthCodeRepository.findByWriteToken / clearWriteToken を使う（リポジトリ経由）
 
 		describe("正常系: 有効な write_token", () => {
-			// See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+			// See: features/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
 			it("有効な write_token で { valid: true, edgeToken } を返す", async () => {
 				vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(
 					makeAuthCode({
@@ -1037,7 +1037,7 @@ describe("AuthService", () => {
 		});
 
 		describe("異常系: write_token が存在しない", () => {
-			// See: features/constraints/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
+			// See: features/specialist_browser_compat.feature @無効な write_token では書き込みが拒否される
 			it("存在しない write_token で { valid: false } を返す", async () => {
 				vi.mocked(AuthCodeRepository.findByWriteToken).mockResolvedValue(null);
 

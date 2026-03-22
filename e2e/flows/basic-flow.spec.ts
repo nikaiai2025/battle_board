@@ -145,7 +145,7 @@ test.describe("基本フロー検証（環境共通）", () => {
 	 * 書き込んだデータが専ブラAPI（subject.txt / DAT）に反映される。
 	 *
 	 * See: docs/architecture/bdd_test_strategy.md §10.3.2 > 専ブラAPI整合
-	 * See: features/constraints/specialist_browser_compat.feature
+	 * See: features/specialist_browser_compat.feature
 	 */
 	test("書き込んだスレッドが subject.txt と DAT に反映される", async ({
 		page,

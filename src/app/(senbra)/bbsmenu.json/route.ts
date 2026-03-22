@@ -5,7 +5,7 @@
  * JSON形式で板情報を返すエンドポイントが必要となる。
  * レスポンスはUTF-8のJSON（Shift_JISではない）。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
  * See: docs/specs/openapi.yaml > /bbsmenu.json
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
@@ -46,7 +46,7 @@ interface BbsMenuResponse {
  * ChMateが期待するJSONフォーマットで板一覧を返す。
  * Content-Type は application/json（UTF-8）。
  *
- * See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+ * See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
  *
  * @returns UTF-8 JSON形式の板一覧レスポンス
  */

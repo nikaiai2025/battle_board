@@ -1,13 +1,13 @@
 /**
  * 単体テスト: AdminUserRepository
  *
- * @feature features/phase1/authentication.feature
+ * @feature features/authentication.feature
  * @scenario 管理者が正しいメールアドレスとパスワードでログインする
  * @scenario 管理者が誤ったパスワードでログインすると失敗する
  *
- * See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
- * See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
- * See: features/phase1/admin.feature @管理者がログイン済みである
+ * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+ * See: features/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+ * See: features/admin.feature @管理者がログイン済みである
  * See: docs/architecture/components/admin.md §3 依存関係
  * See: docs/architecture/architecture.md §5.3 管理者認証
  *
@@ -140,7 +140,7 @@ describe("AdminUserRepository", () => {
 	// =========================================================================
 
 	describe("loginWithPassword", () => {
-		// See: features/phase1/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
+		// See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
 
 		describe("【バグ修正】supabaseAdmin のセッション汚染なし", () => {
 			it("supabaseAdmin.auth.signInWithPassword は呼ばれない（一時クライアントを使用する）", async () => {
@@ -252,7 +252,7 @@ describe("AdminUserRepository", () => {
 		});
 
 		describe("異常系: 認証失敗", () => {
-			// See: features/phase1/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
+			// See: features/authentication.feature @管理者が誤ったパスワードでログインすると失敗する
 
 			it("Supabase Auth が error を返した場合、invalid_credentials を返す", async () => {
 				// Arrange

@@ -11,7 +11,7 @@
  *   - GET /{boardId}/dat/{threadKey}.dat — DAT形式1行目ヘッダー・レス形式
  *   - POST /test/bbs.cgi         — Shift_JISエンコードform-urlencoded書き込み
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  * See: docs/architecture/bdd_test_strategy.md §9 APIテスト方針
  */
 
@@ -267,7 +267,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /bbsmenu.html — Content-Type が Shift_JIS であり板一覧HTMLを返す", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
+		// See: features/specialist_browser_compat.feature @bbsmenu.htmlが板一覧を返す
 		const response = await request.get(`${BASE_URL}/bbsmenu.html`);
 
 		// ステータス 200
@@ -296,7 +296,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /bbsmenu.html — Shift_JIS バイト列が正確にエンコードされている", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
+		// See: features/specialist_browser_compat.feature @専ブラからのPOSTデータがShift_JISとして正しくデコードされる
 		const response = await request.get(`${BASE_URL}/bbsmenu.html`);
 		expect(response.status()).toBe(200);
 
@@ -315,7 +315,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /bbsmenu.json — Content-Type が application/json で板一覧JSONを返す", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+		// See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
 		const response = await request.get(`${BASE_URL}/bbsmenu.json`);
 
 		// ステータス 200
@@ -337,7 +337,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /bbsmenu.json — 各板にurl, board_name, directory_nameが含まれる", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+		// See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
 		const response = await request.get(`${BASE_URL}/bbsmenu.json`);
 
 		expect(response.status()).toBe(200);
@@ -368,7 +368,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /bbsmenu.json — battleboardの板情報が含まれる", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
+		// See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
 		const response = await request.get(`${BASE_URL}/bbsmenu.json`);
 
 		expect(response.status()).toBe(200);
@@ -394,7 +394,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/SETTING.TXT — Content-Type が Shift_JIS で BBS_TITLE を含む", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
+		// See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
 		const response = await request.get(`${BASE_URL}/${BOARD_ID}/SETTING.TXT`);
 
 		// ステータス 200
@@ -446,7 +446,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/subject.txt — スレッドなし時は空レスポンスを返す", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+		// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
 		const response = await request.get(`${BASE_URL}/${BOARD_ID}/subject.txt`);
 
 		expect(response.status()).toBe(200);
@@ -463,7 +463,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/subject.txt — スレッド作成後は DAT 形式で一覧を返す", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+		// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
 
 		// テストデータ作成: スレッドを1件作成
 		const edgeToken = await getAuthenticatedEdgeToken(request);
@@ -496,7 +496,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/subject.txt — 複数スレッドが bump 順（最終書き込み順）で並ぶ", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+		// See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
 
 		const edgeToken = await getAuthenticatedEdgeToken(request);
 
@@ -534,7 +534,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/dat/{threadKey}.dat — Content-Type が Shift_JIS で DAT 形式を返す", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+		// See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
 
 		// テストデータ作成
 		const edgeToken = await getAuthenticatedEdgeToken(request);
@@ -581,7 +581,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/dat/{threadKey}.dat — 1行目のみスレッドタイトルを含む", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
+		// See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
 
 		// テストデータ作成: スレッド + 追加レス
 		const edgeToken = await getAuthenticatedEdgeToken(request);
@@ -650,7 +650,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/dat/{threadKey}.dat — 日付IDフィールドが正しい形式を持つ", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
+		// See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
 
 		const edgeToken = await getAuthenticatedEdgeToken(request);
 		const threadKey = await createThread(
@@ -686,7 +686,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("POST /test/bbs.cgi — Shift_JIS エンコードされたスレッド作成が成功する", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
+		// See: features/specialist_browser_compat.feature @専ブラからの新規スレッド作成が正常に処理される
 
 		// まず JSON API で認証を取得する
 		const edgeToken = await getAuthenticatedEdgeToken(request);
@@ -737,7 +737,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("POST /test/bbs.cgi — Shift_JIS エンコードされた書き込みが成功する", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+		// See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
 
 		// JSON API でスレッドを作成
 		const edgeToken = await getAuthenticatedEdgeToken(request);
@@ -781,7 +781,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("POST /test/bbs.cgi — レスポンスが Shift_JIS エンコードされた HTML を返す", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
+		// See: features/specialist_browser_compat.feature @書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
 		// Note: テスト環境では TURNSTILE_SECRET_KEY が未設定のため認証が常に通過する。
 		//       そのため「未認証でも認証案内HTML」ではなく「成功HTML」が返される。
 		//       bbs.cgi が常に 200 + Shift_JIS HTML を返すことを検証する。
@@ -835,7 +835,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	test("GET /battleboard/dat/{threadKey}.dat — Range ヘッダ付きで 206 差分応答を返す", async ({
 		request,
 	}) => {
-		// See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+		// See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
 
 		const edgeToken = await getAuthenticatedEdgeToken(request);
 		const threadKey = await createThread(

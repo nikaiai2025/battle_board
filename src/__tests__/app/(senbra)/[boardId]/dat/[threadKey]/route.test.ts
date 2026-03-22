@@ -1,9 +1,9 @@
 /**
  * 単体テスト: GET /{boardId}/dat/{threadKey}.dat — Cache-Control ヘッダ検証
  *
- * See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
- * See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
- * See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+ * See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+ * See: features/specialist_browser_compat.feature @更新がない場合は304を返す
  *
  * テスト方針:
  *   - ThreadRepository / PostRepository はモック化
@@ -168,7 +168,7 @@ describe("GET /{boardId}/dat/{threadKey}.dat — Cache-Control ヘッダ検証",
 
 	describe("200 OK — Cache-Control ヘッダ", () => {
 		it("正常: 200 レスポンスに Cache-Control: no-cache が含まれる", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
+			// See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
 			// Cache-Control: no-cache により専ブラがヒューリスティックキャッシュを適用しないことを保証する
 			const lastPostAt = new Date("2025-06-01T12:00:00.000Z");
 			mockFindByThreadKey.mockResolvedValue(makeThread(lastPostAt));
@@ -244,7 +244,7 @@ describe("GET /{boardId}/dat/{threadKey}.dat — Cache-Control ヘッダ検証",
 
 	describe("206 Partial Content（差分あり）— Cache-Control ヘッダ", () => {
 		it("正常: 206（差分あり）レスポンスに Cache-Control: no-cache が含まれる", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
+			// See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す
 			const lastPostAt = new Date("2025-06-01T12:00:00.000Z");
 			mockFindByThreadKey.mockResolvedValue(makeThread(lastPostAt));
 			// encode は 10バイトを返す（デフォルト）。rangeStart=5 → 5バイトの差分
@@ -342,7 +342,7 @@ describe("GET /{boardId}/dat/{threadKey}.dat — Cache-Control ヘッダ検証",
 
 	describe("Content-Type ヘッダ", () => {
 		it("正常: 200 レスポンスの Content-Type に Shift_JIS が含まれる", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+			// See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
 			const lastPostAt = new Date("2025-06-01T12:00:00.000Z");
 			mockFindByThreadKey.mockResolvedValue(makeThread(lastPostAt));
 

@@ -9,7 +9,7 @@
  *   - エラー: titleタグに "ＥＲＲＯＲ"（全角）
  *   - 認証必要: titleタグに "ＥＲＲＯＲ"（全角）+ 認証コード + 認証ページURL + 手順説明
  *
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario 専ブラからの書き込みが正常に処理される
  *   @scenario 書き込みエラー時に専ブラが認識できるエラーレスポンスが返される
  *   @scenario 専ブラからの初回書き込みで認証案内が返される
@@ -86,7 +86,7 @@ ${escapedMessage}
    *   2. 表示された認証コードを入力する
    *   3. 発行された write_token をメール欄に "#write_token" 形式で貼り付けて再書き込みする
    *
-   * See: features/constraints/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
+   * See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
    * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
    * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
    *

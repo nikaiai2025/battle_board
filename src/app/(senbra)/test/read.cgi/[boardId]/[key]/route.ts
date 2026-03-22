@@ -11,7 +11,7 @@
  * boardId はURLパラメータから取得できるため、DBへの追加クエリは不要。
  * スレッドが存在しない場合は404を返す（threadKey の存在確認は ThreadRepository で行う）。
  *
- * See: features/constraints/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
+ * See: features/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
  * See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.5 専ブラread.cgiリダイレクト先の変更
  * See: docs/architecture/components/senbra-adapter.md
  */
@@ -26,7 +26,7 @@ import * as ThreadRepository from "@/lib/infrastructure/repositories/thread-repo
  * boardId は URL パラメータから直接取得するため DB の追加クエリは不要。
  * スレッドが存在しない場合は404を返す。
  *
- * See: features/constraints/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
+ * See: features/specialist_browser_compat.feature @read.cgiのURLでスレッドが閲覧できる
  * See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.5
  *
  * @param req - リクエスト

@@ -27,7 +27,7 @@
  * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
  * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
  * See: features/authentication.feature @期限切れ認証コードでは認証できない
- * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
@@ -76,7 +76,7 @@ interface AuthCodeResponse {
  * 認証ページコンポーネント
  *
  * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+ * See: features/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
  */
 export default function VerifyPage() {
   return (
@@ -274,7 +274,7 @@ function VerifyPageContent() {
    * 認証成功後の write_token 表示
    * 専ブラユーザーはこのトークンをメール欄に「#<write_token>」形式で貼り付けて使用する
    * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
-   * See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+   * See: features/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
    */
   if (writeToken !== null) {
     return (

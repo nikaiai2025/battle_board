@@ -36,7 +36,7 @@ import { seedDummyPost } from "./common.steps";
  * BattleBoardWorld に authentication.feature 向けプロパティを追加する型宣言。
  * write_token（専ブラ認証フロー G4）の保存に使用する。
  * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
- * See: features/constraints/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  */
 declare module "../support/world" {
 	interface BattleBoardWorld {

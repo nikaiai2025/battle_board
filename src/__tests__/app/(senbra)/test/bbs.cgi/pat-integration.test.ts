@@ -529,12 +529,12 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 
 	// =========================================================================
 	// ③ write_token フロー（PAT なし）— 既存機能への影響なし確認
-	// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+	// See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
 	// =========================================================================
 
 	describe("③ write_token フロー（既存機能への影響なし）", () => {
 		it("正常: mail欄に #<32hex>（write_token）があり、PATパターンでない場合は verifyWriteToken が呼ばれる", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+			// See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,
@@ -803,7 +803,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 
 	describe("既存機能への影響なし", () => {
 		it("正常: edge-token Cookie のみ（PATなし）の場合、既存フローで処理される", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
+			// See: features/specialist_browser_compat.feature @専ブラからの書き込みが正常に処理される
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,
@@ -839,7 +839,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 		});
 
 		it("正常: write_token認証フローは影響を受けない", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
+			// See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,

@@ -147,7 +147,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 	// （AuthService は Cookie を操作しない設計。token の有効化は AuthCodeRepository.markVerified で完了）
 	// write_token は専ブラ向け認証橋渡しトークン。オプショナルフィールドとしてレスポンスに含める
 	// See: tmp/auth_spec_review_report.md §3.2 write_token 方式
-	// See: features/constraints/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
+	// See: features/specialist_browser_compat.feature @認証完了後に write_token をメール欄に貼り付けて書き込みが成功する
 	const responseBody: { success: boolean; writeToken?: string } = {
 		success: true,
 	};

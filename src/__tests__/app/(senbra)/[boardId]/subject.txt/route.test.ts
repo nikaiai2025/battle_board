@@ -1,8 +1,8 @@
 /**
  * 単体テスト: GET /{boardId}/subject.txt — 304 Not Modified 判定
  *
- * See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
- * See: features/constraints/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
+ * See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+ * See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
  *
  * テスト方針:
  *   - ThreadRepository はモック化
@@ -132,7 +132,7 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 
 	describe("スレッドなし（空一覧）", () => {
 		it("正常: スレッドが0件の場合、200 が返される（If-Modified-Since なし）", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+			// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
 			mockFindByBoardId.mockResolvedValue([]);
 
 			const req = createGetRequest("test");
@@ -168,7 +168,7 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 
 	describe("If-Modified-Since ヘッダなし", () => {
 		it("正常: If-Modified-Since なしの場合、200 が返される", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+			// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
 			const lastPostAt = new Date("2025-01-01T00:00:00.500Z");
 			mockFindByBoardId.mockResolvedValue([makeThread(lastPostAt)]);
 
@@ -190,7 +190,7 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 
 	describe("304 Not Modified — 更新なし", () => {
 		it("正常: lastPostAt === sinceDate の場合、304 が返される", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @更新がない場合は304を返す
+			// See: features/specialist_browser_compat.feature @更新がない場合は304を返す
 			// 秒単位が同一なら304（ミリ秒は切り捨て）
 			const lastPostAt = new Date("2025-06-01T12:00:00.000Z");
 			const sinceDate = "Sun, 01 Jun 2025 12:00:00 GMT";
@@ -363,7 +363,7 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 
 	describe("Last-Modified レスポンスヘッダ", () => {
 		it("正常: 200 レスポンスに Last-Modified ヘッダが含まれる", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+			// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
 			const lastPostAt = new Date("2025-06-01T12:00:00.000Z");
 			mockFindByBoardId.mockResolvedValue([makeThread(lastPostAt)]);
 
@@ -422,7 +422,7 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 
 	describe("Content-Type ヘッダ", () => {
 		it("正常: Content-Type に Shift_JIS が含まれる", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
+			// See: features/specialist_browser_compat.feature @すべてのレスポンスがShift_JIS（CP932）でエンコードされる
 			mockFindByBoardId.mockResolvedValue([]);
 
 			const req = createGetRequest("test");
@@ -443,7 +443,7 @@ describe("GET /{boardId}/subject.txt — 304 Not Modified 判定", () => {
 
 	describe("Cache-Control ヘッダ", () => {
 		it("正常: 200 レスポンスに Cache-Control: no-cache が含まれる", async () => {
-			// See: features/constraints/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
+			// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
 			// Cache-Control: no-cache により専ブラがヒューリスティックキャッシュを適用しないことを保証する
 			mockFindByBoardId.mockResolvedValue([
 				makeThread(new Date("2025-06-01T12:00:00.000Z")),

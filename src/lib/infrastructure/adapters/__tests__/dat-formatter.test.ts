@@ -1,6 +1,6 @@
 /**
  * DatFormatter 単体テスト
- * See: features/constraints/specialist_browser_compat.feature
+ * See: features/specialist_browser_compat.feature
  *   @scenario DATファイルが所定のフォーマットで返される
  *   @scenario DATファイルの1行目のみスレッドタイトルを含む
  *   @scenario レス内の改行がHTMLのbrタグに変換される
