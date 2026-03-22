@@ -74,6 +74,9 @@ module.exports = {
 			// TASK-264: おみくじコマンド(!omikuji) BDD シナリオ追加
 			// See: features/command_omikuji.feature
 			"features/command_omikuji.feature",
+			// TASK-266: !iamsystem コマンド BDD シナリオ追加
+			// See: features/command_iamsystem.feature
+			"features/command_iamsystem.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -120,6 +123,9 @@ module.exports = {
 			// TASK-264: おみくじコマンド(!omikuji) BDD ステップ定義
 			// See: features/command_omikuji.feature
 			"features/step_definitions/command_omikuji.steps.ts",
+			// TASK-266: !iamsystem BDD ステップ定義
+			// See: features/command_iamsystem.feature
+			"features/step_definitions/command_iamsystem.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

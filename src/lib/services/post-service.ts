@@ -439,7 +439,9 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	const dateJst = getTodayJst();
 	const boardId = "battleboard"; // 現時点では固定。将来的にはスレッドから取得
 	const authorIdSeed = authResult.authorIdSeed;
-	const dailyId = isSystemMessage
+	// let 宣言: Step 5.5 のステルス処理で dailyId を上書きする可能性がある
+	// See: features/command_iamsystem.feature @成功時に表示名とIDがシステム風に変更される
+	let dailyId = isSystemMessage
 		? "SYSTEM"
 		: generateDailyId(authorIdSeed, boardId, dateJst);
 
@@ -467,6 +469,35 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 			console.error("[PostService] CommandService.executeCommand failed:", err);
 		}
 	}
+
+	// Step 5.5: ステルス処理（本文除去 + フィールド上書き）
+	// ステルスコマンドの3原則を実装する:
+	//   成功時: コマンド文字列を本文から除去し、フィールド上書きを適用する
+	//   失敗時: コマンド文字列を残す（意図が露出するペナルティ）
+	//   除去後の本文が空: 空文字列の書き込みとして投稿する
+	// See: features/command_iamsystem.feature
+	// See: docs/architecture/components/command.md §5 ステルスコマンドの設計原則
+	let resolvedBody = input.body;
+
+	if (
+		commandResult?.isStealth &&
+		commandResult.success &&
+		commandResult.rawCommand
+	) {
+		// 成功時: コマンド文字列を本文から除去する
+		resolvedBody = resolvedBody.replace(commandResult.rawCommand, "").trim();
+
+		// フィールド上書きの適用
+		if (commandResult.postFieldOverrides) {
+			if (commandResult.postFieldOverrides.displayName !== undefined) {
+				resolvedDisplayName = commandResult.postFieldOverrides.displayName;
+			}
+			if (commandResult.postFieldOverrides.dailyId !== undefined) {
+				dailyId = commandResult.postFieldOverrides.dailyId;
+			}
+		}
+	}
+	// else: 失敗時 or 非ステルスコマンド → resolvedBody / resolvedDisplayName / dailyId は変更しない
 
 	// Step 6: レス番号採番
 	// See: docs/architecture/architecture.md §7.2 同時実行制御（レス番号採番）
@@ -538,7 +569,8 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	if (!isSystemMessage && !input.isBotWrite) {
 		try {
 			// アンカー解析: 本文中の >>N を解析して最初のアンカー先レスを特定する
-			const anchors = parseAnchors(input.body);
+			// ステルス除去後の resolvedBody を使用する（コマンド文字列は除去済み）
+			const anchors = parseAnchors(resolvedBody);
 			let isReplyTo: string | undefined;
 
 			if (anchors.length > 0) {
@@ -609,13 +641,15 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		inlineSystemInfoParts.length > 0 ? inlineSystemInfoParts.join("\n") : null;
 
 	// Step 9: レス作成
+	// ステルス処理済みの resolvedBody / resolvedDisplayName / dailyId を使用する
+	// See: features/command_iamsystem.feature
 	const createdPost = await PostRepository.create({
 		threadId: input.threadId,
 		postNumber,
 		authorId: resolvedAuthorId,
 		displayName: resolvedDisplayName,
 		dailyId,
-		body: input.body,
+		body: resolvedBody,
 		inlineSystemInfo,
 		isSystemMessage,
 	});

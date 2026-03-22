@@ -40,6 +40,7 @@ import {
 	type IHissiPostRepository,
 	type IHissiThreadRepository,
 } from "./handlers/hissi-handler";
+import { IamsystemHandler } from "./handlers/iamsystem-handler";
 // eslint-disable-next-line no-restricted-imports
 import {
 	type IKinouPostRepository,
@@ -51,6 +52,20 @@ import { TellHandler } from "./handlers/tell-handler";
 // ---------------------------------------------------------------------------
 // 公開インターフェース型定義
 // ---------------------------------------------------------------------------
+
+/**
+ * ステルスコマンドが PostService に指示する、投稿レコードのフィールド上書き。
+ * PostService は Step 5.5（ステルス処理）で success=true のときのみこれらの値を適用する。
+ *
+ * See: features/command_iamsystem.feature
+ * See: docs/architecture/components/command.md §5 ステルスコマンドの設計原則
+ */
+export interface PostFieldOverrides {
+	/** 表示名の上書き値（例: "★システム"）。undefined なら上書きしない */
+	displayName?: string;
+	/** 日次リセットIDの上書き値（例: "SYSTEM"）。undefined なら上書きしない */
+	dailyId?: string;
+}
 
 /**
  * コマンド実行の入力型。
@@ -91,6 +106,32 @@ export interface CommandExecutionResult {
 	 * See: features/investigation.feature
 	 */
 	independentMessage?: string | null;
+
+	/**
+	 * ステルスコマンドが要求する投稿フィールドの上書き指示。
+	 * null / undefined なら上書きなし（既存コマンドは影響を受けない）。
+	 * PostService は success=true のときのみこの値を適用する。
+	 *
+	 * See: features/command_iamsystem.feature @成功時に表示名とIDがシステム風に変更される
+	 */
+	postFieldOverrides?: PostFieldOverrides | null;
+
+	/**
+	 * ステルスコマンドフラグ。true の場合、PostService は本文からコマンド文字列を除去する。
+	 * CommandService が commands.yaml の stealth フラグをそのまま伝播する。
+	 *
+	 * See: docs/architecture/components/command.md §5 ステルスコマンドの設計原則
+	 */
+	isStealth?: boolean;
+
+	/**
+	 * パーサーが抽出したコマンド文字列（例: "!iamsystem"）。
+	 * PostService がステルス除去時に本文から除去する対象文字列として使用する。
+	 * isStealth=true の場合のみ有効。
+	 *
+	 * See: features/command_iamsystem.feature @成功時にコマンド文字列が投稿本文から除去される
+	 */
+	rawCommand?: string;
 }
 
 /**
@@ -130,6 +171,14 @@ export interface CommandHandlerResult {
 	 * See: features/investigation.feature
 	 */
 	independentMessage?: string | null;
+
+	/**
+	 * ステルスコマンドが要求する投稿フィールドの上書き指示。
+	 * CommandService がそのまま CommandExecutionResult に伝播する。
+	 *
+	 * See: features/command_iamsystem.feature
+	 */
+	postFieldOverrides?: PostFieldOverrides | null;
 }
 
 /**
@@ -456,6 +505,9 @@ export class CommandService {
 			// !omikuji: ターゲット任意パターン（依存サービスなし）
 			// See: features/command_omikuji.feature
 			new OmikujiHandler(),
+			// !iamsystem: ステルスでシステム偽装（依存サービスなし）
+			// See: features/command_iamsystem.feature
+			new IamsystemHandler(),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();
@@ -631,6 +683,12 @@ export class CommandService {
 			currencyCost: shouldSkipDebit ? (result.success ? cost : 0) : cost,
 			eliminationNotice: result.eliminationNotice ?? null,
 			independentMessage: result.independentMessage ?? null,
+			// ステルス関連フィールドの伝播
+			// See: features/command_iamsystem.feature
+			// See: docs/architecture/components/command.md §5 ステルスコマンドの設計原則
+			postFieldOverrides: result.postFieldOverrides ?? null,
+			isStealth: config.stealth,
+			rawCommand: parsed.raw,
 		};
 	}
 }

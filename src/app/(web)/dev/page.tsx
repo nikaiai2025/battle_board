@@ -71,22 +71,23 @@ export default async function DevBoardPage({
 			    See: features/dev_board.feature
 			    ===================================================== */}
 			<style>{`
-				body { background: #efefef; }
+				body { background: #efefef; margin: 0; }
 				.dev-wrap {
-					font-family: "MS UI Gothic", "Osaka", sans-serif;
-					font-size: 13px;
+					font-family: "MS Pゴシック", "MS PGothic", "Osaka", sans-serif;
+					font-size: 12px;
 					color: #000;
-					max-width: 780px;
-					margin: 10px auto;
-					padding: 0 8px;
+					margin: 8px;
+					padding: 0;
+					-webkit-font-smoothing: none;
+					-moz-osx-font-smoothing: unset;
 				}
 				.dev-title {
-					font-size: 18px;
+					font-size: 16px;
 					font-weight: bold;
-					border-bottom: 2px solid #000080;
-					padding-bottom: 4px;
-					margin-bottom: 8px;
-					color: #000080;
+					border-bottom: none;
+					padding-bottom: 2px;
+					margin-bottom: 4px;
+					color: #800000;
 				}
 				.dev-form-table {
 					border-collapse: collapse;
@@ -95,25 +96,27 @@ export default async function DevBoardPage({
 				}
 				.dev-form-table th {
 					background: #c0c0c0;
-					border: 1px solid #808080;
-					padding: 3px 6px;
+					border: 2px solid #808080;
+					padding: 2px 6px;
 					text-align: right;
 					width: 80px;
 					font-weight: normal;
 				}
 				.dev-form-table td {
 					background: #ffffff;
-					border: 1px solid #808080;
-					padding: 3px 6px;
+					border: 2px solid #808080;
+					padding: 2px 6px;
 				}
 				.dev-form-table input[type="text"] {
 					width: 280px;
-					font-size: 13px;
+					font-size: 12px;
+					font-family: inherit;
 				}
 				.dev-form-table textarea {
 					width: 100%;
 					height: 80px;
-					font-size: 13px;
+					font-size: 12px;
+					font-family: inherit;
 				}
 				.dev-submit {
 					background: #d4d0c8;
@@ -135,9 +138,9 @@ export default async function DevBoardPage({
 					margin-bottom: 4px;
 				}
 				.dev-post-header {
-					background: #e8e0d0;
-					border: 1px solid #a08060;
-					padding: 2px 6px;
+					background: transparent;
+					border: none;
+					padding: 2px 0;
 					font-size: 12px;
 				}
 				.dev-post-num {
@@ -147,27 +150,25 @@ export default async function DevBoardPage({
 				}
 				.dev-post-name {
 					font-weight: bold;
-					color: #000080;
+					color: #008000;
 					margin-right: 6px;
 				}
 				.dev-post-date {
 					color: #606060;
 				}
 				.dev-post-body {
-					padding: 4px 10px 8px 20px;
-					border-left: 1px solid #a08060;
-					border-right: 1px solid #a08060;
-					border-bottom: 1px solid #a08060;
-					background: #ffffff;
+					padding: 2px 0 8px 20px;
+					border: none;
+					background: transparent;
 					white-space: pre-wrap;
 					word-break: break-all;
 				}
 				.dev-footer {
 					color: #808080;
-					font-size: 11px;
-					text-align: center;
+					font-size: 10px;
+					text-align: left;
 					margin-top: 16px;
-					border-top: 1px solid #808080;
+					border-top: none;
 					padding-top: 4px;
 				}
 			`}</style>

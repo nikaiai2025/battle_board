@@ -79,5 +79,14 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: false,
 		},
+		// TASK-266: !iamsystem コマンド追加（ステルスでシステム偽装）
+		// See: features/command_iamsystem.feature
+		iamsystem: {
+			description: "表示名が★システムになる",
+			cost: 5,
+			targetFormat: null,
+			enabled: true,
+			stealth: true,
+		},
 	},
 };

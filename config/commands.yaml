@@ -60,3 +60,9 @@ commands:
     responseType: independent
     enabled: true
     stealth: false
+  iamsystem:
+    description: "表示名が★システムになる"
+    cost: 5
+    targetFormat: null
+    enabled: true
+    stealth: true
