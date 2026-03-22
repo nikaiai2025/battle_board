@@ -530,12 +530,13 @@ async function handleCreatePost(
 	}
 
 	// PostServiceで書き込みを実行する
+	// NOTE: parsed.name（FROM欄）は渡さない。表示名は課金＋マイページで設定する仕様であり、
+	// 専ブラから送信された名前データを displayName として採用すると偽装が可能になる。
 	const result = await PostService.createPost({
 		threadId: thread.id,
 		body: parsed.message,
 		edgeToken: parsed.edgeToken,
 		ipHash,
-		displayName: parsed.name || undefined,
 		email: parsed.mail || undefined,
 		isBotWrite: false,
 	});

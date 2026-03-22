@@ -4,7 +4,15 @@
 
 ## 現在のフェーズ
 
-**Sprint-103 完了 — countLivingBots型不整合修正 + 固定案内板リンクCF/Vercel併記**
+**Sprint-104 完了 — !livingbot v2 スレッド内カウント追加**
+
+### Sprint-104の成果
+- TASK-281: !livingbot v2 — スレッド内カウント追加
+- 出力: `🤖 生存BOT — 掲示板全体: N体 / このスレッド: M体`
+- BotRepository.countLivingBotsInThread() 新設（3クエリ構成）
+- BDD 16シナリオ全PASS / vitest 1741 PASS
+- コミット: 039aad2
+- 本番スモーク: 30/35 PASS（5件は設計上のスキップ）
 
 ### Sprint-103の成果
 - TASK-280: countLivingBots ネストselect型不整合修正（PostgREST many-to-one が単一オブジェクトを返す問題）
@@ -157,8 +165,8 @@
 ## テスト状況
 
 - vitest: 全PASS（schema-consistency 1件はマイグレーション未適用による既存問題）
-- cucumber-js: 326シナリオ / 310 passed / 0 failed / 16 pending
-  - command_livingbot.feature 14シナリオ全PASS（Sprint-101で実装）
+- cucumber-js: 328シナリオ / 312 passed / 0 failed / 16 pending
+  - command_livingbot.feature 16シナリオ全PASS（Sprint-101でv1実装、Sprint-104でv2拡張）
   - command_newspaper.feature 5シナリオ全PASS（Sprint-97で実装）
   - command_aori.feature 7シナリオ全PASS（Sprint-96で実装）
   - command_iamsystem.feature 7シナリオ全PASS（Sprint-94で実装）
@@ -172,7 +180,7 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-101後):** 18/18 PASS（navigationテスト）
+- **本番スモークテスト (Sprint-104後):** 30/35 PASS（5件は設計上のスキップ）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -271,6 +279,7 @@ GEMINI_API_KEY の **GH Secrets** 設定が必要（人間タスク。Sprint-100
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-104 | !livingbot v2 スレッド内カウント追加 | completed | `tmp/orchestrator/sprint_104_plan.md` |
 | Sprint-103 | countLivingBots型不整合修正 + 固定案内板リンクCF/Vercel併記 | completed | `tmp/orchestrator/sprint_103_plan.md` |
 | Sprint-102 | countLivingBots N+1クエリ最適化（CF Workers サブリクエスト上限回避） | completed | `tmp/orchestrator/sprint_102_plan.md` |
 | Sprint-101 | !livingbotコマンド + ラストボットボーナス実装 | completed | `tmp/orchestrator/sprint_101_plan.md` |
