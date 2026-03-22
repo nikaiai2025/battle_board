@@ -109,8 +109,8 @@ function generateAnnouncementBody(
 		...commandLines,
 		"",
 		"【リンク】",
-		"  マイページ: /mypage",
-		"  開発連絡板: /dev/",
+		"  マイページ: https://battleboard.vercel.app/mypage",
+		"  開発連絡板: https://battleboard.vercel.app/dev/",
 	].join("\n");
 }
 
