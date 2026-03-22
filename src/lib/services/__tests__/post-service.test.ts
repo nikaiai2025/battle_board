@@ -490,6 +490,34 @@ describe("PostService", () => {
 				expect(AuthService.verifyEdgeToken).not.toHaveBeenCalled();
 				expect(result).toMatchObject({ success: true });
 			});
+
+			it("isBotWrite=true の場合、IncentiveService.evaluateOnPost が呼ばれない（同期・遅延両方）", async () => {
+				// BOT書き込みでは IncentiveService をスキップし、FK制約違反による無駄なクエリと
+				// Cloudflare Workers subrequest 上限到達を防ぐ
+				// See: features/bot_system.feature
+				// See: tmp/reports/INCIDENT-CRON500.md
+				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
+				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
+				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
+					undefined,
+				);
+				vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(
+					undefined,
+				);
+
+				const result = await createPost({
+					threadId: "thread-001",
+					body: "ボットの書き込み",
+					edgeToken: null,
+					ipHash: "bot-ip-hash",
+					isBotWrite: true,
+				});
+
+				// IncentiveService は一切呼ばれないこと（同期・遅延ともに）
+				expect(IncentiveService.evaluateOnPost).not.toHaveBeenCalled();
+				expect(result).toMatchObject({ success: true });
+			});
 		});
 
 		// -----------------------------------------------------------------------

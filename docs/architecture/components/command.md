@@ -191,6 +191,17 @@ PostService  →  CommandService
 2. **失敗時: コマンド文字列を除去しない。** 失敗したステルスの意図が他ユーザーに露出する。これはペナルティとして意図的な設計であり、ステルスの成功にはコスト（通貨）が必要であることを強調する
 3. **除去後の本文が空: 空本文の書き込みとして投稿する。** PostService の契約（createPost は必ずレスを作る）を維持し、レス番号を消費する。レスが存在しない完全な不可視化はコマンドの責務範囲外とする
 
+#### ステルスの実装メカニズム
+
+ステルス除去と投稿フィールド上書きは **PostService の Step 5.5**（Step 5 コマンド実行の直後、Step 6 レス番号採番の前）で処理する。
+
+- `CommandExecutionResult` に `isStealth`（設定層フラグの伝播）、`rawCommand`（除去対象文字列）、`postFieldOverrides`（表示名・dailyId 等の上書き指示）を追加する
+- `isStealth` と `rawCommand` は CommandService が設定層（commands.yaml）とパーサーの出力から自動設定する。ハンドラは関与しない
+- `postFieldOverrides` はハンドラが返す。ステルスのうちフィールド上書きを必要とするコマンドのみが使用する
+- PostService は `commandResult.success === true && commandResult.isStealth === true` の場合のみ除去・上書きを適用する
+
+詳細設計: `tmp/workers/bdd-architect_265/iamsystem_design.md` §1-2
+
 ### ターゲット任意パターン
 
 `>>N` 引数の有無で挙動を変えるコマンドを「ターゲット任意」と呼ぶ。

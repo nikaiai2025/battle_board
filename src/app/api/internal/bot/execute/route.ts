@@ -90,9 +90,22 @@ export async function POST(request: Request): Promise<NextResponse> {
 		}
 
 		// Step 4: チュートリアルBOT pending 処理
+		// subrequest 上限超過でも BOT投稿の成功分が500にならないよう個別 try-catch で囲む
 		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
 		// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4
-		const tutorialResult = await botService.processPendingTutorials();
+		// See: tmp/reports/INCIDENT-CRON500.md
+		let tutorialResult: Awaited<
+			ReturnType<typeof botService.processPendingTutorials>
+		> | null = null;
+		try {
+			tutorialResult = await botService.processPendingTutorials();
+		} catch (tutorialErr) {
+			// チュートリアル処理の失敗はBOT投稿結果に影響させない
+			console.error(
+				"[POST /api/internal/bot/execute] processPendingTutorials failed:",
+				tutorialErr,
+			);
+		}
 
 		// Step 5: 結果をJSONで返す
 		return NextResponse.json({

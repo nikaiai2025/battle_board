@@ -253,4 +253,44 @@ test.describe("基本フロー検証（環境共通）", () => {
 
 		// このテスト自体が cleanup の動作確認なので、追加の cleanup は不要
 	});
+
+	/**
+	 * !omikuji コマンドで★システム名義の独立レスが投稿される。
+	 *
+	 * See: features/command_omikuji.feature @おみくじ結果が独立システムレスで即座に表示される
+	 * See: src/lib/services/handlers/omikuji-handler.ts
+	 */
+	test("!omikuji コマンドで★システム名義の独立レスが投稿される", async ({
+		page,
+		authenticate,
+		seedThread,
+		cleanup,
+	}) => {
+		const { threadId } = seedThread;
+		createdThreadIds.push(threadId);
+
+		// シードしたスレッドにアクセス
+		await page.goto(`/threads/${threadId}`);
+		await expect(page.locator("#thread-title")).toBeVisible({
+			timeout: 15_000,
+		});
+		await expect(page.locator("#post-1")).toBeVisible();
+
+		// !omikuji コマンドを書き込み
+		await page.locator("#post-body-input").fill("!omikuji");
+		await page.locator("#post-submit-btn").click();
+
+		// ユーザーの書き込み（>>2）
+		await expect(page.locator("#post-2")).toBeVisible({ timeout: 15_000 });
+		await expect(page.locator("#post-2")).toContainText("!omikuji");
+
+		// ★システム名義の独立レス（>>3）が投稿される
+		await expect(page.locator("#post-3")).toBeVisible({ timeout: 15_000 });
+		await expect(page.locator("#post-3")).toContainText("★システム");
+		// おみくじ結果が含まれる（「今日の運勢は」または「の運勢は」）
+		await expect(page.locator("#post-3")).toContainText("の運勢は");
+
+		// クリーンアップ
+		await cleanup([threadId]);
+	});
 });

@@ -45,6 +45,7 @@ import {
 	type IKinouPostRepository,
 	KinouHandler,
 } from "./handlers/kinou-handler";
+import { OmikujiHandler } from "./handlers/omikuji-handler";
 import { TellHandler } from "./handlers/tell-handler";
 
 // ---------------------------------------------------------------------------
@@ -452,6 +453,9 @@ export class CommandService {
 			new AbeshinzoHandler(),
 			...(resolvedHissiHandler ? [resolvedHissiHandler] : []),
 			...(resolvedKinouHandler ? [resolvedKinouHandler] : []),
+			// !omikuji: ターゲット任意パターン（依存サービスなし）
+			// See: features/command_omikuji.feature
+			new OmikujiHandler(),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();

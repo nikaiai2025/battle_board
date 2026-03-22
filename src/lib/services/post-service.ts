@@ -530,7 +530,12 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// PostContext を構築（同期・遅延の両方で再利用する）
 	let postContext: PostContext | null = null;
 
-	if (!isSystemMessage) {
+	// BOT書き込み時は IncentiveService をスキップする
+	// BOTの botUserId は users テーブルに存在しないため、FK制約違反を起こす無駄なクエリを防ぎ
+	// Cloudflare Workers の subrequest 上限到達を回避する
+	// See: features/bot_system.feature
+	// See: tmp/reports/INCIDENT-CRON500.md
+	if (!isSystemMessage && !input.isBotWrite) {
 		try {
 			// アンカー解析: 本文中の >>N を解析して最初のアンカー先レスを特定する
 			const anchors = parseAnchors(input.body);
@@ -686,7 +691,10 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// INSERT + incrementPostCount の後に実行する。
 	// inlineSystemInfo には含めない（他者への付与であり当該書き込みに表示不要）。
 	// See: tmp/workers/bdd-architect_TASK-070/analysis.md §4 方針A: 二段階評価
-	if (!isSystemMessage && postContext) {
+	// BOT書き込み時は遅延評価ボーナスもスキップする（同期ボーナスと同理由）
+	// See: features/bot_system.feature
+	// See: tmp/reports/INCIDENT-CRON500.md
+	if (!isSystemMessage && !input.isBotWrite && postContext) {
 		try {
 			// postContext の postId を実際の createdPost.id に更新する
 			// （遅延評価ボーナスでは INSERT 済みのレスが threadPosts に含まれるため、

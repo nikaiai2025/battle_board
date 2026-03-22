@@ -255,4 +255,39 @@ describe("POST /api/internal/bot/execute", () => {
 		expect(body.tutorials.results[0].pendingId).toBe("pending-001");
 		expect(body.tutorials.results[0].success).toBe(true);
 	});
+
+	it("processPendingTutorials がエラーをスローしても 200 を返し、BOT投稿結果は保持される", async () => {
+		// subrequest 上限超過など processPendingTutorials の失敗が
+		// BOT投稿成功分を 500 にしないことを検証する
+		// See: tmp/reports/INCIDENT-CRON500.md
+		mockVerifyInternalApiKey.mockReturnValue(true);
+		mockGetActiveBotsDueForPost.mockResolvedValue([
+			{ id: "bot-001", name: "荒らし役" },
+		]);
+		mockExecuteBotPost.mockResolvedValue({
+			postId: "post-001",
+			postNumber: 42,
+			dailyId: "FkBot01",
+		});
+		mockProcessPendingTutorials.mockRejectedValue(
+			new Error("Too many subrequests by single Worker invocation."),
+		);
+
+		// console.error をモック化してノイズを抑制
+		const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+		const request = createAuthenticatedRequest();
+		const response = await POST(request);
+
+		// チュートリアル処理が失敗しても 500 にならない
+		expect(response.status).toBe(200);
+		const body = await response.json();
+		expect(body.successCount).toBe(1);
+		expect(body.results[0].botId).toBe("bot-001");
+		expect(body.results[0].success).toBe(true);
+		// tutorials は null（処理失敗）
+		expect(body.tutorials).toBeNull();
+
+		consoleSpy.mockRestore();
+	});
 });

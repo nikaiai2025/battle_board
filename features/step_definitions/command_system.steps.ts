@@ -1037,6 +1037,10 @@ Then(
 /**
  * 書き込み本文は \"{string}\" がそのまま表示される。
  * コマンド文字列を含む本文がそのまま保存されていることを検証する。
+ *
+ * Note: 独立システムレス（★システム名義）を生成するコマンド（!omikuji 等）では
+ *       最後のレスが独立レスになるため、非システムメッセージの最後のレスを対象とする。
+ *       See: features/command_omikuji.feature @おみくじ結果が独立システムレスで即座に表示される
  */
 Then(
 	"書き込み本文は {string} がそのまま表示される",
@@ -1044,11 +1048,15 @@ Then(
 		assert(this.currentThreadId, "スレッドが設定されていません");
 		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
 		assert(posts.length > 0, "スレッドに書き込みが存在しません");
-		const lastPost = posts[posts.length - 1];
+		// 非システムメッセージの最後のレスを取得する
+		// （独立レスを生成するコマンドでは最後のレスが★システムになるため）
+		const userPosts = posts.filter((p) => !p.isSystemMessage);
+		assert(userPosts.length > 0, "ユーザーの書き込みが存在しません");
+		const lastUserPost = userPosts[userPosts.length - 1];
 		assert.strictEqual(
-			lastPost.body,
+			lastUserPost.body,
 			expectedBody,
-			`本文が "${expectedBody}" であることを期待しましたが "${lastPost.body}" でした`,
+			`本文が "${expectedBody}" であることを期待しましたが "${lastUserPost.body}" でした`,
 		);
 	},
 );

@@ -71,6 +71,9 @@ module.exports = {
 			// TASK-248: ウェルカムシーケンス BDD シナリオ追加
 			// See: features/welcome.feature
 			"features/welcome.feature",
+			// TASK-264: おみくじコマンド(!omikuji) BDD シナリオ追加
+			// See: features/command_omikuji.feature
+			"features/command_omikuji.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -114,6 +117,9 @@ module.exports = {
 			// TASK-248: ウェルカムシーケンス BDD ステップ定義
 			// See: features/welcome.feature
 			"features/step_definitions/welcome.steps.ts",
+			// TASK-264: おみくじコマンド(!omikuji) BDD ステップ定義
+			// See: features/command_omikuji.feature
+			"features/step_definitions/command_omikuji.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

@@ -69,5 +69,15 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: false,
 		},
+		// TASK-264: !omikuji コマンド追加（ターゲット任意パターン）
+		// See: features/command_omikuji.feature
+		omikuji: {
+			description: "おみくじで運勢を占う（>>N 指定で対象レスの人の運勢を占う）",
+			cost: 0,
+			targetFormat: null,
+			responseType: "independent",
+			enabled: true,
+			stealth: false,
+		},
 	},
 };
