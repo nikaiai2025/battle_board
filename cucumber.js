@@ -80,6 +80,9 @@ module.exports = {
 			// TASK-270: !aori コマンド（煽りBOT召喚） BDD シナリオ追加
 			// See: features/command_aori.feature
 			"features/command_aori.feature",
+			// TASK-272: !newspaper コマンド BDD シナリオ追加
+			// See: features/command_newspaper.feature
+			"features/command_newspaper.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -132,6 +135,9 @@ module.exports = {
 			// TASK-270: !aori コマンド（煽りBOT召喚） BDD ステップ定義
 			// See: features/command_aori.feature
 			"features/step_definitions/command_aori.steps.ts",
+			// TASK-272: !newspaper コマンド BDD ステップ定義
+			// See: features/command_newspaper.feature
+			"features/step_definitions/command_newspaper.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

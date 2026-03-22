@@ -77,6 +77,7 @@ export default async function DevBoardPage({
 					margin: 0;
 					padding: 0;
 					font-family: "MS Pゴシック", "MS PGothic", "Osaka", sans-serif;
+					font-weight: bold;
 					color: #000;
 					-webkit-font-smoothing: none;
 					-moz-osx-font-smoothing: unset;
@@ -240,7 +241,7 @@ export default async function DevBoardPage({
 				   右メイン（掲示板本体）
 				   ============================================ */
 				.dev-main {
-					width: 640px;
+					width: 800px;
 					padding: 8px 12px;
 				}
 				/* ---- ページタイトル ---- */
@@ -443,14 +444,8 @@ export default async function DevBoardPage({
 									<dd>秘密</dd>
 									<dt>趣味</dt>
 									<dd>プログラミング,深夜徘徊</dd>
-									<dt>好きな言語</dt>
-									<dd>TypeScript,Perl</dd>
-									<dt>好きなOS</dt>
-									<dd>Windows98SE</dd>
 									<dt>好きな食べ物</dt>
 									<dd>ペヤング</dd>
-									<dt>座右の銘</dt>
-									<dd>コードは書いた人の魂</dd>
 								</dl>
 								<div className="dev-profile-rule">
 									*** このサイトについて ***

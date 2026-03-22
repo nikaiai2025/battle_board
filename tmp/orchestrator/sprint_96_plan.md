@@ -40,4 +40,21 @@
 
 ## 結果
 
-（完了後に記入）
+### TASK-269: !aori設計詳細化
+- 出力: `tmp/workers/bdd-architect_269/aori_design.md`（全9章）
+- pending_async_commands 汎用テーブル設計、AoriHandler、Cron統合、使い切りBOT、煽り文句、InMemoryテスト
+
+### TASK-270: !aori実装
+- 新規6ファイル: マイグレーション, Repository, Handler, 煽り文句100件, BDDステップ, 単体テスト
+- 変更8ファイル: commands.yaml/ts, command-service.ts, bot-service.ts, route.ts, bot-repository.ts, bot-profiles
+- InMemory対応4ファイル
+- エスカレーション2件（いずれもlocked_files漏れ、自律解決）
+- 設計修正: isActive=false→true（AttackHandlerが!isActiveを撃破済みと判定するため）
+- rawArgs: CommandContextに追加（optional化で既存テスト互換維持）
+- テスト: BDD 308シナリオ(292 passed, 16 pending) / vitest 82 passed / AoriHandler 16件PASS
+
+### デプロイ・スモーク
+- Vercel: Ready ✅
+- Cloudflare Workers: 2026-03-22T09:41:11Z ✅
+- 本番スモーク: 30/35 PASS（5 skipped = ローカル限定）✅
+- コミット: 69c80fb

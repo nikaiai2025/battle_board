@@ -52,6 +52,12 @@ import {
 	type IKinouPostRepository,
 	KinouHandler,
 } from "./handlers/kinou-handler";
+// TASK-272: !newspaper コマンド（AIニュース取得・非ステルス）
+// See: features/command_newspaper.feature
+import {
+	type INewspaperPendingRepository,
+	NewspaperHandler,
+} from "./handlers/newspaper-handler";
 import { OmikujiHandler } from "./handlers/omikuji-handler";
 import { TellHandler } from "./handlers/tell-handler";
 
@@ -509,21 +515,37 @@ export class CommandService {
 			resolvedKinouHandler = new KinouHandler(postRepository);
 		}
 
-		// AoriHandler の解決
+		// AoriHandler / NewspaperHandler の解決
 		// DI で提供される場合はそれを使用する。
-		// YAML に aori コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// YAML に各コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// AoriHandler と NewspaperHandler は同一リポジトリを共用する（command_type カラムで区別）。
 		// See: features/command_aori.feature
+		// See: features/command_newspaper.feature
 		let resolvedAoriHandler: AoriHandler | null = null;
+		let resolvedNewspaperHandler: NewspaperHandler | null = null;
+
+		// 解決済みリポジトリ（AoriHandler/NewspaperHandler で共用）
+		let resolvedPendingRepo: IAoriPendingRepository | null = null;
 		if (pendingAsyncCommandRepository !== undefined) {
 			// 明示的に DI された場合（null を含む）
-			resolvedAoriHandler = pendingAsyncCommandRepository
-				? new AoriHandler(pendingAsyncCommandRepository)
-				: null;
-		} else if (parsed.commands.aori?.enabled) {
-			// YAML で aori が有効化されており、DI がない場合のみ本番用生成
+			resolvedPendingRepo = pendingAsyncCommandRepository ?? null;
+		} else if (
+			parsed.commands.aori?.enabled ||
+			parsed.commands.newspaper?.enabled
+		) {
+			// YAML でいずれかが有効化されており、DI がない場合のみ本番用生成
 			// eslint-disable-next-line @typescript-eslint/no-require-imports
-			const PendingAsyncCommandRepository: IAoriPendingRepository = require("../infrastructure/repositories/pending-async-command-repository");
-			resolvedAoriHandler = new AoriHandler(PendingAsyncCommandRepository);
+			resolvedPendingRepo =
+				require("../infrastructure/repositories/pending-async-command-repository") as IAoriPendingRepository;
+		}
+
+		if (resolvedPendingRepo && parsed.commands.aori?.enabled) {
+			resolvedAoriHandler = new AoriHandler(resolvedPendingRepo);
+		}
+		if (resolvedPendingRepo && parsed.commands.newspaper?.enabled) {
+			resolvedNewspaperHandler = new NewspaperHandler(
+				resolvedPendingRepo as INewspaperPendingRepository,
+			);
 		}
 
 		// ハンドラをインスタンス化して Registry に登録する
@@ -545,6 +567,9 @@ export class CommandService {
 			// !aori: 煽りBOT召喚（PendingAsyncCommandRepository の DI が必要）
 			// See: features/command_aori.feature
 			...(resolvedAoriHandler ? [resolvedAoriHandler] : []),
+			// !newspaper: AIニュース取得（PendingAsyncCommandRepository の DI が必要）
+			// See: features/command_newspaper.feature
+			...(resolvedNewspaperHandler ? [resolvedNewspaperHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();

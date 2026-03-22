@@ -74,3 +74,12 @@ commands:
     targetFormat: ">>postNumber"
     enabled: true
     stealth: true
+  # TASK-272: !newspaper コマンド追加（AIニュース取得・非ステルス）
+  # See: features/command_newspaper.feature
+  newspaper:
+    description: "最新ニュースを取得する"
+    cost: 10
+    targetFormat: null
+    responseType: independent
+    enabled: true
+    stealth: false

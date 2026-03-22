@@ -97,5 +97,15 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: true,
 		},
+		// TASK-272: !newspaper コマンド追加（AIニュース取得・非ステルス）
+		// See: features/command_newspaper.feature
+		newspaper: {
+			description: "最新ニュースを取得する",
+			cost: 10,
+			targetFormat: null,
+			responseType: "independent" as const,
+			enabled: true,
+			stealth: false,
+		},
 	},
 };
