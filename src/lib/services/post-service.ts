@@ -74,11 +74,12 @@ export interface PostInput {
 	/** ボット書き込みフラグ（true の場合は認証スキップ） */
 	isBotWrite: boolean;
 	/**
-	 * BOT書き込み時のコマンド実行用ユーザーID（botId をそのまま使用）。
-	 * isBotWrite=true かつ botUserId が指定された場合、resolvedAuthorId をこの値で上書きする。
-	 * これにより、BOT書き込み時でもコマンドパイプライン（!w 等）が正常に動作する。
+	 * BOT書き込み時のコマンドパイプライン用ユーザーID（bots.id をそのまま使用）。
+	 * isBotWrite=true かつ botUserId が指定された場合、コマンドパイプラインの userId にこの値を使用する。
+	 * posts.author_id への代入は行わない（FK制約: posts.author_id は REFERENCES users(id)）。
+	 * posts.author_id は常に NULL を維持し、BOTとの紐付けは bot_posts テーブルで管理する。
 	 * See: features/welcome.feature @チュートリアルBOTが書き込みを行う
-	 * See: tmp/workers/bdd-architect_TASK-236/design.md §3.5 PostInput.botUserId 方式
+	 * See: tmp/reports/2026-03-22_cf_error_investigation.md §問題1 修正方針 案A
 	 */
 	botUserId?: string;
 	/**
@@ -407,14 +408,14 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		}
 	}
 
-	// Step 3a: BOT書き込み時の resolvedAuthorId 設定
-	// isBotWrite=true かつ botUserId が指定された場合、resolvedAuthorId を botUserId で設定する。
-	// これによりコマンドパイプライン（!w 等）で userId="" になる問題を解消する。
+	// Step 3a: BOT書き込み時の author_id は NULL のまま維持する
+	// posts.author_id は REFERENCES users(id) の FK制約を持つため、
+	// botsテーブルのIDをセットするとFK制約違反（posts_author_id_fkey）が発生する。
+	// スキーマ設計の意図: BOTの author_id は NULL、BOTとの紐付けは bot_posts テーブルで管理する。
+	// コマンドパイプラインに botUserId を渡す必要がある場合は Step 5 で input.botUserId を直接参照する。
 	// See: features/welcome.feature @チュートリアルBOTが書き込みを行う
-	// See: tmp/workers/bdd-architect_TASK-236/design.md §3.5 PostInput.botUserId 方式
-	if (input.isBotWrite && input.botUserId) {
-		resolvedAuthorId = input.botUserId;
-	}
+	// See: tmp/reports/2026-03-22_cf_error_investigation.md §問題1 修正方針 案A
+	// See: sql/migrations/00001_create_tables.sql L60 コメント（author_id は人間書き込み時のみ設定）
 
 	// Step 3b: last_ip_hash 更新（認証後・書き込み前）
 	// 書き込みリクエストのたびに last_ip_hash を更新する。
@@ -460,7 +461,11 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				rawCommand: input.body,
 				postId: "", // postId は INSERT 前のためプレースホルダ（コマンド実行には不要）
 				threadId: input.threadId,
-				userId: resolvedAuthorId ?? "",
+				// BOT書き込み時: resolvedAuthorId は FK制約上 null を維持するため、
+				// コマンドパイプライン用に input.botUserId を直接参照する。
+				// 人間書き込み時: resolvedAuthorId（users.id）を使用する。
+				// See: tmp/reports/2026-03-22_cf_error_investigation.md §問題1 修正方針 案A
+				userId: input.botUserId ?? resolvedAuthorId ?? "",
 				dailyId, // Step 4 で生成済み。ハンドラの表示文字列（"名無しさん(ID:xxx)"）に使用
 			});
 		} catch (err) {

@@ -77,13 +77,26 @@ export default async function DevBoardPage({
 					margin: 0;
 					padding: 0;
 					font-family: "MS Pゴシック", "MS PGothic", "Osaka", sans-serif;
-					font-size: 12px;
 					color: #000;
 					-webkit-font-smoothing: none;
 					-moz-osx-font-smoothing: unset;
 				}
 				a { color: #0000EE; }
 				a:visited { color: #551A8B; }
+				a:hover { text-decoration: none; }
+
+				/* ---- marquee ---- */
+				.dev-marquee {
+					background: #000080;
+					color: #ffff00;
+					font-weight: bold;
+					padding: 2px 0;
+					margin-bottom: 6px;
+					border-top: 2px solid #c0c0c0;
+					border-left: 2px solid #c0c0c0;
+					border-right: 2px solid #404040;
+					border-bottom: 2px solid #404040;
+				}
 
 				/* ============================================
 				   フレーム風 外枠テーブル
@@ -92,6 +105,7 @@ export default async function DevBoardPage({
 					width: 100%;
 					height: 100vh;
 					border-collapse: collapse;
+					table-layout: fixed;
 				}
 				.dev-frame td {
 					vertical-align: top;
@@ -103,7 +117,6 @@ export default async function DevBoardPage({
 					background: #c0c8d8;
 					border-right: 2px solid #808080;
 					padding: 8px;
-					font-size: 12px;
 				}
 				.dev-nav-title {
 					font-size: 11px;
@@ -130,7 +143,6 @@ export default async function DevBoardPage({
 					margin-bottom: 3px;
 				}
 				.dev-nav li a {
-					font-size: 12px;
 					text-decoration: none;
 				}
 				.dev-nav li a:hover {
@@ -166,17 +178,69 @@ export default async function DevBoardPage({
 					border-right: 2px solid #ffffff;
 					border-bottom: 2px solid #ffffff;
 				}
+				.dev-counter-kiriban {
+					font-size: 9px;
+					color: #cc0000;
+					font-weight: bold;
+					margin-top: 2px;
+				}
+				.dev-nav-update {
+					font-size: 10px;
+					color: #000;
+				}
+				.dev-nav-update dt {
+					font-weight: bold;
+					color: #404040;
+					margin-top: 3px;
+				}
+				.dev-nav-update dd {
+					margin: 0 0 0 4px;
+				}
+				.dev-nav-env {
+					font-size: 9px;
+					color: #808080;
+					text-align: center;
+					margin-top: 8px;
+				}
 				.dev-nav-copy {
 					font-size: 9px;
 					color: #606060;
 					text-align: center;
-					margin-top: 12px;
+					margin-top: 4px;
+				}
+				.dev-construction {
+					font-size: 10px;
+					color: #cc0000;
+				}
+				/* ---- プロフィール ---- */
+				.dev-profile {
+					font-size: 10px;
+					color: #000;
+				}
+				.dev-profile-name {
+					font-size: 11px;
+					font-weight: bold;
+					color: #000080;
+					text-align: center;
+					margin-bottom: 4px;
+				}
+				.dev-profile dt {
+					color: #606060;
+				}
+				.dev-profile dd {
+					margin: 0 0 2px 6px;
+				}
+				.dev-profile-rule {
+					font-size: 9px;
+					color: #cc0000;
+					margin-top: 4px;
 				}
 
 				/* ============================================
 				   右メイン（掲示板本体）
 				   ============================================ */
 				.dev-main {
+					width: 640px;
 					padding: 8px 12px;
 				}
 				/* ---- ページタイトル ---- */
@@ -187,7 +251,6 @@ export default async function DevBoardPage({
 					margin-bottom: 6px;
 				}
 				.dev-title-sub {
-					font-size: 12px;
 					font-weight: normal;
 					color: #606060;
 					margin-bottom: 8px;
@@ -217,7 +280,6 @@ export default async function DevBoardPage({
 					border-right: 2px solid #ffffff;
 					border-bottom: 2px solid #ffffff;
 					background: #ffffff;
-					font-size: 12px;
 					font-family: inherit;
 					padding: 1px 2px;
 				}
@@ -235,7 +297,6 @@ export default async function DevBoardPage({
 					border-right: 2px solid #404040;
 					border-bottom: 2px solid #404040;
 					padding: 2px 16px;
-					font-size: 12px;
 					font-family: inherit;
 					cursor: pointer;
 				}
@@ -265,7 +326,6 @@ export default async function DevBoardPage({
 					margin-bottom: 2px;
 				}
 				.dev-post-title-line {
-					font-size: 12px;
 					font-weight: bold;
 					color: #800000;
 					padding: 1px 0;
@@ -281,7 +341,6 @@ export default async function DevBoardPage({
 				}
 				.dev-post-footer {
 					text-align: right;
-					font-size: 12px;
 					color: #000;
 					padding: 0 0 2px 0;
 				}
@@ -305,6 +364,51 @@ export default async function DevBoardPage({
 					text-align: left;
 					margin-top: 16px;
 				}
+
+				/* ---- 右カラム（広告枠） ---- */
+				.dev-aside {
+					background: #d0d0d0;
+					border-left: 2px solid #808080;
+					padding: 8px;
+					font-size: 10px;
+					text-align: center;
+				}
+				.dev-ad-box {
+					background: #ffffff;
+					border-top: 2px solid #808080;
+					border-left: 2px solid #808080;
+					border-right: 2px solid #ffffff;
+					border-bottom: 2px solid #ffffff;
+					padding: 4px;
+					margin-bottom: 8px;
+				}
+				.dev-ad-img {
+					width: 144px;
+					height: 144px;
+					background: #c0c0c0;
+					border: 1px solid #808080;
+					display: table-cell;
+					vertical-align: middle;
+					text-align: center;
+					color: #808080;
+					font-size: 10px;
+				}
+				.dev-ad-label {
+					font-size: 9px;
+					color: #808080;
+					margin-top: 2px;
+				}
+				.dev-ad-banner {
+					width: 144px;
+					height: 42px;
+					background: #c0c0c0;
+					border: 1px solid #808080;
+					display: table-cell;
+					vertical-align: middle;
+					text-align: center;
+					color: #808080;
+					font-size: 9px;
+				}
 			`}</style>
 
 			{/* =====================================================
@@ -327,6 +431,39 @@ export default async function DevBoardPage({
 									<a href="/dev">開発連絡板</a>
 								</li>
 							</ul>
+
+							<hr className="dev-nav-sep" />
+
+							{/* 管理人プロフィール */}
+							<div className="dev-nav-section">- Profile -</div>
+							<div className="dev-profile">
+								<div className="dev-profile-name">†Eternal_Coder†</div>
+								<dl>
+									<dt>性別</dt>
+									<dd>秘密</dd>
+									<dt>趣味</dt>
+									<dd>プログラミング,深夜徘徊</dd>
+									<dt>好きな言語</dt>
+									<dd>TypeScript,Perl</dd>
+									<dt>好きなOS</dt>
+									<dd>Windows98SE</dd>
+									<dt>好きな食べ物</dt>
+									<dd>ペヤング</dd>
+									<dt>座右の銘</dt>
+									<dd>コードは書いた人の魂</dd>
+								</dl>
+								<div className="dev-profile-rule">
+									*** このサイトについて ***
+									<br />
+									リンクフリーです。
+									<br />
+									報告は任意ですが頂ける
+									<br />
+									と管理人が喜びます(^_^)
+									<br />
+									画像の無断転載は禁止!!
+								</div>
+							</div>
 
 							<hr className="dev-nav-sep" />
 
@@ -354,12 +491,27 @@ export default async function DevBoardPage({
 							<div className="dev-nav-section">- Tools -</div>
 							<ul>
 								<li>
-									<a href="#">ログビューア</a>
+									<a href="#">ログビューア</a>{" "}
+									<span className="dev-construction">工事中</span>
 								</li>
 								<li>
-									<a href="#">テストデータ生成</a>
+									<a href="#">テストデータ生成</a>{" "}
+									<span className="dev-construction">工事中</span>
 								</li>
 							</ul>
+
+							<hr className="dev-nav-sep" />
+
+							{/* 更新履歴 */}
+							<div className="dev-nav-section">- 更新履歴 -</div>
+							<dl className="dev-nav-update">
+								<dt>2025/03/22</dt>
+								<dd>掲示板UI刷新(^_^)</dd>
+								<dt>2025/03/15</dt>
+								<dd>開発連絡板を設置</dd>
+								<dt>2025/03/01</dt>
+								<dd>BattleBoard開発開始!</dd>
+							</dl>
 
 							<hr className="dev-nav-sep" />
 
@@ -370,17 +522,29 @@ export default async function DevBoardPage({
 									{String(posts.length * 137 + 4649).padStart(6, "0")}
 								</div>
 								<div className="dev-counter-label">人目の訪問者です</div>
+								<div className="dev-counter-kiriban">キリ番踏み逃げ禁止!!</div>
 							</div>
 
+							<div className="dev-nav-env">
+								推奨: IE5.0以上
+								<br />
+								800x600 / 文字サイズ中
+							</div>
 							<div className="dev-nav-copy">since 2025</div>
 						</td>
 
 						{/* ===== 右メイン（掲示板本体） ===== */}
 						<td className="dev-main">
+							{/* marquee お知らせテロップ */}
+							<marquee className="dev-marquee" scrollamount="3">
+								ようこそ開発連絡板へ!
+								バグ報告・作業連絡・雑談などご自由にどうぞ。荒らしはやめてね(^_^;)
+							</marquee>
+
 							{/* ページタイトル */}
 							<div className="dev-title">開発連絡板</div>
 							<div className="dev-title-sub">
-								BattleBoard 開発チーム専用の連絡掲示板です。
+								BattleBoard 開発チーム専用の連絡掲示板です m(_ _)m
 							</div>
 
 							{/* =====================================================
@@ -497,6 +661,39 @@ export default async function DevBoardPage({
 							{/* フッター */}
 							<div className="dev-footer">
 								開発連絡板 — BattleBoard 開発チーム専用
+							</div>
+						</td>
+
+						{/* ===== 右カラム（広告枠） ===== */}
+						<td className="dev-aside">
+							<div className="dev-ad-box">
+								<div className="dev-ad-img">
+									AD
+									<br />
+									144x144
+								</div>
+								<div className="dev-ad-label">- 広告 -</div>
+							</div>
+
+							<div className="dev-ad-box">
+								<div className="dev-ad-img">
+									AD
+									<br />
+									144x144
+								</div>
+								<div className="dev-ad-label">- 広告 -</div>
+							</div>
+
+							<div className="dev-ad-box">
+								<div className="dev-ad-banner">BANNER 144x42</div>
+							</div>
+
+							<div className="dev-ad-box">
+								<div className="dev-ad-banner">BANNER 144x42</div>
+							</div>
+
+							<div className="dev-ad-box">
+								<div className="dev-ad-banner">BANNER 144x42</div>
 							</div>
 						</td>
 					</tr>

@@ -1,15 +1,24 @@
 /**
- * 単体テスト: PostService.getPostListWithBotMark
+ * 単体テスト: PostService
+ *
+ * テスト対象:
+ *   - createPost: BOT書き込み時のFK制約違反バグ修正
+ *   - getPostListWithBotMark: BOTマーク付きレス一覧取得
  *
  * See: features/bot_system.feature @撃破済みボットのレスはWebブラウザで目立たない表示になる
- * See: tmp/workers/bdd-architect_TASK-219/design.md §5.1 単体テスト
+ * See: features/welcome.feature @チュートリアルBOTが書き込みを行う
+ * See: tmp/reports/2026-03-22_cf_error_investigation.md §問題1
  *
  * テスト方針:
  *   - PostRepository, BotPostRepository, BotRepository は全てモック化する
  *   - 外部依存（Supabase）はモック化する（アンチパターン: 外部依存の未モック化回避）
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
  *
- * カバレッジ対象:
+ * カバレッジ対象 (createPost):
+ *   - BOT書き込み時にposts.author_idがNULLでINSERTされる（FK制約違反バグ修正）
+ *   - BOT書き込み時にコマンドパイプラインのuserIdにbotUserIdが渡される
+ *
+ * カバレッジ対象 (getPostListWithBotMark):
  *   - 撃破済みBOT(is_active=false)のpostにbotMarkが含まれる
  *   - 活動中BOT(is_active=true)のpostにbotMarkが含まれない（セキュリティテスト）
  *   - 人間のpostにbotMarkがnull
@@ -36,6 +45,9 @@ vi.mock("../../../lib/infrastructure/supabase/client", () => ({
 // PostRepository をモック化
 vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 	findByThreadId: vi.fn(),
+	getNextPostNumber: vi.fn(),
+	create: vi.fn(),
+	countByAuthorId: vi.fn().mockResolvedValue(1), // デフォルト: 初回書き込みではない
 }));
 
 // BotPostRepository をモック化
@@ -54,6 +66,44 @@ vi.mock("../../../lib/services/command-service", () => ({
 		executeCommand: vi.fn().mockResolvedValue(null),
 	})),
 }));
+
+// createPost のテストに必要な追加モック
+vi.mock("../../../lib/infrastructure/repositories/thread-repository", () => ({
+	findById: vi.fn(),
+	incrementPostCount: vi.fn().mockResolvedValue(undefined),
+	updateLastPostAt: vi.fn().mockResolvedValue(undefined),
+	countActiveThreads: vi.fn().mockResolvedValue(0),
+	wakeThread: vi.fn().mockResolvedValue(undefined),
+	demoteOldestActiveThread: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../../lib/infrastructure/repositories/user-repository", () => ({
+	findById: vi.fn(),
+	updateLastIpHash: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../../lib/services/auth-service", () => ({
+	verifyEdgeToken: vi.fn(),
+	issueEdgeToken: vi.fn(),
+	issueAuthCode: vi.fn(),
+	isIpBanned: vi.fn().mockResolvedValue(false),
+	isUserBanned: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock("../../../lib/services/currency-service", () => ({
+	credit: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../../lib/services/incentive-service", () => ({
+	evaluateOnPost: vi.fn().mockResolvedValue({ granted: [] }),
+}));
+
+vi.mock(
+	"../../../lib/infrastructure/repositories/pending-tutorial-repository",
+	() => ({
+		create: vi.fn().mockResolvedValue(undefined),
+	}),
+);
 
 // テスト時は CommandService を null に設定することで依存を排除する
 import { setCommandService } from "../../../lib/services/post-service";
@@ -151,10 +201,158 @@ function createActiveBot(botId: string): Bot {
 // テスト本体
 // ---------------------------------------------------------------------------
 
+import type { Thread } from "../../../lib/domain/models/thread";
 import * as BotPostRepository from "../../../lib/infrastructure/repositories/bot-post-repository";
 import * as BotRepository from "../../../lib/infrastructure/repositories/bot-repository";
 import * as PostRepository from "../../../lib/infrastructure/repositories/post-repository";
-import { getPostListWithBotMark } from "../../../lib/services/post-service";
+import * as ThreadRepository from "../../../lib/infrastructure/repositories/thread-repository";
+import * as AuthService from "../../../lib/services/auth-service";
+import {
+	createPost,
+	getPostListWithBotMark,
+} from "../../../lib/services/post-service";
+
+// ---------------------------------------------------------------------------
+// テスト用ヘルパー（createPost テスト用）
+// ---------------------------------------------------------------------------
+
+/** テスト用スレッドを生成する */
+function createTestThread(overrides: Partial<Thread> = {}): Thread {
+	return {
+		id: "thread-001",
+		threadKey: "1700000000",
+		boardId: "battleboard",
+		title: "テストスレッド",
+		postCount: 0,
+		datByteSize: 0,
+		createdBy: "user-001",
+		createdAt: new Date("2026-03-22T00:00:00Z"),
+		lastPostAt: new Date("2026-03-22T00:00:00Z"),
+		isDeleted: false,
+		isPinned: false,
+		isDormant: false,
+		...overrides,
+	};
+}
+
+/** テスト用の作成済みPostを生成する（PostRepository.create の返り値）*/
+function createTestCreatedPost(overrides: Partial<Post> = {}): Post {
+	return {
+		id: "post-new-001",
+		threadId: "thread-001",
+		postNumber: 1,
+		authorId: null, // BOT書き込みは null
+		displayName: "名無しさん",
+		dailyId: "ABCDE",
+		body: "テスト投稿です",
+		inlineSystemInfo: null,
+		isSystemMessage: false,
+		isDeleted: false,
+		createdAt: new Date("2026-03-22T12:00:00Z"),
+		...overrides,
+	};
+}
+
+// ---------------------------------------------------------------------------
+// createPost のテスト
+// ---------------------------------------------------------------------------
+
+/**
+ * BOT書き込み時のFK制約違反バグ修正のテスト
+ * See: tmp/reports/2026-03-22_cf_error_investigation.md §問題1
+ * See: features/welcome.feature @チュートリアルBOTが書き込みを行う
+ */
+describe("PostService.createPost — BOT書き込み", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		setCommandService(null);
+
+		// スレッドは通常スレッド（固定でない）
+		vi.mocked(ThreadRepository.findById).mockResolvedValue(createTestThread());
+		// レス番号採番
+		vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
+		// レス作成（authorId=nullで返す）
+		vi.mocked(PostRepository.create).mockResolvedValue(createTestCreatedPost());
+		// スレッドのアクティブ件数
+		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
+	});
+
+	/**
+	 * 修正対象のバグ: BOT書き込み時に resolvedAuthorId が botUserId（botsテーブルのID）に
+	 * なっていたことで posts_author_id_fkey FK制約違反が発生していた。
+	 * 修正後: BOT書き込み時は posts.author_id = NULL でINSERTされる。
+	 *
+	 * See: tmp/reports/2026-03-22_cf_error_investigation.md §問題1 根本原因
+	 */
+	it("BOT書き込み時にPostRepository.createのauthorIdがnullで呼ばれる（FK制約違反バグ修正）", async () => {
+		const botId = "bot-uuid-1234-5678";
+
+		await createPost({
+			threadId: "thread-001",
+			body: "こんにちは！なんJ！",
+			edgeToken: null,
+			ipHash: "bot-ip-hash",
+			isBotWrite: true,
+			botUserId: botId,
+		});
+
+		expect(PostRepository.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				authorId: null, // botsテーブルのIDではなくNULL
+			}),
+		);
+	});
+
+	/**
+	 * BOT書き込み時でもbotUserIdがコマンドパイプラインのuserIdに渡される。
+	 * コマンドサービスが注入されていれば botUserId が userId として使われる。
+	 *
+	 * See: tmp/reports/2026-03-22_cf_error_investigation.md §修正方針 案A
+	 */
+	it("BOT書き込み時にbotUserIdがコマンドパイプラインのuserIdとして使われる", async () => {
+		const botId = "bot-uuid-1234-5678";
+		const mockExecuteCommand = vi.fn().mockResolvedValue(null);
+		// CommandService を注入してコマンドパイプラインを有効化する
+		setCommandService({
+			executeCommand: mockExecuteCommand,
+		} as any);
+
+		await createPost({
+			threadId: "thread-001",
+			body: "こんにちは！なんJ！",
+			edgeToken: null,
+			ipHash: "bot-ip-hash",
+			isBotWrite: true,
+			botUserId: botId,
+		});
+
+		expect(mockExecuteCommand).toHaveBeenCalledWith(
+			expect.objectContaining({
+				userId: botId, // botsテーブルのIDがコマンドパイプラインに渡される
+			}),
+		);
+	});
+
+	/**
+	 * botUserIdが未指定の場合（古いコード互換）、authorIdはnullのまま。
+	 */
+	it("botUserIdが未指定でもauthorIdがnullでINSERTされる", async () => {
+		await createPost({
+			threadId: "thread-001",
+			body: "システムからの書き込み",
+			edgeToken: null,
+			ipHash: "system-ip-hash",
+			isBotWrite: true,
+			// botUserId 未指定
+		});
+
+		expect(PostRepository.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				authorId: null,
+			}),
+		);
+	});
+});
 
 describe("PostService.getPostListWithBotMark", () => {
 	beforeEach(() => {
