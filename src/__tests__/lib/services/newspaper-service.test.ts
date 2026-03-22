@@ -1,9 +1,14 @@
 /**
- * processNewspaperCommands 単体テスト
+ * newspaper-service 単体テスト
  *
- * !newspaper コマンドの Cron 処理（非同期フェーズ）を検証する。
- * AI API 呼び出し → ★システムレス投稿 → pending 削除のフロー、
- * エラー時の通貨返却・システム通知を確認する。
+ * processNewspaperCommands:
+ *   !newspaper コマンドの Cron 処理（非同期フェーズ）を検証する。
+ *   AI API 呼び出し → ★システムレス投稿 → pending 削除のフロー、
+ *   エラー時の通貨返却・システム通知を確認する。
+ *
+ * completeNewspaperCommand:
+ *   GH Actions から AI 生成結果を受け取り、DB 書き込みを行う関数を検証する。
+ *   成功時の投稿・pending 削除、失敗時の通貨返却・エラー通知・pending 削除を確認する。
  *
  * テスト方針:
  *   - 全依存は DI でモック化する
@@ -12,6 +17,7 @@
  *
  * See: features/command_newspaper.feature
  * See: tmp/workers/bdd-architect_271/newspaper_design.md §3.2
+ * See: tmp/workers/bdd-architect_275/newspaper_gh_actions_migration.md §3.2
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -19,6 +25,8 @@ import { NEWSPAPER_SYSTEM_PROMPT } from "../../../../config/newspaper-prompt";
 // Note: config/ はプロジェクトルートにある（src/ の兄弟ディレクトリ）
 import type { IGoogleAiAdapter } from "../../../lib/infrastructure/adapters/google-ai-adapter";
 import {
+	completeNewspaperCommand,
+	type INewspaperCompleteDeps,
 	type INewspaperServiceDeps,
 	processNewspaperCommands,
 } from "../../../lib/services/newspaper-service";
@@ -352,6 +360,208 @@ describe("processNewspaperCommands", () => {
 			await processNewspaperCommands(deps);
 			const call = mocks.generateWithSearch.mock.calls[0][0];
 			expect(call.modelId).toBe("gemini-3-flash-preview");
+		});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// completeNewspaperCommand テストヘルパー
+// ---------------------------------------------------------------------------
+
+/** テスト用 completeNewspaperCommand 依存モックを生成する */
+function createCompleteDeps(overrides: Partial<INewspaperCompleteDeps> = {}): {
+	deps: INewspaperCompleteDeps;
+	mocks: {
+		deletePendingAsyncCommand: ReturnType<typeof vi.fn>;
+		createPostFn: ReturnType<typeof vi.fn>;
+		creditFn: ReturnType<typeof vi.fn>;
+	};
+} {
+	const deletePendingAsyncCommand = vi.fn().mockResolvedValue(undefined);
+	const createPostFn = vi
+		.fn()
+		.mockResolvedValue({ success: true, postId: "post-complete-001" });
+	const creditFn = vi.fn().mockResolvedValue(undefined);
+
+	const deps: INewspaperCompleteDeps = {
+		pendingAsyncCommandRepository: { deletePendingAsyncCommand },
+		createPostFn,
+		creditFn,
+		...overrides,
+	};
+
+	return { deps, mocks: { deletePendingAsyncCommand, createPostFn, creditFn } };
+}
+
+// ---------------------------------------------------------------------------
+// completeNewspaperCommand テストスイート
+// ---------------------------------------------------------------------------
+
+describe("completeNewspaperCommand", () => {
+	// =========================================================================
+	// 成功時フロー
+	// See: features/command_newspaper.feature @コマンド実行後、非同期処理で★システムレスとしてニュースが表示される
+	// =========================================================================
+
+	describe("成功時フロー (success: true)", () => {
+		it("success=true, postId を返す", async () => {
+			const { deps } = createCompleteDeps();
+			const result = await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-001",
+				invokerUserId: "user-001",
+				success: true,
+				generatedText: "【ITニュース速報】テスト記事",
+			});
+			expect(result.success).toBe(true);
+			expect(result.postId).toBe("post-complete-001");
+			expect(result.pendingId).toBe("pending-001");
+		});
+
+		it("★システム名義で createPostFn が呼ばれる", async () => {
+			const { deps, mocks } = createCompleteDeps();
+			await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-xyz",
+				invokerUserId: "user-001",
+				success: true,
+				generatedText: "【ITニュース速報】テスト記事",
+			});
+			expect(mocks.createPostFn).toHaveBeenCalledWith(
+				expect.objectContaining({
+					threadId: "thread-xyz",
+					body: "【ITニュース速報】テスト記事",
+					displayName: "★システム",
+					isBotWrite: true,
+					isSystemMessage: true,
+				}),
+			);
+		});
+
+		it("成功後に pending が削除される", async () => {
+			const { deps, mocks } = createCompleteDeps();
+			await completeNewspaperCommand(deps, {
+				pendingId: "pending-to-delete",
+				threadId: "thread-001",
+				invokerUserId: "user-001",
+				success: true,
+				generatedText: "テスト",
+			});
+			expect(mocks.deletePendingAsyncCommand).toHaveBeenCalledWith(
+				"pending-to-delete",
+			);
+		});
+
+		it("成功時に creditFn は呼ばれない", async () => {
+			const { deps, mocks } = createCompleteDeps();
+			await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-001",
+				invokerUserId: "user-001",
+				success: true,
+				generatedText: "テスト",
+			});
+			expect(mocks.creditFn).not.toHaveBeenCalled();
+		});
+	});
+
+	// =========================================================================
+	// 失敗時フロー
+	// See: features/command_newspaper.feature @AI API呼び出しが失敗した場合は通貨返却・システム通知
+	// =========================================================================
+
+	describe("失敗時フロー (success: false)", () => {
+		it("success=false, error を返す", async () => {
+			const { deps } = createCompleteDeps();
+			const result = await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-001",
+				invokerUserId: "user-001",
+				success: false,
+				error: "API rate limit exceeded",
+			});
+			expect(result.success).toBe(false);
+			expect(result.error).toBe("API rate limit exceeded");
+			expect(result.pendingId).toBe("pending-001");
+		});
+
+		it("失敗時に通貨返却が呼ばれる", async () => {
+			const { deps, mocks } = createCompleteDeps();
+			await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-001",
+				invokerUserId: "user-to-refund",
+				success: false,
+				error: "timeout",
+			});
+			expect(mocks.creditFn).toHaveBeenCalledWith(
+				"user-to-refund",
+				10,
+				"newspaper_api_failure",
+			);
+		});
+
+		it("失敗時にエラー通知が★システム名義で投稿される", async () => {
+			const { deps, mocks } = createCompleteDeps();
+			await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-error",
+				invokerUserId: "user-001",
+				success: false,
+				error: "timeout",
+			});
+			expect(mocks.createPostFn).toHaveBeenCalledWith(
+				expect.objectContaining({
+					threadId: "thread-error",
+					body: expect.stringContaining("ニュースの取得に失敗しました"),
+					displayName: "★システム",
+				}),
+			);
+		});
+
+		it("失敗時に pending が削除される（無限リトライ防止）", async () => {
+			const { deps, mocks } = createCompleteDeps();
+			await completeNewspaperCommand(deps, {
+				pendingId: "pending-fail",
+				threadId: "thread-001",
+				invokerUserId: "user-001",
+				success: false,
+				error: "some error",
+			});
+			expect(mocks.deletePendingAsyncCommand).toHaveBeenCalledWith(
+				"pending-fail",
+			);
+		});
+
+		it("error が undefined の場合、'Unknown error' にフォールバックする", async () => {
+			const { deps } = createCompleteDeps();
+			const result = await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-001",
+				invokerUserId: "user-001",
+				success: false,
+			});
+			expect(result.error).toBe("Unknown error");
+		});
+	});
+
+	// =========================================================================
+	// エッジケース: success: true だが generatedText が空/undefined
+	// =========================================================================
+
+	describe("エッジケース", () => {
+		it("success: true でも generatedText が undefined の場合は失敗フローを実行する", async () => {
+			const { deps, mocks } = createCompleteDeps();
+			const result = await completeNewspaperCommand(deps, {
+				pendingId: "pending-001",
+				threadId: "thread-001",
+				invokerUserId: "user-001",
+				success: true,
+				// generatedText を省略
+			});
+			// generatedText がなければ失敗パスへ
+			expect(result.success).toBe(false);
+			expect(mocks.creditFn).toHaveBeenCalled();
 		});
 	});
 });

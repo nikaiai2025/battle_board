@@ -1,12 +1,16 @@
-# Newspaper Scheduler — !newspaper コマンドの非同期処理トリガー
+# Newspaper Scheduler — !newspaper コマンドの非同期処理
 #
-# 毎時 :05, :35 に Vercel の newspaper process エンドポイントを呼び出す。
+# 毎時 :05, :35 に GH Actions 内で AI API を呼び出し、
+# 生成結果を Vercel の /api/internal/newspaper/complete に送信する。
 # bot-scheduler の :00, :30 と 5 分ずらして負荷分散する。
+#
+# 変更前: curl で Vercel /process を呼び出すだけ（AI 呼び出しは Vercel 内）
+# 変更後: GH Actions 内で AI 生成 → /pending 取得 → /complete に送信
 #
 # 認証: BOT_API_KEY（既存の bot-scheduler と共用）
 # 参照: docs/architecture/architecture.md §13 TDR-010
 # See: features/command_newspaper.feature
-# See: tmp/workers/bdd-architect_271/newspaper_design.md §3.4
+# See: tmp/workers/bdd-architect_275/newspaper_gh_actions_migration.md §4
 
 name: Newspaper Scheduler
 
@@ -19,12 +23,18 @@ jobs:
   process-newspaper:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
       - name: Process newspaper commands
-        run: |
-          echo "=== Newspaper Scheduler triggered at $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
-          RESPONSE=$(curl -fsS \
-            -X POST \
-            -H "Authorization: Bearer ${{ secrets.BOT_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "${{ secrets.DEPLOY_URL }}/api/internal/newspaper/process")
-          echo "Response: ${RESPONSE}"
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          BOT_API_KEY: ${{ secrets.BOT_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npx tsx scripts/newspaper-worker.ts
