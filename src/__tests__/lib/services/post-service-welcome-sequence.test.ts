@@ -416,7 +416,7 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 				authorId: "bot-id-001",
 				displayName: "名無しさん",
 				dailyId: "BOT001",
-				body: ">>1 !w  新参おるやん🤣",
+				body: ">>1 !w\n新参おるやん🤣",
 				inlineSystemInfo: null,
 				isSystemMessage: false,
 				isDeleted: false,
@@ -425,7 +425,7 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 
 			const result = await createPost({
 				threadId: "thread-001",
-				body: ">>1 !w  新参おるやん🤣",
+				body: ">>1 !w\n新参おるやん🤣",
 				edgeToken: null,
 				ipHash: "bot-bot-id-001",
 				isBotWrite: true,

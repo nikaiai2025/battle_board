@@ -15,6 +15,7 @@ on:
       - "Daily Maintenance"
       - "Apply DB Migrations"
       - "Seed Pinned Thread"
+      - "Newspaper Scheduler"
     types: [completed]
 
 jobs:
@@ -23,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      contents: read  # gh issue create が repository.defaultBranchRef を読むため必要
     steps:
       - name: Check for existing open issue
         id: check

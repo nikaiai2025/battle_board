@@ -97,7 +97,7 @@ describe("TutorialContentStrategy", () => {
 	// See: features/welcome.feature @チュートリアルBOTが書き込みを行う
 	// See: tmp/workers/bdd-architect_TASK-236/design.md §3.3 TutorialContentStrategy
 
-	it("tutorialTargetPostNumber が指定された場合、>>N !w  新参おるやん🤣 の形式の本文を返す", async () => {
+	it("tutorialTargetPostNumber が指定された場合、>>N !w\\n新参おるやん🤣 の形式の本文を返す", async () => {
 		const strategy = new TutorialContentStrategy();
 		const context: ContentGenerationContext = {
 			botId: "bot-tutorial-001",
@@ -108,10 +108,10 @@ describe("TutorialContentStrategy", () => {
 
 		const result = await strategy.generateContent(context);
 
-		expect(result).toBe(">>5 !w  新参おるやん🤣");
+		expect(result).toBe(">>5 !w\n新参おるやん🤣");
 	});
 
-	it("tutorialTargetPostNumber = 1 の場合、>>1 !w  新参おるやん🤣 を返す", async () => {
+	it("tutorialTargetPostNumber = 1 の場合、>>1 !w\\n新参おるやん🤣 を返す", async () => {
 		const strategy = new TutorialContentStrategy();
 		const context: ContentGenerationContext = {
 			botId: "bot-tutorial-001",
@@ -122,10 +122,10 @@ describe("TutorialContentStrategy", () => {
 
 		const result = await strategy.generateContent(context);
 
-		expect(result).toBe(">>1 !w  新参おるやん🤣");
+		expect(result).toBe(">>1 !w\n新参おるやん🤣");
 	});
 
-	it("tutorialTargetPostNumber が未設定の場合、デフォルト値 1 で >>1 !w  新参おるやん🤣 を返す", async () => {
+	it("tutorialTargetPostNumber が未設定の場合、デフォルト値 1 で >>1 !w\\n新参おるやん🤣 を返す", async () => {
 		const strategy = new TutorialContentStrategy();
 		const context: ContentGenerationContext = {
 			botId: "bot-tutorial-001",
@@ -136,7 +136,7 @@ describe("TutorialContentStrategy", () => {
 
 		const result = await strategy.generateContent(context);
 
-		expect(result).toBe(">>1 !w  新参おるやん🤣");
+		expect(result).toBe(">>1 !w\n新参おるやん🤣");
 	});
 
 	it("大きなレス番号（999）でも正しい本文を生成する", async () => {
@@ -150,7 +150,7 @@ describe("TutorialContentStrategy", () => {
 
 		const result = await strategy.generateContent(context);
 
-		expect(result).toBe(">>999 !w  新参おるやん🤣");
+		expect(result).toBe(">>999 !w\n新参おるやん🤣");
 	});
 });
 
@@ -360,6 +360,6 @@ describe("resolveStrategies (tutorial 分岐)", () => {
 			threadId: "thread-001",
 			tutorialTargetPostNumber: 3,
 		});
-		expect(body).toBe(">>3 !w  新参おるやん🤣");
+		expect(body).toBe(">>3 !w\n新参おるやん🤣");
 	});
 });

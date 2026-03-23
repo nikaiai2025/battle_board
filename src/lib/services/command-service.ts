@@ -560,6 +560,23 @@ export class CommandService {
 				require("../infrastructure/repositories/pending-async-command-repository") as IAoriPendingRepository;
 		}
 
+		// 非同期コマンドの即時トリガー（TDR-017）
+		// 対象 commandType の pending INSERT 時に GH Actions を workflow_dispatch で即時起動する。
+		// GITHUB_PAT 未設定時（開発・テスト環境）は triggerWorkflow 内でスキップされるため安全。
+		// See: docs/architecture/architecture.md TDR-017
+		if (resolvedPendingRepo) {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const {
+				withWorkflowTrigger,
+				triggerWorkflow,
+			} = require("../infrastructure/adapters/github-workflow-trigger");
+			resolvedPendingRepo = withWorkflowTrigger(
+				resolvedPendingRepo,
+				new Set(["newspaper"]),
+				() => triggerWorkflow("newspaper-scheduler.yml"),
+			);
+		}
+
 		if (resolvedPendingRepo && parsed.commands.aori?.enabled) {
 			resolvedAoriHandler = new AoriHandler(resolvedPendingRepo);
 		}
