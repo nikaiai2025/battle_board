@@ -1,10 +1,27 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-23
+> 最終更新: 2026-03-24
 
 ## 現在のフェーズ
 
-**Sprint-105 完了 — 管理者ログインページUI + 画面テーマ機能段階1**
+**Sprint-108 完了 — サイトリネーム Phase 2（BattleBoard → ボットちゃんねる）**
+
+### Sprint-108の成果（サイトリネーム Phase 2）
+- TASK-288: ソースコード + テストコード名称変更（66ファイル）
+- TASK-289: ドキュメント名称変更（9ファイル）
+- TASK-290: E2Eテストコード名称更新（4ファイル）
+- vitest 1772 PASS / cucumber-js 324 passed, 16 pending / tsc エラーなし
+- コミット: b58585e, e7a9020
+- 本番スモーク: 28/35 PASS（2件FAILはDB未移行起因。E2Eテスト修正済み）
+- **残作業:** 本番DBクリア（人間タスク）→ board_id "livebot" で新規データ開始
+
+### Sprint-107の成果（サイトリネーム Phase 1）
+- TASK-287: 板ID定数化リファクタリング（constants.ts + 11ファイル）
+- コミット: 9d3fca3
+
+### Sprint-106の成果
+- TASK-286: ダッシュボード統計500エラー修正（PostgREST集計関数→JS側合算）
+- コミット: b95308b
 
 ### Sprint-105の成果
 - TASK-283: テーマ機能段階1 設計（bdd-architect）— 設計書出力
@@ -192,11 +209,19 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-105後):** 30/35 PASS（5件は設計上のスキップ）
+- **本番スモークテスト (Sprint-108後):** 28/35 PASS（2件FAILはDB未移行起因、5件は設計上のスキップ）
+  - DB移行（board_id変更）後に再テストで解消見込み
 
 ## 人間タスク（次回セッション開始時に確認）
 
 以下はAI側の開発がブロックされている人間側の準備事項。回答・完了したものからAI開発を再開できる。
+
+### HUMAN-007: 本番DBクリア + 初期データ投入（優先度: 高）
+
+サイトリネーム完了後、旧バグデータ蓄積のため本番DBをクリアする。
+- DBクリア後、`scripts/upsert-pinned-thread.ts` を実行して固定案内板を再生成
+- 新規データは board_id = `"livebot"` で作成される（コード変更済み）
+- DBクリア＋案内板再生成後にスモークテスト再実行で全PASS見込み
 
 ※ HUMAN-005（完了）, HUMAN-001（完了）, HUMAN-002（完了）の詳細は `tmp/orchestrator/archive/sprint_past.md` を参照
 
@@ -291,6 +316,9 @@ GEMINI_API_KEY の **GH Secrets** 設定が必要（人間タスク。Sprint-100
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-108 | サイトリネーム Phase 2 — BattleBoard→ボットちゃんねる | completed | `tmp/orchestrator/sprint_108_plan.md` |
+| Sprint-107 | サイトリネーム Phase 1 — 板ID定数化リファクタリング | completed | `tmp/orchestrator/sprint_107_plan.md` |
+| Sprint-106 | ダッシュボード統計500エラー修正 | completed | (コミット: b95308b) |
 | Sprint-105 | 管理者ログインページUI + 画面テーマ機能段階1 | completed | `tmp/orchestrator/sprint_105_plan.md` |
 | Sprint-104 | !livingbot v2 スレッド内カウント追加 | completed | `tmp/orchestrator/sprint_104_plan.md` |
 | Sprint-103 | countLivingBots型不整合修正 + 固定案内板リンクCF/Vercel併記 | completed | `tmp/orchestrator/sprint_103_plan.md` |
