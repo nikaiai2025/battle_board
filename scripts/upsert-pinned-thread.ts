@@ -20,6 +20,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as yaml from "js-yaml";
+import { DEFAULT_BOARD_ID } from "../src/lib/domain/constants";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -47,7 +48,7 @@ interface CommandsYaml {
 const PINNED_THREAD_TITLE = "■ BattleBoard 案内板";
 
 /** 固定スレッドの board_id */
-const PINNED_THREAD_BOARD_ID = "battleboard";
+const PINNED_THREAD_BOARD_ID = DEFAULT_BOARD_ID;
 
 /**
  * システムユーザーの well-known UUID（固定値）。
@@ -109,8 +110,8 @@ function generateAnnouncementBody(
 		...commandLines,
 		"",
 		"【リンク】",
-		"  メイン（専ブラ可）: https://battle-board.shika.workers.dev/battleboard",
-		"  サブ: https://battle-board-uma.vercel.app/battleboard",
+		`  メイン（専ブラ可）: https://battle-board.shika.workers.dev/${DEFAULT_BOARD_ID}`,
+		`  サブ: https://battle-board-uma.vercel.app/${DEFAULT_BOARD_ID}`,
 		"  マイページ: https://battle-board.shika.workers.dev/mypage",
 		"  開発連絡板: https://battle-board.shika.workers.dev/dev/",
 	].join("\n");

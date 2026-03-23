@@ -12,6 +12,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { DEFAULT_BOARD_ID } from "../src/lib/domain/constants";
 
 // ---------------------------------------------------------------------------
 // 設定
@@ -37,8 +38,8 @@ const EXCLUDED_ROUTES: Record<string, string> = {
  * 静的プレフィックスで自動判定される。
  */
 const DYNAMIC_ROUTE_HINTS: Record<string, string> = {
-	"/[boardId]": "/battleboard",
-	"/[boardId]/[threadKey]": "/battleboard/",
+	"/[boardId]": `/${DEFAULT_BOARD_ID}`,
+	"/[boardId]/[threadKey]": `/${DEFAULT_BOARD_ID}/`,
 	// /threads/[threadId] は旧URLリダイレクトルート。テストでは `/threads/` を含む URL でアクセスする。
 	// See: e2e/smoke/navigation.spec.ts > (13) 旧スレッドURLリダイレクト /threads/[threadId]
 	"/threads/[threadId]": "/threads/",

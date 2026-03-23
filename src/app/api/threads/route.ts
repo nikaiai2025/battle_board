@@ -21,6 +21,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 import { hashIp, reduceIp } from "@/lib/services/auth-service";
 import * as PostService from "@/lib/services/post-service";
 
@@ -60,7 +61,7 @@ function getIpHash(req: NextRequest): string {
  */
 export async function GET(_req: NextRequest): Promise<NextResponse> {
 	try {
-		const threads = await PostService.getThreadList("battleboard");
+		const threads = await PostService.getThreadList(DEFAULT_BOARD_ID);
 		return NextResponse.json({ threads }, { status: 200 });
 	} catch (err) {
 		// HIGH-002: err.message をクライアントに漏洩させない（固定メッセージのみ返す）
@@ -136,12 +137,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 		// --- IP ハッシュの取得 ---
 		const ipHash = getIpHash(req);
 
-		// --- boardId の決定（未指定・不正時は "battleboard" を使用）---
+		// --- boardId の決定（未指定・不正時は DEFAULT_BOARD_ID を使用）---
 		// See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-c 方式A
 		const resolvedBoardId =
 			typeof boardId === "string" && boardId.trim() !== ""
 				? boardId.trim()
-				: "battleboard";
+				: DEFAULT_BOARD_ID;
 
 		// --- PostService への委譲 ---
 		const result = await PostService.createThread(

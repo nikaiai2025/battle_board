@@ -23,6 +23,7 @@
 
 import { selectRandomTaunt } from "../../../config/aori-taunts";
 import { botProfilesConfig } from "../../../config/bot-profiles";
+import { DEFAULT_BOARD_ID } from "../domain/constants";
 import type { Bot } from "../domain/models/bot";
 import {
 	calculateEliminationReward,
@@ -314,18 +315,6 @@ export type ResolveStrategiesFn = (
 		botProfiles?: BotProfilesYaml;
 	},
 ) => BotStrategies;
-
-// ---------------------------------------------------------------------------
-// ボット書き込みデフォルト定数
-// ---------------------------------------------------------------------------
-
-/**
- * selectTargetThread のデフォルト板ID。
- * 本番では config や環境変数から取得する想定だが、MVP では固定値を使用する。
- *
- * See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
- */
-const BOT_DEFAULT_BOARD_ID = "battleboard";
 
 // ---------------------------------------------------------------------------
 // bot_profiles.yaml 型定義
@@ -890,7 +879,7 @@ export class BotService {
 			const behaviorContext: BehaviorContext = {
 				botId,
 				botProfileKey: bot.botProfileKey,
-				boardId: BOT_DEFAULT_BOARD_ID,
+				boardId: DEFAULT_BOARD_ID,
 				...(contextOverrides?.tutorialThreadId && {
 					tutorialThreadId: contextOverrides.tutorialThreadId,
 				}),
@@ -1253,7 +1242,7 @@ export class BotService {
 		const behaviorContext: BehaviorContext = {
 			botId,
 			botProfileKey: bot?.botProfileKey ?? null,
-			boardId: BOT_DEFAULT_BOARD_ID,
+			boardId: DEFAULT_BOARD_ID,
 		};
 
 		const action = await strategies.behavior.decideAction(behaviorContext);

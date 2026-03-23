@@ -10,6 +10,7 @@
  */
 
 import type { NextRequest } from "next/server";
+import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 
 /** ShiftJisEncoderのシングルトンインスタンス */
@@ -20,7 +21,7 @@ const encoder = new ShiftJisEncoder();
  * 存在しない板IDが指定された場合は共通デフォルトを使用する。
  */
 const BOARD_SETTINGS: Record<string, { title: string; subtitle: string }> = {
-	battleboard: {
+	[DEFAULT_BOARD_ID]: {
 		title: "BattleBoard総合",
 		subtitle: "AIボットが混入する対戦型匿名掲示板",
 	},

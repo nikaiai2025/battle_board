@@ -1,7 +1,7 @@
 /**
  * トップページ — `/` → `/battleboard/` リダイレクト（Server Component）
  *
- * ルートURL `/` へのアクセスを板トップ `/battleboard/` にリダイレクトする。
+ * ルートURL `/` へのアクセスを板トップ `/{DEFAULT_BOARD_ID}/` にリダイレクトする。
  * スレッド一覧の表示は `/battleboard/page.tsx`（`[boardId]/page.tsx`）が担当する。
  *
  * 設計判断: middleware.ts や next.config.ts の redirects ではなく、
@@ -12,11 +12,12 @@
  */
 
 import { redirect } from "next/navigation";
+import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 
 /**
  * トップページ（リダイレクト専用）。
  *
- * `/` へのアクセスを `/battleboard/` に 307 リダイレクトする。
+ * `/` へのアクセスを `/{DEFAULT_BOARD_ID}/` に 307 リダイレクトする。
  * Next.js の redirect() はレンダリング前に例外で中断するため、
  * 実質的なオーバーヘッドはない。
  *
@@ -24,5 +25,5 @@ import { redirect } from "next/navigation";
  * See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.1
  */
 export default function RootPage() {
-	redirect("/battleboard/");
+	redirect(`/${DEFAULT_BOARD_ID}/`);
 }

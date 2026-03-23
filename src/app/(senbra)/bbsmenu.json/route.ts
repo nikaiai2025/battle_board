@@ -10,7 +10,8 @@
  * See: docs/architecture/components/senbra-adapter.md §5.2 被依存
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 
 /**
  * BattleBoardのホストURLを環境変数から取得する。
@@ -19,25 +20,25 @@ import { NextRequest } from "next/server";
  * bbsmenu.html/route.ts の getBaseUrl() と同一ロジック。
  */
 function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL ?? "https://battleboard.vercel.app";
+	return process.env.NEXT_PUBLIC_BASE_URL ?? "https://battleboard.vercel.app";
 }
 
 /**
  * ChMateが期待する bbsmenu.json レスポンス型。
  */
 interface BbsMenuCategory {
-  category_name: string;
-  category_content: BbsMenuBoard[];
+	category_name: string;
+	category_content: BbsMenuBoard[];
 }
 
 interface BbsMenuBoard {
-  url: string;
-  board_name: string;
-  directory_name: string;
+	url: string;
+	board_name: string;
+	directory_name: string;
 }
 
 interface BbsMenuResponse {
-  menu_list: BbsMenuCategory[];
+	menu_list: BbsMenuCategory[];
 }
 
 /**
@@ -51,17 +52,17 @@ interface BbsMenuResponse {
  * @returns UTF-8 JSON形式の板一覧レスポンス
  */
 export async function GET(_req: NextRequest): Promise<Response> {
-  const baseUrl = getBaseUrl();
+	const baseUrl = getBaseUrl();
 
-  // ChMate互換 JSON を構築する
-  const responseBody = buildBbsMenuJson(baseUrl);
+	// ChMate互換 JSON を構築する
+	const responseBody = buildBbsMenuJson(baseUrl);
 
-  return new Response(JSON.stringify(responseBody), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+	return new Response(JSON.stringify(responseBody), {
+		status: 200,
+		headers: {
+			"Content-Type": "application/json",
+		},
+	});
 }
 
 /**
@@ -74,9 +75,9 @@ export async function GET(_req: NextRequest): Promise<Response> {
  *         "category_name": "BattleBoard",
  *         "category_content": [
  *           {
- *             "url": "{baseUrl}/battleboard/",
+ *             "url": "{baseUrl}/{DEFAULT_BOARD_ID}/",
  *             "board_name": "BattleBoard総合",
- *             "directory_name": "battleboard"
+ *             "directory_name": "{DEFAULT_BOARD_ID}"
  *           }
  *         ]
  *       }
@@ -87,18 +88,18 @@ export async function GET(_req: NextRequest): Promise<Response> {
  * @returns ChMate互換の板一覧JSONオブジェクト
  */
 function buildBbsMenuJson(baseUrl: string): BbsMenuResponse {
-  return {
-    menu_list: [
-      {
-        category_name: "BattleBoard",
-        category_content: [
-          {
-            url: `${baseUrl}/battleboard/`,
-            board_name: "BattleBoard総合",
-            directory_name: "battleboard",
-          },
-        ],
-      },
-    ],
-  };
+	return {
+		menu_list: [
+			{
+				category_name: "BattleBoard",
+				category_content: [
+					{
+						url: `${baseUrl}/${DEFAULT_BOARD_ID}/`,
+						board_name: "BattleBoard総合",
+						directory_name: DEFAULT_BOARD_ID,
+					},
+				],
+			},
+		],
+	};
 }

@@ -38,6 +38,7 @@
 
 import type { NextRequest } from "next/server";
 import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 import { BbsCgiParser } from "@/lib/infrastructure/adapters/bbs-cgi-parser";
 import { BbsCgiResponseBuilder } from "@/lib/infrastructure/adapters/bbs-cgi-response";
 import {
@@ -449,7 +450,7 @@ async function handleCreateThread(
 ): Promise<Response> {
 	const result = await PostService.createThread(
 		{
-			boardId: parsed.boardId || "battleboard",
+			boardId: parsed.boardId || DEFAULT_BOARD_ID,
 			title: subject.trim(),
 			firstPostBody: parsed.message,
 		},
@@ -477,7 +478,7 @@ async function handleCreateThread(
 	}
 
 	const threadKey = result.thread?.threadKey ?? "";
-	const boardId = parsed.boardId || "battleboard";
+	const boardId = parsed.boardId || DEFAULT_BOARD_ID;
 	const successHtml = responseBuilder.buildSuccess(threadKey, boardId);
 	const response = buildShiftJisHtmlResponse(successHtml, 200);
 	// 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）
@@ -559,7 +560,7 @@ async function handleCreatePost(
 		return buildShiftJisHtmlResponse(errorHtml, 200);
 	}
 
-	const boardId = parsed.boardId || "battleboard";
+	const boardId = parsed.boardId || DEFAULT_BOARD_ID;
 	const successHtml = responseBuilder.buildSuccess(parsed.threadKey, boardId);
 	const response = buildShiftJisHtmlResponse(successHtml, 200);
 	// 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）

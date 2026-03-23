@@ -21,10 +21,11 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 import AuthModal from "./AuthModal";
 
 interface ThreadCreateFormProps {
-	/** 投稿先の板ID（省略時は "battleboard"）
+	/** 投稿先の板ID（省略時は DEFAULT_BOARD_ID）
 	 * See: tmp/feature_plan_pinned_thread_and_dev_board.md §3-d
 	 */
 	boardId?: string;
@@ -38,7 +39,7 @@ interface ThreadCreateFormProps {
  * See: docs/specs/screens/thread-list.yaml @SCR-001 > thread-create-form
  */
 export default function ThreadCreateForm({
-	boardId = "battleboard",
+	boardId = DEFAULT_BOARD_ID,
 	onCreated,
 }: ThreadCreateFormProps) {
 	const router = useRouter();

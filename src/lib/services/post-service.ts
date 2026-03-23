@@ -26,6 +26,7 @@
  */
 
 import type { PostWithBotMark } from "../../types/post-with-bot-mark";
+import { DEFAULT_BOARD_ID } from "../domain/constants";
 import type { PostContext } from "../domain/models/incentive";
 import type { Post } from "../domain/models/post";
 import type { Thread, ThreadInput } from "../domain/models/thread";
@@ -438,7 +439,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// See: src/lib/domain/models/post.ts @dailyId
 	const isSystemMessage = input.isSystemMessage ?? false;
 	const dateJst = getTodayJst();
-	const boardId = "battleboard"; // 現時点では固定。将来的にはスレッドから取得
+	const boardId = DEFAULT_BOARD_ID; // 現時点では固定。将来的にはスレッドから取得
 	const authorIdSeed = authResult.authorIdSeed;
 	// let 宣言: Step 5.5 のステルス処理で dailyId を上書きする可能性がある
 	// See: features/command_iamsystem.feature @成功時に表示名とIDがシステム風に変更される
@@ -738,13 +739,13 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// アクティブスレッド数が上限を超えた場合、末尾スレッドを休眠化する
 	// targetThread は Step 0 のスナップショットを使うが、countActiveThreads は最新のDB状態を参照する
 	const activeCount = await ThreadRepository.countActiveThreads(
-		targetThread?.boardId ?? "battleboard",
+		targetThread?.boardId ?? DEFAULT_BOARD_ID,
 	);
 	if (activeCount > THREAD_LIST_MAX_LIMIT) {
 		// アクティブ非固定スレッドの中で last_post_at が最古のものを休眠化する
 		// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
 		await ThreadRepository.demoteOldestActiveThread(
-			targetThread?.boardId ?? "battleboard",
+			targetThread?.boardId ?? DEFAULT_BOARD_ID,
 		);
 	}
 

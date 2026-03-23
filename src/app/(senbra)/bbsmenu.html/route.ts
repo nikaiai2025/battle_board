@@ -10,6 +10,7 @@
  */
 
 import type { NextRequest } from "next/server";
+import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 
 /** ShiftJisEncoderのシングルトンインスタンス */
@@ -69,7 +70,7 @@ function buildBbsMenuHtml(baseUrl: string): string {
 </head>
 <body>
 <B>BattleBoard</B><br>
-<A HREF="${baseUrl}/battleboard/">BattleBoard総合</A><br>
+<A HREF="${baseUrl}/${DEFAULT_BOARD_ID}/">BattleBoard総合</A><br>
 </body>
 </html>`;
 }
