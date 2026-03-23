@@ -70,7 +70,7 @@ export async function seedThreadLocal(
 	const threadRes = await request.post(`${base}/rest/v1/threads`, {
 		headers,
 		data: {
-			board_id: "battleboard",
+			board_id: "livebot",
 			title: "[E2E] テスト用スレッド",
 			post_count: 1,
 			last_post_at: new Date().toISOString(),
@@ -124,7 +124,7 @@ export async function seedThreadProd(
 		data: {
 			title: "[SMOKE] E2Eテスト用スレッド",
 			body: "スモークテスト用の最初のレスです。",
-			boardId: "battleboard",
+			boardId: "livebot",
 		},
 	});
 
@@ -185,7 +185,7 @@ export async function seedThreadWithAnchorPostsLocal(
 	const threadRes = await request.post(`${base}/rest/v1/threads`, {
 		headers,
 		data: {
-			board_id: "battleboard",
+			board_id: "livebot",
 			title: "[E2E] アンカーテスト用スレッド",
 			post_count: 5,
 			last_post_at: new Date().toISOString(),
@@ -289,7 +289,7 @@ export async function seedThreadWithAnchorPostsProd(
 		data: {
 			title: "[SMOKE] アンカーテスト用スレッド",
 			body: "こんにちは",
-			boardId: "battleboard",
+			boardId: "livebot",
 		},
 	});
 	if (!createRes.ok()) {
@@ -367,7 +367,7 @@ export async function seedThreadWithManyPostsLocal(
 	const threadRes = await request.post(`${base}/rest/v1/threads`, {
 		headers,
 		data: {
-			board_id: "battleboard",
+			board_id: "livebot",
 			title: "[E2E] ポーリングテスト用スレッド",
 			post_count: postCount,
 			last_post_at: new Date().toISOString(),
@@ -473,7 +473,7 @@ export async function seedEliminatedBotThreadLocal(
 	const threadRes = await request.post(`${base}/rest/v1/threads`, {
 		headers,
 		data: {
-			board_id: "battleboard",
+			board_id: "livebot",
 			title: "[E2E] BOT表示テスト用スレッド",
 			post_count: 3,
 			last_post_at: new Date().toISOString(),

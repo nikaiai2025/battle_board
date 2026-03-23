@@ -22,7 +22,7 @@ import * as iconv from "iconv-lite";
 // テストデータ
 // ---------------------------------------------------------------------------
 
-const BOARD_ID = "battleboard";
+const BOARD_ID = "livebot";
 const BASE_URL = "http://localhost:3000";
 
 // テスト毎に固有のタイトルを使うことで並列実行・再実行時の競合を防ぐ
@@ -282,8 +282,8 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		const bodyBytes = Buffer.from(await response.body());
 		const decoded = decodeShiftJis(bodyBytes);
 
-		// BattleBoard の文字列を含む
-		expect(decoded).toContain("BattleBoard");
+		// ボットちゃんねる の文字列を含む
+		expect(decoded).toContain("ボットちゃんねる");
 
 		// 専ブラが認識できる <A HREF=...> 形式のリンクを含む
 		expect(decoded).toMatch(/<A HREF=/i);
@@ -365,9 +365,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		}
 	});
 
-	test("GET /bbsmenu.json — battleboardの板情報が含まれる", async ({
-		request,
-	}) => {
+	test("GET /bbsmenu.json — livebotの板情報が含まれる", async ({ request }) => {
 		// See: features/specialist_browser_compat.feature @bbsmenu.jsonがJSON形式で板一覧を返す
 		const response = await request.get(`${BASE_URL}/bbsmenu.json`);
 
@@ -375,23 +373,23 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 
 		const body = await response.json();
 
-		// battleboard の板情報が含まれることを確認する
+		// livebot の板情報が含まれることを確認する
 		const allBoards = body.menu_list.flatMap(
 			(cat: { category_content: { url: string; directory_name: string }[] }) =>
 				cat.category_content,
 		);
-		const battleboardEntry = allBoards.find(
-			(b: { directory_name: string }) => b.directory_name === "battleboard",
+		const livebotEntry = allBoards.find(
+			(b: { directory_name: string }) => b.directory_name === "livebot",
 		);
-		expect(battleboardEntry).toBeTruthy();
-		expect(battleboardEntry.url).toContain("battleboard");
+		expect(livebotEntry).toBeTruthy();
+		expect(livebotEntry.url).toContain("livebot");
 	});
 
 	// -------------------------------------------------------------------------
 	// GET /{boardId}/SETTING.TXT
 	// -------------------------------------------------------------------------
 
-	test("GET /battleboard/SETTING.TXT — Content-Type が Shift_JIS で BBS_TITLE を含む", async ({
+	test("GET /livebot/SETTING.TXT — Content-Type が Shift_JIS で BBS_TITLE を含む", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @SETTING.TXTが板の設定情報を返す
@@ -412,8 +410,8 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		// BBS_TITLE が含まれる
 		expect(decoded).toContain("BBS_TITLE=");
 
-		// battleboard 板の設定値が含まれる
-		expect(decoded).toContain("BattleBoard");
+		// livebot 板の設定値が含まれる
+		expect(decoded).toContain("なんでも実況B（ボット）");
 
 		// BBS_NONAME_NAME が含まれる（専ブラ必須設定）
 		expect(decoded).toContain("BBS_NONAME_NAME=");
@@ -434,16 +432,16 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		const bodyBytes = Buffer.from(await response.body());
 		const decoded = decodeShiftJis(bodyBytes);
 
-		// デフォルト設定: BattleBoard が含まれる
+		// デフォルト設定: ボットちゃんねる が含まれる
 		expect(decoded).toContain("BBS_TITLE=");
-		expect(decoded).toContain("BattleBoard");
+		expect(decoded).toContain("ボットちゃんねる");
 	});
 
 	// -------------------------------------------------------------------------
 	// GET /{boardId}/subject.txt
 	// -------------------------------------------------------------------------
 
-	test("GET /battleboard/subject.txt — スレッドなし時は空レスポンスを返す", async ({
+	test("GET /livebot/subject.txt — スレッドなし時は空レスポンスを返す", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
@@ -460,7 +458,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		expect(bodyBytes.length).toBe(0);
 	});
 
-	test("GET /battleboard/subject.txt — スレッド作成後は DAT 形式で一覧を返す", async ({
+	test("GET /livebot/subject.txt — スレッド作成後は DAT 形式で一覧を返す", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @subject.txtが所定のフォーマットで返される
@@ -493,7 +491,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		expect(firstLine).toMatch(/^\d+\.dat<>.+\s\(\d+\)$/);
 	});
 
-	test("GET /battleboard/subject.txt — 複数スレッドが bump 順（最終書き込み順）で並ぶ", async ({
+	test("GET /livebot/subject.txt — 複数スレッドが bump 順（最終書き込み順）で並ぶ", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @複数スレッドがbump順（最終書き込み順）で並ぶ
@@ -531,7 +529,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	// GET /{boardId}/dat/{threadKey}.dat
 	// -------------------------------------------------------------------------
 
-	test("GET /battleboard/dat/{threadKey}.dat — Content-Type が Shift_JIS で DAT 形式を返す", async ({
+	test("GET /livebot/dat/{threadKey}.dat — Content-Type が Shift_JIS で DAT 形式を返す", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @DATファイルが所定のフォーマットで返される
@@ -578,7 +576,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		expect(fields[4]).toBe(threadTitle);
 	});
 
-	test("GET /battleboard/dat/{threadKey}.dat — 1行目のみスレッドタイトルを含む", async ({
+	test("GET /livebot/dat/{threadKey}.dat — 1行目のみスレッドタイトルを含む", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @DATファイルの1行目のみスレッドタイトルを含む
@@ -636,7 +634,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		}
 	});
 
-	test("GET /battleboard/dat/{threadKey}.dat — 存在しない threadKey で 404 を返す", async ({
+	test("GET /livebot/dat/{threadKey}.dat — 存在しない threadKey で 404 を返す", async ({
 		request,
 	}) => {
 		// 存在しない threadKey（拡張子付き）で 404 を確認
@@ -647,7 +645,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 		expect(response.status()).toBe(404);
 	});
 
-	test("GET /battleboard/dat/{threadKey}.dat — 日付IDフィールドが正しい形式を持つ", async ({
+	test("GET /livebot/dat/{threadKey}.dat — 日付IDフィールドが正しい形式を持つ", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @日次リセットIDがDATの日付フィールドに正しく含まれる
@@ -832,7 +830,7 @@ test.describe("専ブラ互換API — Shift_JIS・DAT形式検証", () => {
 	// Range リクエスト（差分取得）
 	// -------------------------------------------------------------------------
 
-	test("GET /battleboard/dat/{threadKey}.dat — Range ヘッダ付きで 206 差分応答を返す", async ({
+	test("GET /livebot/dat/{threadKey}.dat — Range ヘッダ付きで 206 差分応答を返す", async ({
 		request,
 	}) => {
 		// See: features/specialist_browser_compat.feature @Rangeヘッダ付きリクエストに差分データのみ返す

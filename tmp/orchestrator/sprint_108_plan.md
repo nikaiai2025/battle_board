@@ -16,8 +16,9 @@
 
 | TASK_ID | 担当 | 内容 | 依存 | 状態 |
 |---|---|---|---|---|
-| TASK-288 | bdd-coding (Opus) | ソースコード + テストコード名称変更 (§3.1〜3.5) | なし | assigned |
-| TASK-289 | bdd-coding | ドキュメント名称変更 (§3.7) | なし | assigned |
+| TASK-288 | bdd-coding (Opus) | ソースコード + テストコード名称変更 (§3.1〜3.5) | なし | completed |
+| TASK-289 | bdd-coding | ドキュメント名称変更 (§3.7) | なし | completed |
+| TASK-290 | bdd-coding | E2Eテストコード名称更新（TASK-288漏れ分） | なし | completed |
 
 ※ TASK-288 と TASK-289 は locked_files 重複なし → 並行実行可能
 
@@ -35,3 +36,5 @@
   - 除外: BattleBoardWorld（内部クラス名）、ドメイン名（Phase 3）、JSDoc内の板ID例示
 - TASK-289: completed — docs/ 9ファイル名称変更
   - research/ はヒストリカル資料として原文保持（スキップ）
+- TASK-290: completed — E2E テストコード4ファイル名称更新（tsc PASS）
+- 本番スモーク: 28/35 PASS（2件FAILはE2Eテスト旧名称 + DB未移行。DB移行は人間タスクとして保留）

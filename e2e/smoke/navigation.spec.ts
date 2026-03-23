@@ -8,8 +8,8 @@
  *
  * 対象ページ:
  * 1. トップページ /
- * 2. 板トップページ /battleboard/
- * 3. スレッドページ /battleboard/{threadKey}/
+ * 2. 板トップページ /livebot/
+ * 3. スレッドページ /livebot/{threadKey}/
  * 4. マイページ /mypage（認証必須）
  * 5. 認証コード検証ページ /auth/verify
  * 6. 開発連絡板 /dev
@@ -69,7 +69,7 @@ test.describe("トップページ /", () => {
 
 		// See: src/app/(web)/_components/Header.tsx > #site-title
 		await expect(page.locator("#site-title")).toBeVisible();
-		await expect(page.locator("#site-title")).toHaveText("BattleBoard");
+		await expect(page.locator("#site-title")).toHaveText("ボットちゃんねる");
 
 		await expect(page.locator("main")).toBeVisible();
 
@@ -95,7 +95,7 @@ test.describe("トップページ /", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (2) 板トップページ /battleboard/
+// (2) 板トップページ /livebot/
 // ---------------------------------------------------------------------------
 
 /**
@@ -105,7 +105,7 @@ test.describe("トップページ /", () => {
  * See: src/app/(web)/[boardId]/page.tsx
  * See: features/thread.feature @url_structure
  */
-test.describe("板トップページ /battleboard/", () => {
+test.describe("板トップページ /livebot/", () => {
 	test("HTTPステータス200で応答し、スレッド一覧が表示される", async ({
 		page,
 	}) => {
@@ -114,7 +114,7 @@ test.describe("板トップページ /battleboard/", () => {
 			jsErrors.push(err.message);
 		});
 
-		const response = await page.goto("/battleboard/");
+		const response = await page.goto("/livebot/");
 		expect(response?.status()).toBe(200);
 
 		await expect(page.locator("main")).toBeVisible();
@@ -129,7 +129,7 @@ test.describe("板トップページ /battleboard/", () => {
 			jsErrors.push(err.message);
 		});
 
-		await page.goto("/battleboard/");
+		await page.goto("/livebot/");
 		await expect(page.locator("main")).toBeVisible();
 		await expect(page.locator("#site-title")).toBeVisible();
 
@@ -138,7 +138,7 @@ test.describe("板トップページ /battleboard/", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (3) スレッドページ /battleboard/{threadKey}/
+// (3) スレッドページ /livebot/{threadKey}/
 // ---------------------------------------------------------------------------
 
 /**
@@ -150,7 +150,7 @@ test.describe("板トップページ /battleboard/", () => {
  * See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx
  * See: features/thread.feature @url_structure
  */
-test.describe("スレッドページ /battleboard/{threadKey}/", () => {
+test.describe("スレッドページ /livebot/{threadKey}/", () => {
 	test("シードデータのスレッドにアクセスでき、主要UI要素の確認と一覧への戻り遷移が行える", async ({
 		page,
 		seedThread,
@@ -163,7 +163,7 @@ test.describe("スレッドページ /battleboard/{threadKey}/", () => {
 
 		const { threadId, threadKey } = seedThread;
 
-		const response = await page.goto(`/battleboard/${threadKey}/`);
+		const response = await page.goto(`/livebot/${threadKey}/`);
 		expect(response?.status()).toBe(200);
 
 		// See: src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx > #thread-title
@@ -180,8 +180,8 @@ test.describe("スレッドページ /battleboard/{threadKey}/", () => {
 		await expect(backLink).toBeVisible();
 
 		await backLink.click();
-		await page.waitForURL("**/battleboard");
-		expect(page.url()).toContain("/battleboard");
+		await page.waitForURL("**/livebot");
+		expect(page.url()).toContain("/livebot");
 
 		expect(jsErrors).toHaveLength(0);
 
