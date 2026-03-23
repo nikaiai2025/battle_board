@@ -12,7 +12,7 @@ Feature: 5ch専用ブラウザ互換性
   # CON-001: 5ch専ブラプロトコル互換
 
   5ch専ブラユーザーとして、使い慣れた専用ブラウザ（ChMate、Siki等）から
-  BattleBoardのスレッド閲覧・書き込みをしたい。匿名掲示板文化に慣れた
+  ボットちゃんねるのスレッド閲覧・書き込みをしたい。匿名掲示板文化に慣れた
   ユーザーにとって専ブラの操作感は重要であり、DAT形式・subject.txt・bbs.cgi等の
   5chプロトコルに厳密に準拠する必要がある。
 
@@ -251,14 +251,14 @@ Feature: 5ch専用ブラウザ互換性
     # このURLは専ブラのスレッドリンクコピーや通常ブラウザでの閲覧に使用される。
     # リダイレクト先: /{板ID}/{スレッドキー}/ 形式のWeb UIスレッド表示ページ
     Given スレッドキー "1234567890" のスレッドが存在する
-    When /test/read.cgi/battleboard/1234567890/ にGETリクエストする
-    Then /battleboard/1234567890/ にリダイレクトされる
+    When /test/read.cgi/livebot/1234567890/ にGETリクエストする
+    Then /livebot/1234567890/ にリダイレクトされる
 
   Scenario: 板トップURLがアクセス可能である
     # bbsmenu.html/jsonで板URLとして /{板ID}/ を返しているため、
     # 通常ブラウザでリンクを開いた場合に404にならないようにする。
     # /{板ID}/ が直接スレッド一覧ページとして機能する。
-    When /battleboard/ にGETリクエストする
+    When /livebot/ にGETリクエストする
     Then スレッド一覧が表示される
 
   Scenario: 過去ログ(kako)リクエストに適切に応答する

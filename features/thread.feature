@@ -119,21 +119,21 @@ Feature: スレッド管理
 
   @pinned_thread
   Scenario: 固定スレッドがスレッド一覧の先頭に表示される
-    Given 固定スレッド "■ BattleBoard 案内板" が存在する
+    Given 固定スレッド "■ ボットちゃんねる 案内板" が存在する
     And スレッド "新しいスレッド" の最終書き込みが1分前である
     When スレッド一覧を表示する
-    Then "■ BattleBoard 案内板" が "新しいスレッド" より上に表示される
+    Then "■ ボットちゃんねる 案内板" が "新しいスレッド" より上に表示される
 
   @pinned_thread
   Scenario: 固定スレッドには一般ユーザーが書き込みできない
-    Given 固定スレッド "■ BattleBoard 案内板" が存在する
+    Given 固定スレッド "■ ボットちゃんねる 案内板" が存在する
     And ユーザーがログイン済みである
     When 固定スレッドに書き込みを試みる
     Then 書き込みが "PINNED_THREAD" エラーで拒否される
 
   @pinned_thread
   Scenario: 固定スレッドに案内情報が含まれる
-    Given 固定スレッド "■ BattleBoard 案内板" が本文付きで存在する
+    Given 固定スレッド "■ ボットちゃんねる 案内板" が本文付きで存在する
     When 固定スレッドの本文を確認する
     Then 本文に "/mypage" が含まれる
     And 本文に "!tell" が含まれる
@@ -147,32 +147,32 @@ Feature: スレッド管理
   Scenario: スレッドURLにスレッドキー（数値）が使われる
     # URL形式: /{板ID}/{スレッドキー}/
     Given スレッドキー "1742259600" のスレッドが存在する
-    When ユーザーが /battleboard/1742259600/ にアクセスする
+    When ユーザーが /livebot/1742259600/ にアクセスする
     Then スレッドの内容が正常に表示される
 
   @url_structure
   Scenario: ルートURLが板トップにリダイレクトされる
     When ユーザーが / にアクセスする
-    Then /battleboard/ にリダイレクトされる
+    Then /livebot/ にリダイレクトされる
 
   @url_structure
   Scenario: 板URLでスレッド一覧が直接表示される
     # /{板ID}/ がスレッド一覧ページそのもの
-    When ユーザーが /battleboard/ にアクセスする
+    When ユーザーが /livebot/ にアクセスする
     Then スレッド一覧が表示される
 
   @url_structure
   Scenario: スレッド一覧のリンクが板パス付きスレッドキー形式である
     Given スレッドキー "1742259600" のスレッド "今日の雑談" が存在する
     When スレッド一覧を表示する
-    Then "今日の雑談" のリンク先が /battleboard/1742259600/ である
+    Then "今日の雑談" のリンク先が /livebot/1742259600/ である
 
   @url_structure
   Scenario: 旧形式のスレッドURL（/threads/UUID）が新URLにリダイレクトされる
     Given UUID "f7538d61-5201-4ef3-aa75-1e9e1973de29" のスレッドが存在する
     And そのスレッドキーが "1742259600" である
     When ユーザーが /threads/f7538d61-5201-4ef3-aa75-1e9e1973de29 にアクセスする
-    Then /battleboard/1742259600/ にリダイレクトされる
+    Then /livebot/1742259600/ にリダイレクトされる
   # ===========================================
   # レス番号表示
   # ===========================================

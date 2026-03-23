@@ -99,6 +99,7 @@ color: green
 - プッシュした後、Vercel,Cloudflareそれぞれで自動デプロイが実施される。デプロイ見込み時間として3分間待機した後、CLIでデプロイ状況を確認する。
   - Vercel: `npx vercel ls`
   - Cloudflare: `wrangler deployments status`
+    (使用禁止コマンド: `npx wrangler deployments list`)
 - 仮にデプロイに問題があったとしても**手動デプロイは禁止**。修正コードをコミット・プッシュして、再度自動デプロイを待つ。
 
 ### ステップ9: デプロイ後検証
