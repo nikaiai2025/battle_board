@@ -202,7 +202,7 @@ const mockPost: Post = {
 const mockThread: Thread = {
 	id: "thread-001",
 	threadKey: "1741471200",
-	boardId: "battleboard",
+	boardId: "livebot",
 	title: "今日の雑談",
 	postCount: 0,
 	datByteSize: 0,
@@ -1410,7 +1410,7 @@ describe("PostService", () => {
 
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "今日の雑談",
 						firstPostBody: "自由に話しましょう",
 					},
@@ -1444,7 +1444,7 @@ describe("PostService", () => {
 
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "今日の雑談",
 						firstPostBody: "自由に話しましょう",
 					},
@@ -1466,7 +1466,7 @@ describe("PostService", () => {
 			it("空タイトルでエラーを返す", async () => {
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "",
 						firstPostBody: "自由に話しましょう",
 					},
@@ -1482,7 +1482,7 @@ describe("PostService", () => {
 			it("スペースのみのタイトルでエラーを返す", async () => {
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "   ",
 						firstPostBody: "内容",
 					},
@@ -1503,7 +1503,7 @@ describe("PostService", () => {
 
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: longTitle,
 						firstPostBody: "内容",
 					},
@@ -1539,7 +1539,7 @@ describe("PostService", () => {
 
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: maxTitle,
 						firstPostBody: "内容",
 					},
@@ -1555,7 +1555,7 @@ describe("PostService", () => {
 			it("空の1レス目本文でエラーを返す", async () => {
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "今日の雑談",
 						firstPostBody: "",
 					},
@@ -1597,7 +1597,7 @@ describe("PostService", () => {
 
 				await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "今日の雑談",
 						firstPostBody: "自由に話しましょう",
 					},
@@ -1639,7 +1639,7 @@ describe("PostService", () => {
 
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "今日の雑談",
 						firstPostBody: "自由に話しましょう",
 					},
@@ -1670,7 +1670,7 @@ describe("PostService", () => {
 
 				const result = await createThread(
 					{
-						boardId: "battleboard",
+						boardId: "livebot",
 						title: "新スレ",
 						firstPostBody: "内容",
 					},
@@ -1771,7 +1771,7 @@ describe("PostService", () => {
 				// Assert: 書き込み成功 + demoteOldestActiveThread が呼ばれた
 				expect(result).toMatchObject({ success: true });
 				expect(ThreadRepository.demoteOldestActiveThread).toHaveBeenCalledWith(
-					"battleboard",
+					"livebot",
 				);
 			});
 
@@ -1839,7 +1839,7 @@ describe("PostService", () => {
 				expect(result).toMatchObject({ success: true });
 				expect(ThreadRepository.wakeThread).toHaveBeenCalledWith("thread-001");
 				expect(ThreadRepository.demoteOldestActiveThread).toHaveBeenCalledWith(
-					"battleboard",
+					"livebot",
 				);
 			});
 		});
@@ -1858,20 +1858,20 @@ describe("PostService", () => {
 					isBotWrite: false,
 				});
 
-				// Assert: mockThread.boardId = 'battleboard'
+				// Assert: mockThread.boardId = 'livebot'
 				expect(ThreadRepository.countActiveThreads).toHaveBeenCalledWith(
-					"battleboard",
+					"livebot",
 				);
 			});
 		});
 
 		describe("スレッドが存在しない場合（nullスレッド）のフォールバック", () => {
-			it("スレッドが null の場合は countActiveThreads が battleboard でフォールバック呼び出しされる", async () => {
+			it("スレッドが null の場合は countActiveThreads が livebot でフォールバック呼び出しされる", async () => {
 				// Arrange: スレッドが存在しない（targetThread = null）
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(null);
 				// null スレッドでも後続処理（認証 → バリデーション → Step 9）まで進む必要があるが、
 				// null の場合は isPinned チェックが false → Step 1以降が処理される
-				// ただし null.boardId のアクセスはフォールバック "battleboard" で対応
+				// ただし null.boardId のアクセスはフォールバック "livebot" で対応
 
 				// Act: 通常書き込み
 				await createPost({
@@ -1882,9 +1882,9 @@ describe("PostService", () => {
 					isBotWrite: false,
 				});
 
-				// Assert: フォールバック "battleboard" で呼ばれる
+				// Assert: フォールバック "livebot" で呼ばれる
 				expect(ThreadRepository.countActiveThreads).toHaveBeenCalledWith(
-					"battleboard",
+					"livebot",
 				);
 			});
 		});
@@ -1909,14 +1909,13 @@ describe("PostService", () => {
 					mockThreads,
 				);
 
-				const result = await getThreadList("battleboard");
+				const result = await getThreadList("livebot");
 
 				expect(result).toEqual(mockThreads);
 				// onlyActive: true で呼ばれ、LIMIT は使用しない
-				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith(
-					"battleboard",
-					{ onlyActive: true },
-				);
+				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith("livebot", {
+					onlyActive: true,
+				});
 			});
 
 			it("アクティブスレッドのみ取得する（onlyActive:true を使用）", async () => {
@@ -1931,20 +1930,19 @@ describe("PostService", () => {
 					activeThreads,
 				);
 
-				const result = await getThreadList("battleboard");
+				const result = await getThreadList("livebot");
 
 				expect(result).toHaveLength(50);
-				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith(
-					"battleboard",
-					{ onlyActive: true },
-				);
+				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith("livebot", {
+					onlyActive: true,
+				});
 			});
 
 			it("スレッドが0件の場合は空配列を返す", async () => {
 				// See: features/thread.feature @スレッドが0件の場合はメッセージが表示される
 				vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([]);
 
-				const result = await getThreadList("battleboard");
+				const result = await getThreadList("livebot");
 
 				expect(result).toEqual([]);
 			});
@@ -1960,7 +1958,7 @@ describe("PostService", () => {
 					new Error("ThreadRepository.findByBoardId failed: DB障害"),
 				);
 
-				await expect(getThreadList("battleboard")).rejects.toThrow(
+				await expect(getThreadList("livebot")).rejects.toThrow(
 					"ThreadRepository.findByBoardId failed",
 				);
 			});

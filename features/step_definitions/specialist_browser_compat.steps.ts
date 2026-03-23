@@ -73,7 +73,7 @@ const encoder = new ShiftJisEncoder();
 // ---------------------------------------------------------------------------
 
 /** BDD テストで使用するデフォルト板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /** BDD テストで使用するデフォルト IP ハッシュ */
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
@@ -1782,8 +1782,8 @@ When(
 	function (this: BattleBoardWorld) {
 		// SETTING.TXTの固定テキストを構築する（Route Handlerと同一ロジック）
 		const settingLines = [
-			`BBS_TITLE=BattleBoard総合`,
-			`BBS_TITLE_ORIG=BattleBoard総合`,
+			`BBS_TITLE=なんでも実況B（ボット）`,
+			`BBS_TITLE_ORIG=なんでも実況B（ボット）`,
 			`BBS_SUBTITLE=AIボットが混入する対戦型匿名掲示板`,
 			`BBS_NONAME_NAME=名無しさん`,
 			`BBS_THREAD_STOP=1000`,
@@ -1834,11 +1834,11 @@ When(
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">
-<title>BattleBoard - 板一覧</title>
+<title>ボットちゃんねる - 板一覧</title>
 </head>
 <body>
-<B>BattleBoard</B><br>
-<A HREF="${baseUrl}/battleboard/">BattleBoard総合</A><br>
+<B>ボットちゃんねる</B><br>
+<A HREF="${baseUrl}/livebot/">なんでも実況B（ボット）</A><br>
 </body>
 </html>`;
 		lastBbsCgiHtml = html;
@@ -1868,10 +1868,10 @@ Then("板へのリンクを含むHTMLが返される", function (this: BattleBoa
  */
 Then("リンク先が板のルートURLを指している", function (this: BattleBoardWorld) {
 	assert(lastBbsCgiHtml !== null, "bbsmenu.html HTMLが生成されていません");
-	// リンク先が板のルートURL（例: /battleboard/）を含むことを確認する
+	// リンク先が板のルートURL（例: /livebot/）を含むことを確認する
 	assert(
-		/HREF="[^"]*\/battleboard\/"/.test(lastBbsCgiHtml),
-		`リンク先が板のルートURL（/battleboard/）を指していることを期待しましたが含まれていません`,
+		/HREF="[^"]*\/livebot\/"/.test(lastBbsCgiHtml),
+		`リンク先が板のルートURL（/livebot/）を指していることを期待しましたが含まれていません`,
 	);
 });
 
@@ -1910,12 +1910,12 @@ When(
 		const responseBody = {
 			menu_list: [
 				{
-					category_name: "BattleBoard",
+					category_name: "ボットちゃんねる",
 					category_content: [
 						{
-							url: `${baseUrl}/battleboard/`,
-							board_name: "BattleBoard総合",
-							directory_name: "battleboard",
+							url: `${baseUrl}/livebot/`,
+							board_name: "なんでも実況B（ボット）",
+							directory_name: "livebot",
 						},
 					],
 				},
@@ -2660,7 +2660,7 @@ Given(
 );
 
 /**
- * /test/read.cgi/battleboard/1234567890/ にGETリクエストする。
+ * /test/read.cgi/livebot/1234567890/ にGETリクエストする。
  * Route Handlerの GET 関数を直接呼び出してリダイレクト応答を検証する。
  *
  * リダイレクト先（Location ヘッダ）を this.lastResult.data.redirectTarget に保存し、
@@ -2706,7 +2706,7 @@ When(
 // thread.steps.ts の共通ステップで検証する。
 
 /**
- * /battleboard/ にGETリクエストする。
+ * /livebot/ にGETリクエストする。
  * PostService.getThreadList を直接呼び出してスレッド一覧を取得する。
  *
  * 旧実装: (senbra)/[boardId]/route.ts の Route Handler 経由でリダイレクト応答を確認していた。

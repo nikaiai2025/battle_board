@@ -1,4 +1,4 @@
-# BattleBoard ユビキタス言語辞書 (D-02)
+# ボットちゃんねる ユビキタス言語辞書 (D-02)
 # ステータス: ドラフト（G1承認前）
 # 作成日: 2026-03-01
 # 最終更新: 2026-03-20
@@ -29,7 +29,7 @@ ubiquitous_language:
   - term: 掲示板
     english: bulletin_board
     definition: >
-      BattleBoardサービス全体を指す。スレッドの集合体であり、
+      ボットちゃんねるサービス全体を指す。スレッドの集合体であり、
       ユーザーとAIボットが書き込みを行う場。
     forbidden_alias:
       - BBS
@@ -539,7 +539,7 @@ ubiquitous_language:
     forbidden_alias:
       - 専用ブラウザ
       - 5chブラウザ
-    notes: "BattleBoardでは読み書き + 独自拡張コマンドに対応"
+    notes: "ボットちゃんねるでは読み書き + 独自拡張コマンドに対応"
 
   # --- インセンティブ・ボーナス ---
 

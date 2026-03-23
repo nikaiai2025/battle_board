@@ -17,7 +17,7 @@ import { ShiftJisEncoder } from "@/lib/infrastructure/encoding/shift-jis";
 const encoder = new ShiftJisEncoder();
 
 /**
- * BattleBoardのホストURLを環境変数から取得する。
+ * ボットちゃんねるのホストURLを環境変数から取得する。
  * 未設定の場合はデフォルト値を使用する。
  */
 function getBaseUrl(): string {
@@ -66,11 +66,11 @@ function buildBbsMenuHtml(baseUrl: string): string {
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">
-<title>BattleBoard - 板一覧</title>
+<title>ボットちゃんねる - 板一覧</title>
 </head>
 <body>
-<B>BattleBoard</B><br>
-<A HREF="${baseUrl}/${DEFAULT_BOARD_ID}/">BattleBoard総合</A><br>
+<B>ボットちゃんねる</B><br>
+<A HREF="${baseUrl}/${DEFAULT_BOARD_ID}/">なんでも実況B（ボット）</A><br>
 </body>
 </html>`;
 }

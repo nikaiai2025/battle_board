@@ -78,7 +78,7 @@ export default async function AdminLayout({
 		<div className="min-h-screen bg-gray-50">
 			{/* ヘッダー */}
 			<header className="bg-gray-800 text-white px-4 py-3 flex items-center justify-between">
-				<h1 className="text-base font-bold">BattleBoard Admin</h1>
+				<h1 className="text-base font-bold">ボットちゃんねる 管理</h1>
 				<span className="text-xs text-gray-400">管理者パネル</span>
 			</header>
 

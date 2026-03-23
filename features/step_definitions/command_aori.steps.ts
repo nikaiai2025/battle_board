@@ -58,7 +58,7 @@ function getPostService() {
 // テスト用定数
 // ---------------------------------------------------------------------------
 
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
 
 // ---------------------------------------------------------------------------

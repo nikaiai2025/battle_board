@@ -249,13 +249,13 @@ describe("GET /api/mypage/history", () => {
 	describe("クエリパラメータ: keyword バリデーション", () => {
 		it("keyword を指定するとサービスに渡る", async () => {
 			// See: features/mypage.feature @キーワードで書き込み履歴を検索する
-			const req = makeRequest({ keyword: "BattleBoard" });
+			const req = makeRequest({ keyword: "ボットちゃんねる" });
 
 			await GET(req);
 
 			expect(mockGetPostHistory).toHaveBeenCalledWith(
 				USER_ID,
-				expect.objectContaining({ keyword: "BattleBoard" }),
+				expect.objectContaining({ keyword: "ボットちゃんねる" }),
 			);
 		});
 

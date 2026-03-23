@@ -116,7 +116,7 @@ function createGrassHandler() {
 // ---------------------------------------------------------------------------
 
 /** BDD テストで使用する板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /** BDD テストで使用するデフォルト IP ハッシュ接頭辞 */
 const IP_HASH_PREFIX = "bdd-reactions-ip-hash";

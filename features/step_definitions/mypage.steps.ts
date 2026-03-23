@@ -31,7 +31,7 @@ import { seedDummyPost } from "./common.steps";
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
 
 /** BDD テストで使用するデフォルト板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 // ---------------------------------------------------------------------------
 // サービス層の動的 require ヘルパー

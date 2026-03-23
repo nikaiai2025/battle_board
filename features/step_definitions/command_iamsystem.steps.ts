@@ -54,7 +54,7 @@ function getCurrencyService() {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 // ---------------------------------------------------------------------------
 // When: 本文に {string} のみを含めて投稿する

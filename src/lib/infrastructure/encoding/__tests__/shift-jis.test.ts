@@ -253,19 +253,19 @@ describe("ShiftJisEncoder", () => {
 			expect(params.get("MESSAGE")).toBe("テスト");
 		});
 
-		it("ASCII文字のみのパラメータ（bbs=battleboard）が正常にデコードされる", () => {
+		it("ASCII文字のみのパラメータ（bbs=livebot）が正常にデコードされる", () => {
 			const encoder = new ShiftJisEncoder();
-			const body = Buffer.from("bbs=battleboard", "ascii");
+			const body = Buffer.from("bbs=livebot", "ascii");
 			const params = encoder.decodeFormData(body);
-			expect(params.get("bbs")).toBe("battleboard");
+			expect(params.get("bbs")).toBe("livebot");
 		});
 
 		it("複数パラメータが正しくパースされる", () => {
 			const encoder = new ShiftJisEncoder();
-			// bbs=battleboard&MESSAGE=%83e%83X%83g
-			const body = Buffer.from("bbs=battleboard&MESSAGE=%83e%83X%83g", "ascii");
+			// bbs=livebot&MESSAGE=%83e%83X%83g
+			const body = Buffer.from("bbs=livebot&MESSAGE=%83e%83X%83g", "ascii");
 			const params = encoder.decodeFormData(body);
-			expect(params.get("bbs")).toBe("battleboard");
+			expect(params.get("bbs")).toBe("livebot");
 			expect(params.get("MESSAGE")).toBe("テスト");
 		});
 
@@ -320,18 +320,18 @@ describe("ShiftJisEncoder", () => {
 		});
 
 		it("実際の専ブラPOSTボディ全体を正しくデコードする（統合シナリオ）", () => {
-			// bbs=battleboard&key=1234567890&FROM=%96%BC%96%B3%82%B5%82%B3%82%F1&mail=sage&MESSAGE=%83e%83X%83g%82P&submit=%8F%91%82%AB%8D%9E%82%DE
+			// bbs=livebot&key=1234567890&FROM=%96%BC%96%B3%82%B5%82%B3%82%F1&mail=sage&MESSAGE=%83e%83X%83g%82P&submit=%8F%91%82%AB%8D%9E%82%DE
 			// FROM="名無しさん", MESSAGE="テスト１", submit="書き込む"
 			const encoder = new ShiftJisEncoder();
 			const bodyStr =
-				"bbs=battleboard&key=1234567890" +
+				"bbs=livebot&key=1234567890" +
 				"&FROM=%96%BC%96%B3%82%B5%82%B3%82%F1" +
 				"&mail=sage" +
 				"&MESSAGE=%83e%83X%83g%82P" +
 				"&submit=%8F%91%82%AB%8D%9E%82%DE";
 			const body = Buffer.from(bodyStr, "ascii");
 			const params = encoder.decodeFormData(body);
-			expect(params.get("bbs")).toBe("battleboard");
+			expect(params.get("bbs")).toBe("livebot");
 			expect(params.get("key")).toBe("1234567890");
 			expect(params.get("FROM")).toBe("名無しさん");
 			expect(params.get("mail")).toBe("sage");

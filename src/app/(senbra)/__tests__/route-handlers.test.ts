@@ -86,7 +86,7 @@ function makeThread(
 	return {
 		id: "thread-uuid-001",
 		threadKey: "1234567890",
-		boardId: "battleboard",
+		boardId: "livebot",
 		title: "テストスレ",
 		postCount: 3,
 		datByteSize: 0,
@@ -168,7 +168,7 @@ describe("bbsmenu.html Route Handler", () => {
 		const buffer = await res.arrayBuffer();
 		const decoded = decodeSjis(buffer);
 		// Shift_JISとして正常にデコードできることを確認
-		expect(decoded).toContain("BattleBoard");
+		expect(decoded).toContain("ボットちゃんねる");
 	});
 
 	it("板へのリンクを含むHTMLが返される", async () => {
@@ -177,7 +177,7 @@ describe("bbsmenu.html Route Handler", () => {
 		const buffer = await res.arrayBuffer();
 		const decoded = decodeSjis(buffer);
 		expect(decoded).toContain("<A HREF=");
-		expect(decoded).toContain("battleboard");
+		expect(decoded).toContain("livebot");
 	});
 
 	it("HTMLにtitleタグが含まれる", async () => {
@@ -264,7 +264,7 @@ describe("bbsmenu.json Route Handler", () => {
 		}
 	});
 
-	it("urlにbattleboardが含まれる", async () => {
+	it("urlにlivebotが含まれる", async () => {
 		const req = new NextRequest("http://localhost/bbsmenu.json");
 		const res = await GET(req);
 		const body = await res.json();
@@ -272,7 +272,7 @@ describe("bbsmenu.json Route Handler", () => {
 			(cat: { category_content: { url: string }[] }) => cat.category_content,
 		);
 		expect(
-			allBoards.some((b: { url: string }) => b.url.includes("battleboard")),
+			allBoards.some((b: { url: string }) => b.url.includes("livebot")),
 		).toBe(true);
 	});
 
@@ -323,25 +323,25 @@ describe("SETTING.TXT Route Handler", () => {
 	});
 
 	it("200 OK を返す", async () => {
-		const req = new NextRequest("http://localhost/battleboard/SETTING.TXT");
+		const req = new NextRequest("http://localhost/livebot/SETTING.TXT");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.status).toBe(200);
 	});
 
 	it("Content-TypeヘッダにShift_JISが含まれる", async () => {
-		const req = new NextRequest("http://localhost/battleboard/SETTING.TXT");
+		const req = new NextRequest("http://localhost/livebot/SETTING.TXT");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.headers.get("content-type")).toContain("charset=Shift_JIS");
 	});
 
 	it("BBS_TITLE= を含むテキストが返される", async () => {
-		const req = new NextRequest("http://localhost/battleboard/SETTING.TXT");
+		const req = new NextRequest("http://localhost/livebot/SETTING.TXT");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		const buffer = await res.arrayBuffer();
 		const decoded = decodeSjis(buffer);
@@ -349,9 +349,9 @@ describe("SETTING.TXT Route Handler", () => {
 	});
 
 	it("BBS_NONAME_NAME=名無しさん が含まれる", async () => {
-		const req = new NextRequest("http://localhost/battleboard/SETTING.TXT");
+		const req = new NextRequest("http://localhost/livebot/SETTING.TXT");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		const buffer = await res.arrayBuffer();
 		const decoded = decodeSjis(buffer);
@@ -359,9 +359,9 @@ describe("SETTING.TXT Route Handler", () => {
 	});
 
 	it("Content-Typeヘッダがtext/plainである", async () => {
-		const req = new NextRequest("http://localhost/battleboard/SETTING.TXT");
+		const req = new NextRequest("http://localhost/livebot/SETTING.TXT");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.headers.get("content-type")).toContain("text/plain");
 	});
@@ -402,18 +402,18 @@ describe("subject.txt Route Handler", () => {
 				postCount: 5,
 			}),
 		]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt");
+		const req = new NextRequest("http://localhost/livebot/subject.txt");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.status).toBe(200);
 	});
 
 	it("Content-TypeヘッダにShift_JISが含まれる", async () => {
 		vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([makeThread()]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt");
+		const req = new NextRequest("http://localhost/livebot/subject.txt");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.headers.get("content-type")).toContain("charset=Shift_JIS");
 	});
@@ -426,9 +426,9 @@ describe("subject.txt Route Handler", () => {
 				postCount: 5,
 			}),
 		]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt");
+		const req = new NextRequest("http://localhost/livebot/subject.txt");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		const buffer = await res.arrayBuffer();
 		const decoded = decodeSjis(buffer);
@@ -440,9 +440,9 @@ describe("subject.txt Route Handler", () => {
 			makeThread({ threadKey: "1111111111", title: "スレ1", postCount: 1 }),
 			makeThread({ threadKey: "2222222222", title: "スレ2", postCount: 2 }),
 		]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt");
+		const req = new NextRequest("http://localhost/livebot/subject.txt");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		const buffer = await res.arrayBuffer();
 		const decoded = decodeSjis(buffer);
@@ -452,9 +452,9 @@ describe("subject.txt Route Handler", () => {
 
 	it("スレッドが0件の場合に空レスポンスを返す", async () => {
 		vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt");
+		const req = new NextRequest("http://localhost/livebot/subject.txt");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.status).toBe(200);
 		const buffer = await res.arrayBuffer();
@@ -467,11 +467,11 @@ describe("subject.txt Route Handler", () => {
 		vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([
 			makeThread({ lastPostAt }),
 		]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt", {
+		const req = new NextRequest("http://localhost/livebot/subject.txt", {
 			headers: { "if-modified-since": lastPostAt.toUTCString() },
 		});
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.status).toBe(304);
 	});
@@ -481,22 +481,22 @@ describe("subject.txt Route Handler", () => {
 		vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([
 			makeThread({ lastPostAt }),
 		]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt", {
+		const req = new NextRequest("http://localhost/livebot/subject.txt", {
 			headers: {
 				"if-modified-since": new Date("2025-01-01T00:00:00Z").toUTCString(),
 			},
 		});
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.status).toBe(200);
 	});
 
 	it("Last-Modified ヘッダが設定されている", async () => {
 		vi.mocked(ThreadRepository.findByBoardId).mockResolvedValue([makeThread()]);
-		const req = new NextRequest("http://localhost/battleboard/subject.txt");
+		const req = new NextRequest("http://localhost/livebot/subject.txt");
 		const res = await GET(req, {
-			params: Promise.resolve({ boardId: "battleboard" }),
+			params: Promise.resolve({ boardId: "livebot" }),
 		});
 		expect(res.headers.get("last-modified")).not.toBeNull();
 	});
@@ -520,12 +520,10 @@ describe("DATファイル Route Handler", () => {
 
 	it("スレッドが存在しない場合に 404 を返す", async () => {
 		vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(null);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -537,12 +535,10 @@ describe("DATファイル Route Handler", () => {
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
 			makePost({ postNumber: 1, body: "テスト本文" }),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -552,12 +548,10 @@ describe("DATファイル Route Handler", () => {
 	it("Content-TypeヘッダにShift_JISが含まれる", async () => {
 		vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([makePost()]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -576,12 +570,10 @@ describe("DATファイル Route Handler", () => {
 				body: "本文テスト",
 			}),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -603,12 +595,10 @@ describe("DATファイル Route Handler", () => {
 			makePost({ postNumber: 2, body: "2レス目" }),
 			makePost({ postNumber: 3, body: "3レス目" }),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -629,15 +619,12 @@ describe("DATファイル Route Handler", () => {
 		vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(
 			makeThread({ lastPostAt }),
 		);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-			{
-				headers: { "if-modified-since": lastPostAt.toUTCString() },
-			},
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat", {
+			headers: { "if-modified-since": lastPostAt.toUTCString() },
+		});
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -652,15 +639,12 @@ describe("DATファイル Route Handler", () => {
 			makePost({ postNumber: 1 }),
 			makePost({ postNumber: 2, body: "追加レス" }),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-			{
-				headers: { range: "bytes=0-" },
-			},
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat", {
+			headers: { range: "bytes=0-" },
+		});
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -676,15 +660,12 @@ describe("DATファイル Route Handler", () => {
 		]);
 		// まず全体サイズを知るため、モックデータから実際のサイズを求める
 		// ここでは非常に大きなオフセットを指定して空のレスポンスを期待する
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-			{
-				headers: { range: "bytes=999999-" },
-			},
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat", {
+			headers: { range: "bytes=999999-" },
+		});
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -700,15 +681,12 @@ describe("DATファイル Route Handler", () => {
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
 			makePost({ postNumber: 1 }),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-			{
-				headers: { range: "bytes=0-" },
-			},
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat", {
+			headers: { range: "bytes=0-" },
+		});
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -720,12 +698,10 @@ describe("DATファイル Route Handler", () => {
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
 			makePost({ dailyId: "AbCd1234" }),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -739,12 +715,10 @@ describe("DATファイル Route Handler", () => {
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
 			makePost({ body: "1行目\n2行目" }),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -758,12 +732,10 @@ describe("DATファイル Route Handler", () => {
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
 			makePost({ body: "<script>alert('xss')</script>" }),
 		]);
-		const req = new NextRequest(
-			"http://localhost/battleboard/dat/1234567890.dat",
-		);
+		const req = new NextRequest("http://localhost/livebot/dat/1234567890.dat");
 		const res = await GET(req, {
 			params: Promise.resolve({
-				boardId: "battleboard",
+				boardId: "livebot",
 				threadKey: "1234567890",
 			}),
 		});
@@ -845,7 +817,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			FROM: "名無しさん",
 			mail: "",
@@ -876,7 +848,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			FROM: "",
 			mail: "",
@@ -899,7 +871,7 @@ describe("bbs.cgi Route Handler", () => {
 		vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(null);
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "9999999999",
 			MESSAGE: "テスト",
 		});
@@ -925,7 +897,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			MESSAGE: "テスト",
 		});
@@ -948,7 +920,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			MESSAGE: "テスト",
 		});
@@ -977,7 +949,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			subject: "新しいスレッド",
 			FROM: "名無しさん",
 			mail: "",
@@ -1013,7 +985,7 @@ describe("bbs.cgi Route Handler", () => {
 
 		const japaneseMessage = "日本語テスト書き込み★";
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			MESSAGE: japaneseMessage,
 		});
@@ -1030,7 +1002,7 @@ describe("bbs.cgi Route Handler", () => {
 
 	it("threadKeyが空の場合に ＥＲＲＯＲ を返す", async () => {
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "",
 			MESSAGE: "テスト",
 		});
@@ -1068,7 +1040,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			FROM: "名無しさん",
 			mail: `#${validWriteToken}`,
@@ -1117,7 +1089,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			mail: `sage#${validWriteToken}`,
 			MESSAGE: "テスト",
@@ -1155,7 +1127,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			mail: `#${validWriteToken}`,
 			MESSAGE: "テスト",
@@ -1176,7 +1148,7 @@ describe("bbs.cgi Route Handler", () => {
 		vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({ valid: false });
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			mail: `#${invalidWriteToken}`,
 			MESSAGE: "テスト",
@@ -1201,7 +1173,7 @@ describe("bbs.cgi Route Handler", () => {
 		vi.mocked(AuthService.verifyWriteToken).mockResolvedValue({ valid: false });
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			mail: `#${invalidWriteToken}`,
 			MESSAGE: "テスト",
@@ -1226,7 +1198,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			mail: "sage",
 			MESSAGE: "テスト",
@@ -1258,7 +1230,7 @@ describe("bbs.cgi Route Handler", () => {
 		});
 
 		const body = makeShiftJisBody({
-			bbs: "battleboard",
+			bbs: "livebot",
 			key: "1234567890",
 			mail: `#${upperWriteToken}`,
 			MESSAGE: "テスト",

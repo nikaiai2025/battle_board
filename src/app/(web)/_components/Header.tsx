@@ -1,8 +1,8 @@
 /**
  * Header — ヘッダーナビゲーションコンポーネント
  *
- * BattleBoard のサイト全体で共用するヘッダー。
- * - サイトタイトル「BattleBoard」表示
+ * ボットちゃんねる のサイト全体で共用するヘッダー。
+ * - サイトタイトル「ボットちゃんねる」表示
  * - 「ログイン」リンクを常時表示（本登録ユーザーの復帰手段）
  * - 認証済みの場合は「マイページ」リンクも表示
  *
@@ -38,7 +38,7 @@ export default function Header({ isAuthenticated = false }: HeaderProps) {
 					className="text-lg font-bold text-yellow-300 hover:text-yellow-200"
 					id="site-title"
 				>
-					BattleBoard
+					ボットちゃんねる
 				</Link>
 
 				{/* ナビゲーション */}

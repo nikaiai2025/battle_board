@@ -440,7 +440,7 @@ export default async function DevBoardPage({
 						{/* ===== 左ナビ ===== */}
 						<td className="dev-nav">
 							<div className="dev-nav-title">
-								BattleBoard
+								ボットちゃんねる
 								<br />
 								Dev Menu
 							</div>
@@ -485,7 +485,7 @@ export default async function DevBoardPage({
 							<ul>
 								<li>
 									<a href="/" className="dev-blink">
-										BattleBoard 本番
+										ボットちゃんねる 本番
 									</a>
 								</li>
 								<li>
@@ -526,7 +526,7 @@ export default async function DevBoardPage({
 								<dt>2025/03/15</dt>
 								<dd>開発連絡板を設置</dd>
 								<dt>2025/03/01</dt>
-								<dd>BattleBoard開発開始!</dd>
+								<dd>ボットちゃんねる開発開始!</dd>
 							</dl>
 
 							<hr className="dev-nav-sep" />
@@ -562,7 +562,7 @@ export default async function DevBoardPage({
 							{/* ページタイトル */}
 							<div className="dev-title">開発連絡板</div>
 							<div className="dev-title-sub">
-								BattleBoard 開発チーム専用の連絡掲示板です m(_ _)m
+								ボットちゃんねる 開発チーム専用の連絡掲示板です m(_ _)m
 							</div>
 
 							{/* =====================================================
@@ -678,7 +678,7 @@ export default async function DevBoardPage({
 
 							{/* フッター */}
 							<div className="dev-footer">
-								開発連絡板 — BattleBoard 開発チーム専用
+								開発連絡板 — ボットちゃんねる 開発チーム専用
 							</div>
 						</td>
 

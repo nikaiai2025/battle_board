@@ -98,7 +98,7 @@ export default function AdminLoginPage() {
 			<div className="bg-white border border-gray-200 rounded p-8 shadow-sm w-full max-w-sm">
 				{/* タイトル */}
 				<h1 className="text-lg font-bold text-gray-800 mb-6">
-					BattleBoard 管理者ログイン
+					ボットちゃんねる 管理者ログイン
 				</h1>
 
 				{/* エラーメッセージ

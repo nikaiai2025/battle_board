@@ -68,7 +68,7 @@ function getCurrencyService() {
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-accusation";
 
 /** BDD テストで使用する板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /** 告発コスト（config/commands.yaml の tell.cost と同値） */
 const TELL_COST = 10;

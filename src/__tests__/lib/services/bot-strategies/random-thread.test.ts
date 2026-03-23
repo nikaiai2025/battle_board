@@ -36,7 +36,7 @@ function createContext(
 	return {
 		botId: "bot-001",
 		botProfileKey: "荒らし役",
-		boardId: "battleboard",
+		boardId: "livebot",
 		...overrides,
 	};
 }

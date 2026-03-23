@@ -30,7 +30,7 @@ import type { BattleBoardWorld } from "../support/world";
 // ---------------------------------------------------------------------------
 
 /** BDD テストで使用するデフォルト板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /** テスト用管理者アカウントの固定値 */
 // UUID形式でないとInMemoryリポジトリのバリデーションに弾かれるため randomUUID で生成する

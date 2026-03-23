@@ -213,12 +213,12 @@ describe("PostRepository.searchByAuthorId", () => {
 		await PostRepository.searchByAuthorId(AUTHOR_ID, {
 			limit: 50,
 			offset: 0,
-			keyword: "BattleBoard",
+			keyword: "ボットちゃんねる",
 		});
 
 		expect(mockQueryBuilder.ilike).toHaveBeenCalledWith(
 			"body",
-			"%BattleBoard%",
+			"%ボットちゃんねる%",
 		);
 	});
 

@@ -701,11 +701,11 @@ describe("MypageService", () => {
 					total: 0,
 				});
 
-				await getPostHistory("user-free-001", { keyword: "BattleBoard" });
+				await getPostHistory("user-free-001", { keyword: "ボットちゃんねる" });
 
 				expect(PostRepository.searchByAuthorId).toHaveBeenCalledWith(
 					"user-free-001",
-					expect.objectContaining({ keyword: "BattleBoard" }),
+					expect.objectContaining({ keyword: "ボットちゃんねる" }),
 				);
 			});
 

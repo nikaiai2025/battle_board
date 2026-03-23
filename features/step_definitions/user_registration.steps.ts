@@ -94,7 +94,7 @@ function getMypageService() {
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
 
 /** BDD テストで使用する板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /** テスト用メールアドレス */
 const TEST_EMAIL = "test-user@battleboard.test";

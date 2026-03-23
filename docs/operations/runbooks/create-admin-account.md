@@ -14,7 +14,7 @@ Supabase Auth ユーザー作成 + `admin_users` テーブル登録の2段階で
 
 片方のみでは管理者ログインできない。両方のレコードが必要。
 
-**メールアドレスについて:** 架空アドレス（例: `admin@battleboard.local`）を使用する。アプリケーションから管理者へメールを送信する機能はなく、メールアドレスはログインIDとしてのみ使用される。実在アドレスを使うとSupabase Authのパスワードリセット等で意図しないメール送信が発生しうるため、架空アドレスが望ましい。パスワードを忘れた場合はSupabase Dashboardから直接リセットする。
+**メールアドレスについて:** 架空アドレス（例: `admin@livebot.local`）を使用する。アプリケーションから管理者へメールを送信する機能はなく、メールアドレスはログインIDとしてのみ使用される。実在アドレスを使うとSupabase Authのパスワードリセット等で意図しないメール送信が発生しうるため、架空アドレスが望ましい。パスワードを忘れた場合はSupabase Dashboardから直接リセットする。
 
 ## Local環境
 
@@ -30,7 +30,7 @@ curl -X POST http://127.0.0.1:54321/auth/v1/admin/users \
   -H "apikey: <SERVICE_ROLE_KEY>" \
   -H "Authorization: Bearer <SERVICE_ROLE_KEY>" \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@battleboard.local","password":"admin1234","email_confirm":true}'
+  -d '{"email":"admin@livebot.local","password":"admin1234","email_confirm":true}'
 ```
 
 レスポンスの `"id"` フィールド（UUID）をコピーする。
@@ -40,7 +40,7 @@ curl -X POST http://127.0.0.1:54321/auth/v1/admin/users \
 ```bash
 npx supabase db query "
   INSERT INTO admin_users (id, email, role)
-  VALUES ('<ステップ1のUUID>', 'admin@battleboard.local', 'admin');
+  VALUES ('<ステップ1のUUID>', 'admin@livebot.local', 'admin');
 "
 ```
 
@@ -58,7 +58,7 @@ npx supabase db query "
 
 Supabase Dashboard > Authentication > Users > **Add user** で作成する。
 
-- Email: 架空アドレス（例: `admin@battleboard.local`）
+- Email: 架空アドレス（例: `admin@livebot.local`）
 - Password: 十分に強固なパスワード
 - Auto Confirm User: ON
 
@@ -69,7 +69,7 @@ Supabase Dashboard > Authentication > Users > **Add user** で作成する。
 ```bash
 npx supabase db query "
   INSERT INTO admin_users (id, email, role)
-  VALUES ('<ステップ1のUUID>', 'admin@battleboard.local', 'admin');
+  VALUES ('<ステップ1のUUID>', 'admin@livebot.local', 'admin');
 " --linked
 ```
 

@@ -1,5 +1,5 @@
 /**
- * ルートレイアウト — BattleBoard アプリケーション全体の共通設定
+ * ルートレイアウト — ボットちゃんねる アプリケーション全体の共通設定
  *
  * See: features/thread.feature
  * See: features/authentication.feature
@@ -10,32 +10,32 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+	variable: "--font-geist-sans",
+	subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+	variable: "--font-geist-mono",
+	subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "BattleBoard",
-  description: "AIボットが混入する対戦型匿名掲示板",
+	title: "ボットちゃんねる",
+	description: "AIボットが混入する対戦型匿名掲示板",
 };
 
 export default function RootLayout({
-  children,
+	children,
 }: Readonly<{
-  children: React.ReactNode;
+	children: React.ReactNode;
 }>) {
-  return (
-    <html lang="ja">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
-    </html>
-  );
+	return (
+		<html lang="ja">
+			<body
+				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+			>
+				{children}
+			</body>
+		</html>
+	);
 }

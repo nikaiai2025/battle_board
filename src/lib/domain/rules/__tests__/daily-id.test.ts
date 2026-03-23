@@ -13,14 +13,14 @@ describe("generateDailyId", () => {
 
   describe("正常系: 同一入力 → 同一出力（冪等性）", () => {
     it("同じ引数を渡すと常に同じIDが返る", () => {
-      const result1 = generateDailyId("seed-abc", "battleboard", "2026-03-08");
-      const result2 = generateDailyId("seed-abc", "battleboard", "2026-03-08");
+      const result1 = generateDailyId("seed-abc", "livebot", "2026-03-08");
+      const result2 = generateDailyId("seed-abc", "livebot", "2026-03-08");
       expect(result1).toBe(result2);
     });
 
     it("複数回呼び出しても結果が一致する", () => {
       const calls = Array.from({ length: 5 }, () =>
-        generateDailyId("user-seed-xyz", "battleboard", "2026-03-08")
+        generateDailyId("user-seed-xyz", "livebot", "2026-03-08")
       );
       const [first, ...rest] = calls;
       expect(rest.every((v) => v === first)).toBe(true);
@@ -29,8 +29,8 @@ describe("generateDailyId", () => {
 
   describe("正常系: 異なる日付 → 異なるID", () => {
     it("日付が異なると異なるIDが返る", () => {
-      const id1 = generateDailyId("seed-abc", "battleboard", "2026-03-08");
-      const id2 = generateDailyId("seed-abc", "battleboard", "2026-03-09");
+      const id1 = generateDailyId("seed-abc", "livebot", "2026-03-08");
+      const id2 = generateDailyId("seed-abc", "livebot", "2026-03-09");
       expect(id1).not.toBe(id2);
     });
 
@@ -43,8 +43,8 @@ describe("generateDailyId", () => {
 
   describe("正常系: 異なるseed → 異なるID", () => {
     it("authorIdSeed が異なると異なるIDが返る", () => {
-      const id1 = generateDailyId("seed-user-1", "battleboard", "2026-03-08");
-      const id2 = generateDailyId("seed-user-2", "battleboard", "2026-03-08");
+      const id1 = generateDailyId("seed-user-1", "livebot", "2026-03-08");
+      const id2 = generateDailyId("seed-user-2", "livebot", "2026-03-08");
       expect(id1).not.toBe(id2);
     });
   });
@@ -59,12 +59,12 @@ describe("generateDailyId", () => {
 
   describe("正常系: 出力フォーマット", () => {
     it("返り値は8文字の文字列", () => {
-      const id = generateDailyId("seed", "battleboard", "2026-03-08");
+      const id = generateDailyId("seed", "livebot", "2026-03-08");
       expect(id).toHaveLength(8);
     });
 
     it("返り値は16進数の小文字文字列", () => {
-      const id = generateDailyId("seed", "battleboard", "2026-03-08");
+      const id = generateDailyId("seed", "livebot", "2026-03-08");
       expect(id).toMatch(/^[0-9a-f]{8}$/);
     });
 
@@ -77,7 +77,7 @@ describe("generateDailyId", () => {
   describe("正常系: アルゴリズム検証（sha256の先頭8文字）", () => {
     it("sha256(dateJst + boardId + authorIdSeed) の先頭8文字と一致する", () => {
       const authorIdSeed = "test-seed-value";
-      const boardId = "battleboard";
+      const boardId = "livebot";
       const dateJst = "2026-03-08";
 
       const expected = createHash("sha256")
@@ -103,7 +103,7 @@ describe("generateDailyId", () => {
   describe("境界値: 特殊な入力", () => {
     it("長い seed でも8文字を返す", () => {
       const longSeed = "a".repeat(1000);
-      const id = generateDailyId(longSeed, "battleboard", "2026-03-08");
+      const id = generateDailyId(longSeed, "livebot", "2026-03-08");
       expect(id).toHaveLength(8);
     });
 

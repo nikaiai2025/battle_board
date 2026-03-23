@@ -67,14 +67,14 @@ app/(web)/[boardId]/page.tsx  [Server Component]
         └── ThreadCard [Server Component]  // 1スレッドの表示
               // リンク先: /{boardId}/{threadKey}/ 形式
 
-app/(web)/page.tsx  →  redirect('/battleboard/')  // リダイレクト専用（旧ルート互換）
+app/(web)/page.tsx  →  redirect('/livebot/')  // リダイレクト専用（旧ルート互換）
 ```
 
 データ取得：PostService.getThreadList(boardId) 直接呼び出し（`export const dynamic = 'force-dynamic'` でキャッシュ無効化）
 
-- `[boardId]` 動的セグメント: 将来の板追加に対応。現在は `battleboard` 板のみ
+- `[boardId]` 動的セグメント: 将来の板追加に対応。現在は `livebot` 板のみ
 - `ThreadCard` のリンク先が `/{boardId}/{threadKey}/` 形式に変更済み（旧: `/threads/{UUID}/`）
-- 旧 `page.tsx` はリダイレクト専用に変更済み（`/` → `/battleboard/` を 307 リダイレクト）
+- 旧 `page.tsx` はリダイレクト専用に変更済み（`/` → `/livebot/` を 307 リダイレクト）
 
 ### 3.2 スレッドページ
 

@@ -127,7 +127,7 @@ import {
 function createMockThread(overrides: Partial<Thread> = {}): Thread {
 	return {
 		id: "thread-001",
-		boardId: "battleboard",
+		boardId: "livebot",
 		title: "テストスレッド",
 		threadKey: "1700000000",
 		postCount: 5,

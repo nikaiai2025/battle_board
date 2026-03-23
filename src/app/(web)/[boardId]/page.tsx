@@ -53,7 +53,7 @@ interface BoardPageProps {
  * See: features/thread.feature @url_structure
  * See: docs/specs/openapi.yaml > /api/threads > get
  *
- * @param boardId - 板ID（例: 'battleboard'）
+ * @param boardId - 板ID（例: 'livebot'）
  * @returns ThreadView 配列
  */
 async function fetchThreads(boardId: string): Promise<ThreadSummary[]> {
@@ -101,7 +101,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 		<main className="max-w-4xl mx-auto px-4 py-4">
 			{/* ページタイトル */}
 			<h1 className="text-base font-bold text-gray-700 border-b border-gray-400 pb-1 mb-3">
-				BattleBoard — スレッド一覧
+				ボットちゃんねる — スレッド一覧
 			</h1>
 
 			{/* thread-create-form: スレッド作成フォーム（Client Component）

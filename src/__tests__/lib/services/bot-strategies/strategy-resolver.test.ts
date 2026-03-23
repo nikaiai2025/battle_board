@@ -202,7 +202,7 @@ describe("resolveStrategies", () => {
 			const action = await result.behavior.decideAction({
 				botId: "bot-001",
 				botProfileKey: "荒らし役",
-				boardId: "battleboard",
+				boardId: "livebot",
 			});
 
 			expect(action.type).toBe("post_to_existing");

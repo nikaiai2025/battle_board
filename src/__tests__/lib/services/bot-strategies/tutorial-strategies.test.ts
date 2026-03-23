@@ -167,7 +167,7 @@ describe("TutorialBehaviorStrategy", () => {
 		const context: BehaviorContext = {
 			botId: "bot-tutorial-001",
 			botProfileKey: "tutorial",
-			boardId: "battleboard",
+			boardId: "livebot",
 			tutorialThreadId: "thread-001",
 		};
 
@@ -184,7 +184,7 @@ describe("TutorialBehaviorStrategy", () => {
 		const context: BehaviorContext = {
 			botId: "bot-tutorial-002",
 			botProfileKey: "tutorial",
-			boardId: "battleboard",
+			boardId: "livebot",
 			tutorialThreadId: "thread-special-999",
 		};
 
@@ -201,7 +201,7 @@ describe("TutorialBehaviorStrategy", () => {
 		const context: BehaviorContext = {
 			botId: "bot-tutorial-001",
 			botProfileKey: "tutorial",
-			boardId: "battleboard",
+			boardId: "livebot",
 			// tutorialThreadId は未設定
 		};
 

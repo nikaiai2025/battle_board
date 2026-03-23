@@ -52,7 +52,7 @@ function getPostService() {
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
 
 /** BDD テストで使用する板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 // ---------------------------------------------------------------------------
 // シナリオ内で共有される状態

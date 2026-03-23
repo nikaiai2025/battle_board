@@ -125,7 +125,7 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
 	return {
 		id: "thread-uuid-001",
 		threadKey: "1741305600",
-		boardId: "battleboard",
+		boardId: "livebot",
 		title: "今日の雑談",
 		postCount: 5,
 		datByteSize: 1024,

@@ -56,7 +56,7 @@ function getUserRepository() {
 const DEFAULT_IP_HASH = "bdd-integration-test-ip-hash-sha512-placeholder";
 
 /** BDD テストで使用する板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 // ---------------------------------------------------------------------------
 // Given: 統合テスト用に認証済みユーザーが存在する

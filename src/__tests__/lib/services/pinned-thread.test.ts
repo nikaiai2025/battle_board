@@ -119,8 +119,8 @@ function makePinnedThread(overrides: Partial<Thread> = {}): Thread {
 	return {
 		id: "pinned-thread-id",
 		threadKey: "4070908800",
-		boardId: "battleboard",
-		title: "■ BattleBoard 案内板",
+		boardId: "livebot",
+		title: "■ ボットちゃんねる 案内板",
 		postCount: 1,
 		datByteSize: 0,
 		createdBy: "system",
@@ -139,7 +139,7 @@ function makeNormalThread(overrides: Partial<Thread> = {}): Thread {
 	return {
 		id: "normal-thread-id",
 		threadKey: "1700000000",
-		boardId: "battleboard",
+		boardId: "livebot",
 		title: "通常スレッド",
 		postCount: 0,
 		datByteSize: 0,

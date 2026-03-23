@@ -70,7 +70,7 @@ export function seedDummyPost(userId: string): void {
 // ---------------------------------------------------------------------------
 
 /** BDD テストで使用するデフォルトの板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /** BDD テストで使用するデフォルト IP ハッシュ */
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";

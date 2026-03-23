@@ -176,7 +176,7 @@ describe("ThreadRepository.demoteOldestActiveThread — 末尾スレッド休眠
 
 		// Act
 		await expect(
-			demoteOldestActiveThread("battleboard"),
+			demoteOldestActiveThread("livebot"),
 		).resolves.toBeUndefined();
 	});
 
@@ -200,7 +200,7 @@ describe("ThreadRepository.demoteOldestActiveThread — 末尾スレッド休眠
 
 		// Act & Assert: 例外なし・何もしない
 		await expect(
-			demoteOldestActiveThread("battleboard"),
+			demoteOldestActiveThread("livebot"),
 		).resolves.toBeUndefined();
 
 		// update は呼ばれない
@@ -226,7 +226,7 @@ describe("ThreadRepository.demoteOldestActiveThread — 末尾スレッド休眠
 		});
 
 		// Act & Assert
-		await expect(demoteOldestActiveThread("battleboard")).rejects.toThrow(
+		await expect(demoteOldestActiveThread("livebot")).rejects.toThrow(
 			"ThreadRepository.demoteOldestActiveThread (select) failed",
 		);
 	});
@@ -257,7 +257,7 @@ describe("ThreadRepository.countActiveThreads — アクティブスレッド数
 			.mockResolvedValue({ count: 42, error: null });
 
 		// Act
-		const result = await countActiveThreads("battleboard");
+		const result = await countActiveThreads("livebot");
 
 		// Assert
 		expect(result).toBe(42);
@@ -276,7 +276,7 @@ describe("ThreadRepository.countActiveThreads — アクティブスレッド数
 			.mockResolvedValue({ count: 0, error: null });
 
 		// Act
-		const result = await countActiveThreads("battleboard");
+		const result = await countActiveThreads("livebot");
 
 		// Assert
 		expect(result).toBe(0);
@@ -295,7 +295,7 @@ describe("ThreadRepository.countActiveThreads — アクティブスレッド数
 			.mockResolvedValue({ count: null, error: null });
 
 		// Act
-		const result = await countActiveThreads("battleboard");
+		const result = await countActiveThreads("livebot");
 
 		// Assert: null フォールバックで 0
 		expect(result).toBe(0);
@@ -317,7 +317,7 @@ describe("ThreadRepository.countActiveThreads — アクティブスレッド数
 			});
 
 		// Act & Assert
-		await expect(countActiveThreads("battleboard")).rejects.toThrow(
+		await expect(countActiveThreads("livebot")).rejects.toThrow(
 			"ThreadRepository.countActiveThreads failed",
 		);
 	});
@@ -335,7 +335,7 @@ describe("ThreadRepository.countActiveThreads — アクティブスレッド数
 			.mockResolvedValue({ count: 50, error: null });
 
 		// Act
-		const result = await countActiveThreads("battleboard");
+		const result = await countActiveThreads("livebot");
 
 		// Assert
 		expect(result).toBe(50);
@@ -354,7 +354,7 @@ describe("ThreadRepository.countActiveThreads — アクティブスレッド数
 			.mockResolvedValue({ count: 51, error: null });
 
 		// Act
-		const result = await countActiveThreads("battleboard");
+		const result = await countActiveThreads("livebot");
 
 		// Assert
 		expect(result).toBe(51);

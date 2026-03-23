@@ -7,4 +7,4 @@
  *
  * 制約: /^[a-z0-9_]+$/ （validation.ts BOARD_ID_PATTERN）
  */
-export const DEFAULT_BOARD_ID = "battleboard";
+export const DEFAULT_BOARD_ID = "livebot";

@@ -45,7 +45,7 @@ interface CommandsYaml {
 // ---------------------------------------------------------------------------
 
 /** 固定スレッドのタイトル */
-const PINNED_THREAD_TITLE = "■ BattleBoard 案内板";
+const PINNED_THREAD_TITLE = "■ ボットちゃんねる 案内板";
 
 /** 固定スレッドの board_id */
 const PINNED_THREAD_BOARD_ID = DEFAULT_BOARD_ID;
@@ -100,7 +100,7 @@ function generateAnnouncementBody(
 	});
 
 	return [
-		"■ BattleBoard 案内板",
+		"■ ボットちゃんねる 案内板",
 		"",
 		"【使い方】",
 		"書き込み欄にテキストを入力して送信するだけ。",

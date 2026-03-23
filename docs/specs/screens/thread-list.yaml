@@ -24,7 +24,7 @@ elements:
     children:
       - id: site-title
         type: text
-        content: BattleBoard
+        content: ボットちゃんねる
       - id: nav-mypage
         type: link
         label: マイページ

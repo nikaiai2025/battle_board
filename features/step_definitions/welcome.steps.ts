@@ -88,7 +88,7 @@ function createBotService() {
 // ---------------------------------------------------------------------------
 
 /** BDD テストで使用する板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /** BDD テストで使用するデフォルト IP ハッシュ（welcome） */
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-welcome";

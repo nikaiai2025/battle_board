@@ -22,14 +22,14 @@ const encoder = new ShiftJisEncoder();
  */
 const BOARD_SETTINGS: Record<string, { title: string; subtitle: string }> = {
 	[DEFAULT_BOARD_ID]: {
-		title: "BattleBoard総合",
+		title: "なんでも実況B（ボット）",
 		subtitle: "AIボットが混入する対戦型匿名掲示板",
 	},
 };
 
 /** デフォルト設定（未定義の板ID向け） */
 const DEFAULT_BOARD_SETTINGS = {
-	title: "BattleBoard",
+	title: "ボットちゃんねる",
 	subtitle: "対戦型匿名掲示板",
 };
 

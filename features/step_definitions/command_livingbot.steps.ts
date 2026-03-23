@@ -62,7 +62,7 @@ const {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-livingbot";
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /**
  * スレッド内BOT総数（撃破済み含む）の一時保持。

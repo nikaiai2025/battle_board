@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: BattleBoard API
+  title: ボットちゃんねる API
   version: 0.1.0
   description: |
-    BattleBoard の Web API 仕様。
+    ボットちゃんねる の Web API 仕様。
     5ch専ブラ互換APIは別セクション（paths末尾）に記載。
 
     ## 認証方式

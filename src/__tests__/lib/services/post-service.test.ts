@@ -221,7 +221,7 @@ function createTestThread(overrides: Partial<Thread> = {}): Thread {
 	return {
 		id: "thread-001",
 		threadKey: "1700000000",
-		boardId: "battleboard",
+		boardId: "livebot",
 		title: "テストスレッド",
 		postCount: 0,
 		datByteSize: 0,

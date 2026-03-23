@@ -15,7 +15,7 @@ describe("BbsCgiParser", () => {
     it("標準的なPOSTパラメータを正しくパースする", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         FROM: "名無しさん",
         mail: "sage",
@@ -23,7 +23,7 @@ describe("BbsCgiParser", () => {
         submit: "書き込む",
       });
       const result = parser.parseRequest(body, "");
-      expect(result.boardId).toBe("battleboard");
+      expect(result.boardId).toBe("livebot");
       expect(result.threadKey).toBe("1234567890");
       expect(result.name).toBe("名無しさん");
       expect(result.mail).toBe("sage");
@@ -33,7 +33,7 @@ describe("BbsCgiParser", () => {
     it("cookieヘッダからedgeTokenを抽出する", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         MESSAGE: "テスト",
         submit: "書き込む",
@@ -47,7 +47,7 @@ describe("BbsCgiParser", () => {
     it("cookieにedge-tokenがない場合はnullを返す", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         MESSAGE: "テスト",
         submit: "書き込む",
@@ -59,7 +59,7 @@ describe("BbsCgiParser", () => {
     it("cookieヘッダが空文字列の場合はedgeTokenがnull", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         MESSAGE: "テスト",
         submit: "書き込む",
@@ -71,7 +71,7 @@ describe("BbsCgiParser", () => {
     it("FROMパラメータが省略された場合、nameは空文字列になる", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         MESSAGE: "テスト",
         submit: "書き込む",
@@ -83,7 +83,7 @@ describe("BbsCgiParser", () => {
     it("mailパラメータが省略された場合、mailは空文字列になる", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         FROM: "名無し",
         MESSAGE: "テスト",
@@ -96,7 +96,7 @@ describe("BbsCgiParser", () => {
     it("コマンド文字列 '!tell >>5' を含むMESSAGEをそのままmessageに格納する（コマンド解釈はサービス層が担う）", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         MESSAGE: "!tell >>5",
         submit: "書き込む",
@@ -126,7 +126,7 @@ describe("BbsCgiParser", () => {
     it("keyパラメータが省略された場合、threadKeyは空文字列になる", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         MESSAGE: "テスト",
         submit: "書き込む",
       });
@@ -137,7 +137,7 @@ describe("BbsCgiParser", () => {
     it("BbsCgiParsedRequestの全フィールドが存在する", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         FROM: "名無しさん",
         mail: "",
@@ -156,7 +156,7 @@ describe("BbsCgiParser", () => {
     it("複数のcookieがある場合でも正しくedge-tokenを抽出する", () => {
       const parser = new BbsCgiParser();
       const body = new URLSearchParams({
-        bbs: "battleboard",
+        bbs: "livebot",
         key: "1234567890",
         MESSAGE: "テスト",
         submit: "書き込む",

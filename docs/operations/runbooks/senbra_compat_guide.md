@@ -215,8 +215,8 @@ bbs.cgiの受信パス（`decodeFormData` 後、`PostService` 呼び出し前）
 
 ### 症状
 
-- スレッドURLをコピーすると `test/read.cgi/battleboard/...` になり、ブラウザで開けない
-- 板URL `/battleboard/` が404になる
+- スレッドURLをコピーすると `test/read.cgi/livebot/...` になり、ブラウザで開けない
+- 板URL `/livebot/` が404になる
 - `/kako/` へのアクセスが飛んでくる
 
 ### 原因

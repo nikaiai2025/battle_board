@@ -14,7 +14,7 @@ import type { NextRequest } from "next/server";
 import { DEFAULT_BOARD_ID } from "@/lib/domain/constants";
 
 /**
- * BattleBoardのホストURLを環境変数から取得する。
+ * ボットちゃんねるのホストURLを環境変数から取得する。
  * 未設定の場合はデフォルト値を使用する。
  *
  * bbsmenu.html/route.ts の getBaseUrl() と同一ロジック。
@@ -72,11 +72,11 @@ export async function GET(_req: NextRequest): Promise<Response> {
  *   {
  *     "menu_list": [
  *       {
- *         "category_name": "BattleBoard",
+ *         "category_name": "ボットちゃんねる",
  *         "category_content": [
  *           {
  *             "url": "{baseUrl}/{DEFAULT_BOARD_ID}/",
- *             "board_name": "BattleBoard総合",
+ *             "board_name": "なんでも実況B（ボット）",
  *             "directory_name": "{DEFAULT_BOARD_ID}"
  *           }
  *         ]
@@ -91,11 +91,11 @@ function buildBbsMenuJson(baseUrl: string): BbsMenuResponse {
 	return {
 		menu_list: [
 			{
-				category_name: "BattleBoard",
+				category_name: "ボットちゃんねる",
 				category_content: [
 					{
 						url: `${baseUrl}/${DEFAULT_BOARD_ID}/`,
-						board_name: "BattleBoard総合",
+						board_name: "なんでも実況B（ボット）",
 						directory_name: DEFAULT_BOARD_ID,
 					},
 				],

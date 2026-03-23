@@ -44,7 +44,7 @@ function getPostService() {
 const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
 
 /** BDD テストで使用する板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 // ---------------------------------------------------------------------------
 // When: スレッド作成
@@ -1134,21 +1134,21 @@ When(
 
 /**
  * ユーザーが / にアクセスする。
- * サービス層テスト: / → /battleboard/ へのリダイレクト仕様を確認する。
+ * サービス層テスト: / → /livebot/ へのリダイレクト仕様を確認する。
  * Next.js Server Component の redirect() は E2E で検証するため、
- * サービス層では battleboard の存在確認のみ行う。
+ * サービス層では livebot の存在確認のみ行う。
  *
  * See: features/thread.feature @url_structure
  * See: docs/architecture/bdd_test_strategy.md §7.3 BDDシナリオの検証層マッピング
  */
 When(/^ユーザーが \/ にアクセスする$/, async function (this: BattleBoardWorld) {
 	const PostService = getPostService();
-	// / → /battleboard/ のリダイレクトは Next.js redirect() で実装済み。
-	// サービス層テストでは battleboard へのアクセスが有効であることを確認する。
+	// / → /livebot/ のリダイレクトは Next.js redirect() で実装済み。
+	// サービス層テストでは livebot へのアクセスが有効であることを確認する。
 	const threads = await PostService.getThreadList(TEST_BOARD_ID);
 	this.lastResult = {
 		type: "success",
-		data: { redirectTarget: "/battleboard/", threadList: threads },
+		data: { redirectTarget: "/livebot/", threadList: threads },
 	};
 });
 
@@ -1157,8 +1157,8 @@ When(/^ユーザーが \/ にアクセスする$/, async function (this: BattleB
  * サービス層テスト: lastResult に redirectTarget が設定されていることを確認する。
  *
  * マッチパターン:
- *   - /battleboard/ → boardId="battleboard"
- *   - /battleboard/1742259600/ → boardId="battleboard", threadKey="1742259600"
+ *   - /livebot/ → boardId="livebot"
+ *   - /livebot/1742259600/ → boardId="livebot", threadKey="1742259600"
  *
  * See: features/thread.feature @url_structure
  */
@@ -1181,7 +1181,7 @@ Then(
 
 /**
  * /{boardId}/ にリダイレクトされる（スレッドキーなし）。
- * サービス層テスト: / → /battleboard/ のリダイレクト検証。
+ * サービス層テスト: / → /livebot/ のリダイレクト検証。
  *
  * See: features/thread.feature @url_structure
  */
@@ -1203,7 +1203,7 @@ Then(
 );
 
 /**
- * ユーザーが /battleboard/ にアクセスする。
+ * ユーザーが /livebot/ にアクセスする。
  * サービス層テスト: getThreadList でスレッド一覧を取得する。
  *
  * See: features/thread.feature @url_structure

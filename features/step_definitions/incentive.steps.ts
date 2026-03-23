@@ -35,7 +35,7 @@ import { seedDummyPost } from "./common.steps";
 // ---------------------------------------------------------------------------
 
 /** BDD テストで使用するデフォルトの板 ID */
-const TEST_BOARD_ID = "battleboard";
+const TEST_BOARD_ID = "livebot";
 
 /**
  * 時刻依存テストで使用する基準時刻 T（固定値）。
