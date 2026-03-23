@@ -74,7 +74,7 @@ test.describe("ポーリング検証（ローカル限定）", () => {
 			await seedThreadWithManyPostsLocal(request, 1);
 
 		// スレッドにアクセス
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/livebot/${threadKey}/`);
 		await expect(page.locator("#post-1")).toBeVisible({ timeout: 15_000 });
 
 		// DB直接INSERTで新レスを追加
@@ -125,7 +125,7 @@ test.describe("ポーリング検証（ローカル限定）", () => {
 			await seedThreadWithManyPostsLocal(request, 60);
 
 		// 過去ページ（1-50）にアクセス
-		await page.goto(`/battleboard/${threadKey}/1-50`);
+		await page.goto(`/livebot/${threadKey}/1-50`);
 		await expect(page.locator("#post-1")).toBeVisible({ timeout: 15_000 });
 
 		// DB直接INSERTで新レスを追加

@@ -68,7 +68,7 @@ test.describe("撃破済みBOT表示（ローカル限定）", () => {
 			await seedEliminatedBotThreadLocal(request);
 
 		// スレッドページにアクセス
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/livebot/${threadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -114,7 +114,7 @@ test.describe("撃破済みBOT表示（ローカル限定）", () => {
 			await seedEliminatedBotThreadLocal(request);
 
 		// スレッドページにアクセス
-		await page.goto(`/battleboard/${threadKey}/`);
+		await page.goto(`/livebot/${threadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});

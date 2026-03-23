@@ -70,7 +70,7 @@ test.describe("認証UI連結フロー（ローカル限定）", () => {
 		});
 
 		// Step 5: スレッドを開く → 本文(>>1)表示
-		// URL構造: /{boardId}/{threadKey} (例: /battleboard/1742259600)
+		// URL構造: /{boardId}/{threadKey} (例: /livebot/1742259600)
 		await page.locator(`a:has-text("${TEST_THREAD_TITLE}")`).click();
 		await page.waitForURL(/\/[^/]+\/\d+/, { waitUntil: "domcontentloaded" });
 

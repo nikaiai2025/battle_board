@@ -159,7 +159,7 @@ test.describe("基本フロー検証（環境共通）", () => {
 		createdThreadIds.push(threadId);
 
 		// subject.txt にスレッドが含まれることを確認
-		const subjectRes = await request.get(`${baseURL}/battleboard/subject.txt`);
+		const subjectRes = await request.get(`${baseURL}/livebot/subject.txt`);
 		expect(subjectRes.status()).toBe(200);
 
 		const subjectContentType = subjectRes.headers()["content-type"] ?? "";
@@ -171,9 +171,7 @@ test.describe("基本フロー検証（環境共通）", () => {
 		expect(subjectText).toContain(`${threadKey}.dat`);
 
 		// DAT ファイルが取得できることを確認
-		const datRes = await request.get(
-			`${baseURL}/battleboard/dat/${threadKey}.dat`,
-		);
+		const datRes = await request.get(`${baseURL}/livebot/dat/${threadKey}.dat`);
 		expect(datRes.status()).toBe(200);
 
 		const datContentType = datRes.headers()["content-type"] ?? "";
@@ -238,15 +236,13 @@ test.describe("基本フロー検証（環境共通）", () => {
 		);
 
 		// 専ブラAPI（subject.txt）からもスレッドが消えている
-		const subjectRes = await request.get(`${baseURL}/battleboard/subject.txt`);
+		const subjectRes = await request.get(`${baseURL}/livebot/subject.txt`);
 		const subjectBody = await subjectRes.body();
 		const subjectText = subjectBody.toString("latin1");
 		expect(subjectText).not.toContain(`${threadKey}.dat`);
 
 		// DAT ファイルも 404 になる
-		const datRes = await request.get(
-			`${baseURL}/battleboard/dat/${threadKey}.dat`,
-		);
+		const datRes = await request.get(`${baseURL}/livebot/dat/${threadKey}.dat`);
 		expect([200, 404]).toContain(datRes.status());
 		// ソフトデリートの場合 200 だが空データの可能性もある
 		// 404 が返る場合はより明確に削除されている

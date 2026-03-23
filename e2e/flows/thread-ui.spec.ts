@@ -115,7 +115,7 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 		});
 
 		// スレッドページにアクセス
-		await page.goto(`/battleboard/${sharedThreadKey}/`);
+		await page.goto(`/livebot/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -155,7 +155,7 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 			jsErrors.push(err.message);
 		});
 
-		await page.goto(`/battleboard/${sharedThreadKey}/`);
+		await page.goto(`/livebot/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -202,7 +202,7 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 			jsErrors.push(err.message);
 		});
 
-		await page.goto(`/battleboard/${sharedThreadKey}/`);
+		await page.goto(`/livebot/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -244,7 +244,7 @@ test.describe("アンカーポップアップ (@anchor_popup)", () => {
 			jsErrors.push(err.message);
 		});
 
-		await page.goto(`/battleboard/${sharedThreadKey}/`);
+		await page.goto(`/livebot/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -280,7 +280,7 @@ test.describe("レス番号表示 (@post_number_display)", () => {
 			jsErrors.push(err.message);
 		});
 
-		await page.goto(`/battleboard/${sharedThreadKey}/`);
+		await page.goto(`/livebot/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -314,7 +314,7 @@ test.describe("レス番号表示 (@post_number_display)", () => {
 			jsErrors.push(err.message);
 		});
 
-		await page.goto(`/battleboard/${sharedThreadKey}/`);
+		await page.goto(`/livebot/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
@@ -345,7 +345,7 @@ test.describe("レス番号表示 (@post_number_display)", () => {
 			jsErrors.push(err.message);
 		});
 
-		await page.goto(`/battleboard/${sharedThreadKey}/`);
+		await page.goto(`/livebot/${sharedThreadKey}/`);
 		await expect(page.locator("#thread-title")).toBeVisible({
 			timeout: 15_000,
 		});
