@@ -34,6 +34,7 @@ export const dynamic = "force-dynamic";
 const NAV_LINKS = [
 	{ href: "/admin", label: "ダッシュボード" },
 	{ href: "/admin/users", label: "ユーザー" },
+	{ href: "/admin/threads", label: "スレッド管理" },
 	{ href: "/admin/ip-bans", label: "IP BAN" },
 ] as const;
 

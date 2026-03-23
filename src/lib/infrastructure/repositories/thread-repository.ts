@@ -371,6 +371,36 @@ export async function demoteOldestActiveThread(boardId: string): Promise<void> {
 }
 
 /**
+ * 管理者用: 全スレッドを取得する（削除済みを含む）。
+ * is_deleted によるフィルタを行わず、last_post_at DESC でソートする。
+ *
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
+ * See: src/app/api/admin/threads/route.ts
+ *
+ * @param options.limit - 取得件数（デフォルト 200）
+ * @returns Thread 配列（last_post_at DESC ソート済み）
+ */
+export async function findAllForAdmin(
+	options: { limit?: number } = {},
+): Promise<Thread[]> {
+	const limit = options.limit ?? 200;
+
+	const { data, error } = await supabaseAdmin
+		.from("threads")
+		.select("*")
+		.order("last_post_at", { ascending: false })
+		.limit(limit);
+
+	if (error) {
+		throw new Error(
+			`ThreadRepository.findAllForAdmin failed: ${error.message}`,
+		);
+	}
+
+	return (data as ThreadRow[]).map(rowToThread);
+}
+
+/**
  * 指定板のアクティブスレッド数を返す。
  * アクティブスレッド = is_deleted=false かつ is_dormant=false
  *
