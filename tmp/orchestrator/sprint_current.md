@@ -1,10 +1,18 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-24
+> 最終更新: 2026-03-25
 
 ## 現在のフェーズ
 
-**Sprint-110 完了 — 認証フロー簡素化（6桁認証コード廃止 → Turnstileのみ）**
+**Sprint-111 完了 — 管理画面UI + バグ修正 + 非同期コマンド即時トリガー**
+
+### Sprint-111の成果
+- TASK-298: 管理画面スレッド・レス管理ページ新設（`/admin/threads`、一覧/詳細/削除UI）
+- TASK-300: チュートリアルBOT `!w`コマンドバグ修正（本文改行分割で後方引数問題回避）
+- TASK-299: 非同期コマンド即時トリガー（workflow_dispatch）導入 + cron 30分→4時間フォールバック化 + CI failure notifier権限修正
+- vitest 1758 PASS / cucumber-js 339 passed, 16 pending / tsc エラーなし
+- コミット: ecd81eb, cebd451
+- 本番スモーク: **29/34 PASS**（5件は設計上のスキップ）
 
 ### Sprint-110の成果（認証フロー簡素化コード実装）
 - TASK-294: Backend Core（service/repo/types/adapter/routes/DB migration） — Opus
@@ -209,7 +217,7 @@
 
 ## テスト状況
 
-- vitest: 1747 PASS（schema-consistency 1件はマイグレーション未適用による既存問題）
+- vitest: 1758 PASS
 - cucumber-js: 339シナリオ / 323 passed / 0 failed / 16 pending
   - authentication.feature: 認証フロー簡素化対応済み（Sprint-110）
   - theme.feature 12シナリオ全PASS（Sprint-105で実装）
@@ -227,7 +235,7 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-110後):** 29/34 PASS（5件は設計上のスキップ。1テスト減は認証コードプリフィルテスト廃止による正常減少）
+- **本番スモークテスト (Sprint-111後):** 29/34 PASS（5件は設計上のスキップ）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -320,16 +328,16 @@ GEMINI_API_KEY の **GH Secrets** 設定が必要（人間タスク。Sprint-100
 ## 残課題
 
 - HUMAN-003/004（上記「人間タスク」参照）
+- サイトリネーム Phase 3: ドメイン変更（新ドメイン確定待ち。詳細: `tmp/site_rename_migration_plan.md` Section 4）
 - デザイン・レイアウト改善（機能優先のため後回し）
 - BOTマーク専ブラ反映（DAT差分同期問題の解決 — 未着手）
-- **cron移行**: CF Cron Triggers 導入済み（Sprint-84 TASK-238）。荒らし役BOT移行完了。チュートリアルBOTスポーン処理も実装完了（Sprint-85 TASK-249）
-- **[解決済み] cron 500エラー**: 原因2つ修正済み＋本番動作確認済み — (1) Sprint-93: IncentiveServiceスキップ (2) Sprint-95: FK制約違反修正。BOT正常動作を確認（2026-03-22）
-- ※ 解決済みバグ（UUID変換、subject.txt 304、CF 1101）は `tmp/orchestrator/archive/sprint_past.md` に記録
+- ※ 解決済み: cron移行（Sprint-84/85）、cron 500エラー（Sprint-93/95）、UUID変換、subject.txt 304、CF 1101 → `tmp/orchestrator/archive/sprint_past.md` に記録
 
 ## スプリント履歴
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-111 | 管理画面スレッド管理UI + !wバグ修正 + 非同期コマンド即時トリガー | completed | `tmp/orchestrator/sprint_111_plan.md` |
 | Sprint-110 | 認証フロー簡素化コード実装（6桁コード廃止→Turnstileのみ） | completed | `tmp/orchestrator/sprint_110_plan.md` |
 | Sprint-109 | 認証フロー簡素化ドキュメントレビュー | completed | (コミット: 0d6f777) |
 | Sprint-108 | サイトリネーム Phase 2 — BattleBoard→ボットちゃんねる | completed | `tmp/orchestrator/sprint_108_plan.md` |
