@@ -11,7 +11,7 @@
  * 2. 板トップページ /livebot/
  * 3. スレッドページ /livebot/{threadKey}/
  * 4. マイページ /mypage（認証必須）
- * 5. 認証コード検証ページ /auth/verify
+ * 5. 認証ページ /auth/verify
  * 6. 開発連絡板 /dev
  * 7. メール本登録ページ /register/email（仮ユーザー認証必須）
  * 8. Discord本登録ページ /register/discord（仮ユーザー認証必須）
@@ -294,17 +294,19 @@ test.describe("マイページ /mypage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (5) 認証コード検証ページ /auth/verify
+// (5) 認証ページ /auth/verify
 // ---------------------------------------------------------------------------
 
 /**
- * 認証コード検証ページの到達性・UI要素を検証する。
+ * 認証ページの到達性・UI要素を検証する。
+ *
+ * Sprint-110 で認証コード入力は廃止され、Turnstile のみで認証する方式に変更された。
  *
  * See: docs/architecture/bdd_test_strategy.md §10.2.3 各ページでの検証項目
  * See: src/app/(web)/auth/verify/page.tsx
  */
-test.describe("認証コード検証ページ /auth/verify", () => {
-	test("HTTPステータス200で応答し、認証フォームが表示される", async ({
+test.describe("認証ページ /auth/verify", () => {
+	test("HTTPステータス200で応答し、認証フォームとTurnstileウィジェットが表示される", async ({
 		page,
 	}) => {
 		const jsErrors: string[] = [];
@@ -320,30 +322,14 @@ test.describe("認証コード検証ページ /auth/verify", () => {
 			timeout: 10_000,
 		});
 
-		// See: src/app/(web)/auth/verify/page.tsx > #auth-code-input
-		await expect(page.locator("#auth-code-input")).toBeVisible();
+		// Turnstile ウィジェットの存在確認（Sprint-110: 認証コード入力は廃止済み）
+		// See: src/app/(web)/auth/verify/page.tsx > #cf-turnstile
+		await expect(page.locator("#cf-turnstile")).toBeVisible({
+			timeout: 15_000,
+		});
 
 		// See: src/app/(web)/auth/verify/page.tsx > #auth-submit-btn
 		await expect(page.locator("#auth-submit-btn")).toBeVisible();
-
-		expect(jsErrors).toHaveLength(0);
-	});
-
-	test("クエリパラメータ code を渡すと認証コードがプリフィルされる", async ({
-		page,
-	}) => {
-		const jsErrors: string[] = [];
-		page.on("pageerror", (err) => {
-			jsErrors.push(err.message);
-		});
-
-		const response = await page.goto("/auth/verify?code=123456");
-		expect(response?.status()).toBe(200);
-
-		await expect(page.locator("#auth-verify-form")).toBeVisible({
-			timeout: 10_000,
-		});
-		await expect(page.locator("#auth-code-input")).toHaveValue("123456");
 
 		expect(jsErrors).toHaveLength(0);
 	});

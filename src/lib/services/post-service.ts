@@ -223,8 +223,8 @@ function getTodayJst(): string {
 
 /**
  * 認証フローを実行する。
- * edge-token が null または not_found の場合に新しい edge-token と認証コードを発行する。
- * not_verified の場合は既存 edge-token を維持したまま認証コードを再発行する（G1 是正）。
+ * edge-token が null または not_found の場合に新しい edge-token と認証レコードを作成する。
+ * not_verified の場合は既存 edge-token を維持したまま認証を再要求する（G1 是正）。
  * IP チェックは廃止。verifyEdgeToken は「edge-token の存在 + is_verified=true」のみで判定する。
  *
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証

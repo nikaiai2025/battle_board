@@ -30,10 +30,14 @@ export async function waitForTurnstileAndEnableButton(
 }
 
 /**
- * AuthModal から認証コードを読み取り、入力して認証を完了させる。
+ * AuthModal で Turnstile 認証を完了させる。
+ *
+ * Sprint-110 で認証コード入力は廃止され、Turnstile のみで認証する方式に変更された。
+ * テスト用サイトキー "1x00000000000000000000AA" を使用しているため、
+ * Turnstile は自動パスする。送信ボタンが enabled になり次第クリックする。
  *
  * See: src/app/(web)/_components/AuthModal.tsx
- * See: docs/specs/screens/auth-code.yaml @SCR-004
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  *
  * @param page - Playwright の Page オブジェクト
  */
@@ -41,18 +45,6 @@ export async function completeAuth(page: Page): Promise<void> {
 	// AuthModal が表示されるのを待つ
 	const dialog = page.locator('[role="dialog"][aria-modal="true"]');
 	await expect(dialog).toBeVisible({ timeout: 10_000 });
-
-	// 認証コードを DOM から読み取る
-	// See: src/app/(web)/_components/AuthModal.tsx > #auth-code-display
-	const authCodeDisplay = page.locator("#auth-code-display");
-	await expect(authCodeDisplay).toBeVisible({ timeout: 5_000 });
-	const authCode = await authCodeDisplay.textContent();
-	expect(authCode).toMatch(/^\d{6}$/);
-
-	// 認証コードを入力欄に入力する
-	// See: src/app/(web)/_components/AuthModal.tsx > #auth-code-input
-	const authCodeInput = page.locator("#auth-code-input");
-	await authCodeInput.fill(authCode!);
 
 	// Turnstile 自動パスを待つ（認証ボタンが有効になるまで）
 	await waitForTurnstileAndEnableButton(page);

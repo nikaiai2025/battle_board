@@ -1,17 +1,15 @@
 /**
  * 単体テスト: validation.ts（入力バリデーション）
  * See: docs/architecture/architecture.md §10.2 入力バリデーション
- * See: docs/requirements/ubiquitous_language.yaml #スレッド #レス #認証コード
+ * See: docs/requirements/ubiquitous_language.yaml #スレッド #レス
  */
 
 import { describe, expect, it } from "vitest";
 import {
-	AUTH_CODE_LENGTH,
 	BOARD_ID_MAX_LENGTH,
 	POST_BODY_MAX_LENGTH,
 	THREAD_TITLE_MAX_LENGTH,
 	USERNAME_MAX_LENGTH,
-	validateAuthCode,
 	validateBoardId,
 	validatePostBody,
 	validateThreadTitle,
@@ -256,84 +254,6 @@ describe("validateUsername", () => {
 
 	it("USERNAME_MAX_LENGTH は 20 である", () => {
 		expect(USERNAME_MAX_LENGTH).toBe(20);
-	});
-});
-
-// ---------------------------------------------------------------------------
-// 認証コードのバリデーション
-// ---------------------------------------------------------------------------
-
-describe("validateAuthCode", () => {
-	it("6桁の数字は有効", () => {
-		const result = validateAuthCode("123456");
-		expect(result.valid).toBe(true);
-	});
-
-	it("000000 は有効（ゼロ始まり）", () => {
-		const result = validateAuthCode("000000");
-		expect(result.valid).toBe(true);
-	});
-
-	it("999999 は有効（最大値）", () => {
-		const result = validateAuthCode("999999");
-		expect(result.valid).toBe(true);
-	});
-
-	it("5桁の数字は無効（短すぎる）", () => {
-		const result = validateAuthCode("12345");
-		expect(result.valid).toBe(false);
-		if (!result.valid) {
-			expect(result.code).toBe("INVALID_AUTH_CODE_FORMAT");
-		}
-	});
-
-	it("7桁の数字は無効（長すぎる）", () => {
-		const result = validateAuthCode("1234567");
-		expect(result.valid).toBe(false);
-		if (!result.valid) {
-			expect(result.code).toBe("INVALID_AUTH_CODE_FORMAT");
-		}
-	});
-
-	it("英字を含む場合は無効", () => {
-		const result = validateAuthCode("12345a");
-		expect(result.valid).toBe(false);
-		if (!result.valid) {
-			expect(result.code).toBe("INVALID_AUTH_CODE_FORMAT");
-		}
-	});
-
-	it("空文字列は無効", () => {
-		const result = validateAuthCode("");
-		expect(result.valid).toBe(false);
-		if (!result.valid) {
-			expect(result.code).toBe("INVALID_AUTH_CODE_FORMAT");
-		}
-	});
-
-	it("null は無効", () => {
-		const result = validateAuthCode(null);
-		expect(result.valid).toBe(false);
-		if (!result.valid) {
-			expect(result.code).toBe("INVALID_TYPE");
-		}
-	});
-
-	it("数値型は無効（型チェック）", () => {
-		const result = validateAuthCode(123456);
-		expect(result.valid).toBe(false);
-		if (!result.valid) {
-			expect(result.code).toBe("INVALID_TYPE");
-		}
-	});
-
-	it("スペースを含む場合は無効", () => {
-		const result = validateAuthCode("123 456");
-		expect(result.valid).toBe(false);
-	});
-
-	it("AUTH_CODE_LENGTH は 6 である", () => {
-		expect(AUTH_CODE_LENGTH).toBe(6);
 	});
 });
 

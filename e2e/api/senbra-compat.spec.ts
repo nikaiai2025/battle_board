@@ -131,9 +131,10 @@ async function cleanupDatabase(request: APIRequestContext): Promise<void> {
 /**
  * 認証フローを経由して edge-token を取得する。
  *
- * POST /api/threads で 401 を受け取り、
- * レスポンスボディの authCode と Set-Cookie の edge-token を使って
- * POST /api/auth/auth-code で認証を完了する。
+ * POST /api/threads で 401 を受け取り、Set-Cookie の edge-token を使って
+ * POST /api/auth/verify で Turnstile 認証を完了する。
+ *
+ * Sprint-110: 認証コード廃止。Turnstile トークンのみで認証する。
  *
  * @param request - APIRequestContext
  * @returns 認証済み edge-token Cookie 文字列
@@ -141,7 +142,7 @@ async function cleanupDatabase(request: APIRequestContext): Promise<void> {
 async function getAuthenticatedEdgeToken(
 	request: APIRequestContext,
 ): Promise<string> {
-	// 未認証でスレッド作成を試みて 401 + authCode + Set-Cookie を取得する
+	// 未認証でスレッド作成を試みて 401 + Set-Cookie を取得する
 	const response401 = await request.post(`${BASE_URL}/api/threads`, {
 		headers: { "Content-Type": "application/json" },
 		data: {
@@ -157,21 +158,13 @@ async function getAuthenticatedEdgeToken(
 	expect(edgeTokenMatch).not.toBeNull();
 	const edgeToken = edgeTokenMatch![1];
 
-	// レスポンスボディから authCode を取得する
-	const body401 = await response401.json();
-	const authCode: string = body401.authCode;
-	expect(authCode).toMatch(/^\d{6}$/);
-
-	// POST /api/auth/auth-code で認証を完了する
-	const authResponse = await request.post(`${BASE_URL}/api/auth/auth-code`, {
+	// POST /api/auth/verify で Turnstile 認証を完了する
+	const authResponse = await request.post(`${BASE_URL}/api/auth/verify`, {
 		headers: {
 			"Content-Type": "application/json",
 			Cookie: `edge-token=${edgeToken}`,
 		},
-		data: {
-			code: authCode,
-			turnstileToken: "test-token",
-		},
+		data: { turnstileToken: "test-token" },
 	});
 	expect(authResponse.status()).toBe(200);
 

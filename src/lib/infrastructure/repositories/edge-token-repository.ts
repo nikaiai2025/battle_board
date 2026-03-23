@@ -75,7 +75,7 @@ function rowToEdgeToken(row: EdgeTokenRow): EdgeToken {
  * id / created_at / last_used_at は DB のデフォルト値を使用する。
  *
  * 呼び出し元:
- *   - 初回書き込み時（認証コード発行と同時）
+ *   - 初回書き込み時（認証レコード作成と同時）
  *   - ログイン時（新デバイス）
  *   - PAT 認証時（新デバイス・専ブラ）
  *

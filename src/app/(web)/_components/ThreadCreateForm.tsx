@@ -14,7 +14,7 @@
  *
  * See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
  * See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
- * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+ * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
  * See: docs/specs/screens/thread-list.yaml @SCR-001 > thread-create-form
  * See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
  */

@@ -7,7 +7,7 @@
  * 検証対象:
  *   - POST /api/threads (未認証) → 401 + Set-Cookie: edge-token; HttpOnly; SameSite=Lax; Path=/
  *   - POST /api/threads/{threadId}/posts (未認証) → 同上
- *   - POST /api/auth/auth-code (認証成功) → 200 + Set-Cookie の Cookie 属性
+ *   - POST /api/auth/verify (認証成功) → 200 + Set-Cookie の Cookie 属性
  *
  * 検証ポイント:
  *   - HttpOnly フラグ（クライアント JS からアクセス不可）
@@ -18,7 +18,7 @@
  * See: docs/architecture/bdd_test_strategy.md §9.2 認証API
  * See: src/app/api/threads/route.ts
  * See: src/app/api/threads/[threadId]/posts/route.ts
- * See: src/app/api/auth/auth-code/route.ts
+ * See: src/app/api/auth/verify/route.ts
  */
 
 import { type APIRequestContext, expect, test } from "@playwright/test";
@@ -217,14 +217,15 @@ test.describe("認証 Cookie 属性の検証", () => {
 		expect(maxAgeValue).toBeGreaterThan(0);
 	});
 
-	test("POST /api/threads 未認証 — 401 レスポンスボディに authCode が含まれる", async ({
+	test("POST /api/threads 未認証 — 401 レスポンスボディに authUrl が含まれる", async ({
 		request,
 	}) => {
-		// See: src/app/api/threads/route.ts @POST > result.authRequired.code
+		// See: src/app/api/threads/route.ts @POST > 401 レスポンス
+		// Sprint-110: authCode / authCodeUrl は廃止。authUrl のみ返される
 		const response = await request.post(`${BASE_URL}/api/threads`, {
 			headers: { "Content-Type": "application/json" },
 			data: {
-				title: `authCode検証テスト_${testRunId}`,
+				title: `authUrl検証テスト_${testRunId}`,
 				body: "テスト本文",
 			},
 		});
@@ -233,11 +234,12 @@ test.describe("認証 Cookie 属性の検証", () => {
 
 		const body = await response.json();
 
-		// authCode は 6 桁数字
-		expect(body.authCode).toMatch(/^\d{6}$/);
+		// authUrl が /auth/verify を指す
+		expect(body.authUrl).toBe("/auth/verify");
 
-		// authCodeUrl が存在する
-		expect(body.authCodeUrl).toBeTruthy();
+		// authCode / authCodeUrl は存在しない（Sprint-110 で廃止）
+		expect(body.authCode).toBeUndefined();
+		expect(body.authCodeUrl).toBeUndefined();
 	});
 
 	// -------------------------------------------------------------------------
@@ -270,16 +272,13 @@ test.describe("認証 Cookie 属性の検証", () => {
 		expect(edgeTokenMatch).not.toBeNull();
 		const edgeToken = edgeTokenMatch![1];
 
-		const body401 = await response401.json();
-		const authCode: string = body401.authCode;
-
-		// 認証完了
-		const authResponse = await request.post(`${BASE_URL}/api/auth/auth-code`, {
+		// 認証完了（Sprint-110: Turnstile のみ、認証コード不要）
+		const authResponse = await request.post(`${BASE_URL}/api/auth/verify`, {
 			headers: {
 				"Content-Type": "application/json",
 				Cookie: `edge-token=${edgeToken}`,
 			},
-			data: { code: authCode, turnstileToken: "test-token" },
+			data: { turnstileToken: "test-token" },
 		});
 		expect(authResponse.status()).toBe(200);
 
@@ -334,19 +333,20 @@ test.describe("認証 Cookie 属性の検証", () => {
 	});
 
 	// -------------------------------------------------------------------------
-	// POST /api/auth/auth-code (認証成功) → 200 + Set-Cookie
+	// POST /api/auth/verify (認証成功) → 200 + Set-Cookie
+	// Sprint-110: 認証コード廃止、Turnstile のみで認証
 	// -------------------------------------------------------------------------
 
-	test("POST /api/auth/auth-code 認証成功 — 200 + edge-token Cookie が再設定される", async ({
+	test("POST /api/auth/verify 認証成功 — 200 + edge-token Cookie が再設定される", async ({
 		request,
 	}) => {
-		// See: src/app/api/auth/auth-code/route.ts @POST > response.cookies.set
+		// See: src/app/api/auth/verify/route.ts @POST > response.cookies.set
 
-		// 未認証でスレッド作成を試みて edge-token と authCode を取得
+		// 未認証でスレッド作成を試みて edge-token を取得
 		const response401 = await request.post(`${BASE_URL}/api/threads`, {
 			headers: { "Content-Type": "application/json" },
 			data: {
-				title: `auth-code認証テスト_${testRunId}`,
+				title: `auth-verify認証テスト_${testRunId}`,
 				body: "テスト本文",
 			},
 		});
@@ -357,17 +357,13 @@ test.describe("認証 Cookie 属性の検証", () => {
 		expect(edgeTokenMatch).not.toBeNull();
 		const edgeToken = edgeTokenMatch![1];
 
-		const body401 = await response401.json();
-		const authCode: string = body401.authCode;
-		expect(authCode).toMatch(/^\d{6}$/);
-
-		// 認証コードを送信
-		const authResponse = await request.post(`${BASE_URL}/api/auth/auth-code`, {
+		// Turnstile トークンを送信（認証コード不要）
+		const authResponse = await request.post(`${BASE_URL}/api/auth/verify`, {
 			headers: {
 				"Content-Type": "application/json",
 				Cookie: `edge-token=${edgeToken}`,
 			},
-			data: { code: authCode, turnstileToken: "test-token" },
+			data: { turnstileToken: "test-token" },
 		});
 
 		// 認証成功: 200
@@ -378,34 +374,30 @@ test.describe("認証 Cookie 属性の検証", () => {
 		expect(setCookieHeader).toContain("edge-token=");
 	});
 
-	test("POST /api/auth/auth-code 認証成功 — HttpOnly SameSite=Lax Path=/ Max-Age が設定される", async ({
+	test("POST /api/auth/verify 認証成功 — HttpOnly SameSite=Lax Path=/ Max-Age が設定される", async ({
 		request,
 	}) => {
-		// See: src/app/api/auth/auth-code/route.ts > response.cookies.set > httpOnly/sameSite/path/maxAge
+		// See: src/app/api/auth/verify/route.ts > response.cookies.set > httpOnly/sameSite/path/maxAge
 
-		// 未認証でスレッド作成を試みて edge-token と authCode を取得
+		// 未認証でスレッド作成を試みて edge-token を取得
 		const response401 = await request.post(`${BASE_URL}/api/threads`, {
 			headers: { "Content-Type": "application/json" },
 			data: {
-				title: `auth-code属性テスト_${testRunId}`,
+				title: `auth-verify属性テスト_${testRunId}`,
 				body: "テスト本文",
 			},
 		});
 		const setCookie401 = response401.headers()["set-cookie"] ?? "";
 		const edgeTokenMatch = setCookie401.match(/edge-token=([^;]+)/);
 		const edgeToken = edgeTokenMatch![1];
-		const body401 = await response401.json();
 
-		// 認証コードを送信
-		const authResponse = await request.post(`${BASE_URL}/api/auth/auth-code`, {
+		// Turnstile トークンを送信（認証コード不要）
+		const authResponse = await request.post(`${BASE_URL}/api/auth/verify`, {
 			headers: {
 				"Content-Type": "application/json",
 				Cookie: `edge-token=${edgeToken}`,
 			},
-			data: {
-				code: body401.authCode,
-				turnstileToken: "test-token",
-			},
+			data: { turnstileToken: "test-token" },
 		});
 
 		expect(authResponse.status()).toBe(200);
@@ -431,52 +423,17 @@ test.describe("認証 Cookie 属性の検証", () => {
 		expect(maxAgeValue).toBe(60 * 60 * 24 * 365);
 	});
 
-	test("POST /api/auth/auth-code 誤った認証コード — 401 を返す", async ({
+	test("POST /api/auth/verify — edge-token Cookie なしで 400 を返す", async ({
 		request,
 	}) => {
-		// See: src/app/api/auth/auth-code/route.ts @POST > 認証失敗 → 401
+		// See: src/app/api/auth/verify/route.ts @POST > edge-token が存在しない場合 → 400
 
-		const response401 = await request.post(`${BASE_URL}/api/threads`, {
-			headers: { "Content-Type": "application/json" },
-			data: {
-				title: `authCode失敗テスト_${testRunId}`,
-				body: "テスト本文",
-			},
-		});
-		const setCookie401 = response401.headers()["set-cookie"] ?? "";
-		const edgeTokenMatch = setCookie401.match(/edge-token=([^;]+)/);
-		const edgeToken = edgeTokenMatch![1];
-
-		// 誤った認証コードを送信
-		const authResponse = await request.post(`${BASE_URL}/api/auth/auth-code`, {
-			headers: {
-				"Content-Type": "application/json",
-				Cookie: `edge-token=${edgeToken}`,
-			},
-			data: {
-				code: "000000", // 間違ったコード
-				turnstileToken: "test-token",
-			},
-		});
-
-		expect(authResponse.status()).toBe(401);
-
-		const body = await authResponse.json();
-		expect(body.success).toBe(false);
-	});
-
-	test("POST /api/auth/auth-code — edge-token Cookie なしで 400 を返す", async ({
-		request,
-	}) => {
-		// See: src/app/api/auth/auth-code/route.ts @POST > edge-token が存在しない場合 → 400
-
-		const authResponse = await request.post(`${BASE_URL}/api/auth/auth-code`, {
+		const authResponse = await request.post(`${BASE_URL}/api/auth/verify`, {
 			headers: {
 				"Content-Type": "application/json",
 				// Cookie なし
 			},
 			data: {
-				code: "123456",
 				turnstileToken: "test-token",
 			},
 		});

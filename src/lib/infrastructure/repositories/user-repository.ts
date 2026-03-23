@@ -219,7 +219,7 @@ export async function create(
 
 /**
  * ユーザーの auth_token（edge-token）を更新する。
- * トークンのローテーションや認証コード検証完了後の有効化に使用する。
+ * トークンのローテーションや認証完了後の有効化に使用する。
  *
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
  *
@@ -319,7 +319,7 @@ export async function updateIsPremium(
 
 /**
  * ユーザーの認証完了状態（isVerified）を更新する。
- * AuthService.verifyAuthCode が認証コードとTurnstileの検証に成功した後に呼び出される。
+ * AuthService.verifyAuth が Turnstile の検証に成功した後に呼び出される。
  * is_verified = true への更新により、書き込み時の認証チェック（G1 是正）が機能する。
  *
  * See: features/authentication.feature @認証フロー是正
