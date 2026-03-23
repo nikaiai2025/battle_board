@@ -113,13 +113,13 @@ export async function POST(
 
 		// --- レスポンス整形 ---
 
-		// 未認証の場合: 401 + AuthCodeIssuedResponse + Set-Cookie
+		// 未認証の場合: 401 + AuthRequiredResponse + Set-Cookie
+		// See: docs/specs/openapi.yaml > AuthRequiredResponse
 		if ("authRequired" in result) {
 			const response = NextResponse.json(
 				{
-					message: "認証コードを入力してください",
-					authCodeUrl: "/auth/auth-code",
-					authCode: result.code,
+					message: "認証が必要です",
+					authUrl: "/auth/verify",
 				},
 				{ status: 401 },
 			);

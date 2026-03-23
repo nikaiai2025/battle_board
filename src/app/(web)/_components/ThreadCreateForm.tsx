@@ -48,7 +48,6 @@ export default function ThreadCreateForm({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [showAuthModal, setShowAuthModal] = useState(false);
-	const [authCode, setAuthCode] = useState<string | undefined>(undefined);
 
 	/**
 	 * スレッド作成を API に送信する内部関数。
@@ -73,10 +72,6 @@ export default function ThreadCreateForm({
 		}
 
 		if (res.status === 401) {
-			// 未認証: 認証コードを表示してAuthModalを開く
-			// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
-			const data = (await res.json()) as { authCode?: string };
-			setAuthCode(data.authCode);
 			setShowAuthModal(true);
 			return false;
 		}
@@ -206,7 +201,6 @@ export default function ThreadCreateForm({
 				isOpen={showAuthModal}
 				onSuccess={handleAuthSuccess}
 				onClose={() => setShowAuthModal(false)}
-				authCode={authCode}
 			/>
 		</>
 	);

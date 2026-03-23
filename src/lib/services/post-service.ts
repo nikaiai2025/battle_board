@@ -95,22 +95,24 @@ export interface PostInput {
  * 書き込み結果型。
  * See: docs/architecture/components/posting.md §2.2 出力型（PostResult）
  */
+// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
 export type PostResult =
 	| { success: true; postId: string; postNumber: number; systemMessages: [] }
 	| { success: false; error: string; code: string }
-	| { authRequired: true; code: string; edgeToken: string };
+	| { authRequired: true; edgeToken: string };
 
 /**
  * スレッド作成結果型。
  * See: docs/architecture/components/posting.md §2.3 createThread
  */
+// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
 export interface CreateThreadResult {
 	success: boolean;
 	thread?: Thread;
 	firstPost?: Post;
 	error?: string;
 	code?: string;
-	authRequired?: { code: string; edgeToken: string };
+	authRequired?: { edgeToken: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +240,7 @@ async function resolveAuth(
 	isBotWrite: boolean,
 ): Promise<
 	| { authenticated: true; userId: string | null; authorIdSeed: string }
-	| { authenticated: false; authRequired: { code: string; edgeToken: string } }
+	| { authenticated: false; authRequired: { edgeToken: string } }
 > {
 	// ボット書き込みは認証スキップ
 	// See: docs/architecture/components/posting.md §2.1 isBotWrite フラグの扱い
@@ -246,13 +248,13 @@ async function resolveAuth(
 		return { authenticated: true, userId: null, authorIdSeed: ipHash };
 	}
 
-	// edge-token が null → 新規ユーザーとして edge-token と認証コードを発行
+	// edge-token が null → 新規ユーザーとして edge-token と認証レコードを発行
 	if (edgeToken === null) {
 		const { token: newToken } = await AuthService.issueEdgeToken(ipHash);
-		const { code } = await AuthService.issueAuthCode(ipHash, newToken);
+		await AuthService.issueAuthCode(ipHash, newToken);
 		return {
 			authenticated: false,
-			authRequired: { code, edgeToken: newToken },
+			authRequired: { edgeToken: newToken },
 		};
 	}
 
@@ -261,20 +263,20 @@ async function resolveAuth(
 
 	if (!verifyResult.valid) {
 		if (verifyResult.reason === "not_verified") {
-			// 未検証（G1 是正）: 認証コード未入力で再書き込みされた場合。
-			// 新規 edge-token の発行は不要。既存の edge-token に紐づく認証コードを再発行する。
-			// See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+			// 未検証（G1 是正）: Turnstile 未通過で再書き込みされた場合。
+			// 新規 edge-token の発行は不要。既存の edge-token に紐づく認証レコードを再発行する。
+			// See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
 			// See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
-			const { code } = await AuthService.issueAuthCode(ipHash, edgeToken);
-			return { authenticated: false, authRequired: { code, edgeToken } };
+			await AuthService.issueAuthCode(ipHash, edgeToken);
+			return { authenticated: false, authRequired: { edgeToken } };
 		}
 
 		// not_found: 新規ユーザーとして認証フロー起動
 		const { token: newToken } = await AuthService.issueEdgeToken(ipHash);
-		const { code } = await AuthService.issueAuthCode(ipHash, newToken);
+		await AuthService.issueAuthCode(ipHash, newToken);
 		return {
 			authenticated: false,
-			authRequired: { code, edgeToken: newToken },
+			authRequired: { edgeToken: newToken },
 		};
 	}
 
@@ -372,7 +374,6 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		// 認証フロー起動: authRequired 応答を返す
 		return {
 			authRequired: true,
-			code: authResult.authRequired.code,
 			edgeToken: authResult.authRequired.edgeToken,
 		};
 	}
@@ -869,7 +870,6 @@ export async function createThread(
 		return {
 			success: false,
 			authRequired: {
-				code: authResult.authRequired.code,
 				edgeToken: authResult.authRequired.edgeToken,
 			},
 		};
@@ -907,7 +907,6 @@ export async function createThread(
 		return {
 			success: false,
 			authRequired: {
-				code: postResult.code,
 				edgeToken: postResult.edgeToken,
 			},
 		};

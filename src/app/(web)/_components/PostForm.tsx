@@ -13,7 +13,7 @@
  * 認証フロー:
  * 1. POST /api/threads/{threadId}/posts → 401 レスポンス
  * 2. authRequired として AuthModal を表示
- * 3. ユーザーが認証コードを入力 → POST /api/auth/auth-code
+ * 3. ユーザーがTurnstileを通過 → POST /api/auth/verify
  * 4. 認証成功 → 書き込みをリトライ
  *
  * See: features/posting.feature @無料ユーザーが書き込みを行う
@@ -27,15 +27,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AuthModal from "./AuthModal";
 import { usePostFormRegister } from "./PostFormContext";
-
-// ---------------------------------------------------------------------------
-// 型定義
-// ---------------------------------------------------------------------------
-
-interface AuthRequiredResponse {
-	message: string;
-	authCode?: string;
-}
 
 // ---------------------------------------------------------------------------
 // コンポーネント
@@ -64,7 +55,6 @@ export default function PostForm({ threadId }: PostFormProps) {
 
 	// AuthModal の状態
 	const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-	const [authCode, setAuthCode] = useState<string | undefined>(undefined);
 	// 認証前に送信しようとしていた本文を保持（認証成功後のリトライ用）
 	const [pendingBody, setPendingBody] = useState<string | null>(null);
 
@@ -88,9 +78,7 @@ export default function PostForm({ threadId }: PostFormProps) {
 			if (res.status === 401) {
 				// 未認証: AuthModal を表示
 				// See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
-				const data = (await res.json()) as AuthRequiredResponse;
 				setPendingBody(postBody);
-				setAuthCode(data.authCode);
 				setIsAuthModalOpen(true);
 				return false;
 			}
@@ -176,7 +164,6 @@ export default function PostForm({ threadId }: PostFormProps) {
 	 */
 	const handleAuthClose = useCallback(() => {
 		setIsAuthModalOpen(false);
-		setAuthCode(undefined);
 		setPendingBody(null);
 	}, []);
 
@@ -252,7 +239,6 @@ export default function PostForm({ threadId }: PostFormProps) {
 				isOpen={isAuthModalOpen}
 				onSuccess={handleAuthSuccess}
 				onClose={handleAuthClose}
-				authCode={authCode}
 			/>
 		</>
 	);

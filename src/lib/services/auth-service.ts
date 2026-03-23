@@ -6,7 +6,7 @@
  * See: docs/architecture/architecture.md §5 認証アーキテクチャ
  *
  * 責務:
- *   - 一般ユーザー認証（edge-token 発行・検証・認証コード発行・検証）
+ *   - 一般ユーザー認証（edge-token 発行・検証・Turnstile検証）
  *   - 管理者認証（Supabase Auth セッション検証）
  *   - IP ハッシュ生成・IP 縮約ユーティリティ
  *
@@ -17,6 +17,8 @@
  *     （eddist 参考実装に倣い。モバイル回線等の IP 変動時の再認証問題を解消）
  *     See: docs/research/eddist_edge_token_ip_report_2026-03-14.md
  *     See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
+ *   - 6桁認証コードは廃止済み。Turnstile のみで認証する（Sprint-110: 認証フロー簡素化）
+ *     See: tmp/auth_simplification_analysis.md §5 方針: 案B
  */
 
 import { createHash, randomBytes } from "crypto";
@@ -36,9 +38,9 @@ import { initializeBalance } from "./currency-service";
  * edge-token 検証結果。
  * See: docs/architecture/components/authentication.md §2.1
  *
- * not_verified: edge-token は存在するが認証コード未検証（is_verified=false）。
+ * not_verified: edge-token は存在するが Turnstile 未通過（is_verified=false）。
  * G1 是正対応。PostService の resolveAuth が認証案内を再表示する。
- * See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
  *
  * Note: ip_mismatch は廃止（投稿時の IP チェックを廃止したため）。
  * See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
@@ -133,21 +135,6 @@ export function hashIp(ip: string): string {
 	return createHash("sha512").update(reduced).digest("hex");
 }
 
-/**
- * 6桁の認証コードを生成する（0〜9 のランダムな数字列）。
- * crypto.randomInt を使用して安全な乱数を生成する。
- *
- * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
- *
- * @returns 6桁の数字文字列（例: "048293"）
- */
-function generateAuthCode(): string {
-	// 000000〜999999 の範囲で生成し、ゼロパディングで6桁に揃える
-	const { randomInt } = require("crypto") as typeof import("crypto");
-	const num = randomInt(0, 1_000_000);
-	return num.toString().padStart(6, "0");
-}
-
 // ---------------------------------------------------------------------------
 // 一般ユーザー認証
 // ---------------------------------------------------------------------------
@@ -158,7 +145,7 @@ function generateAuthCode(): string {
  * eddist の参考実装（docs/research/eddist_edge_token_ip_report_2026-03-14.md）に倣い、
  * モバイル回線等の IP 変動時に再認証が発生する問題を解消する。
  *
- * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  * See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  * See: docs/architecture/components/authentication.md §2.1 verifyEdgeToken
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
@@ -252,29 +239,26 @@ export async function issueEdgeToken(
 }
 
 /**
- * 認証コードを発行する。
- * 6桁の数字コードを生成して AuthCodeRepository に保存する。
+ * 認証レコードを発行する（コードなし）。
+ * edge-token に紐づく auth_codes レコードを作成する。
  * 有効期限は発行から10分（600秒）。
+ * 6桁認証コードは廃止済み（Sprint-110: 認証フロー簡素化）。
  *
- * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+ * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
  * See: docs/architecture/components/authentication.md §2.1 issueAuthCode
- * See: TASK-006 タスク指示書 > 補足・制約 > 認証コードの有効期限: 10分
  *
  * @param ipHash - 発行時の IP ハッシュ（検証時の整合確認に使用）
  * @param edgeToken - 発行済みの edge-token（token_id として紐付ける）
- * @returns 認証コード文字列と有効期限
+ * @returns 有効期限
  */
 export async function issueAuthCode(
 	ipHash: string,
 	edgeToken: string,
-): Promise<{ code: string; expiresAt: Date }> {
-	const code = generateAuthCode();
-
+): Promise<{ expiresAt: Date }> {
 	// 有効期限: 10分（600秒）
 	const expiresAt = new Date(Date.now() + 600 * 1000);
 
 	await AuthCodeRepository.create({
-		code,
 		tokenId: edgeToken,
 		ipHash,
 		verified: false,
@@ -284,39 +268,40 @@ export async function issueAuthCode(
 		writeTokenExpiresAt: null,
 	});
 
-	return { code, expiresAt };
+	return { expiresAt };
 }
 
 /**
- * 認証コードを検証し、有効な場合は認証済みに更新する。
+ * Turnstile 検証を行い、有効な場合は認証済みに更新する。
+ * 6桁認証コードは廃止済み。edge-token (tokenId) で認証レコードを検索する。
+ *
  * 検証ステップ:
- *   1. コードが存在するか
- *   2. 有効期限内か
+ *   1. edge-token で auth_codes レコードを検索する
+ *   2. 有効期限チェック
  *   3. Turnstile トークンが有効か
  *   4. 認証済み状態に更新（auth_codes.verified = true）
  *   5. ユーザーを検証済みに更新（users.is_verified = true）
  *   6. write_token を生成して auth_codes に保存
  * IP 整合チェックはソフトチェック（不一致でも成功扱い、ログのみ）。
  *
- * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
- * See: features/authentication.feature @期限切れ認証コードでは認証できない
  * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
- * See: docs/architecture/components/authentication.md §2.1 verifyAuthCode
+ * See: docs/architecture/components/authentication.md §2.1 verifyAuth
  *
- * @param code - ユーザーが入力した6桁認証コード
+ * @param edgeToken - Cookie から取得した edge-token 文字列
  * @param turnstileToken - Turnstile チャレンジレスポンストークン
  * @param ipHash - 検証時のクライアント IP ハッシュ
  * @returns 検証成功時 { success: true, writeToken: string }、失敗時 { success: false }
  */
-export async function verifyAuthCode(
-	code: string,
+export async function verifyAuth(
+	edgeToken: string,
 	turnstileToken: string,
 	ipHash: string,
 ): Promise<{ success: boolean; writeToken?: string }> {
-	// Step 1: コードの存在確認
-	const authCode = await AuthCodeRepository.findByCode(code);
+	// Step 1: edge-token で auth_codes レコードを検索する
+	const authCode = await AuthCodeRepository.findByTokenId(edgeToken);
 	if (!authCode) {
 		return { success: false };
 	}
@@ -330,7 +315,7 @@ export async function verifyAuthCode(
 	if (authCode.ipHash !== ipHash) {
 		// モバイル回線等のIP変動を考慮し、ログ記録のみで続行する
 		console.warn(
-			`[AuthService] 認証コード検証時 IP 不一致: codeId=${authCode.id}（続行します）`,
+			`[AuthService] 認証検証時 IP 不一致: authCodeId=${authCode.id}（続行します）`,
 		);
 	}
 
@@ -346,11 +331,12 @@ export async function verifyAuthCode(
 
 	// Step 6: ユーザーを検証済みに更新（users.is_verified = true）
 	// tokenId は edge-token 文字列。EdgeTokenRepository + UserRepository でユーザーを解決する
-	// See: tmp/auth_spec_review_report.md §3.1 統一認証フロー > [認証ページ /auth/verify]
 	// See: docs/architecture/components/user-registration.md §5.5 edge-token検証（改修）
-	const edgeToken = await EdgeTokenRepository.findByToken(authCode.tokenId);
-	if (edgeToken) {
-		const user = await UserRepository.findById(edgeToken.userId);
+	const edgeTokenRecord = await EdgeTokenRepository.findByToken(
+		authCode.tokenId,
+	);
+	if (edgeTokenRecord) {
+		const user = await UserRepository.findById(edgeTokenRecord.userId);
 		if (user) {
 			await UserRepository.updateIsVerified(user.id, true);
 		}

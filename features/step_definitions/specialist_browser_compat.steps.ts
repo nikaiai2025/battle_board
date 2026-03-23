@@ -2084,7 +2084,7 @@ Given(
 	async function (this: BattleBoardWorld) {
 		const AuthService = getAuthService();
 
-		// edge-token を発行する（isVerified=false のまま = 認証コード未入力）
+		// edge-token を発行する（isVerified=false のまま = Turnstile未通過）
 		const { token, userId } = await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
 		g4EdgeToken = token;
 		g4UserId = userId;
@@ -2100,7 +2100,7 @@ Given(
 /**
  * bbs.cgi に書き込みを POST する（G4: 未認証の専ブラからの初回書き込み）。
  * 未認証（isVerified=false）のユーザーが書き込みを試みる。
- * PostService.createPost は authRequired を返し、認証コードを発行する。
+ * PostService.createPost は authRequired を返し、認証レコードを発行する。
  *
  * See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
  * See: features/specialist_browser_compat.feature @Cookie共有の専ブラでは認証後そのまま書き込みできる
@@ -2128,7 +2128,6 @@ When("bbs.cgiに書き込みをPOSTする", async function (this: BattleBoardWor
 	if ("authRequired" in result && result.authRequired) {
 		this.lastResult = {
 			type: "authRequired",
-			code: result.code,
 			edgeToken: result.edgeToken,
 		};
 		this.currentEdgeToken = result.edgeToken;
@@ -2145,29 +2144,19 @@ When("bbs.cgiに書き込みをPOSTする", async function (this: BattleBoardWor
 });
 
 /**
- * レスポンスに認証コードと認証ページURLが含まれる。
- * authRequired が返されていることを確認する（認証コードが発行されている）。
+ * レスポンスに認証ページURLが含まれる。
+ * authRequired が返されていることを確認する。
  *
  * See: features/specialist_browser_compat.feature @専ブラからの初回書き込みで認証案内が返される
  */
-Then(
-	"レスポンスに認証コードと認証ページURLが含まれる",
-	function (this: BattleBoardWorld) {
-		assert(this.lastResult, "操作結果が存在しません");
-		assert.strictEqual(
-			this.lastResult.type,
-			"authRequired",
-			`authRequired が返されることを期待しましたが "${this.lastResult.type}" でした`,
-		);
-		// 認証コードが発行されていることを確認する
-		const code = this.lastResult.code;
-		assert(code, "認証コードが発行されていません");
-		assert(
-			/^\d{6}$/.test(code),
-			`6桁の数字コードを期待しましたが "${code}" でした`,
-		);
-	},
-);
+Then("レスポンスに認証ページURLが含まれる", function (this: BattleBoardWorld) {
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"authRequired",
+		`authRequired が返されることを期待しましたが "${this.lastResult.type}" でした`,
+	);
+});
 
 /**
  * edge-token Cookie が発行される（専ブラシナリオ用）。
@@ -2187,7 +2176,7 @@ Then("edge-token Cookieが発行される", function (this: BattleBoardWorld) {
 
 /**
  * ユーザーが認証ページで認証を完了し write_token を取得している。
- * verifyAuthCode を呼び出して認証を完了させ、write_token を World に保存する。
+ * verifyAuth を呼び出して認証を完了させ、write_token を World に保存する。
  *
  * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  */
@@ -2214,12 +2203,12 @@ Given(
 		// See: features/welcome.feature
 		seedDummyPost(userId);
 
-		// 認証コードを発行する
-		const { code } = await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
+		// 認証レコードを発行する
+		await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
 
-		// 認証コードを検証して write_token を取得する
-		const result = await AuthService.verifyAuthCode(
-			code,
+		// Turnstile認証を完了して write_token を取得する
+		const result = await AuthService.verifyAuth(
+			token,
 			"dummy-turnstile-token",
 			DEFAULT_IP_HASH,
 		);
@@ -2423,10 +2412,10 @@ Given(
 		// See: features/welcome.feature
 		seedDummyPost(userId);
 
-		// 認証コードを発行して検証する（isVerified=true に更新される）
-		const { code } = await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
-		const result = await AuthService.verifyAuthCode(
-			code,
+		// 認証レコードを発行してTurnstile認証を完了する（isVerified=true に更新される）
+		await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
+		const result = await AuthService.verifyAuth(
+			token,
 			"dummy-turnstile-token",
 			DEFAULT_IP_HASH,
 		);
@@ -2838,10 +2827,10 @@ Given(
 		// See: features/welcome.feature
 		seedDummyPost(userId);
 
-		// 認証コードを発行して検証し write_token を取得する
-		const { code } = await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
-		const authResult = await AuthService.verifyAuthCode(
-			code,
+		// 認証レコードを発行してTurnstile認証を完了し write_token を取得する
+		await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
+		const authResult = await AuthService.verifyAuth(
+			token,
 			"dummy-turnstile-token",
 			DEFAULT_IP_HASH,
 		);

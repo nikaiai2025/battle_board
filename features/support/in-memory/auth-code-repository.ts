@@ -15,7 +15,7 @@ import { assertUUID } from "./assert-uuid";
 // インメモリストア
 // ---------------------------------------------------------------------------
 
-/** シナリオ間でリセットされる認証コードストア */
+/** シナリオ間でリセットされる認証レコードストア */
 const store = new Map<string, AuthCode>();
 
 /**
@@ -26,7 +26,7 @@ export function reset(): void {
 }
 
 /**
- * テスト用ヘルパー: 認証コードを直接ストアに追加する。
+ * テスト用ヘルパー: 認証レコードを直接ストアに追加する。
  */
 export function _insert(authCode: AuthCode): void {
 	store.set(authCode.id, authCode);
@@ -37,7 +37,7 @@ export function _insert(authCode: AuthCode): void {
 // ---------------------------------------------------------------------------
 
 /**
- * 新規認証コードレコードを作成する。
+ * 新規認証レコードを作成する。
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function create(
@@ -53,18 +53,8 @@ export async function create(
 }
 
 /**
- * 認証コード文字列（6桁）でレコードを取得する。
- * See: src/lib/infrastructure/repositories/auth-code-repository.ts
- */
-export async function findByCode(code: string): Promise<AuthCode | null> {
-	for (const authCode of store.values()) {
-		if (authCode.code === code) return authCode;
-	}
-	return null;
-}
-
-/**
  * edge-token の識別子（token_id）でレコードを取得する。
+ * verifyAuth が認証レコード検索に使用する。
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
@@ -76,7 +66,7 @@ export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
 }
 
 /**
- * 認証コードを認証済み状態にする。
+ * 認証レコードを認証済み状態にする。
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function markVerified(id: string): Promise<void> {
@@ -88,7 +78,7 @@ export async function markVerified(id: string): Promise<void> {
 }
 
 /**
- * 有効期限切れの認証コードを削除し、削除件数を返す。
+ * 有効期限切れの認証レコードを削除し、削除件数を返す。
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function deleteExpired(): Promise<number> {
@@ -104,8 +94,8 @@ export async function deleteExpired(): Promise<number> {
 }
 
 /**
- * 認証コードレコードに write_token と write_token_expires_at を設定する。
- * AuthService.verifyAuthCode が認証成功後に専ブラ向け write_token を発行する際に呼ばれる。
+ * 認証レコードに write_token と write_token_expires_at を設定する。
+ * AuthService.verifyAuth が認証成功後に専ブラ向け write_token を発行する際に呼ばれる。
  *
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts > updateWriteToken
  * See: features/specialist_browser_compat.feature @専ブラ認証フロー
@@ -141,7 +131,7 @@ export async function findByWriteToken(
 }
 
 /**
- * 認証コードレコードの write_token と write_token_expires_at を null にする（ワンタイム消費）。
+ * 認証レコードの write_token と write_token_expires_at を null にする（ワンタイム消費）。
  * AuthService.verifyWriteToken がトークン検証成功後に呼ばれ、再利用を防ぐ。
  *
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts > clearWriteToken

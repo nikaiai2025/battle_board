@@ -90,97 +90,80 @@ describe("BbsCgiResponseBuilder", () => {
 	// ---------------------------------------------------------------------------
 
 	describe("buildAuthRequired()", () => {
-		const code = "123456";
 		const edgeToken = "test-edge-token-abc";
 		const baseUrl = "https://example.com";
 
 		it("titleタグに 'ＥＲＲＯＲ'（全角）を含む（eddist形式: ChMateがSet-Cookieを処理できる標準パターン）", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
 			expect(html).toContain("<title>ＥＲＲＯＲ</title>");
 		});
 
 		it("bodyの冒頭に '<b>ＥＲＲＯＲ</b>' を含む（eddist形式）", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
 			expect(html).toContain("<b>ＥＲＲＯＲ</b><br>");
 		});
 
 		it("bodyに '認証が必要です。' の文言を含む", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
 			expect(html).toContain("認証が必要です。");
 		});
 
-		it("認証コードが本文に含まれる", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
-			expect(html).toContain(code);
-		});
-
-		it("認証ページURLが絶対URL形式 'https://domain/auth/verify?code={code}&token={edgeToken}' で含まれる", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+		it("認証ページURLが絶対URL形式 'https://domain/auth/verify?token={edgeToken}' で含まれる（codeなし）", () => {
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
 			expect(html).toContain(
-				`https://example.com/auth/verify?code=${code}&token=${edgeToken}`,
+				`https://example.com/auth/verify?token=${edgeToken}`,
 			);
+			// code パラメータは含まれないこと
+			expect(html).not.toContain("code=");
 		});
 
 		it("認証URLへのリンク（aタグ）が絶対URLで含まれる", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
 			expect(html).toContain('<a href="https://example.com/auth/verify');
 		});
 
 		it("手順説明が含まれる（URLにアクセスするよう案内する）", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
-			// 手順の説明が含まれること
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
 			expect(html).toContain("認証");
 			expect(html).toContain("URL");
 		});
 
 		it("write_token をメール欄に貼り付ける手順説明が含まれる", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
 			expect(html).toContain("write_token");
 		});
 
-		it("Shift_JIS Content-Type meta タグを含む", () => {
-			const html = builder.buildAuthRequired(code, edgeToken, baseUrl);
-			expect(html).toContain("charset=Shift_JIS");
+		it("Cookie共有の専ブラに関する手順説明が含まれる", () => {
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
+			expect(html).toContain("Cookie共有の専ブラではそのまま書き込めます");
 		});
 
-		it("認証コード中の HTML 特殊文字がエスケープされる（XSS対策）", () => {
-			const maliciousCode = "<script>alert(1)</script>";
-			const html = builder.buildAuthRequired(maliciousCode, edgeToken, baseUrl);
-			expect(html).not.toContain("<script>");
-			expect(html).toContain("&lt;script&gt;");
+		it("Shift_JIS Content-Type meta タグを含む", () => {
+			const html = builder.buildAuthRequired(edgeToken, baseUrl);
+			expect(html).toContain("charset=Shift_JIS");
 		});
 
 		it("edgeToken 中の HTML 特殊文字がエスケープされる（XSS対策）", () => {
 			const maliciousToken = `"><script>alert(1)</script>`;
-			const html = builder.buildAuthRequired(code, maliciousToken, baseUrl);
+			const html = builder.buildAuthRequired(maliciousToken, baseUrl);
 			expect(html).not.toContain("<script>");
 		});
 
-		it("空の認証コードでもエラーにならない（エッジケース: 空入力）", () => {
-			expect(() =>
-				builder.buildAuthRequired("", edgeToken, baseUrl),
-			).not.toThrow();
-		});
-
 		it("空の edgeToken でもエラーにならない（エッジケース: 空入力）", () => {
-			expect(() => builder.buildAuthRequired(code, "", baseUrl)).not.toThrow();
+			expect(() => builder.buildAuthRequired("", baseUrl)).not.toThrow();
 		});
 
 		it("異なるbaseUrlで正しく絶対URLが生成される", () => {
 			const prodUrl = "https://battle-board.nikai-ai.workers.dev";
-			const html = builder.buildAuthRequired(code, edgeToken, prodUrl);
+			const html = builder.buildAuthRequired(edgeToken, prodUrl);
 			expect(html).toContain(
-				`https://battle-board.nikai-ai.workers.dev/auth/verify?code=${code}&token=${edgeToken}`,
+				`https://battle-board.nikai-ai.workers.dev/auth/verify?token=${edgeToken}`,
 			);
 		});
 
 		it("baseUrlの末尾スラッシュが正規化される（エッジケース: 末尾スラッシュあり）", () => {
 			const urlWithTrailingSlash = "https://example.com/";
-			const html = builder.buildAuthRequired(
-				code,
-				edgeToken,
-				urlWithTrailingSlash,
-			);
+			const html = builder.buildAuthRequired(edgeToken, urlWithTrailingSlash);
 			// 二重スラッシュにならないこと
 			expect(html).not.toContain("//auth/verify");
 		});

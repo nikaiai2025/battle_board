@@ -74,10 +74,9 @@ export interface PostResult {
 	/**
 	 * 認証が必要な場合のみ設定（edgeToken が null だった場合）。
 	 * 呼び出し元はこの情報を元にユーザーへ認証フローを案内する。
+	 * 6桁認証コードは廃止済み（Sprint-110: 認証フロー簡素化）。
 	 */
 	authRequired?: {
-		/** 発行された6桁認証コード */
-		code: string;
 		/** 発行された edge-token */
 		token: string;
 	};

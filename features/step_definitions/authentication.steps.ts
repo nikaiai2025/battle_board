@@ -1,7 +1,7 @@
 /**
  * authentication.feature ステップ定義
  *
- * 書き込み認証（edge-token + 認証コード）と日次リセットIDに関するシナリオを実装する。
+ * 書き込み認証（edge-token + Turnstile）と日次リセットIDに関するシナリオを実装する。
  *
  * サービス層は動的 require で取得する。
  * これは mock-installer.ts の installMocks() が BeforeAll フックで呼ばれ、
@@ -35,7 +35,7 @@ import { seedDummyPost } from "./common.steps";
 /**
  * BattleBoardWorld に authentication.feature 向けプロパティを追加する型宣言。
  * write_token（専ブラ認証フロー G4）の保存に使用する。
- * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  * See: features/specialist_browser_compat.feature @専ブラ認証フロー
  */
 declare module "../support/world" {
@@ -77,7 +77,7 @@ const TEST_BOARD_ID = "livebot";
 
 // ---------------------------------------------------------------------------
 // Given: 未認証ユーザーが書き込みを送信する
-// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
 // ---------------------------------------------------------------------------
 
 /**
@@ -103,7 +103,7 @@ Given(
 
 // ---------------------------------------------------------------------------
 // When: サーバーが書き込みリクエストを処理する
-// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
 // ---------------------------------------------------------------------------
 
 /**
@@ -127,7 +127,6 @@ When(
 		if ("authRequired" in result && result.authRequired) {
 			this.lastResult = {
 				type: "authRequired",
-				code: result.code,
 				edgeToken: result.edgeToken,
 			};
 			// 発行された edge-token を保存する
@@ -145,33 +144,23 @@ When(
 );
 
 // ---------------------------------------------------------------------------
-// Then: 認証コード入力ページへの案内が表示される
-// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証コードが案内される
+// Then: 認証ページへの案内が表示される
+// See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
 // ---------------------------------------------------------------------------
 
-Then(
-	"認証コード入力ページへの案内が表示される",
-	function (this: BattleBoardWorld) {
-		assert(this.lastResult, "操作結果が存在しません");
-		assert.strictEqual(
-			this.lastResult.type,
-			"authRequired",
-			`authRequired が返されることを期待しましたが "${this.lastResult.type}" でした`,
-		);
-	},
-);
-
-Then("6桁の認証コードが発行される", async function (this: BattleBoardWorld) {
-	assert(
-		this.lastResult?.type === "authRequired",
-		"authRequired 状態が必要です",
-	);
-	// authRequired に含まれる code が発行済みであることを確認
-	const code = this.lastResult.code;
-	assert(code, "認証コードが発行されていません");
-	assert(
-		/^\d{6}$/.test(code),
-		`6桁の数字コードを期待しましたが "${code}" でした`,
+/**
+ * 認証ページへの案内が表示される。
+ * authRequired が返されていることを確認する。
+ *
+ * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
+ * See: features/authentication.feature @edge-token Cookieの有効期限が切れると再認証が必要になる
+ */
+Then("認証ページへの案内が表示される", function (this: BattleBoardWorld) {
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"authRequired",
+		`authRequired が返されることを期待しましたが "${this.lastResult.type}" でした`,
 	);
 });
 
@@ -186,16 +175,18 @@ Then("edge-token Cookie が発行される", function (this: BattleBoardWorld) {
 });
 
 // ---------------------------------------------------------------------------
-// Given: 有効な認証コードを持つユーザー
-// See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+// Given: 未認証のedge-tokenを持つユーザー
+// See: features/authentication.feature @Turnstile通過で認証に成功する
+// See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
 // ---------------------------------------------------------------------------
 
 /**
- * ユーザーが有効な6桁認証コードを持っている。
- * edge-token を発行し、認証コードを発行して World に保存する。
+ * ユーザーが未認証のedge-tokenを持っている。
+ * edge-token を発行し、認証レコードを発行する。
+ * isVerified=false の状態（Turnstile認証未完了）。
  */
 Given(
-	"ユーザーが有効な6桁認証コードを持っている",
+	"ユーザーが未認証のedge-tokenを持っている",
 	async function (this: BattleBoardWorld) {
 		const AuthService = getAuthService();
 
@@ -205,44 +196,8 @@ Given(
 		this.currentUserId = userId;
 		this.currentIpHash = DEFAULT_IP_HASH;
 
-		// 認証コードを発行する（有効期限内）
-		const { code } = await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
-		// World の lastResult に code を一時保存する
-		this.lastResult = { type: "authRequired", code, edgeToken: token };
-	},
-);
-
-/**
- * ユーザーが有効期限切れの6桁認証コードを持っている。
- * 有効期限を過去に設定した認証コードを直接ストアに挿入する。
- */
-Given(
-	"ユーザーが有効期限切れの6桁認証コードを持っている",
-	async function (this: BattleBoardWorld) {
-		const AuthService = getAuthService();
-
-		// edge-token を発行する
-		const { token, userId } = await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
-		this.currentEdgeToken = token;
-		this.currentUserId = userId;
-		this.currentIpHash = DEFAULT_IP_HASH;
-
-		// 有効期限切れの認証コードを直接ストアに挿入する
-		const expiredAt = new Date(Date.now() - 1000); // 1秒前に期限切れ
-		InMemoryAuthCodeRepo._insert({
-			id: crypto.randomUUID(),
-			code: "123456",
-			tokenId: token,
-			ipHash: DEFAULT_IP_HASH,
-			verified: false,
-			expiresAt: expiredAt,
-			createdAt: new Date(Date.now() - 700 * 1000),
-		});
-		this.lastResult = {
-			type: "authRequired",
-			code: "123456",
-			edgeToken: token,
-		};
+		// 認証レコードを発行する（有効期限内）
+		await AuthService.issueAuthCode(DEFAULT_IP_HASH, token);
 	},
 );
 
@@ -268,36 +223,72 @@ Given(
 );
 
 // ---------------------------------------------------------------------------
-// When: /auth/verify で認証コードを送信する
-// See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+// When: /auth/verify でTurnstile認証を完了する / 試みる
+// See: features/authentication.feature @Turnstile通過で認証に成功する
+// See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
 // ---------------------------------------------------------------------------
 
 /**
- * ユーザーが /auth/verify で認証コードを送信する。
- * AuthService.verifyAuthCode を呼び出し、戻り値 { success, writeToken? } を処理する。
+ * ユーザーが /auth/verify でTurnstile認証を完了する。
+ * AuthService.verifyAuth(edgeToken, turnstileToken, ipHash) を呼び出し、
+ * 戻り値 { success, writeToken? } を処理する。
  * 認証成功時は write_token を World に保存する（専ブラ向け G4 対応）。
  *
- * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 When(
-	/^ユーザーが \/auth\/verify で認証コードを送信する$/,
+	/^ユーザーが \/auth\/verify でTurnstile認証を完了する$/,
 	async function (this: BattleBoardWorld) {
-		assert(this.lastResult?.type === "authRequired", "認証コードが必要です");
-		const code = this.lastResult.code;
+		assert(this.currentEdgeToken, "edge-token が必要です");
 
 		const AuthService = getAuthService();
 
-		// AuthService.verifyAuthCode を呼び出す（Turnstileトークンはダミー）
+		// AuthService.verifyAuth を呼び出す（Turnstileトークンはダミー）
 		// 戻り値: { success: boolean, writeToken?: string }
-		const result = await AuthService.verifyAuthCode(
-			code,
+		const result = await AuthService.verifyAuth(
+			this.currentEdgeToken,
 			"dummy-turnstile-token",
 			DEFAULT_IP_HASH,
 		);
 
 		if (result.success) {
 			// write_token を World に保存する（専ブラシナリオで使用）
+			this.currentWriteToken = result.writeToken ?? null;
+			this.lastResult = {
+				type: "success",
+				data: { verified: true, writeToken: result.writeToken },
+			};
+		} else {
+			this.lastResult = {
+				type: "error",
+				message: "認証に失敗しました",
+				code: "AUTH_FAILED",
+			};
+		}
+	},
+);
+
+/**
+ * ユーザーが /auth/verify でTurnstile認証を試みる（失敗ケース）。
+ * Turnstile検証が失敗状態に設定されている場合に使用する。
+ *
+ * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
+ */
+When(
+	/^ユーザーが \/auth\/verify でTurnstile認証を試みる$/,
+	async function (this: BattleBoardWorld) {
+		assert(this.currentEdgeToken, "edge-token が必要です");
+
+		const AuthService = getAuthService();
+
+		const result = await AuthService.verifyAuth(
+			this.currentEdgeToken,
+			"dummy-turnstile-token",
+			DEFAULT_IP_HASH,
+		);
+
+		if (result.success) {
 			this.currentWriteToken = result.writeToken ?? null;
 			this.lastResult = {
 				type: "success",
@@ -327,9 +318,9 @@ Then("edge-token が有効化される", function (this: BattleBoardWorld) {
 
 /**
  * write_tokenが発行される。
- * verifyAuthCode 成功時に write_token が World に保存されていることを確認する。
+ * verifyAuth 成功時に write_token が World に保存されていることを確認する。
  *
- * See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  */
 Then("write_tokenが発行される", function (this: BattleBoardWorld) {
@@ -625,8 +616,14 @@ Given(
 	},
 );
 
+/**
+ * ユーザーがTurnstileで再認証する。
+ * Cookie削除後に同一IPから新しいedge-tokenを発行し、認証済み状態にする。
+ *
+ * See: features/authentication.feature @Cookie削除後に再認証しても同日・同一回線では同じIDになる
+ */
 Given(
-	"ユーザーが認証コードで再認証する",
+	"ユーザーがTurnstileで再認証する",
 	async function (this: BattleBoardWorld) {
 		const AuthService = getAuthService();
 
@@ -635,8 +632,8 @@ Given(
 		this.currentEdgeToken = token;
 		this.currentUserId = userId;
 		// ipHash は同じまま（同一回線）
-		// isVerified=true に設定して書き込み可能状態にする（TASK-041 verifyEdgeToken not_verified チェック対応）
-		// See: features/authentication.feature @認証フロー是正
+		// isVerified=true に設定して書き込み可能状態にする
+		// See: features/authentication.feature @Cookie削除後に再認証しても同日・同一回線では同じIDになる
 		await InMemoryUserRepo.updateIsVerified(userId, true);
 		// ウェルカムシーケンス抑止（TASK-248）
 		seedDummyPost(userId);
@@ -790,19 +787,19 @@ Then(
 
 // ---------------------------------------------------------------------------
 // G1: 認証バイパス防止
-// See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+// See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
 // ---------------------------------------------------------------------------
 
 /**
- * ユーザーが edge-token を発行されているが認証コードを未入力である。
- * issueEdgeToken で edge-token を発行するが、verifyAuthCode を呼ばないため
- * isVerified = false のまま（認証コード未入力状態）。
+ * ユーザーが edge-token を発行されているが Turnstile 認証を完了していない。
+ * issueEdgeToken で edge-token を発行するが、verifyAuth を呼ばないため
+ * isVerified = false のまま（Turnstile未通過状態）。
  *
- * See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
  * See: tmp/auth_spec_review_report.md §3.1 統一認証フロー
  */
 Given(
-	"ユーザーがedge-tokenを発行されているが認証コードを未入力である",
+	"ユーザーがedge-tokenを発行されているがTurnstile認証を完了していない",
 	async function (this: BattleBoardWorld) {
 		const AuthService = getAuthService();
 
@@ -828,7 +825,7 @@ Given(
  * 未認証（isVerified=false）ユーザーが createPost を呼び出す。
  * PostService は verifyEdgeToken で not_verified を検出し、authRequired を返す。
  *
- * See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
  */
 When("ユーザーが書き込みを送信する", async function (this: BattleBoardWorld) {
 	assert(this.currentThreadId, "スレッドが設定されていません");
@@ -847,7 +844,6 @@ When("ユーザーが書き込みを送信する", async function (this: BattleB
 	if ("authRequired" in result && result.authRequired) {
 		this.lastResult = {
 			type: "authRequired",
-			code: result.code,
 			edgeToken: result.edgeToken,
 		};
 		this.currentEdgeToken = result.edgeToken;
@@ -863,28 +859,25 @@ When("ユーザーが書き込みを送信する", async function (this: BattleB
 });
 
 /**
- * 認証コード入力ページへの案内が再度表示される（G1シナリオ）。
+ * 認証ページへの案内が再度表示される（G1シナリオ）。
  * authRequired が返されていることを確認する。
  *
- * See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
  */
-Then(
-	"認証コード入力ページへの案内が再度表示される",
-	function (this: BattleBoardWorld) {
-		assert(this.lastResult, "操作結果が存在しません");
-		assert.strictEqual(
-			this.lastResult.type,
-			"authRequired",
-			`authRequired が返されることを期待しましたが "${this.lastResult.type}" でした`,
-		);
-	},
-);
+Then("認証ページへの案内が再度表示される", function (this: BattleBoardWorld) {
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"authRequired",
+		`authRequired が返されることを期待しましたが "${this.lastResult.type}" でした`,
+	);
+});
 
 /**
  * 書き込みは処理されない（G1シナリオ）。
  * スレッドにレスが追加されていないことを確認する。
  *
- * See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+ * See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
  */
 Then("書き込みは処理されない", async function (this: BattleBoardWorld) {
 	assert(this.currentThreadId, "スレッドが設定されていません");
@@ -1012,7 +1005,6 @@ When(
 		if ("authRequired" in result && result.authRequired) {
 			this.lastResult = {
 				type: "authRequired",
-				code: result.code,
 				edgeToken: result.edgeToken,
 			};
 			// 新しく発行された edge-token を保存する

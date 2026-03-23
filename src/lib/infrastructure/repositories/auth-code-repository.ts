@@ -1,7 +1,8 @@
 /**
  * AuthCodeRepository — auth_codes テーブルへの CRUD 操作
  *
- * auth_codes テーブルは 6桁認証コードを管理する。
+ * auth_codes テーブルは edge-token と Turnstile 検証の紐付け管理を担う。
+ * 6桁認証コードは廃止済み（Sprint-110: 認証フロー簡素化）。
  * RLS により anon/authenticated ロールからの全操作を全拒否している。
  * service_role キーを持つ supabaseAdmin を使用して RLS をバイパスする。
  *
@@ -10,6 +11,7 @@
  * See: docs/architecture/architecture.md §4.2 主要テーブル定義 > auth_codes
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証
  * See: docs/architecture/architecture.md §10.1.1 RLSポリシー設計
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  */
 
 import { supabaseAdmin } from "../supabase/client";
@@ -20,18 +22,18 @@ import { supabaseAdmin } from "../supabase/client";
 
 /**
  * 認証コードエンティティ。
- * 一般ユーザーの edge-token 認証フロー（§5.1）で使用する 6桁コード管理用。
+ * edge-token と Turnstile 検証の紐付け管理用。
+ * 6桁認証コード（code カラム）は廃止済み（Sprint-110）。
  *
  * write_token は専ブラ向け認証橋渡しトークン（G4 対応）。
  * 認証完了時に生成される 32 文字 hex で、専ブラの mail 欄に #<write_token> 形式で使用する。
  * See: tmp/auth_spec_review_report.md §3.2 write_token 方式
  * See: features/specialist_browser_compat.feature @専ブラ認証フロー
+ * See: features/authentication.feature @Turnstile通過で認証に成功する
  */
 export interface AuthCode {
 	/** 内部識別子 (UUID) */
 	id: string;
-	/** 6桁認証コード */
-	code: string;
 	/** 対応する edge-token の識別子 */
 	tokenId: string;
 	/** 発行時の IP ハッシュ（検証用） */
@@ -60,10 +62,9 @@ export interface AuthCode {
 // DB レコード型（snake_case）
 // ---------------------------------------------------------------------------
 
-/** auth_codes テーブルの生レコード型 */
+/** auth_codes テーブルの生レコード型（code カラムは Sprint-110 で廃止済み） */
 interface AuthCodeRow {
 	id: string;
-	code: string;
 	token_id: string;
 	ip_hash: string;
 	verified: boolean;
@@ -92,7 +93,6 @@ interface AuthCodeRow {
 function rowToAuthCode(row: AuthCodeRow): AuthCode {
 	return {
 		id: row.id,
-		code: row.code,
 		tokenId: row.token_id,
 		ipHash: row.ip_hash,
 		verified: row.verified,
@@ -110,16 +110,16 @@ function rowToAuthCode(row: AuthCodeRow): AuthCode {
 // ---------------------------------------------------------------------------
 
 /**
- * 新規認証コードレコードを作成する。
- * AuthService が認証コードを発行する際に呼ばれる。
+ * 新規認証レコードを作成する。
+ * AuthService が edge-token 発行時に呼ばれる。
  * id, createdAt は DB デフォルト値で生成されるため入力から除外する。
  * writeToken, writeTokenExpiresAt は認証完了後に updateWriteToken で設定するため、
  * 初回作成時は NULL（省略時デフォルト）となる。
  *
- * See: features/authentication.feature @認証フロー是正
+ * See: features/authentication.feature @未認証ユーザーが書き込みを行うと認証ページが案内される
  *
- * @param authCode 作成する認証コードデータ（id, createdAt を除く）
- * @returns 作成された認証コードレコード
+ * @param authCode 作成する認証データ（id, createdAt を除く）
+ * @returns 作成された認証レコード
  */
 export async function create(
 	authCode: Omit<AuthCode, "id" | "createdAt">,
@@ -127,7 +127,6 @@ export async function create(
 	const { data, error } = await supabaseAdmin
 		.from("auth_codes")
 		.insert({
-			code: authCode.code,
 			token_id: authCode.tokenId,
 			ip_hash: authCode.ipHash,
 			verified: authCode.verified,
@@ -150,33 +149,8 @@ export async function create(
 }
 
 /**
- * 認証コード文字列（6桁）でレコードを取得する。
- * 認証コード検証時に使用する。
- *
- * @param code 6桁認証コード文字列
- * @returns 認証コードレコード、または存在しない場合は null
- */
-export async function findByCode(code: string): Promise<AuthCode | null> {
-	const { data, error } = await supabaseAdmin
-		.from("auth_codes")
-		.select("*")
-		.eq("code", code)
-		.single();
-
-	if (error) {
-		// PGRST116: 行が見つからない
-		if (error.code === "PGRST116") {
-			return null;
-		}
-		throw new Error(`AuthCodeRepository.findByCode failed: ${error.message}`);
-	}
-
-	return data ? rowToAuthCode(data as AuthCodeRow) : null;
-}
-
-/**
- * edge-token の識別子（token_id）でレコードを取得する。
- * 既発行コードの存在確認・再発行制御に使用する。
+ * edge-token の識別子（token_id）で未検証レコードを取得する。
+ * verifyAuth で edge-token に紐づく認証レコードを検索する際に使用する。
  *
  * @param tokenId edge-token の識別子
  * @returns 認証コードレコード、または存在しない場合は null
@@ -202,8 +176,8 @@ export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
 }
 
 /**
- * 認証コードを認証済み状態にする（verified = true）。
- * Turnstile 検証と 6桁コード照合が成功した後に呼ばれる。
+ * 認証レコードを認証済み状態にする（verified = true）。
+ * Turnstile 検証が成功した後に呼ばれる。
  *
  * See: docs/architecture/architecture.md §5.1 一般ユーザー認証 > ③コード検証
  *

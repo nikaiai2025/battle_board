@@ -41,7 +41,7 @@ vi.mock("@/lib/infrastructure/repositories/edge-token-repository", () => ({
 }));
 
 vi.mock("@/lib/infrastructure/repositories/auth-code-repository", () => ({
-	findByCode: vi.fn(),
+	findByTokenId: vi.fn(),
 	create: vi.fn(),
 	markVerified: vi.fn(),
 	updateWriteToken: vi.fn(),
@@ -88,7 +88,7 @@ import {
 	issueEdgeToken,
 	reduceIp,
 	verifyAdminSession,
-	verifyAuthCode,
+	verifyAuth,
 	verifyEdgeToken,
 	verifyWriteToken,
 } from "../auth-service";
@@ -153,7 +153,6 @@ function makeEdgeToken(
 function makeAuthCode(
 	overrides: Partial<{
 		id: string;
-		code: string;
 		tokenId: string;
 		ipHash: string;
 		verified: boolean;
@@ -165,7 +164,6 @@ function makeAuthCode(
 ) {
 	return {
 		id: "auth-code-uuid-001",
-		code: "123456",
 		tokenId: "valid-edge-token",
 		ipHash: "ip-hash-abc123",
 		verified: false,
@@ -590,14 +588,6 @@ describe("AuthService", () => {
 
 	describe("issueAuthCode", () => {
 		describe("正常系", () => {
-			it("6桁の数字コードを返す", async () => {
-				vi.mocked(AuthCodeRepository.create).mockResolvedValue(makeAuthCode());
-
-				const result = await issueAuthCode("ip-hash", "edge-token");
-
-				expect(result.code).toMatch(/^\d{6}$/);
-			});
-
 			it("有効期限が10分後になっている", async () => {
 				vi.mocked(AuthCodeRepository.create).mockResolvedValue(makeAuthCode());
 				const before = Date.now();
@@ -611,7 +601,17 @@ describe("AuthService", () => {
 				expect(expiresMs).toBeLessThanOrEqual(after + 600_000 + 5000);
 			});
 
-			it("AuthCodeRepository.create を正しい引数で呼び出す", async () => {
+			it("戻り値に code フィールドが含まれない（6桁コード廃止）", async () => {
+				vi.mocked(AuthCodeRepository.create).mockResolvedValue(makeAuthCode());
+
+				const result = await issueAuthCode("ip-hash", "edge-token");
+
+				// code プロパティが存在しないことを確認
+				expect(result).not.toHaveProperty("code");
+				expect(result).toHaveProperty("expiresAt");
+			});
+
+			it("AuthCodeRepository.create を正しい引数で呼び出す（code なし）", async () => {
 				vi.mocked(AuthCodeRepository.create).mockResolvedValue(makeAuthCode());
 
 				await issueAuthCode("test-ip-hash", "test-edge-token");
@@ -625,30 +625,9 @@ describe("AuthService", () => {
 						writeTokenExpiresAt: null,
 					}),
 				);
-			});
-
-			it("生成されるコードの code フィールドが6桁数字", async () => {
-				// 複数回呼び出してすべて6桁であることを確認
-				vi.mocked(AuthCodeRepository.create).mockResolvedValue(makeAuthCode());
-
-				for (let i = 0; i < 10; i++) {
-					const result = await issueAuthCode("ip-hash", "token");
-					expect(result.code).toMatch(/^\d{6}$/);
-				}
-			});
-		});
-
-		describe("境界値: ゼロパディング", () => {
-			it("0から始まるコードも6桁で返される（ゼロパディング）", async () => {
-				// generateAuthCode は 0〜999999 の範囲で生成するため、
-				// 先頭0のコード（例: "000001"）も正しく処理されることを確認
-				vi.mocked(AuthCodeRepository.create).mockResolvedValue(
-					makeAuthCode({ code: "000001" }),
-				);
-
-				// 実際の生成は内部で行われるため、形式のみ確認
-				const result = await issueAuthCode("ip-hash", "token");
-				expect(result.code).toHaveLength(6);
+				// code フィールドが引数に含まれないことを確認
+				const callArg = vi.mocked(AuthCodeRepository.create).mock.calls[0][0];
+				expect(callArg).not.toHaveProperty("code");
 			});
 		});
 
@@ -666,18 +645,18 @@ describe("AuthService", () => {
 	});
 
 	// =========================================================================
-	// verifyAuthCode: 認証コード検証
+	// verifyAuth: Turnstile 認証検証（6桁コード廃止後）
 	// =========================================================================
 
-	describe("verifyAuthCode", () => {
+	describe("verifyAuth", () => {
 		describe("正常系: 認証成功", () => {
-			// See: features/authentication.feature @正しい認証コードとTurnstileで認証に成功する
-			it("有効なコードとTurnstile成功で { success: true, writeToken } を返す", async () => {
+			// See: features/authentication.feature @Turnstile通過で認証に成功する
+			it("有効な edge-token と Turnstile 成功で { success: true, writeToken } を返す", async () => {
 				const edgeToken = makeEdgeToken({
 					token: "valid-edge-token",
 					userId: "user-uuid-001",
 				});
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(
 					makeAuthCode(),
 				);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true);
@@ -689,8 +668,8 @@ describe("AuthService", () => {
 					undefined,
 				);
 
-				const result = await verifyAuthCode(
-					"123456",
+				const result = await verifyAuth(
+					"valid-edge-token",
 					"turnstile-token",
 					"ip-hash-abc123",
 				);
@@ -706,7 +685,7 @@ describe("AuthService", () => {
 					token: "valid-edge-token",
 					userId: "user-uuid-001",
 				});
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode);
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(authCode);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true);
 				vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined);
 				vi.mocked(EdgeTokenRepository.findByToken).mockResolvedValue(edgeToken);
@@ -716,7 +695,11 @@ describe("AuthService", () => {
 					undefined,
 				);
 
-				await verifyAuthCode("123456", "turnstile-token", "ip-hash-abc123");
+				await verifyAuth(
+					"valid-edge-token",
+					"turnstile-token",
+					"ip-hash-abc123",
+				);
 
 				expect(AuthCodeRepository.markVerified).toHaveBeenCalledWith(
 					"code-id-001",
@@ -724,14 +707,13 @@ describe("AuthService", () => {
 			});
 
 			it("認証成功後に UserRepository.updateIsVerified(userId, true) を呼び出す", async () => {
-				// See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
 				const authCode = makeAuthCode({ tokenId: "test-edge-token" });
 				const edgeToken = makeEdgeToken({
 					token: "test-edge-token",
 					userId: "test-user-id",
 				});
 				const user = makeUser({ id: "test-user-id" });
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode);
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(authCode);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true);
 				vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined);
 				vi.mocked(EdgeTokenRepository.findByToken).mockResolvedValue(edgeToken);
@@ -741,7 +723,11 @@ describe("AuthService", () => {
 					undefined,
 				);
 
-				await verifyAuthCode("123456", "turnstile-token", "ip-hash-abc123");
+				await verifyAuth(
+					"test-edge-token",
+					"turnstile-token",
+					"ip-hash-abc123",
+				);
 
 				expect(EdgeTokenRepository.findByToken).toHaveBeenCalledWith(
 					"test-edge-token",
@@ -760,7 +746,7 @@ describe("AuthService", () => {
 					token: "valid-edge-token",
 					userId: "user-uuid-001",
 				});
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode);
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(authCode);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true);
 				vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined);
 				vi.mocked(EdgeTokenRepository.findByToken).mockResolvedValue(edgeToken);
@@ -770,7 +756,11 @@ describe("AuthService", () => {
 					undefined,
 				);
 
-				await verifyAuthCode("123456", "turnstile-token", "ip-hash-abc123");
+				await verifyAuth(
+					"valid-edge-token",
+					"turnstile-token",
+					"ip-hash-abc123",
+				);
 
 				expect(AuthCodeRepository.updateWriteToken).toHaveBeenCalledWith(
 					"code-id-001",
@@ -785,7 +775,7 @@ describe("AuthService", () => {
 					token: "valid-edge-token",
 					userId: "user-uuid-001",
 				});
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(authCode);
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(authCode);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true);
 				vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined);
 				vi.mocked(EdgeTokenRepository.findByToken).mockResolvedValue(edgeToken);
@@ -795,9 +785,8 @@ describe("AuthService", () => {
 					undefined,
 				);
 
-				// IP が異なる場合でも認証は成功する
-				const result = await verifyAuthCode(
-					"123456",
+				const result = await verifyAuth(
+					"valid-edge-token",
 					"turnstile-token",
 					"different-ip",
 				);
@@ -806,8 +795,7 @@ describe("AuthService", () => {
 			});
 
 			it("対応 edge-token が edge_tokens テーブルに存在しない場合も write_token 発行は行われる", async () => {
-				// tokenId に対応する edge-token が edge_tokens テーブルに見つからない稀なケース
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(
 					makeAuthCode(),
 				);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true);
@@ -817,25 +805,24 @@ describe("AuthService", () => {
 					undefined,
 				);
 
-				const result = await verifyAuthCode(
-					"123456",
+				const result = await verifyAuth(
+					"valid-edge-token",
 					"turnstile-token",
 					"ip-hash",
 				);
 
 				expect(result.success).toBe(true);
 				expect(result.writeToken).toMatch(/^[0-9a-f]{32}$/);
-				// edge-token が見つからない場合は updateIsVerified は呼ばれない
 				expect(UserRepository.updateIsVerified).not.toHaveBeenCalled();
 			});
 		});
 
-		describe("異常系: コードが存在しない", () => {
-			it("存在しないコードで { success: false } を返す", async () => {
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(null);
+		describe("異常系: edge-token に紐づく認証レコードが存在しない", () => {
+			it("認証レコードが見つからない場合 { success: false } を返す", async () => {
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(null);
 
-				const result = await verifyAuthCode(
-					"999999",
+				const result = await verifyAuth(
+					"unknown-edge-token",
 					"turnstile-token",
 					"ip-hash",
 				);
@@ -847,15 +834,16 @@ describe("AuthService", () => {
 		});
 
 		describe("異常系: 有効期限切れ", () => {
-			// See: features/authentication.feature @期限切れ認証コードでは認証できない
-			it("期限切れコードで { success: false } を返す", async () => {
-				const expiredCode = makeAuthCode({
-					expiresAt: new Date(Date.now() - 1000), // 1秒前に期限切れ
+			it("期限切れレコードで { success: false } を返す", async () => {
+				const expiredRecord = makeAuthCode({
+					expiresAt: new Date(Date.now() - 1000),
 				});
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(expiredCode);
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(
+					expiredRecord,
+				);
 
-				const result = await verifyAuthCode(
-					"123456",
+				const result = await verifyAuth(
+					"valid-edge-token",
 					"turnstile-token",
 					"ip-hash",
 				);
@@ -869,15 +857,15 @@ describe("AuthService", () => {
 		describe("異常系: Turnstile 検証失敗", () => {
 			// See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
 			it("Turnstile 検証失敗で { success: false } を返す", async () => {
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(
 					makeAuthCode(),
 				);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(
 					false,
 				);
 
-				const result = await verifyAuthCode(
-					"123456",
+				const result = await verifyAuth(
+					"valid-edge-token",
 					"invalid-turnstile",
 					"ip-hash-abc123",
 				);
@@ -889,14 +877,14 @@ describe("AuthService", () => {
 
 		describe("境界値: 期限ちょうど", () => {
 			it("有効期限の1ms前は有効", async () => {
-				const code = makeAuthCode({
-					expiresAt: new Date(Date.now() + 1), // 1ms 後に期限切れ
+				const authCode = makeAuthCode({
+					expiresAt: new Date(Date.now() + 1),
 				});
 				const edgeToken = makeEdgeToken({
 					token: "valid-edge-token",
 					userId: "user-uuid-001",
 				});
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(code);
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(authCode);
 				vi.mocked(TurnstileClient.verifyTurnstileToken).mockResolvedValue(true);
 				vi.mocked(AuthCodeRepository.markVerified).mockResolvedValue(undefined);
 				vi.mocked(EdgeTokenRepository.findByToken).mockResolvedValue(edgeToken);
@@ -906,8 +894,8 @@ describe("AuthService", () => {
 					undefined,
 				);
 
-				const result = await verifyAuthCode(
-					"123456",
+				const result = await verifyAuth(
+					"valid-edge-token",
 					"turnstile",
 					"ip-hash-abc123",
 				);
@@ -917,22 +905,22 @@ describe("AuthService", () => {
 		});
 
 		describe("エッジケース", () => {
-			it("空のコードでも AuthCodeRepository を呼び出す", async () => {
-				vi.mocked(AuthCodeRepository.findByCode).mockResolvedValue(null);
+			it("空の edge-token でも AuthCodeRepository を呼び出す", async () => {
+				vi.mocked(AuthCodeRepository.findByTokenId).mockResolvedValue(null);
 
-				const result = await verifyAuthCode("", "turnstile", "ip-hash");
+				const result = await verifyAuth("", "turnstile", "ip-hash");
 
 				expect(result.success).toBe(false);
-				expect(AuthCodeRepository.findByCode).toHaveBeenCalledWith("");
+				expect(AuthCodeRepository.findByTokenId).toHaveBeenCalledWith("");
 			});
 
 			it("AuthCodeRepository がエラーをスローした場合は伝播する", async () => {
-				vi.mocked(AuthCodeRepository.findByCode).mockRejectedValue(
+				vi.mocked(AuthCodeRepository.findByTokenId).mockRejectedValue(
 					new Error("DB接続エラー"),
 				);
 
 				await expect(
-					verifyAuthCode("123456", "turnstile", "ip-hash"),
+					verifyAuth("edge-token", "turnstile", "ip-hash"),
 				).rejects.toThrow("DB接続エラー");
 			});
 		});

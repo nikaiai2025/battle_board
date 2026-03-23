@@ -531,13 +531,12 @@ describe("PostService", () => {
 		describe("未認証: edge-token が null の場合に認証フローを起動する", () => {
 			// See: docs/architecture/architecture.md §5.1 一般ユーザー認証
 
-			it("authRequired:true のレスポンスを返し、edgeToken と code を含む", async () => {
+			it("authRequired:true のレスポンスを返し、edgeToken を含む（code は廃止）", async () => {
 				vi.mocked(AuthService.issueEdgeToken).mockResolvedValue({
 					token: "new-edge-token",
 					userId: "user-new",
 				});
 				vi.mocked(AuthService.issueAuthCode).mockResolvedValue({
-					code: "123456",
 					expiresAt: new Date(),
 				});
 
@@ -552,8 +551,8 @@ describe("PostService", () => {
 				expect(result).toMatchObject({
 					authRequired: true,
 					edgeToken: "new-edge-token",
-					code: "123456",
 				});
+				expect(result).not.toHaveProperty("code");
 				expect(AuthService.issueEdgeToken).toHaveBeenCalledWith("ip-hash-xyz");
 				expect(AuthService.issueAuthCode).toHaveBeenCalledWith(
 					"ip-hash-xyz",
@@ -571,7 +570,6 @@ describe("PostService", () => {
 					userId: "user-new",
 				});
 				vi.mocked(AuthService.issueAuthCode).mockResolvedValue({
-					code: "654321",
 					expiresAt: new Date(),
 				});
 
@@ -586,14 +584,13 @@ describe("PostService", () => {
 				expect(result).toMatchObject({ authRequired: true });
 			});
 
-			it("edge-token が not_verified の場合は既存 edge-token を維持して認証コードを再発行する（G1 是正）", async () => {
-				// See: features/authentication.feature @edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
+			it("edge-token が not_verified の場合は既存 edge-token を維持して認証レコードを再発行する（G1 是正）", async () => {
+				// See: features/authentication.feature @edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
 				vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
 					valid: false,
 					reason: "not_verified",
 				});
 				vi.mocked(AuthService.issueAuthCode).mockResolvedValue({
-					code: "999888",
 					expiresAt: new Date(),
 				});
 
@@ -609,11 +606,11 @@ describe("PostService", () => {
 				expect(result).toMatchObject({
 					authRequired: true,
 					edgeToken: "existing-unverified-token",
-					code: "999888",
 				});
+				expect(result).not.toHaveProperty("code");
 				// 新規 edge-token は発行されない（既存を維持）
 				expect(AuthService.issueEdgeToken).not.toHaveBeenCalled();
-				// 既存 edge-token に紐づく認証コードを再発行
+				// 既存 edge-token に紐づく認証レコードを再発行
 				expect(AuthService.issueAuthCode).toHaveBeenCalledWith(
 					"ip-hash-xyz",
 					"existing-unverified-token",
@@ -1658,13 +1655,12 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("未認証: edge-token がない場合に認証フローを起動する", () => {
-			it("authRequired 情報を返す", async () => {
+			it("authRequired 情報を返す（code は廃止）", async () => {
 				vi.mocked(AuthService.issueEdgeToken).mockResolvedValue({
 					token: "new-token",
 					userId: "user-new",
 				});
 				vi.mocked(AuthService.issueAuthCode).mockResolvedValue({
-					code: "111111",
 					expiresAt: new Date(),
 				});
 
@@ -1681,7 +1677,7 @@ describe("PostService", () => {
 				expect(result.success).toBe(false);
 				expect(result.authRequired).toBeDefined();
 				expect(result.authRequired?.edgeToken).toBe("new-token");
-				expect(result.authRequired?.code).toBe("111111");
+				expect(result.authRequired).not.toHaveProperty("code");
 				expect(ThreadRepository.create).not.toHaveBeenCalled();
 			});
 		});

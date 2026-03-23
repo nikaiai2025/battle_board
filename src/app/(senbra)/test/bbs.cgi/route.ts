@@ -461,7 +461,6 @@ async function handleCreateThread(
 	if (result.authRequired) {
 		// 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
 		const authHtml = responseBuilder.buildAuthRequired(
-			result.authRequired.code,
 			result.authRequired.edgeToken,
 			getBaseUrl(),
 		);
@@ -545,7 +544,6 @@ async function handleCreatePost(
 	if ("authRequired" in result) {
 		// 認証が必要な場合: 認証案内HTMLを返す（絶対URLで生成する）
 		const authHtml = responseBuilder.buildAuthRequired(
-			result.code,
 			result.edgeToken,
 			getBaseUrl(),
 		);

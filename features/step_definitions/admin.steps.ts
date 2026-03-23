@@ -1248,51 +1248,48 @@ When(
 );
 
 // ---------------------------------------------------------------------------
-// When: そのIPから認証コード発行を試みる
+// When: そのIPから認証を試みる
 // See: features/admin.feature @BANされたIPからの新規登録が拒否される
 // ---------------------------------------------------------------------------
 
 /**
- * BAN済みIPから認証コード発行（新規登録）を試みる。
+ * BAN済みIPから認証（edge-token発行）を試みる。
  * AuthService.issueEdgeToken を呼び出してIP BANチェックを検証する。
  *
  * See: features/admin.feature @BANされたIPからの新規登録が拒否される
  */
-When(
-	"そのIPから認証コード発行を試みる",
-	async function (this: BattleBoardWorld) {
-		const namedUser = this.getNamedUser("UserA");
-		assert(namedUser, "ユーザー UserA が存在しません");
+When("そのIPから認証を試みる", async function (this: BattleBoardWorld) {
+	const namedUser = this.getNamedUser("UserA");
+	assert(namedUser, "ユーザー UserA が存在しません");
 
-		const AuthService = getAuthService();
-		try {
-			// BAN済みIPで新規ユーザー作成（edge-token発行）を試みる
-			await AuthService.issueEdgeToken(namedUser.ipHash);
-			// 成功した場合はエラーが出ないはずなので不正な結果として記録
-			this.lastResult = { type: "success", data: {} };
-		} catch (err) {
-			const message = err instanceof Error ? err.message : "不明なエラー";
-			this.lastResult = {
-				type: "error",
-				message,
-				code: message.startsWith("IP_BANNED") ? "IP_BANNED" : "UNKNOWN",
-			};
-		}
-	},
-);
+	const AuthService = getAuthService();
+	try {
+		// BAN済みIPで新規ユーザー作成（edge-token発行）を試みる
+		await AuthService.issueEdgeToken(namedUser.ipHash);
+		// 成功した場合はエラーが出ないはずなので不正な結果として記録
+		this.lastResult = { type: "success", data: {} };
+	} catch (err) {
+		const message = err instanceof Error ? err.message : "不明なエラー";
+		this.lastResult = {
+			type: "error",
+			message,
+			code: message.startsWith("IP_BANNED") ? "IP_BANNED" : "UNKNOWN",
+		};
+	}
+});
 
 // ---------------------------------------------------------------------------
-// Then: 認証コードは発行されない
+// Then: 認証は拒否される
 // See: features/admin.feature @BANされたIPからの新規登録が拒否される
 // ---------------------------------------------------------------------------
 
 /**
- * 認証コードが発行されなかったことを確認する。
+ * 認証が拒否されたことを確認する。
  * lastResult が error（IP_BANNED）であることを確認する。
  *
  * See: features/admin.feature @BANされたIPからの新規登録が拒否される
  */
-Then("認証コードは発行されない", function (this: BattleBoardWorld) {
+Then("認証は拒否される", function (this: BattleBoardWorld) {
 	assert(this.lastResult, "操作結果が存在しません");
 	assert.strictEqual(
 		this.lastResult.type,
