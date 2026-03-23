@@ -323,8 +323,8 @@ test.describe("認証ページ /auth/verify", () => {
 		});
 
 		// Turnstile ウィジェットの存在確認（Sprint-110: 認証コード入力は廃止済み）
-		// See: src/app/(web)/auth/verify/page.tsx > #cf-turnstile
-		await expect(page.locator("#cf-turnstile")).toBeVisible({
+		// See: src/app/(web)/auth/verify/page.tsx > #turnstile-widget
+		await expect(page.locator("#turnstile-widget")).toBeVisible({
 			timeout: 15_000,
 		});
 
