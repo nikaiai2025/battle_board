@@ -107,8 +107,8 @@ Feature: 管理者機能
 
   Scenario: BANされたIPからの新規登録が拒否される
     Given ユーザー "UserA" のIPがBANされている
-    When そのIPから認証コード発行を試みる
-    Then 認証コードは発行されない
+    When そのIPから認証を試みる
+    Then 認証は拒否される
 
   Scenario: 管理者がIP BANを解除する
     Given ユーザー "UserA" のIPがBANされている

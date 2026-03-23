@@ -6,7 +6,7 @@
 entity: User
 description: >
   ユーザーの認証状態とアカウント種別の遷移を定義する。
-  一般ユーザーはedge-token + 認証コードで認証し、
+  一般ユーザーはedge-token + Turnstile で認証し、
   管理者はメール+パスワードで認証する。
 
 # =============================================
@@ -18,9 +18,9 @@ auth_states:
     description: edge-token を持たない、または期限切れの状態
     initial: true
 
-  - name: code_issued
-    label: 認証コード発行済み
-    description: 認証コードと edge-token が発行されたが、まだ認証コード未入力の状態
+  - name: token_issued
+    label: edge-token発行済み
+    description: edge-token が発行されたが、まだ Turnstile 認証を完了していない状態
 
   - name: authenticated
     label: 認証済み
@@ -28,32 +28,29 @@ auth_states:
 
 auth_transitions:
   - from: unauthenticated
-    to: code_issued
+    to: token_issued
     trigger: 書き込みリクエスト送信
     action:
-      - 6桁認証コードを発行
       - edge-token Cookie を発行（未有効化）
-      - 認証コード入力ページへ案内
-    feature_ref: authentication.feature#未認証ユーザーが書き込みを行うと認証コードが案内される
+      - 認証ページへ案内
+    feature_ref: authentication.feature#未認証ユーザーが書き込みを行うと認証ページが案内される
 
-  - from: code_issued
+  - from: token_issued
     to: authenticated
-    trigger: 正しい認証コード + Turnstile検証成功
+    trigger: Turnstile検証成功
     guard:
-      - 認証コードが有効期限内
       - Turnstile検証に成功
-      - IP整合性チェックに成功
     action:
       - edge-token を有効化
       - users レコードを作成（初回の場合）
       - author_id_seed を生成（IPベース）
-    feature_ref: authentication.feature#正しい認証コードとTurnstileで認証に成功する
+    feature_ref: authentication.feature#Turnstile通過で認証に成功する
 
-  - from: code_issued
+  - from: token_issued
     to: unauthenticated
     trigger: 認証失敗
     guard:
-      - Turnstile検証失敗 OR 認証コード期限切れ
+      - Turnstile検証失敗
     action:
       - エラーメッセージ表示
       - edge-token は有効化されない

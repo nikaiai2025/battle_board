@@ -1,68 +1,115 @@
-# 本番DBデータリセット
+# 本番DBコンテンツリセット
+
+> **本手順は必ず人間の監督下で実施すること。** AIが単独で実行してはならない。
 
 ## 概要
 
-リモート Supabase DB の全テーブルのデータを削除する。テーブル構造・RLS・関数は保持される。
+リモート Supabase DB のコンテンツデータ（スレッド・投稿・ゲーム活動）を全削除する。ユーザーとシードデータは保全される。テーブル構造・RLS・関数・マイグレーション履歴は保持される。
 
-## 用途
+用途: リリース前の開発テストデータ全削除
 
-- リリース前のテストデータ全削除
-- E2Eテスト前の本番DB初期化
+## 方針
 
-## 方法1: CLIスクリプト（推奨）
+- **ユーザー保全**: users / edge_tokens / currencies / admin_users は TRUNCATE しない
+- **シード保全**: ボット・固定スレッドは退避→状態リセット→復元
+- **テーブルリスト明示**: SQLスクリプトに対象テーブルを明記し、実行前に網羅性を確認する
 
-```bash
-SUPABASE_URL="https://{ref}.supabase.co" \
-SUPABASE_SERVICE_ROLE_KEY="ey..." \
-node scripts/reset-remote-db.mjs
+### テーブル分類
+
+| 分類 | 処理 | テーブル |
+|---|---|---|
+| TRUNCATE対象 | 全行削除 | threads, posts, bots, bot_posts, accusations, attacks, grass_reactions, incentive_logs, daily_events, daily_stats, pending_tutorials, pending_async_commands, auth_codes, ip_bans |
+| 保全（ユーザー） | 変更なし（キャッシュカラムのみリセット） | users, edge_tokens, currencies, admin_users |
+| 保全（シード） | 退避→TRUNCATE→復元 | bots, threads の一部（固定スレッド）, posts の一部（固定スレッド1レス目） |
+| 対象外 | リセットしない | dev_posts（開発連絡板。本番システムと独立） |
+
+### 既知の副作用: ウェルカムシーケンス再発動
+
+ユーザーを保全しつつ posts を削除すると、初回書き込み検出（`PostRepository.countByAuthorId === 0`）が全ユーザーで再び真になる。既存ユーザーがリセット後に書き込むと以下が発生する:
+
+- +50 初回書き込みボーナス再付与
+- 「Welcome to Underground...」システムメッセージ再表示
+- チュートリアルBOTスポーンのキューイング
+
+**リリース前のテスターのみの環境では許容可能。** 一般ユーザーが存在する環境でこの副作用が許容できない場合は、コンテンツリセット後にユーザーも全削除する:
+
+```sql
+TRUNCATE TABLE users, edge_tokens, currencies, admin_users RESTART IDENTITY CASCADE;
 ```
 
-または `.env.production.local` に接続情報を記載しておけば引数不要:
+この場合、全ユーザーの再登録と管理者アカウントの再作成（`create-admin-account.md`）が必要になる。
 
-```bash
-node scripts/reset-remote-db.mjs
+## 事前確認（AIが実施）
+
+### Step 1: 全テーブル一覧を取得
+
+```sql
+SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
 ```
 
-### 接続情報の取得方法
+### Step 2: スクリプトとの突合
+
+`supabase/snippets/reset_all_data.sql` 内の以下3リストと Step 1 の結果を突合する:
+
+- Phase 2: TRUNCATE 対象
+- ヘッダコメント: 保全対象 / 対象外
+
+全テーブルがいずれかに分類されていることを確認する。どこにも載っていないテーブルがある場合:
+
+| 判断項目 | YES の場合の対応 |
+|---|---|
+| ユーザー操作で行が生成されるか？ | TRUNCATE リストに追加 |
+| マイグレーションでシードされるデータがあるか？ | Phase 1 の退避対象に追加 |
+| 他テーブルへの FK を持つか？ | 退避テーブルから INSERT する際の順序を確認 |
+
+### Step 3: スクリプト更新
+
+差分があった場合、SQLスクリプトを更新してコミットする。
+
+### Step 4: 人間に確認結果を報告し、実行の承認を得る
+
+## 実行（人間が実施または承認の上でAIが実施）
+
+### 方法A: Supabase SQL Editor
+
+`supabase/snippets/reset_all_data.sql` の内容を Supabase Dashboard > SQL Editor にペーストして実行する。
+
+### 方法B: CLI
 
 ```bash
-# プロジェクトref確認
-npx supabase projects list
-
-# URL: https://{ref}.supabase.co
-
-# Service Role Key 取得
-npx supabase projects api-keys --project-ref {ref}
+npx supabase db query -f supabase/snippets/reset_all_data.sql --linked
 ```
 
-### 安全策
+## リセット後の作業（人間が実施）
 
-- `SUPABASE_URL` が localhost を指している場合は実行拒否される（ローカルは `npx supabase db reset` を使う）
-- 削除は外部キー依存順（子→親）で実行される
-- 削除後に全10テーブルが空であることを自動検証する
+リセット直後は固定スレッド（案内板）のみが存在する状態になる。
 
-## 方法2: ダッシュボード SQL Editor
+### 1. 固定スレッドの案内テキストを最新化
 
-`supabase/snippets/reset_all_data.sql` の内容を Supabase ダッシュボード > SQL Editor にペーストして実行する。
+リセットで復元される固定スレッドは DB に保存されていた内容そのままであり、board_id やコマンド一覧が古い可能性がある。以下を実行して最新状態に上書きする:
 
-## 対象テーブル
+```bash
+# GitHub Actions から実行する場合
+# Actions > Seed Pinned Thread > Run workflow
 
-削除順（外部キー依存順）:
+# CLI から実行する場合（要: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY）
+npx tsx scripts/upsert-pinned-thread.ts
+```
 
-1. bot_posts
-2. accusations
-3. incentive_logs
-4. posts
-5. currencies
-6. bots
-7. threads
-8. auth_codes
-9. admin_users
-10. users
+### 2. 動作確認
+
+ボットは既存の非固定スレッドに書き込む設計のため、スレッドがないと自動投稿が開始されない。
+
+1. **テストスレッドを作成する** — ブラウザまたは専ブラから新規スレッドを1つ立てる
+2. **ユーザー書き込みの動作確認** — 作成したスレッドにレスを投稿できることを確認する
+3. **ボット自動投稿の動作確認** — 次回の cron 実行後、ボットがスレッドに書き込んでいることを確認する
 
 ## 関連ファイル
 
 | ファイル | 説明 |
 |---|---|
-| `scripts/reset-remote-db.mjs` | CLI実行用スクリプト |
-| `supabase/snippets/reset_all_data.sql` | ダッシュボード用SQL |
+| `supabase/snippets/reset_all_data.sql` | リセット用SQL（正本） |
+| `scripts/upsert-pinned-thread.ts` | 固定スレッドの案内テキスト最新化（リセット後に実行） |
+| `docs/operations/runbooks/create-admin-account.md` | 管理者アカウント作成（ユーザー全削除時に必要） |
+
+> **廃止**: `scripts/reset-remote-db.mjs`（旧CLIスクリプト）はテーブル不足・シード保全なしのため使用禁止。

@@ -1,0 +1,47 @@
+# D-06 画面要素定義書: 書き込み認証
+# ステータス: 運用中
+# 作成日: 2026-03-07
+# 対象: Phase 1
+
+screen_id: SCR-004
+name: 書き込み認証
+route: /auth/verify
+description: >
+  未認証ユーザーが書き込みを試みた際にリダイレクトされる認証画面。
+  Cloudflare Turnstile CAPTCHA のみで認証を行う。
+
+api_dependencies:
+  - POST /api/auth/verify (verifyAuth)
+
+# =============================================
+# 画面要素
+# =============================================
+elements:
+  - id: auth-header
+    type: heading
+    content: 書き込み認証
+
+  - id: auth-description
+    type: text
+    content: >
+      書き込みするには認証が必要です。
+      以下のボタンを押して認証を完了してください。
+
+  - id: auth-form
+    type: form
+    fields:
+      - id: turnstile-widget
+        type: component
+        description: Cloudflare Turnstile CAPTCHA ウィジェット
+        note: 自動的にチャレンジが実行される
+
+      - id: auth-submit-btn
+        type: button
+        label: 認証する
+        action: POST /api/auth/verify
+
+  - id: auth-error
+    type: text
+    condition: 認証失敗時
+    style: error
+    content: 認証に失敗しました。もう一度お試しください。

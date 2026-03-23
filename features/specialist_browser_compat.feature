@@ -118,7 +118,7 @@ Feature: 5ch専用ブラウザ互換性
   Scenario: 専ブラからの初回書き込みで認証案内が返される
     Given ユーザーが専ブラで未認証である
     When bbs.cgiに書き込みをPOSTする
-    Then レスポンスに認証コードと認証ページURLが含まれる
+    Then レスポンスに認証ページURLが含まれる
     And edge-token Cookieが発行される
 
   Scenario: 認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する

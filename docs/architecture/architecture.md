@@ -81,7 +81,7 @@
 | **Vercel**（サブ） | フロントエンド配信、API実行（Serverless Functions）、CDN、BOT cron受付 | 冗長性確保 + BOT定期実行の負荷分散先（TDR-010）。Cloudflare障害時のフォールバック |
 | **Supabase PostgreSQL** | データ永続化（スレッド・レス・ユーザー・通貨・ボット等） | RLS でアクセス制御 |
 | **Supabase Auth** | 管理者認証（メール+パスワード） | 一般ユーザー認証には使わない |
-| **Cloudflare Turnstile** | 一般ユーザーの CAPTCHA 検証 | `/auth-code` 認証コード有効化時のみ |
+| **Cloudflare Turnstile** | 一般ユーザーの CAPTCHA 検証 | `/auth/verify` 認証時のみ |
 | **Cloudflare Cron Triggers** | 高頻度BOTの定期実行（5分間隔） | Workers の scheduled イベント。短時間完了BOTを担当（TDR-013） |
 | **GitHub Actions** | AI API使用BOTの定期実行、期限切れデータ掃除 | cron スケジュール。長時間実行ジョブを担当（TDR-013） |
 | **AI API** | 運営ボットの書き込み文章生成 | GitHub Actions から呼び出し。AiApiClient を通じて Google Gemini / OpenAI / Anthropic を使い分け（v6） |
@@ -210,7 +210,7 @@ npx supabase db push
 | **BotService** | ボット管理・偽装ID生成・HP管理・撃破処理・戦歴生成 | bot_system |
 | **CurrencyService** | 通貨残高の増減・マイナス制約・二重消費防止 | currency |
 | **IncentiveService** | 8種のボーナスイベント判定・付与 | incentive |
-| **AuthService** | 認証コード発行/検証・edge-token管理・日次リセットID生成 | authentication |
+| **AuthService** | Turnstile認証・edge-token管理・日次リセットID生成 | authentication |
 | **AdminService** | レス削除・スレッド削除・管理者認証 | admin |
 
 #### Domain Layer（ドメイン層）
@@ -392,13 +392,12 @@ RLS: service role   │   attacks    │
                     │  auth_codes  │     ┌──────────────┐
                     ├──────────────┤     │  admin_      │
                     │ id (PK)      │     │  users       │
-                    │ code         │     ├──────────────┤
-                    │ token_id     │     │ id (PK)      │
-                    │ ip_hash      │     │ email        │
-                    │ verified     │     │ role         │
-                    │ expires_at   │     │ created_at   │
-                    │ write_token  │     └──────────────┘
-                    │ write_token_ │
+                    │ token_id     │     ├──────────────┤
+                    │ ip_hash      │     │ id (PK)      │
+                    │ verified     │     │ email        │
+                    │ expires_at   │     │ role         │
+                    │ write_token  │     │ created_at   │
+                    │ write_token_ │     └──────────────┘
                     │   expires_at │
                     │ created_at   │
                     └──────────────┘
@@ -464,7 +463,7 @@ RLS: service role   │   attacks    │
 | id | UUID (PK) | 内部識別子 |
 | auth_token | VARCHAR | 現在有効な edge-token |
 | author_id_seed | VARCHAR | IP由来の seed（日次リセットID生成に使用） |
-| is_verified | BOOLEAN DEFAULT false | edge-token の認証完了状態。`verifyAuthCode` または `verifyWriteToken` 成功時に `true` に更新される（G1対応） |
+| is_verified | BOOLEAN DEFAULT false | edge-token の認証完了状態。`verifyAuth` または `verifyWriteToken` 成功時に `true` に更新される（G1対応） |
 | is_premium | BOOLEAN | 有料ユーザーフラグ |
 | username | VARCHAR(20), NULLABLE | ユーザーネーム（有料ユーザーのみ設定可） |
 | streak_days | INTEGER | 連続書き込み日数 |
@@ -553,12 +552,11 @@ RLS: service role   │   attacks    │
 | カラム | 型 | 説明 |
 |---|---|---|
 | id | UUID (PK) | 内部識別子 |
-| code | VARCHAR(6) | 6桁認証コード |
 | token_id | VARCHAR | 対応する edge-token の識別子 |
-| ip_hash | VARCHAR | 発行時の IPハッシュ（検証用） |
-| verified | BOOLEAN | 認証済みフラグ |
+| ip_hash | VARCHAR | 発行時の IPハッシュ |
+| verified | BOOLEAN | Turnstile認証済みフラグ |
 | expires_at | TIMESTAMPTZ | 有効期限 |
-| write_token | TEXT, NULLABLE | 専ブラ向け認証橋渡しトークン（32文字 hex）。`verifyAuthCode` 成功時に生成。ワンタイム消費後 null に更新（G4対応） |
+| write_token | TEXT, NULLABLE | 専ブラ向け認証橋渡しトークン（32文字 hex）。`verifyAuth` 成功時に生成。ワンタイム消費後 null に更新（G4対応） |
 | write_token_expires_at | TIMESTAMPTZ, NULLABLE | write_token の有効期限（認証完了から10分） |
 | created_at | TIMESTAMPTZ | 発行日時 |
 
@@ -586,17 +584,17 @@ RLS: service role   │   attacks    │
 │        │   または is_verified=   │  → 未認証応答  │
 │        │   false)               │  → edge-token │
 │        │◄─────────────────────│    Cookie発行  │
-│        │  ②認証コード案内       │  (is_verified │
+│        │  ②認証案内             │  (is_verified │
 │        │    + edge-token発行   │   =false)      │
 │        │                       └───────────────┘
 │        │
-│        │  ③6桁コード + Turnstile応答
+│        │  ③Turnstile応答
 │        │──────────────────────►┌───────────────┐
 │        │                       │  AuthService  │
-│        │◄─────────────────────│  → コード検証  │
-│        │  ④is_verified=true    │  → IP整合検証  │
-│        │    + write_token発行  │  → Turnstile  │
-│        │                       │    API検証     │
+│        │◄─────────────────────│  → Turnstile  │
+│        │  ④is_verified=true    │    API検証     │
+│        │    + write_token発行  │               │
+│        │                       │               │
 │        │  ⑤書き込みPOST        └───────────────┘
 │        │──────────────────────►┌───────────────┐
 │        │  (is_verified=true    │  PostService  │
@@ -607,10 +605,8 @@ RLS: service role   │   attacks    │
 
 - **edge-token**: Cookie に保持。書き込みAPI呼び出し時に検証
 - **is_verified フラグ**: edge-token に紐づく認証完了状態。`false` の場合は書き込みを拒否して認証案内を再表示する（G1対応）
-- **認証コード**: 6桁数字。有効期限あり（10分）
-- **Turnstile**: `/auth/verify` での認証コード有効化時にのみ検証（毎回の書き込み時には不要）
+- **Turnstile**: `/auth/verify` での認証時にのみ検証（毎回の書き込み時には不要）
 - **write_token**: 認証完了時に発行される専ブラ向け認証橋渡しトークン（32文字 hex、10分有効、ワンタイム）。Cookie を共有できない専ブラが mail 欄に `#<write_token>` 形式で使用する（G4対応）
-- **IP整合**: 認証コード発行時のIPとedge-token使用時のIPの整合性を検証（ソフトチェック）
 
 ### 5.2 日次リセットID生成
 
@@ -689,7 +685,7 @@ app/
 
 ### 6.3 認証連携（専ブラ）
 
-専ブラからの書き込み（bbs.cgi POST）では、edge-token を Cookie として受け取り、一般ユーザーと同一の認証フローで検証する。初回書き込み時は HTML レスポンスで認証コード入力を案内する。
+専ブラからの書き込み（bbs.cgi POST）では、edge-token を Cookie として受け取り、一般ユーザーと同一の認証フローで検証する。初回書き込み時は HTML レスポンスで認証ページURLを案内する。
 
 ---
 
@@ -764,7 +760,7 @@ COMMIT
 | **BOTマーク解除** | bots | is_revealed = false、revealed_at = NULL |
 | **ボット生存日数加算** | bots (is_active=true) | survival_days を +1 |
 | **攻撃記録クリーンアップ** | attacks | 前日以前の攻撃記録を DELETE（1日1回制限のリセット） |
-| **期限切れ認証コード削除** | auth_codes | expires_at < NOW() のレコードを DELETE |
+| **期限切れ認証レコード削除** | auth_codes | expires_at < NOW() のレコードを DELETE |
 
 ---
 
@@ -791,7 +787,7 @@ src/
         route.ts                    # POST: スレッド作成, GET: 一覧
       auth/
         auth-code/
-          route.ts                  # POST: 認証コード検証
+          route.ts                  # POST: Turnstile認証
       admin/
         posts/[postId]/
           route.ts                  # DELETE: レス削除
@@ -904,7 +900,7 @@ supabase/
 
 | 領域 | 方式 |
 |---|---|
-| 一般ユーザー書き込み | edge-token Cookie + 認証コード + Turnstile |
+| 一般ユーザー書き込み | edge-token Cookie + Turnstile |
 | 管理者 | Supabase Auth（メール+パスワード）+ admin_session Cookie |
 | ボット（GitHub Actions） | サービスアカウント API キー |
 | RLS | Supabase PostgreSQL の Row Level Security で DB レベルのアクセス制御 |
@@ -918,7 +914,7 @@ supabase/
 | **bot_posts** | DENY ALL | FULL ACCESS | ボット正体の唯一の記録。漏洩するとゲーム崩壊 |
 | **bots** | DENY ALL | FULL ACCESS | ボットの内部管理情報（HP、ペルソナ等） |
 | **attacks** | DENY ALL | FULL ACCESS | 攻撃記録の保護 |
-| **auth_codes** | DENY ALL | FULL ACCESS | 認証コードの漏洩防止 |
+| **auth_codes** | DENY ALL | FULL ACCESS | 認証レコードの保護 |
 | **admin_users** | DENY ALL | FULL ACCESS | 管理者情報の保護 |
 | threads | SELECT (is_deleted=false) | FULL ACCESS | 削除済みスレッドは非表示 |
 | posts | SELECT (所属スレッドが非削除) | FULL ACCESS | 閲覧は全員可能 |
@@ -936,7 +932,7 @@ supabase/
 | スレッドタイトル | 空チェック、最大文字数チェック（96文字） |
 | 書き込み本文 | 空チェック、最大文字数チェック |
 | コマンド引数 | 存在するレス番号か、対象が自分自身でないか等 |
-| 認証コード | 6桁数字、有効期限、IP整合 |
+| Turnstileトークン | Cloudflare API による検証 |
 | 管理者入力 | Supabase Auth による検証 |
 
 ### 10.3 XSS/インジェクション対策
@@ -1019,7 +1015,7 @@ supabase/
 | bot-scheduler | 毎時 :00, :30（`0,30 * * * *`） | AI API使用BOTの書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
 | newspaper-scheduler | 毎時 :05, :35（`5,35 * * * *`） | !newspaper pending の非同期処理（AI API使用） |
 | daily-maintenance | 毎日 JST 0:00 | 日次リセットID・BOTマークリセット・生存日数加算 |
-| cleanup | 毎日 JST 3:00（初期値） | 期限切れ認証コード削除・不要データ掃除 |
+| cleanup | 毎日 JST 3:00（初期値） | 期限切れ認証レコード削除・不要データ掃除 |
 
 #### 非同期処理の実行トポロジ
 
@@ -1043,11 +1039,11 @@ supabase/
 
 ## 13. 技術的意思決定記録（TDR）
 
-### TDR-001: 一般ユーザー認証に edge-token + 認証コード方式を採用
+### TDR-001: 一般ユーザー認証に edge-token + Turnstile 方式を採用
 
-- **決定日**: 2026-03-04
-- **詳細**: `docs/requirements/decision_log/decision_log_auth_architecture_2026-03-04.md`
-- **理由**: メール登録不要で匿名掲示板の敷居の低さを維持しつつ、荒らし対策の最低限の認証を実現するため
+- **決定日**: 2026-03-04（初版）、2026-03-24（6桁コード廃止）
+- **詳細**: `docs/requirements/decision_log/decision_log_auth_architecture_2026-03-04.md`、`tmp/auth_simplification_analysis.md`
+- **理由**: メール登録不要で匿名掲示板の敷居の低さを維持しつつ、荒らし対策の最低限の認証を実現するため。当初は6桁認証コード+Turnstileの2段階だったが、コードが画面表示→同画面入力で知識認証として機能しないため、Turnstileのみに簡素化
 
 ### TDR-002: 専ブラ互換APIはファイルシステムではなく動的ルーティングで実現
 
@@ -1086,7 +1082,7 @@ supabase/
 - **調査**: 他の匿名掲示板（eddist等）の先行事例を調査し、同一方式を採用
 - **決定**: 認証完了時に write_token（32文字 hex）を発行し、専ブラの mail 欄に `#<write_token>` 形式で貼り付けて使用する方式を採用する
 - **実装方針**:
-  - `verifyAuthCode` 成功時に `crypto.randomBytes(16).toString('hex')` で生成し `auth_codes` テーブルに保存
+  - `verifyAuth` 成功時に `crypto.randomBytes(16).toString('hex')` で生成し `auth_codes` テーブルに保存
   - 有効期限10分、ワンタイム消費（使用後 null に更新）
   - bbs.cgi ルートが mail 欄から `#xxx` パターンを検出して `verifyWriteToken` を呼び出し、DAT には漏洩させない
   - Cookie 共有の専ブラ（認証後そのまま書き込める場合）では write_token 不要

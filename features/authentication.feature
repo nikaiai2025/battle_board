@@ -2,41 +2,34 @@
 # ステータス: 承認済み v4
 Feature: 書き込み認証・管理者認証と日次リセットID
 
-  無料ユーザーとして、メール登録なしで認証コードを使って書き込みたい。
+  無料ユーザーとして、メール登録なしでTurnstile認証を使って書き込みたい。
   書き込み時は edge-token により認証状態を保持し、同日中は同一IDで識別される。
   管理者はメールアドレスとパスワードでログインしたい。
-  # US-001: 書き込み認証（認証コード + edge-token）
+  # US-001: 書き込み認証（Turnstile + edge-token）
   # US-002: 日次リセットID（IP依存度: 強め）
   # US-003: 管理者ログイン（メール + パスワード）
   # ===========================================
-  # 書き込み認証（認証コード + edge-token）
+  # 書き込み認証（Turnstile + edge-token）
   # ===========================================
 
-  Scenario: 未認証ユーザーが書き込みを行うと認証コードが案内される
+  Scenario: 未認証ユーザーが書き込みを行うと認証ページが案内される
     Given 未認証のユーザーが書き込みフォームから書き込みを送信する
     When サーバーが書き込みリクエストを処理する
-    Then 認証コード入力ページへの案内が表示される
-    And 6桁の認証コードが発行される
+    Then 認証ページへの案内が表示される
     And edge-token Cookie が発行される
 
-  Scenario: 正しい認証コードとTurnstileで認証に成功する
-    Given ユーザーが有効な6桁認証コードを持っている
+  Scenario: Turnstile通過で認証に成功する
+    Given ユーザーが未認証のedge-tokenを持っている
     And ユーザーがTurnstile検証を通過している
-    When ユーザーが /auth/verify で認証コードを送信する
+    When ユーザーが /auth/verify でTurnstile認証を完了する
     Then edge-token が有効化される
     And write_tokenが発行される
     And 書き込み可能状態になる
 
   Scenario: Turnstile検証に失敗すると認証に失敗する
-    Given ユーザーが有効な6桁認証コードを持っている
+    Given ユーザーが未認証のedge-tokenを持っている
     And ユーザーがTurnstile検証に失敗している
-    When ユーザーが /auth/verify で認証コードを送信する
-    Then 認証エラーメッセージが表示される
-    And edge-token は有効化されない
-
-  Scenario: 期限切れ認証コードでは認証できない
-    Given ユーザーが有効期限切れの6桁認証コードを持っている
-    When ユーザーが /auth/verify で認証コードを送信する
+    When ユーザーが /auth/verify でTurnstile認証を試みる
     Then 認証エラーメッセージが表示される
     And edge-token は有効化されない
 
@@ -44,10 +37,10 @@ Feature: 書き込み認証・管理者認証と日次リセットID
   # 認証バイパス防止（G1対応）
   # ===========================================
 
-  Scenario: edge-token発行後、認証コード未入力で再書き込みすると認証が再要求される
-    Given ユーザーがedge-tokenを発行されているが認証コードを未入力である
+  Scenario: edge-token発行後、Turnstile未通過で再書き込みすると認証が再要求される
+    Given ユーザーがedge-tokenを発行されているがTurnstile認証を完了していない
     When ユーザーが書き込みを送信する
-    Then 認証コード入力ページへの案内が再度表示される
+    Then 認証ページへの案内が再度表示される
     And 書き込みは処理されない
 
   # ===========================================
@@ -66,7 +59,7 @@ Feature: 書き込み認証・管理者認証と日次リセットID
   Scenario: edge-token Cookieの有効期限が切れると再認証が必要になる
     Given ユーザーが書き込み可能状態である
     When edge-token Cookieの有効期限が切れた後に書き込みを行う
-    Then 認証コード入力ページへの案内が表示される
+    Then 認証ページへの案内が表示される
     And 新しいedge-tokenが発行される
   # ===========================================
   # 日次リセットID（IP依存度: 強め）
@@ -85,7 +78,7 @@ Feature: 書き込み認証・管理者認証と日次リセットID
   Scenario: Cookie削除後に再認証しても同日・同一回線では同じIDになる
     Given ユーザーが同日中に同一回線から書き込みを行っている
     And ユーザーが edge-token Cookie を削除する
-    And ユーザーが認証コードで再認証する
+    And ユーザーがTurnstileで再認証する
     When 同じスレッドに再度書き込む
     Then 再認証前と同一の日次リセットIDが表示される
 

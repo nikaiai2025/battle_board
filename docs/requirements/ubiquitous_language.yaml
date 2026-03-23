@@ -15,11 +15,11 @@
 #   2026-03-08: v2要件・認証決定ログ・BDDシナリオ(features/*.feature)との整合を反映
 #     - AI告発: 全公開方式に更新、冤罪ボーナスを追記
 #     - 通貨: 獲得手段を incentive.feature v4 に準拠（書き込み報酬なし、譲渡スコープ外）
-#     - 認証: edge-token + 認証コード方式に更新（メール登録不要）
+#     - 認証: edge-token + Turnstile 方式に更新（メール登録不要）
 #     - ボット撃破: 告発→BOTマーク→攻撃→撃破のv2フローに更新
 #     - 議論投票 → AI審判（!battle）に変更
 #     - デバフ呪文 → v2コマンド体系（!mute, !delete等）に変更
-#     - 新規用語追加: BOTマーク、冤罪ボーナス、システムメッセージ、認証コード、
+#     - 新規用語追加: BOTマーク、冤罪ボーナス、システムメッセージ、
 #       edge-token、ペルソナ、ステルス系コマンド
 
 ubiquitous_language:
@@ -153,24 +153,11 @@ ubiquitous_language:
       - ユーザーID
     notes: "5chの「ID」表示に相当。ただしリセット間隔は固定で1日"
 
-  - term: 認証コード
-    english: auth_code
-    definition: >
-      一般ユーザーが書き込み前に入力する6桁の数字コード。
-      未認証の状態で書き込みを試みると発行され、認証コード入力ページで
-      このコードとCloudflare Turnstile（CAPTCHA）を通過することで
-      edge-tokenが有効化され、書き込みが可能になる。
-      メール送信ではなく画面に表示される方式（ボット防止が目的）。
-    forbidden_alias:
-      - ワンタイムパスワード
-      - 確認コード
-    notes: "有効期限あり。認証決定ログ(2026-03-04)で確定"
-
   - term: edge-token
     english: edge_token
     definition: >
       一般ユーザーの書き込み認証に使用されるCookieベースのトークン。
-      認証コード検証成功後に有効化される。書き込みAPI呼び出し時に
+      Turnstile検証成功後に有効化される。書き込みAPI呼び出し時に
       Cookie経由で自動送信され、認証状態を保持する。
     forbidden_alias:
       - セッショントークン
@@ -180,7 +167,7 @@ ubiquitous_language:
   - term: 無料ユーザー
     english: free_user
     definition: >
-      認証コード + edge-token による認証を完了したユーザー。
+      Turnstile + edge-token による認証を完了したユーザー。
       メール登録は不要。表示名は「名無しさん」固定。
       基本的なゲーム機能は利用可能。
     forbidden_alias:
@@ -202,7 +189,7 @@ ubiquitous_language:
   - term: 仮ユーザー
     english: temporary_user
     definition: >
-      edge-token + 認証コードで認証済みだが、Supabase Auth 未連携のユーザー。
+      edge-token + Turnstile で認証済みだが、Supabase Auth 未連携のユーザー。
       Cookie 喪失時にアイデンティティが失われる。課金（有料ステータス切り替え）不可。
     forbidden_alias:
       - 未登録ユーザー

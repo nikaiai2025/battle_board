@@ -203,17 +203,13 @@ components:
           minLength: 1
       required: [body]
 
-    VerifyAuthCodeRequest:
+    VerifyAuthRequest:
       type: object
       properties:
-        code:
-          type: string
-          pattern: "^[0-9]{6}$"
-          description: 6桁認証コード
         turnstileToken:
           type: string
           description: Cloudflare Turnstile の検証トークン
-      required: [code, turnstileToken]
+      required: [turnstileToken]
 
     SetUsernameRequest:
       type: object
@@ -236,16 +232,16 @@ components:
 
     # --- レスポンス ---
 
-    AuthCodeIssuedResponse:
+    AuthRequiredResponse:
       type: object
       properties:
         message:
           type: string
-          example: 認証コードを入力してください
-        authCodeUrl:
+          example: 認証が必要です
+        authUrl:
           type: string
-          example: /auth/auth-code
-      required: [message, authCodeUrl]
+          example: /auth/verify
+      required: [message, authUrl]
 
     ErrorResponse:
       type: object
@@ -282,12 +278,12 @@ paths:
   # -----------------------------------------
   # 認証
   # -----------------------------------------
-  /api/auth/auth-code:
+  /api/auth/verify:
     post:
-      operationId: verifyAuthCode
-      summary: 認証コード検証
+      operationId: verifyAuth
+      summary: Turnstile認証
       description: |
-        6桁認証コードと Turnstile トークンを検証し、edge-token を有効化する。
+        Turnstile トークンを検証し、edge-token を有効化する。
         成功時に edge-token Cookie が有効化される。
       tags: [認証]
       requestBody:
@@ -295,7 +291,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/VerifyAuthCodeRequest"
+              $ref: "#/components/schemas/VerifyAuthRequest"
       responses:
         "200":
           description: 認証成功。edge-token が有効化される
@@ -305,7 +301,7 @@ paths:
               schema:
                 type: string
         "400":
-          description: 認証失敗（コード不正/期限切れ/Turnstile失敗）
+          description: 認証失敗（Turnstile検証失敗）
           content:
             application/json:
               schema:
@@ -340,7 +336,7 @@ paths:
       summary: スレッド作成
       description: |
         新しいスレッドを作成する。1件目のレスとして本文が書き込まれる。
-        未認証の場合は 401 で認証コード案内を返す。
+        未認証の場合は 401 で認証案内を返す。
       tags: [スレッド]
       security:
         - edgeTokenCookie: []
@@ -364,14 +360,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
-          description: 未認証。認証コード案内を返す
+          description: 未認証。認証案内を返す
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthCodeIssuedResponse"
+                $ref: "#/components/schemas/AuthRequiredResponse"
           headers:
             Set-Cookie:
-              description: edge-token Cookie（未有効化）+ 認証コード
+              description: edge-token Cookie（未有効化）
               schema:
                 type: string
 
@@ -420,7 +416,7 @@ paths:
       description: |
         スレッドにレスを書き込む。
         本文中に !command を含む場合はコマンドとして解析・実行される。
-        未認証の場合は 401 で認証コード案内を返す。
+        未認証の場合は 401 で認証案内を返す。
 
         レスポンスには書き込まれたレスと、コマンド実行結果（ある場合）を含む。
       tags: [書き込み]
@@ -473,11 +469,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
-          description: 未認証。認証コード案内を返す
+          description: 未認証。認証案内を返す
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthCodeIssuedResponse"
+                $ref: "#/components/schemas/AuthRequiredResponse"
         "404":
           description: スレッドが存在しない
           content:
@@ -1492,7 +1488,7 @@ paths:
         レスポンスはHTMLで、<title>タグの内容で成否を判定:
         - 成功: 「書きこみました」
         - エラー: 「ＥＲＲＯＲ」
-        - 認証要求: 認証コード案内
+        - 認証要求: 認証案内
       tags: [専ブラ互換]
       requestBody:
         required: true

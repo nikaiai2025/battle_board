@@ -23,7 +23,7 @@ registration_states:
   - name: temporary_user
     label: 仮ユーザー
     description: >
-      edge-token + 認証コードで認証済みだが、Supabase Auth 未連携のユーザー。
+      edge-token + Turnstile で認証済みだが、Supabase Auth 未連携のユーザー。
       Cookie 喪失時にアイデンティティが失われる。課金（有料ステータス）不可。
     initial: true
     db_condition: "users.supabase_auth_id IS NULL"
@@ -205,7 +205,7 @@ edge_token_lifecycle:
     これにより本登録ユーザーが複数デバイスで同時に利用できる。
 
   creation:
-    - trigger: 初回書き込み時（認証コード発行と同時）
+    - trigger: 初回書き込み時（edge-token発行と同時）
       note: 仮ユーザー・本登録ユーザー共通
     - trigger: ログイン時（新デバイス）
       note: 本登録ユーザーのみ
