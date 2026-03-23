@@ -12,8 +12,9 @@
 - TASK-290: E2Eテストコード名称更新（4ファイル）
 - vitest 1772 PASS / cucumber-js 324 passed, 16 pending / tsc エラーなし
 - コミット: b58585e, e7a9020
-- 本番スモーク: 28/35 PASS（2件FAILはDB未移行起因。E2Eテスト修正済み）
-- **残作業:** 本番DBクリア（人間タスク）→ board_id "livebot" で新規データ開始
+- TASK-291: E2E flows配下の旧板ID修正（5ファイル）
+- コミット: b58585e, e7a9020, 65d653f
+- 本番スモーク: **30/35 PASS**（5件は設計上のスキップ）— DBリセット + E2E全修正後
 
 ### Sprint-107の成果（サイトリネーム Phase 1）
 - TASK-287: 板ID定数化リファクタリング（constants.ts + 11ファイル）
@@ -209,19 +210,15 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-108後):** 28/35 PASS（2件FAILはDB未移行起因、5件は設計上のスキップ）
-  - DB移行（board_id変更）後に再テストで解消見込み
+- **本番スモークテスト (Sprint-108後):** 30/35 PASS（5件は設計上のスキップ）
 
 ## 人間タスク（次回セッション開始時に確認）
 
 以下はAI側の開発がブロックされている人間側の準備事項。回答・完了したものからAI開発を再開できる。
 
-### HUMAN-007: 本番DBクリア + 初期データ投入（優先度: 高）
+### ~~HUMAN-007: 本番DBクリア + 初期データ投入~~ — **完了（2026-03-24）**
 
-サイトリネーム完了後、旧バグデータ蓄積のため本番DBをクリアする。
-- DBクリア後、`scripts/upsert-pinned-thread.ts` を実行して固定案内板を再生成
-- 新規データは board_id = `"livebot"` で作成される（コード変更済み）
-- DBクリア＋案内板再生成後にスモークテスト再実行で全PASS見込み
+DBリセット + 固定案内板再生成（GH Actions workflow_dispatch）完了。スモーク30/35 PASS。
 
 ※ HUMAN-005（完了）, HUMAN-001（完了）, HUMAN-002（完了）の詳細は `tmp/orchestrator/archive/sprint_past.md` を参照
 
