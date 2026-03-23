@@ -4,7 +4,23 @@
 
 ## 現在のフェーズ
 
-**Sprint-108 完了 — サイトリネーム Phase 2（BattleBoard → ボットちゃんねる）**
+**Sprint-110 完了 — 認証フロー簡素化（6桁認証コード廃止 → Turnstileのみ）**
+
+### Sprint-110の成果（認証フロー簡素化コード実装）
+- TASK-294: Backend Core（service/repo/types/adapter/routes/DB migration） — Opus
+- TASK-295: Frontend UI（AuthModal/PostForm/ThreadCreateForm/verify page）
+- TASK-296: BDD Step Definitions + In-Memory Repo — Opus
+- TASK-297: E2Eテスト修正 + デッドコード削除 + コメント修正 — Opus
+- vitest 1747 PASS / cucumber-js 323 passed, 16 pending / tsc エラーなし
+- コミット: 7a3fe43, 3e3db3f, eabb73e
+- 本番スモーク: **29/34 PASS**（5件は設計上のスキップ）
+- 変更ファイル: 40+ファイル（src 29, e2e 4, features 4, migration 1, etc）
+
+### Sprint-109の成果（認証フロー簡素化ドキュメントレビュー）
+- TASK-292: 外部仕様 + 用語辞書レビュー（WARNING: M3件/L2件）
+- TASK-293: アーキテクチャ・コンポーネント設計レビュー（WARNING: H2件/M2件/L1件）
+- 全指摘を修正（M3ステップ定義はSprint-110で対応）
+- コミット: 0d6f777
 
 ### Sprint-108の成果（サイトリネーム Phase 2）
 - TASK-288: ソースコード + テストコード名称変更（66ファイル）
@@ -193,8 +209,9 @@
 
 ## テスト状況
 
-- vitest: 1772 PASS（schema-consistency 1件はマイグレーション未適用による既存問題）
-- cucumber-js: 340シナリオ / 324 passed / 0 failed / 16 pending
+- vitest: 1747 PASS（schema-consistency 1件はマイグレーション未適用による既存問題）
+- cucumber-js: 339シナリオ / 323 passed / 0 failed / 16 pending
+  - authentication.feature: 認証フロー簡素化対応済み（Sprint-110）
   - theme.feature 12シナリオ全PASS（Sprint-105で実装）
   - command_livingbot.feature 16シナリオ全PASS（Sprint-101でv1実装、Sprint-104でv2拡張）
   - command_newspaper.feature 5シナリオ全PASS（Sprint-97で実装）
@@ -210,7 +227,7 @@
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-108後):** 30/35 PASS（5件は設計上のスキップ）
+- **本番スモークテスト (Sprint-110後):** 29/34 PASS（5件は設計上のスキップ。1テスト減は認証コードプリフィルテスト廃止による正常減少）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -313,6 +330,8 @@ GEMINI_API_KEY の **GH Secrets** 設定が必要（人間タスク。Sprint-100
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-110 | 認証フロー簡素化コード実装（6桁コード廃止→Turnstileのみ） | completed | `tmp/orchestrator/sprint_110_plan.md` |
+| Sprint-109 | 認証フロー簡素化ドキュメントレビュー | completed | (コミット: 0d6f777) |
 | Sprint-108 | サイトリネーム Phase 2 — BattleBoard→ボットちゃんねる | completed | `tmp/orchestrator/sprint_108_plan.md` |
 | Sprint-107 | サイトリネーム Phase 1 — 板ID定数化リファクタリング | completed | `tmp/orchestrator/sprint_107_plan.md` |
 | Sprint-106 | ダッシュボード統計500エラー修正 | completed | (コミット: b95308b) |
