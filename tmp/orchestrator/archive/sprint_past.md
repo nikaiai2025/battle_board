@@ -2,6 +2,122 @@
 
 > sprint_current.md から移植した、今後のスプリントで参照不要な履歴情報。
 
+## 完了済みスプリント成果（Sprint-75〜104）
+
+### Sprint-104の成果
+- TASK-281: !livingbot v2 — スレッド内カウント追加
+- BDD 16シナリオ全PASS / vitest 1741 PASS / コミット: 039aad2
+
+### Sprint-103の成果
+- TASK-280: countLivingBots ネストselect型不整合修正（2クエリ分離 + Array.isArray()）
+- コミット: 0a0962d, f5ff278
+
+### Sprint-102の成果
+- TASK-279: countLivingBots N+1クエリ最適化（CF Workers サブリクエスト上限回避）
+- コミット: a880754
+
+### Sprint-101の成果
+- TASK-277/278: !livingbotコマンド + ラストボットボーナス実装
+- 新規: livingbot-handler.ts, daily-event-repository.ts, 00024_daily_events.sql
+- コミット: 5f0df18
+
+### Sprint-100の成果
+- TASK-275/276: newspaper非同期処理GH Actions移行（AI API呼び出しをVercel→GH Actions）
+- コミット: c705a3c
+
+### Sprint-99の成果
+- TASK-274: command-parser.ts raw→match[0]修正（ステルスコマンド本文除去バグ）
+- コミット: 37fe1f3
+
+### Sprint-98の成果
+- TASK-273: Phase 5 HIGH修正3件 + 検証サイクル完了
+- コミット: fabe02b
+
+### Sprint-97の成果
+- TASK-271/272: !newspaper実装（AI API + Google Search Grounding + 非同期キュー）
+- コミット: 9bd187c
+
+### Sprint-96の成果
+- TASK-269/270: !aori実装（煽りBOT召喚 + 非同期キュー基盤）
+- コミット: 69c80fb
+
+### Sprint-95の成果
+- TASK-267/268: 固定案内板リンクフルURL化 + BOT投稿FK制約違反修正
+- コミット: 6225e73
+
+### Sprint-94の成果
+- TASK-266: !iamsystemコマンド実装（ステルス基盤構築）
+- BDD 285 passed / vitest 1675 PASS
+
+### Sprint-93の成果
+- TASK-263/264/265: cron 500修正 + !omikuji実装 + !iamsystem設計
+- BDD 278 passed / vitest 1668 PASS
+
+### Sprint-92の成果
+- featureファイルフラット構成化 + 旧パス残存修正
+- vitest 1653 PASS
+
+### Sprint-91の成果
+- TASK-260/261: dev_postsテーブル + レトロUI + E2Eスモーク修正
+- コミット: 406299b, c8c64cc
+
+### Sprint-90の成果
+- TASK-259: isSystemMessage dailyId="SYSTEM"修正
+- コミット: 259646d
+
+### Sprint-89の成果
+- TASK-258: 隠しコマンド案内板非表示修正
+- コミット: d9ce610
+
+### Sprint-88の成果
+- TASK-257: formatDateTime()共有ユーティリティ化、JST統一
+- コミット: 1022e3a
+
+### Sprint-86の成果（Phase 5差し戻し修正）
+- TASK-256: D-05 currency修正 + bot tutorial除外
+- コミット: 8609acf
+
+### Sprint-85の成果
+- TASK-249/250/251/245/246/248: ウェルカムシーケンス実装 + BDD 19シナリオ
+- vitest 1635 PASS / cucumber-js 274 passed
+
+### Sprint-84の成果
+- TASK-238〜241: CF Cron + ウェルカムシーケンス同期 + Tutorial Strategy + Mypage API
+- vitest 1628 PASS
+
+### Sprint-83の成果
+- TASK-236/237: ウェルカムシーケンス設計 + マイページ設計
+
+### Sprint-82の成果
+- TASK-233/234/235: E2E cleanup + bdd_test_strategy.md規約追記
+- コミット: 5ce3ce2
+
+### Sprint-81の成果
+- TASK-232: cleanupDatabase FK制約修正
+- コミット: a54a86c
+
+### Sprint-80の成果
+- TASK-226/227: Phase 5差し戻しコード修正6件 + D-06修正
+- コミット: 288da80
+
+### Sprint-79の成果
+- TASK-219/220: 撃破済みBOT表示機能
+- コミット: 2f69639
+
+### Sprint-78の成果
+- E2Eテスト11件実装
+- コミット: 35889ab
+
+### Sprint-77の成果
+- @image_preview 4シナリオ + kinou-handler TZ修正
+- コミット: 78138b0
+
+### Sprint-75〜76の成果
+- Sprint-76: 調査コマンド(!hissi, !kinou)実装（コミット: 9efe8fd）
+- Sprint-75: TSC型エラー解消 + スレッド休眠実装 + 障害修正（コミット: b04feb1, 02b7655）
+
+---
+
 ## 完了済みスプリント成果（Sprint-44〜74）
 
 ### Sprint-74の成果
