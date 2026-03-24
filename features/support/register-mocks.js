@@ -88,6 +88,9 @@ const supabaseClientMock = {
 	exports: {
 		supabaseClient: inMemorySupabaseClient.supabaseClient,
 		supabaseAdmin: inMemorySupabaseClient.supabaseAdmin,
+		// createAuthOnlyClient: RegistrationService.loginWithEmail が使用するファクトリ関数
+		// See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+		createAuthOnlyClient: inMemorySupabaseClient.createAuthOnlyClient,
 	},
 	parent: null,
 	children: [],

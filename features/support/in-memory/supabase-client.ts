@@ -188,3 +188,17 @@ export const supabaseClient = dummyClient;
 
 /** service_role キーを使用するサーバーサイド専用クライアント（ダミー） */
 export const supabaseAdmin = dummyClient;
+
+/**
+ * 認証専用の使い捨てクライアントを生成する（BDDテスト用ダミー）。
+ *
+ * registration-service.ts の loginWithEmail が createAuthOnlyClient() を呼ぶため、
+ * BDDテスト環境でも同一スタブを返す必要がある。
+ * signInWithPassword は supabaseAuthStore と照合してシミュレートする。
+ *
+ * See: src/lib/infrastructure/supabase/client.ts createAuthOnlyClient()
+ * See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+ */
+export function createAuthOnlyClient() {
+	return dummyClient;
+}

@@ -14,21 +14,37 @@
  *   クライアントサイドバンドルに含めることを禁止する。
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL ?? ''
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? ''
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+const supabaseUrl = process.env.SUPABASE_URL ?? "";
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? "";
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
 /**
  * anon キーを使用するクライアント。
  * Row Level Security が適用されるため、一般ユーザー向けの読み書きに使用する。
  */
-export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * service_role キーを使用するサーバーサイド専用クライアント。
  * RLS をバイパスするため、サーバーサイド処理（API ルート・バッチ）でのみ使用する。
  * クライアントサイドコードからインポートしてはならない。
  */
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+/**
+ * 認証専用の使い捨てクライアントを生成する。
+ *
+ * signInWithPassword はクライアントのセッション状態を変更するため、
+ * シングルトン supabaseAdmin で呼ぶとセッション汚染が発生する。
+ * この関数は anon key + persistSession: false で使い捨てクライアントを返す。
+ *
+ * See: admin-user-repository.ts createAuthClient()（同一パターン）
+ * See: features/user_registration.feature @本登録ユーザーがメールアドレスとパスワードでログインする
+ */
+export function createAuthOnlyClient() {
+	return createClient(supabaseUrl, supabaseAnonKey, {
+		auth: { persistSession: false, autoRefreshToken: false },
+	});
+}

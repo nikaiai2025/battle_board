@@ -71,6 +71,9 @@ vi.mock("../../../lib/infrastructure/supabase/client", () => ({
 	supabaseAdmin: {
 		auth: mockSupabaseAuth,
 	},
+	createAuthOnlyClient: () => ({
+		auth: mockSupabaseAuth,
+	}),
 }));
 
 vi.mock("../../../lib/infrastructure/repositories/user-repository", () => ({

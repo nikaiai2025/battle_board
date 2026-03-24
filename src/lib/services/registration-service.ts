@@ -17,11 +17,14 @@
  *   - PAT は 32文字 hex（crypto.randomBytes(16).toString('hex')）
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { randomBytes, randomUUID } from "crypto";
 import * as EdgeTokenRepository from "../infrastructure/repositories/edge-token-repository";
 import * as UserRepository from "../infrastructure/repositories/user-repository";
-import { supabaseAdmin } from "../infrastructure/supabase/client";
+// createClient の直接 import を削除（レイヤー規約準拠）
+import {
+	createAuthOnlyClient,
+	supabaseAdmin,
+} from "../infrastructure/supabase/client";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -217,11 +220,8 @@ export async function loginWithEmail(
 	// 注意: signInWithPassword はクライアントのセッション状態を変更するため、
 	// supabaseAdmin を使うと以降のDB操作がユーザーJWTで実行され RLS 違反となる。
 	// 使い捨てクライアントで認証し、DB操作は supabaseAdmin で行う。
-	const authClient = createClient(
-		process.env.SUPABASE_URL ?? "",
-		process.env.SUPABASE_ANON_KEY ?? "",
-		{ auth: { persistSession: false, autoRefreshToken: false } },
-	);
+	// See: src/lib/infrastructure/supabase/client.ts createAuthOnlyClient()
+	const authClient = createAuthOnlyClient();
 	const { data: authData, error: authError } =
 		await authClient.auth.signInWithPassword({
 			email,

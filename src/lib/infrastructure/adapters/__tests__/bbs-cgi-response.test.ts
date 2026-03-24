@@ -103,9 +103,9 @@ describe("BbsCgiResponseBuilder", () => {
 			expect(html).toContain("<b>ＥＲＲＯＲ</b><br>");
 		});
 
-		it("bodyに '認証が必要です。' の文言を含む", () => {
+		it("bodyに認証が必要な旨の文言を含む", () => {
 			const html = builder.buildAuthRequired(edgeToken, baseUrl);
-			expect(html).toContain("認証が必要です。");
+			expect(html).toContain("認証が必要です");
 		});
 
 		it("認証ページURLが絶対URL形式 'https://domain/auth/verify?token={edgeToken}' で含まれる（codeなし）", () => {
@@ -128,14 +128,10 @@ describe("BbsCgiResponseBuilder", () => {
 			expect(html).toContain("URL");
 		});
 
-		it("write_token をメール欄に貼り付ける手順説明が含まれる", () => {
+		it("PAT によるログイン手順説明が含まれる", () => {
 			const html = builder.buildAuthRequired(edgeToken, baseUrl);
-			expect(html).toContain("write_token");
-		});
-
-		it("Cookie共有の専ブラに関する手順説明が含まれる", () => {
-			const html = builder.buildAuthRequired(edgeToken, baseUrl);
-			expect(html).toContain("Cookie共有の専ブラではそのまま書き込めます");
+			expect(html).toContain("PAT");
+			expect(html).toContain("メールアドレス欄に入力");
 		});
 
 		it("Shift_JIS Content-Type meta タグを含む", () => {
