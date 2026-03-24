@@ -417,8 +417,31 @@ export async function grantCurrency(
 // ---------------------------------------------------------------------------
 
 /**
+ * ユーザー一覧の各エントリ型。
+ * User の基本情報に通貨残高を付加した集約型。
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ */
+export interface UserListItem {
+	/** ユーザーID */
+	id: string;
+	/** 登録日時 */
+	createdAt: Date;
+	/** BAN状態 */
+	isBanned: boolean;
+	/** 有料ステータス */
+	isPremium: boolean;
+	/** 本登録ステータス */
+	registrationType: "email" | "discord" | null;
+	/** ユーザーネーム */
+	username: string | null;
+	/** 通貨残高 */
+	balance: number;
+}
+
+/**
  * ユーザー詳細情報。
  * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ * See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
  */
 export interface UserDetail {
 	/** ユーザー基本情報 */
@@ -438,20 +461,21 @@ export interface UserDetail {
 	grassCount: number;
 	/** 通貨残高 */
 	balance: number;
-	/** 書き込み履歴 */
-	posts: import("../domain/models/post").Post[];
+	/** 書き込み履歴（スレッドタイトル付き） */
+	posts: import("../infrastructure/repositories/post-repository").PostWithThread[];
 }
 
 /**
- * ユーザー一覧を取得する（ページネーション付き）。
+ * ユーザー一覧を取得する（ページネーション付き、通貨残高付き）。
  * 管理画面のユーザー一覧ページで使用する。
+ * 各ユーザーの通貨残高を CurrencyRepository.getBalance で取得し UserListItem に集約する。
  *
  * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
  * See: tmp/feature_plan_admin_expansion.md §4-b AdminService.getUserList
  *
  * @param options.limit - 取得件数（デフォルト 50）
  * @param options.offset - スキップ件数（デフォルト 0）
- * @returns ユーザー配列と総件数
+ * @returns UserListItem 配列（balance 付き）と総件数
  */
 export async function getUserList(
 	options: {
@@ -459,15 +483,37 @@ export async function getUserList(
 		offset?: number;
 		orderBy?: "created_at" | "last_post_date";
 	} = {},
-): Promise<{ users: import("../domain/models/user").User[]; total: number }> {
-	return UserRepository.findAll(options);
+): Promise<{ users: UserListItem[]; total: number }> {
+	// ユーザー一覧を取得する
+	const { users, total } = await UserRepository.findAll(options);
+
+	// 各ユーザーの通貨残高を並列取得し UserListItem に集約する
+	// See: features/admin.feature @各ユーザーのID、登録日時、ステータス、通貨残高が表示される
+	const usersWithBalance: UserListItem[] = await Promise.all(
+		users.map(async (user) => {
+			const balance = await CurrencyRepository.getBalance(user.id);
+			return {
+				id: user.id,
+				createdAt: user.createdAt,
+				isBanned: user.isBanned,
+				isPremium: user.isPremium,
+				registrationType: user.registrationType,
+				username: user.username,
+				balance,
+			};
+		}),
+	);
+
+	return { users: usersWithBalance, total };
 }
 
 /**
  * ユーザー詳細を取得する（基本情報 + 通貨残高 + 書き込み履歴）。
  * 管理画面のユーザー詳細ページで使用する。
+ * 書き込み履歴は searchByAuthorId を使用してスレッドタイトル付きで取得する。
  *
  * See: features/admin.feature @管理者が特定ユーザーの詳細を閲覧できる
+ * See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
  * See: tmp/feature_plan_admin_expansion.md §4-b AdminService.getUserDetail
  *
  * @param userId - 対象ユーザーの UUID
@@ -480,7 +526,12 @@ export async function getUserDetail(
 	if (!user) return null;
 
 	const balance = await getBalance(userId);
-	const posts = await PostRepository.findByAuthorId(userId, { limit: 50 });
+	// searchByAuthorId を使用してスレッドタイトル付きの書き込み履歴を取得する
+	// See: features/admin.feature @管理者画面でも各書き込みのスレッド名、本文、書き込み日時が含まれる
+	const { posts } = await PostRepository.searchByAuthorId(userId, {
+		limit: 50,
+		offset: 0,
+	});
 
 	return {
 		id: user.id,
@@ -497,8 +548,9 @@ export async function getUserDetail(
 }
 
 /**
- * ユーザーの書き込み履歴を取得する。
+ * ユーザーの書き込み履歴を取得する（スレッドタイトル付き）。
  * 管理画面のユーザー詳細ページ（書き込み履歴セクション）で使用する。
+ * searchByAuthorId を使用して threads JOIN 付きで取得する。
  *
  * See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
  * See: tmp/feature_plan_admin_expansion.md §4-b AdminService.getUserPosts
@@ -506,17 +558,21 @@ export async function getUserDetail(
  * @param userId - 対象ユーザーの UUID
  * @param options.limit - 取得件数（デフォルト 50）
  * @param options.offset - スキップ件数（デフォルト 0）
- * @returns Post 配列（created_at DESC ソート済み）
+ * @returns PostWithThread 配列（created_at DESC ソート済み、スレッドタイトル付き）
  */
 export async function getUserPosts(
 	userId: string,
 	options: { limit?: number; offset?: number } = {},
-): Promise<import("../domain/models/post").Post[]> {
+): Promise<
+	import("../infrastructure/repositories/post-repository").PostWithThread[]
+> {
 	// HIGH-003: offset をリポジトリに伝播してページネーションを機能させる
-	return PostRepository.findByAuthorId(userId, {
-		limit: options.limit,
-		offset: options.offset,
+	// searchByAuthorId を使用してスレッドタイトル付きで取得する
+	const { posts } = await PostRepository.searchByAuthorId(userId, {
+		limit: options.limit ?? 50,
+		offset: options.offset ?? 0,
 	});
+	return posts;
 }
 
 // ---------------------------------------------------------------------------

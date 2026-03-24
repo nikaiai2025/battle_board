@@ -1524,7 +1524,7 @@ function getAdminServiceForUsers() {
 
 /** ユーザー一覧取得結果（Then ステップでのアサーション用） */
 let userListResult: {
-	users: import("../../src/lib/domain/models/user").User[];
+	users: import("../../src/lib/services/admin-service").UserListItem[];
 	total: number;
 } | null = null;
 
@@ -1619,8 +1619,12 @@ Then(
 				typeof user.isPremium === "boolean",
 				`ユーザーに isPremium フィールドが存在しません: ${user.id}`,
 			);
-			// 通貨残高は CurrencyService 経由で確認（一覧APIでは別途取得）
-			// ここでは id, createdAt, isPremium の存在確認のみ行う
+			// 通貨残高の検証
+			// See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+			assert(
+				typeof user.balance === "number",
+				`ユーザーに通貨残高（balance）フィールドが存在しません: ${user.id}`,
+			);
 		}
 	},
 );
@@ -1842,7 +1846,7 @@ Given(
 
 /**
  * ユーザー詳細の書き込み履歴に必要なフィールドが含まれることを確認する。
- * threadId（スレッド名の代替）・body・createdAt の存在を確認する。
+ * threadTitle（スレッド名）・body・createdAt の存在を確認する。
  *
  * See: features/admin.feature @管理者がユーザーの書き込み履歴を確認できる
  */
@@ -1859,7 +1863,12 @@ Then(
 			`書き込みが3件以上あることを期待しましたが ${userDetailResult.posts.length} 件でした`,
 		);
 		for (const post of userDetailResult.posts) {
-			assert(post.threadId, `書き込みに threadId が存在しません: ${post.id}`);
+			// スレッド名（threadTitle）の検証
+			// See: features/admin.feature @管理者画面でも各書き込みのスレッド名、本文、書き込み日時が含まれる
+			assert(
+				post.threadTitle,
+				`書き込みにスレッド名（threadTitle）が存在しません: ${post.id}`,
+			);
 			assert(post.body, `書き込みに本文が存在しません: ${post.id}`);
 			assert(
 				post.createdAt instanceof Date,
