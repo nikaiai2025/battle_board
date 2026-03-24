@@ -105,6 +105,10 @@ const TEST_PASSWORD = "test-password-secure";
 /** テスト用間違いパスワード */
 const TEST_WRONG_PASSWORD = "wrong-password";
 
+/** テスト用リダイレクトURL（BDDではHTTPフローを通過しないためダミー値） */
+const TEST_REDIRECT_URL =
+	"http://localhost:3000/api/auth/callback?flow=email_confirm&userId=test";
+
 // ---------------------------------------------------------------------------
 // ヘルパー関数: 認証済み仮ユーザーを作成する
 // ---------------------------------------------------------------------------
@@ -232,6 +236,7 @@ Given(
 			this.currentUserId!,
 			TEST_EMAIL,
 			TEST_PASSWORD,
+			TEST_REDIRECT_URL,
 		);
 		assert.strictEqual(
 			result.success,
@@ -782,6 +787,7 @@ When(
 			this.currentUserId,
 			TEST_EMAIL,
 			TEST_PASSWORD,
+			TEST_REDIRECT_URL,
 		);
 		this.registrationEmail = TEST_EMAIL;
 		this.registrationPassword = TEST_PASSWORD;
@@ -840,6 +846,7 @@ When(
 			this.currentUserId!,
 			TEST_EMAIL,
 			TEST_PASSWORD,
+			TEST_REDIRECT_URL,
 		);
 
 		if (result.success) {

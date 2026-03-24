@@ -1195,7 +1195,13 @@ describe("BotService", () => {
 					hp: 10,
 					maxHp: 10,
 					isActive: true,
+					nextPostAt: null, // 使い切りBOT: cron に拾われないよう null (LL-013)
 				}),
+			);
+			// 投稿後に nextPostAt が null にリセットされている（executeBotPost Step 9 の上書き対策）
+			expect(botRepo.updateNextPostAt).toHaveBeenCalledWith(
+				"tutorial-bot-001",
+				null,
 			);
 			// pending削除が呼ばれている
 			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(

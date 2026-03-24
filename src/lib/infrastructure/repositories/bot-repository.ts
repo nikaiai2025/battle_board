@@ -422,11 +422,11 @@ export async function incrementTimesAttacked(botId: string): Promise<void> {
  */
 export async function updateNextPostAt(
 	botId: string,
-	nextPostAt: Date,
+	nextPostAt: Date | null,
 ): Promise<void> {
 	const { error } = await supabaseAdmin
 		.from("bots")
-		.update({ next_post_at: nextPostAt.toISOString() })
+		.update({ next_post_at: nextPostAt?.toISOString() ?? null })
 		.eq("id", botId);
 
 	if (error) {

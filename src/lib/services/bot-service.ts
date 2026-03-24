@@ -147,7 +147,7 @@ export interface IBotRepository {
 	 * 次回投稿予定時刻を更新する。
 	 * See: docs/architecture/architecture.md §13 TDR-010
 	 */
-	updateNextPostAt(botId: string, nextPostAt: Date): Promise<void>;
+	updateNextPostAt(botId: string, nextPostAt: Date | null): Promise<void>;
 	/**
 	 * 投稿対象のBOT一覧を取得する（is_active=true AND next_post_at <= NOW()）。
 	 * See: docs/architecture/architecture.md §13 TDR-010
@@ -1037,7 +1037,7 @@ export class BotService {
 					revealedAt: null,
 					grassCount: 0,
 					botProfileKey: "tutorial",
-					nextPostAt: new Date(),
+					nextPostAt: null,
 				});
 
 				// Step 2b: executeBotPost で書き込み実行（contextOverrides 付き）
@@ -1046,6 +1046,11 @@ export class BotService {
 					tutorialTargetPostNumber: pending.triggerPostNumber,
 					tutorialThreadId: pending.threadId,
 				});
+
+				// Step 2b-post: チュートリアルBOTは1回きりの投稿のため next_post_at を null にリセット
+				// executeBotPost の Step 9 で next_post_at が更新されるが、定期投稿は不要。
+				// 煽りBOT（processAoriCommands）と同じ「使い切り」パターン。
+				await this.botRepository.updateNextPostAt(newBot.id, null);
 
 				// Step 2c: pending 削除
 				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.iii

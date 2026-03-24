@@ -171,6 +171,9 @@ describe("RegistrationService", () => {
 	// =========================================================================
 
 	describe("registerWithEmail", () => {
+		const REDIRECT_URL =
+			"https://example.com/api/auth/callback?flow=email_confirm&userId=user-uuid-001";
+
 		it("正常: 仮ユーザーが本登録申請すると success: true を返す", async () => {
 			// See: features/user_registration.feature @仮ユーザーがメールアドレスとパスワードで本登録を申請する
 			mockUserRepository.findById.mockResolvedValue(createTemporaryUser());
@@ -180,17 +183,18 @@ describe("RegistrationService", () => {
 				USER_ID,
 				EMAIL,
 				PASSWORD,
+				REDIRECT_URL,
 			);
 
 			expect(result).toEqual({ success: true });
 			expect(mockSupabaseAuth.signUp).toHaveBeenCalledWith({
 				email: EMAIL,
 				password: PASSWORD,
-				options: { emailRedirectTo: undefined },
+				options: { emailRedirectTo: REDIRECT_URL },
 			});
 		});
 
-		it("正常: redirectTo を渡すと signUp の emailRedirectTo に設定される", async () => {
+		it("正常: redirectTo が signUp の emailRedirectTo に設定される", async () => {
 			mockUserRepository.findById.mockResolvedValue(createTemporaryUser());
 			mockSupabaseAuth.signUp.mockResolvedValue({ error: null });
 
@@ -215,6 +219,7 @@ describe("RegistrationService", () => {
 				"nonexistent-user-id",
 				EMAIL,
 				PASSWORD,
+				REDIRECT_URL,
 			);
 
 			expect(result).toEqual({ success: false, reason: "not_found" });
@@ -229,6 +234,7 @@ describe("RegistrationService", () => {
 				USER_ID,
 				EMAIL,
 				PASSWORD,
+				REDIRECT_URL,
 			);
 
 			expect(result).toEqual({ success: false, reason: "already_registered" });
@@ -246,6 +252,7 @@ describe("RegistrationService", () => {
 				USER_ID,
 				EMAIL,
 				PASSWORD,
+				REDIRECT_URL,
 			);
 
 			expect(result).toEqual({ success: false, reason: "email_taken" });
@@ -258,7 +265,12 @@ describe("RegistrationService", () => {
 			});
 
 			await expect(
-				RegistrationService.registerWithEmail(USER_ID, EMAIL, PASSWORD),
+				RegistrationService.registerWithEmail(
+					USER_ID,
+					EMAIL,
+					PASSWORD,
+					REDIRECT_URL,
+				),
 			).rejects.toThrow("RegistrationService.registerWithEmail failed");
 		});
 	});

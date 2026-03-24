@@ -126,12 +126,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 	const { userId } = authResult;
 
+	// --- redirectTo のデフォルト値構築 ---
+	// Discord 登録/ログインと同パターン: サーバー側で callback URL を構築する
+	// See: src/app/api/auth/register/discord/route.ts（同一パターン）
+	// See: src/app/api/auth/login/discord/route.ts（同一パターン）
+	const origin = req.nextUrl.origin;
+	const emailRedirectTo =
+		redirectTo ??
+		`${origin}/api/auth/callback?flow=email_confirm&userId=${userId}`;
+
 	// --- RegistrationService への委譲 ---
 	const result = await RegistrationService.registerWithEmail(
 		userId,
 		email,
 		password,
-		redirectTo,
+		emailRedirectTo,
 	);
 
 	if (!result.success) {

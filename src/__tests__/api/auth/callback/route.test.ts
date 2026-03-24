@@ -12,11 +12,10 @@
  * カバレッジ対象:
  *   - Discord本登録フロー: code + flow=register + userId → handleOAuthCallback呼び出し → リダイレクト + Cookie設定
  *   - Discordログインフロー: code + flow=login → handleOAuthCallback呼び出し → リダイレクト + Cookie設定
- *   - メール確認フロー: code + flow=email_confirm + edge-token Cookie → handleOAuthCallback呼び出し
+ *   - メール確認フロー: code + flow=email_confirm + userId → handleOAuthCallback呼び出し
  *   - codeなし → エラーリダイレクト
  *   - handleOAuthCallback失敗 → エラーリダイレクト
- *   - edge-token Cookie なし（email_confirm フロー）→ エラーリダイレクト
- *   - edge-token 無効（email_confirm フロー）→ エラーリダイレクト
+ *   - email_confirm で userId なし → ログインフローにフォールスルー
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,21 +24,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // vi.hoisted を使ったモック変数の事前定義（hoisting問題回避）
 // ---------------------------------------------------------------------------
 
-const { mockRegistrationService, mockAuthService, mockCookies } = vi.hoisted(
-	() => {
-		const mockRegistrationService = {
-			handleOAuthCallback: vi.fn(),
-		};
+const { mockRegistrationService } = vi.hoisted(() => {
+	const mockRegistrationService = {
+		handleOAuthCallback: vi.fn(),
+	};
 
-		const mockAuthService = {
-			verifyEdgeToken: vi.fn(),
-		};
-
-		const mockCookies = vi.fn();
-
-		return { mockRegistrationService, mockAuthService, mockCookies };
-	},
-);
+	return { mockRegistrationService };
+});
 
 // ---------------------------------------------------------------------------
 // モック宣言（インポート前に必須）
@@ -48,15 +39,6 @@ const { mockRegistrationService, mockAuthService, mockCookies } = vi.hoisted(
 vi.mock("@/lib/services/registration-service", () => ({
 	handleOAuthCallback: (...args: unknown[]) =>
 		mockRegistrationService.handleOAuthCallback(...args),
-}));
-
-vi.mock("@/lib/services/auth-service", () => ({
-	verifyEdgeToken: (...args: unknown[]) =>
-		mockAuthService.verifyEdgeToken(...args),
-}));
-
-vi.mock("next/headers", () => ({
-	cookies: () => mockCookies(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -71,7 +53,6 @@ import { GET } from "../../../../app/api/auth/callback/route";
 // ---------------------------------------------------------------------------
 
 const ORIGIN = "http://localhost:3000";
-const EDGE_TOKEN = "test-edge-token-uuid";
 const USER_ID = "user-uuid-001";
 const NEW_EDGE_TOKEN = "new-edge-token-uuid";
 
@@ -84,21 +65,6 @@ function createRequest(params: Record<string, string>): NextRequest {
 	return new NextRequest(url.toString());
 }
 
-/** edge-token Cookie ありの cookieStore モックを設定する */
-function setupCookieWithEdgeToken(token: string = EDGE_TOKEN): void {
-	mockCookies.mockResolvedValue({
-		get: (name: string) =>
-			name === "edge-token" ? { value: token } : undefined,
-	});
-}
-
-/** edge-token Cookie なしの cookieStore モックを設定する */
-function setupCookieWithoutEdgeToken(): void {
-	mockCookies.mockResolvedValue({
-		get: (_name: string) => undefined,
-	});
-}
-
 // ---------------------------------------------------------------------------
 // テストスイート
 // ---------------------------------------------------------------------------
@@ -106,8 +72,6 @@ function setupCookieWithoutEdgeToken(): void {
 describe("GET /api/auth/callback", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		// デフォルト: Cookie なし
-		setupCookieWithoutEdgeToken();
 	});
 
 	// =========================================================================
@@ -284,15 +248,11 @@ describe("GET /api/auth/callback", () => {
 	// メール確認フロー (flow=email_confirm)
 	// =========================================================================
 
-	describe("メール確認フロー (flow=email_confirm)", () => {
-		it("正常: edge-token Cookie から userId を特定して handleOAuthCallback(code, userId) を呼び出す", async () => {
+	describe("メール確認フロー (flow=email_confirm + userId)", () => {
+		it("正常: URL の userId を使って handleOAuthCallback(code, userId, 'email') を呼び出す", async () => {
+			// Discord 本登録と同パターン: userId は URL パラメータから取得
+			// Gmailアプリ等 Cookie 非共有環境でも動作する
 			// See: docs/architecture/components/user-registration.md §7.1 メール認証
-			setupCookieWithEdgeToken(EDGE_TOKEN);
-			mockAuthService.verifyEdgeToken.mockResolvedValue({
-				valid: true,
-				userId: USER_ID,
-				authorIdSeed: "seed-001",
-			});
 			mockRegistrationService.handleOAuthCallback.mockResolvedValue({
 				success: true,
 				userId: USER_ID,
@@ -302,66 +262,49 @@ describe("GET /api/auth/callback", () => {
 			const req = createRequest({
 				code: "email-confirm-code",
 				flow: "email_confirm",
+				userId: USER_ID,
 			});
 
 			const response = await GET(req);
 
-			expect(mockAuthService.verifyEdgeToken).toHaveBeenCalledWith(
-				EDGE_TOKEN,
-				"",
-			);
 			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
 				"email-confirm-code",
 				USER_ID,
+				"email",
 			);
 			expect(response.status).toBe(307);
 			expect(response.headers.get("location")).toBe(`${ORIGIN}/mypage`);
+
+			// edge-token Cookie が設定されること
+			const setCookieHeader = response.headers.get("set-cookie");
+			expect(setCookieHeader).toContain("edge-token");
+			expect(setCookieHeader).toContain(NEW_EDGE_TOKEN);
 		});
 
-		it("異常系: edge-token Cookie なし → /auth/error にリダイレクト", async () => {
-			// setupCookieWithoutEdgeToken は beforeEach で設定済み
-			const req = createRequest({
-				code: "email-confirm-code",
-				flow: "email_confirm",
-			});
-
-			const response = await GET(req);
-
-			expect(response.status).toBe(307);
-			expect(response.headers.get("location")).toBe(`${ORIGIN}/auth/error`);
-			expect(
-				mockRegistrationService.handleOAuthCallback,
-			).not.toHaveBeenCalled();
-		});
-
-		it("異常系: edge-token が無効 → /auth/error にリダイレクト", async () => {
-			setupCookieWithEdgeToken("invalid-token");
-			mockAuthService.verifyEdgeToken.mockResolvedValue({
-				valid: false,
-				reason: "not_found",
+		it("異常系: userId なし → ログインフローにフォールスルー", async () => {
+			// flow=email_confirm だが userId がない場合、条件不一致で else 節に落ちる
+			mockRegistrationService.handleOAuthCallback.mockResolvedValue({
+				success: false,
+				reason: "not_registered",
 			});
 
 			const req = createRequest({
 				code: "email-confirm-code",
 				flow: "email_confirm",
+				// userId なし
 			});
 
 			const response = await GET(req);
 
+			// pendingUserId なしのログインフローとして処理される
+			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
+				"email-confirm-code",
+			);
 			expect(response.status).toBe(307);
 			expect(response.headers.get("location")).toBe(`${ORIGIN}/auth/error`);
-			expect(
-				mockRegistrationService.handleOAuthCallback,
-			).not.toHaveBeenCalled();
 		});
 
-		it("異常系: handleOAuthCallback が失敗した場合は /auth/error にリダイレクト", async () => {
-			setupCookieWithEdgeToken(EDGE_TOKEN);
-			mockAuthService.verifyEdgeToken.mockResolvedValue({
-				valid: true,
-				userId: USER_ID,
-				authorIdSeed: "seed-001",
-			});
+		it("異常系: handleOAuthCallback が失敗 → /auth/error にリダイレクト", async () => {
 			mockRegistrationService.handleOAuthCallback.mockResolvedValue({
 				success: false,
 				reason: "invalid_credentials",
@@ -370,6 +313,7 @@ describe("GET /api/auth/callback", () => {
 			const req = createRequest({
 				code: "email-confirm-code",
 				flow: "email_confirm",
+				userId: USER_ID,
 			});
 
 			const response = await GET(req);

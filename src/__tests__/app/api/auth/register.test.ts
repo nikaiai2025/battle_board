@@ -93,7 +93,7 @@ describe("POST /api/auth/register", () => {
 		expect(body.message).toContain("確認メールを送信しました");
 	});
 
-	it("正常: RegistrationService.registerWithEmail が正しい引数で呼ばれる", async () => {
+	it("正常: redirectTo 指定時はそのまま registerWithEmail に渡す", async () => {
 		const req = createRequest({
 			email: VALID_EMAIL,
 			password: VALID_PASSWORD,
@@ -107,6 +107,33 @@ describe("POST /api/auth/register", () => {
 			VALID_PASSWORD,
 			"https://example.com/callback",
 		);
+	});
+
+	it("正常: redirectTo 未指定時はコールバック URL を自動構築して渡す", async () => {
+		// フロントエンド /register/email は redirectTo を送信しない。
+		// ルートハンドラがデフォルトの callback URL を構築する責務を持つ。
+		// Discord 本登録（register/discord/route.ts）と同一パターン。
+		const req = createRequest({
+			email: VALID_EMAIL,
+			password: VALID_PASSWORD,
+			// redirectTo なし（フロントエンドのデフォルト動作）
+		});
+		await POST(req);
+
+		const actualRedirectTo = mockRegisterWithEmail.mock.calls[0][3] as string;
+
+		// callback URL が構築されていること（undefined でないこと）
+		expect(actualRedirectTo).toBeDefined();
+		expect(actualRedirectTo).not.toBe("undefined");
+
+		// flow=email_confirm が含まれること（callback ルートのフロー判定に必須）
+		expect(actualRedirectTo).toContain("flow=email_confirm");
+
+		// userId が含まれること（Cookie 非共有環境でのユーザー特定に必須）
+		expect(actualRedirectTo).toContain(`userId=${USER_ID}`);
+
+		// /api/auth/callback を指していること
+		expect(actualRedirectTo).toContain("/api/auth/callback");
 	});
 
 	// =========================================================================

@@ -296,7 +296,7 @@ function VerifyPageContent() {
 								専用ブラウザをご利用の方へ
 							</p>
 							<p className="text-xs text-yellow-700 mb-3">
-								次の書き込み時に、メール欄に以下のコードを入力してください（有効期限:
+								専ブラに戻って書き込み可能です。書き込めない場合はメール欄に以下のコードを入力してください（有効期限:
 								10分）。
 							</p>
 							<p className="text-xs text-muted-foreground mb-1">

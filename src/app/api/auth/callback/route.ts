@@ -8,7 +8,7 @@
  * 責務:
  *   - Discord本登録フロー（flow=register + userId）の処理
  *   - Discordログインフロー（flow=login または flow なし）の処理
- *   - メール確認フロー（flow=email_confirm + edge-token Cookie）の処理
+ *   - メール確認フロー（flow=email_confirm + userId）の処理
  *   - handleOAuthCallback の呼び出しと edge-token Cookie 設定
  *   - 成功時: /mypage へリダイレクト
  *   - 失敗時: /auth/error へリダイレクト
@@ -19,10 +19,8 @@
  *   - See: docs/architecture/components/user-registration.md §13
  */
 
-import { cookies } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
-import * as AuthService from "@/lib/services/auth-service";
 import * as RegistrationService from "@/lib/services/registration-service";
 
 // ---------------------------------------------------------------------------
@@ -37,12 +35,12 @@ import * as RegistrationService from "@/lib/services/registration-service";
  *
  * 1. Discord本登録フロー: flow=register かつ userId あり
  * 2. Discord/メールログインフロー: flow=login または flow なし
- * 3. メール確認フロー: flow=email_confirm かつ edge-token Cookie あり
+ * 3. メール確認フロー: flow=email_confirm かつ userId あり
  *
  * クエリパラメータ:
  *   - code: Supabase Auth コールバックコード（必須）
  *   - flow: フロー種別（"register" | "login" | "email_confirm" | なし）
- *   - userId: 本登録フローの仮ユーザーID（flow=register 時のみ）
+ *   - userId: 本登録フローの仮ユーザーID（flow=register / flow=email_confirm 時）
  *
  * リダイレクト先:
  *   - 成功時: /mypage
@@ -68,28 +66,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 		// フロー1: Discord本登録フロー（flow=register + userId あり）
 		// See: docs/architecture/components/user-registration.md §7.2 Discord連携
 		result = await RegistrationService.handleOAuthCallback(code, userId);
-	} else if (flow === "email_confirm") {
-		// フロー3: メール確認フロー（flow=email_confirm + edge-token Cookie あり）
+	} else if (flow === "email_confirm" && userId) {
+		// フロー3: メール確認フロー（flow=email_confirm + userId）
+		// Discord 本登録フローと同パターン: userId は URL パラメータから取得
+		// （Gmailアプリ等 Cookie 非共有環境でも動作する）
 		// See: docs/architecture/components/user-registration.md §7.1 メール認証
-		const cookieStore = await cookies();
-		const edgeToken = cookieStore.get(EDGE_TOKEN_COOKIE)?.value;
-
-		if (!edgeToken) {
-			// edge-token Cookie なし → エラーページにリダイレクト
-			return NextResponse.redirect(new URL("/auth/error", req.nextUrl.origin));
-		}
-
-		// edge-token から userId を特定して本登録完了処理を呼ぶ
-		// verifyEdgeToken で仮ユーザーIDを取得（ipHash は未使用だが互換性のためダミーを渡す）
-		const verifyResult = await AuthService.verifyEdgeToken(edgeToken, "");
-
-		if (!verifyResult.valid) {
-			return NextResponse.redirect(new URL("/auth/error", req.nextUrl.origin));
-		}
-
 		result = await RegistrationService.handleOAuthCallback(
 			code,
-			verifyResult.userId,
+			userId,
+			"email",
 		);
 	} else {
 		// フロー2: Discord/メールログインフロー（flow=login または flow なし）

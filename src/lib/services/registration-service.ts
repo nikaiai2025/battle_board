@@ -75,14 +75,14 @@ export type VerifyPatResult =
  * @param userId - 現在の仮ユーザーの user_id
  * @param email - 登録するメールアドレス
  * @param password - パスワード
- * @param redirectTo - メール確認後のリダイレクト先URL（省略可）
+ * @param redirectTo - メール確認後のリダイレクト先URL（呼び出し元が構築する。省略不可）
  * @returns RegisterResult
  */
 export async function registerWithEmail(
 	userId: string,
 	email: string,
 	password: string,
-	redirectTo?: string,
+	redirectTo: string,
 ): Promise<RegisterResult> {
 	// Step 1: 仮ユーザーの存在確認
 	const user = await UserRepository.findById(userId);
@@ -289,11 +289,13 @@ export async function loginWithDiscord(
  *
  * @param code - Supabase Auth コールバックの code パラメータ
  * @param pendingUserId - 本登録フローの場合、紐付け先の仮ユーザーID（ログインフローの場合は不要）
+ * @param registrationType - 本登録方法: 'email' | 'discord'（本登録フローの場合に使用）
  * @returns LoginResult（ログイン成功時は userId と edgeToken を含む）
  */
 export async function handleOAuthCallback(
 	code: string,
 	pendingUserId?: string,
+	registrationType: "email" | "discord" = "discord",
 ): Promise<LoginResult> {
 	// Step 1: コードをセッションに交換
 	const { data: sessionData, error: sessionError } =
@@ -313,7 +315,7 @@ export async function handleOAuthCallback(
 		if (!pendingUserId) {
 			return { success: false, reason: "not_registered" };
 		}
-		await completeRegistration(pendingUserId, supabaseAuthId, "discord");
+		await completeRegistration(pendingUserId, supabaseAuthId, registrationType);
 		user = await UserRepository.findById(pendingUserId);
 		if (!user) {
 			return { success: false, reason: "not_registered" };

@@ -437,3 +437,109 @@ commandResult = await cmdService.executeCommand({
 サービス間の呼び出しで DB の UUID 列に到達し得るフィールドに `""` を渡している箇所全般。特に「値が実行時点で構造的に利用不可能」な場合に注意。
 
 See: `docs/operations/incidents/2026-03-19_attack_elimination_no_system_post.md`
+
+---
+
+## LL-012: 検索キーの変更時はユニーク性の不変条件を再検証する
+
+- **発見日:** 2026-03-25
+- **発見契機:** 専ブラ認証フローで「2回書き込み→認証」すると認証が必ず失敗するバグを人間が実機テストで発見
+
+### 事象
+
+Sprint-110 で6桁認証コードを廃止した際、認証レコードの検索キーが `code`（レコードごとにユニーク）から `token_id`（再発行で重複しうる）に変更された。しかし検索クエリの `.single()` はそのまま残り、重複レコードの蓄積を防ぐロジックも追加されなかった。結果、専ブラから2回以上書き込んだ後に認証すると `.single()` が複数行エラーを返し、認証が必ず失敗した。
+
+### 根本原因
+
+検索キーの変更が「フィールド名の変更」として扱われ、**ユニーク性の不変条件が変わった**ことが認識されなかった。
+
+| 項目 | 変更前（`code`） | 変更後（`token_id`） |
+|---|---|---|
+| 値の生成 | レコードごとに異なる6桁コード | edge-token（複数レコードが共有しうる） |
+| ユニーク性 | 事実上ユニーク | **非ユニーク** |
+| `.single()` | 安全（常に0 or 1行） | **危険（2行以上になりうる）** |
+
+### 教訓
+
+**検索キーを変更する際は、新しいキーが旧キーと同じユニーク性の保証を持つかを必ず確認する。** ユニーク性が弱まる場合は、以下の2点を同時に対処する:
+
+1. **クエリの安全化**: `.single()` → `.order().limit(1).single()` で複数行をハンドリングする
+2. **データの正規化**: 不要な重複レコードが蓄積しない仕組み（DELETE before INSERT、UPSERT等）を導入する
+
+片方だけでは不十分。クエリの防御だけでは古いレコードが蓄積し続け、データの正規化だけでは既存の重複に対して脆弱になる。
+
+### LL-002 との関係
+
+LL-002「InMemoryリポジトリは実DBの制約を再現する」の延長線上の問題。InMemory実装では `.single()` の複数行エラーは再現されないため、BDDテストでは検出不可能だった。InMemoryリポジトリのクエリセマンティクス（最新1件を返す等）を本番クエリと同期させることが重要。
+
+See: `docs/operations/incidents/2026-03-25_senbra_auth_findByTokenId_duplicate.md`
+
+---
+
+## LL-013: 使い切りBOTは `nextPostAt: null` で作成し、投稿後もリセットする
+
+- **発見日:** 2026-03-25
+- **発見契機:** 本番蓄積ログでチュートリアルBOTが cron に拾われ続けてエラーを出していることを発見
+
+### 事象
+
+チュートリアルBOTが `nextPostAt: new Date()` で作成されたため、`findDueForPost`（`is_active=true AND next_post_at <= NOW()`）に拾われ、`contextOverrides` なしの `executeBotPost` で `tutorialThreadId` 未設定エラーが cron のたびに発生していた。
+
+### 根本原因
+
+「使い切りBOT」パターン（1回投稿後は cron に拾われない）が煽りBOT固有の実装に埋もれており、共通パターンとして明文化されていなかった。
+
+### 教訓
+
+**使い切りBOT（チュートリアル・煽り・将来のBOT召喚等）は以下の2点を守る:**
+
+1. **作成時に `nextPostAt: null`** — `findDueForPost` に拾われない
+2. **`executeBotPost` 経由で投稿する場合、投稿後に `updateNextPostAt(id, null)`** — Step 9 の上書きをリセット
+
+煽りBOTのように `createPostFn` を直接呼ぶ場合は Step 9 を通らないため 2. は不要。
+
+### 防止策
+
+将来の使い切りBOT実装時に参照すべきチェック項目:
+- `botRepository.create()` の `nextPostAt` が `null` であること
+- `executeBotPost` 経由の場合、投稿後に `nextPostAt` を `null` にリセットしていること
+- BDD シナリオに「定期書き込みを行わない」相当の検証があること
+
+See: `docs/operations/incidents/2026-03-25_tutorial_bot_cron_repost_error.md`
+
+---
+
+## LL-014: 同一パターンの関数は同一のシグネチャにする（オプショナル引数で契約を緩めない）
+
+- **発見日:** 2026-03-25
+- **発見契機:** メール本登録の確認リンクが機能しないバグを人間が実機テストで発見
+
+### 事象
+
+メール本登録で Supabase に渡す `emailRedirectTo` が `undefined` となり、確認メールのリダイレクト先がサイトルートになって本登録完了処理が実行されなかった。Discord 本登録/ログインは同じコールバックを正しく使えていた。
+
+### 根本原因
+
+同じ役割の引数 `redirectTo` が、Discord 系では `string`（必須）、メール系では `string?`（オプショナル）と定義されていた。オプショナルにしたことで、呼び出し元がデフォルト値の構築を忘れても TypeScript が警告しなかった。
+
+```typescript
+// 安全: 省略するとコンパイルエラー
+registerWithDiscord(redirectTo: string)
+loginWithDiscord(redirectTo: string)
+
+// 危険: 省略しても通る → undefined が Supabase に渡る
+registerWithEmail(redirectTo?: string)  // ← 今回のバグ
+```
+
+### 教訓
+
+**同一パターンの関数群では、同一の引数シグネチャを維持する。** 特に外部サービスに渡す設定値をオプショナルにすると、フォールバック動作（Supabase のサイトURL等）に暗黙的に依存するパスが生まれ、テストで検出しにくいバグを招く。
+
+「呼び出し元が省略できる」と「省略しても安全」は異なる。省略が安全でない引数は必須にして、コンパイラに責務を委ねる。
+
+### 関連する設計原則
+
+- **Make illegal states unrepresentable**: 不正な状態を型で表現不可能にする（LL-001 のブランド型と同系統）
+- **新しいルートハンドラを追加する際のチェック**: 同一パターンの既存ルートと引数の一貫性を確認する
+
+See: `docs/operations/incidents/2026-03-25_email_auth_redirect_missing.md`
