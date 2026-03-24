@@ -11,7 +11,7 @@
 ## 方針
 
 - **ユーザー保全**: users / edge_tokens / currencies / admin_users は TRUNCATE しない
-- **シード保全**: ボット・固定スレッドは退避→状態リセット→復元
+- **シード保全**: 荒らし役ボット・固定スレッドは退避→状態リセット→復元（チュートリアル・煽りBOTは動的生成のため破棄）
 - **テーブルリスト明示**: SQLスクリプトに対象テーブルを明記し、実行前に網羅性を確認する
 
 ### テーブル分類
@@ -20,7 +20,7 @@
 |---|---|---|
 | TRUNCATE対象 | 全行削除 | threads, posts, bots, bot_posts, accusations, attacks, grass_reactions, incentive_logs, daily_events, daily_stats, pending_tutorials, pending_async_commands, auth_codes, ip_bans |
 | 保全（ユーザー） | 変更なし（キャッシュカラムのみリセット） | users, edge_tokens, currencies, admin_users |
-| 保全（シード） | 退避→TRUNCATE→復元 | bots, threads の一部（固定スレッド）, posts の一部（固定スレッド1レス目） |
+| 保全（シード） | 退避→TRUNCATE→復元 | bots の一部（荒らし役のみ）, threads の一部（固定スレッド）, posts の一部（固定スレッド1レス目） |
 | 対象外 | リセットしない | dev_posts（開発連絡板。本番システムと独立） |
 
 ### 既知の副作用: ウェルカムシーケンス再発動
@@ -62,11 +62,23 @@ SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
 | マイグレーションでシードされるデータがあるか？ | Phase 1 の退避対象に追加 |
 | 他テーブルへの FK を持つか？ | 退避テーブルから INSERT する際の順序を確認 |
 
-### Step 3: スクリプト更新
+### Step 3: ボット保全対象の確認
+
+リセットSQLは荒らし役ボット (`bot_profile_key = '荒らし役'`) のみを保全する。これはスクリプト作成時に荒らし役しか常駐BOTが存在しなかったため。新たに常駐型BOTが追加実装されていないか、以下で確認すること:
+
+```sql
+SELECT DISTINCT bot_profile_key FROM bots;
+```
+
+マイグレーションでシードされる常駐BOT（荒らし役と同様に定期投稿する種別）が増えている場合は、`reset_all_data.sql` の Phase 1 の `WHERE bot_profile_key = '荒らし役'` 条件にその種別を追加する。
+
+動的生成BOT（チュートリアル・煽り等、ユーザー操作をトリガーに生成されるもの）は復元不要。復元するとコンテキスト消失で cron が全件エラーになる。
+
+### Step 4: スクリプト更新
 
 差分があった場合、SQLスクリプトを更新してコミットする。
 
-### Step 4: 人間に確認結果を報告し、実行の承認を得る
+### Step 5: 人間に確認結果を報告し、実行の承認を得る
 
 ## 実行（人間が実施または承認の上でAIが実施）
 

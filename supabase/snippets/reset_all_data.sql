@@ -10,7 +10,11 @@
 --
 -- ■ 保全対象
 --   ユーザー関連: users / edge_tokens / currencies / admin_users（全行）
---   シード: 固定スレッド（案内板）+ 1レス目 / ボット全体（状態リセット）
+--   シード: 固定スレッド（案内板）+ 1レス目 / 荒らし役ボットのみ（状態リセット）
+--
+-- ■ 破棄対象（復元しない）
+--   チュートリアルBOT・煽りBOT — ユーザー操作時に動的生成されるため復元不要。
+--   復元すると tutorialThreadId 等のコンテキスト消失で cron が全件エラーになる。
 --
 -- ■ 対象外（リセットしない）
 --   dev_posts — 開発連絡板。本番システムと独立した運用のため
@@ -36,9 +40,11 @@ SELECT p.* FROM posts p
 JOIN _seed_threads st ON st.id = p.thread_id
 WHERE p.post_number = 1;
 
--- ボット全体（ランタイム状態を初期値にリセット）
+-- 荒らし役ボットのみ保全（チュートリアル・煽りBOTは動的生成のため破棄）
+-- チュートリアルBOTを復元すると tutorialThreadId コンテキスト消失で
+-- cron の処理枠を占有し荒らし役BOTが投稿できなくなる（INCIDENT-BOTSILENT）
 CREATE TEMP TABLE _seed_bots AS
-SELECT * FROM bots;
+SELECT * FROM bots WHERE bot_profile_key = '荒らし役';
 UPDATE _seed_bots SET
   hp = max_hp, is_revealed = false, revealed_at = NULL,
   is_active = true, survival_days = 0, total_posts = 0,
@@ -96,14 +102,17 @@ BEGIN
   SELECT count(*) INTO v_bots    FROM bots;
   SELECT count(*) INTO v_threads FROM threads;
 
-  RAISE NOTICE 'users=% (保全), bots=% (復元), threads=% (復元)',
+  RAISE NOTICE 'users=% (保全), bots=% (荒らし役のみ復元), threads=% (復元)',
     v_users, v_bots, v_threads;
 
   IF v_users < 1 THEN
     RAISE EXCEPTION 'FAIL: ユーザーが保全されていません';
   END IF;
   IF v_bots < 1 THEN
-    RAISE EXCEPTION 'FAIL: ボットが復元されていません';
+    RAISE EXCEPTION 'FAIL: 荒らし役ボットが復元されていません';
+  END IF;
+  IF v_bots > 15 THEN
+    RAISE WARNING 'WARN: ボット数が多すぎます (%)。チュートリアル/煽りBOTが混入していないか確認してください', v_bots;
   END IF;
 
   RAISE NOTICE 'OK: コンテンツリセット完了';
