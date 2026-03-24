@@ -489,23 +489,6 @@ export default function MypagePage() {
 					<span className="font-medium">連続書き込み: </span>
 					{mypageInfo.streakDays}日
 				</div>
-
-				{/* ログアウトボタン（本登録ユーザーのみ表示）
-            D-06: id=logout-btn, style=danger, condition=user.isRegistered==true
-            See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
-            仮ユーザーはログアウトするとユーザーIDを喪失するため非表示。 */}
-				{isPermanentUser(mypageInfo) && (
-					<button
-						id="logout-btn"
-						type="button"
-						onClick={() => {
-							void handleLogout();
-						}}
-						className="px-4 py-1.5 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700"
-					>
-						ログアウト
-					</button>
-				)}
 			</section>
 
 			{/* =============================
@@ -893,6 +876,27 @@ export default function MypagePage() {
 					通知はありません（Phase 2 で実装予定）
 				</p>
 			</section>
+
+			{/* =============================
+          ログアウト（本登録ユーザーのみ・ページ最下部）
+          D-06: id=logout-btn, style=danger, condition=user.isRegistered==true
+          See: features/user_registration.feature @ログアウトすると書き込みに再認証が必要になる
+          仮ユーザーはログアウトするとユーザーIDを喪失するため非表示。
+          ============================= */}
+			{isPermanentUser(mypageInfo) && (
+				<div className="pt-4 border-t border-border">
+					<button
+						id="logout-btn"
+						type="button"
+						onClick={() => {
+							void handleLogout();
+						}}
+						className="px-4 py-1.5 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700"
+					>
+						ログアウト
+					</button>
+				</div>
+			)}
 		</main>
 	);
 }

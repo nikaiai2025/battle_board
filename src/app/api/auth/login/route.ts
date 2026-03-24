@@ -16,8 +16,8 @@
  * 設計上の判断:
  *   - edge-token Cookie の設定は Route Handler が担当
  *   - ログインは新デバイスの edge-token を追加発行するだけ。既存トークンは影響なし
- *   - See: docs/architecture/components/user-registration.md §13 設計上の判断
- *     「ログイン時に追加のCookieは設けない」
+ *   - 本登録状態の判定は Layout が AuthService.getLayoutAuthStatus() で
+ *     edge-token から DB 参照する（追加 Cookie は不要）
  */
 
 import { type NextRequest, NextResponse } from "next/server";

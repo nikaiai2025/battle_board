@@ -3,11 +3,9 @@
  *
  * BattleBoard の Web UI 全ページに共通するレイアウトを定義。
  * - Header コンポーネントを全ページに表示
- * - edge-token Cookie の存在を Server Component から読み取り、
- *   isAuthenticated を動的に設定する（DB呼び出しなし・Cookie存在チェックのみ）
- *
- * NOTE: Cookie 存在チェックは認証の簡易判定であり、トークンの有効性検証は
- *       API 境界（Route Handler）で行う。
+ * - edge-token Cookie が存在する場合、AuthService.getLayoutAuthStatus() で
+ *   認証状態と本登録状態を取得し Header に渡す（軽量 DB 問い合わせ）
+ * - Cookie が存在しない場合は DB 問い合わせをスキップする
  *
  * See: features/mypage.feature @マイページに基本情報が表示される
  * See: features/authentication.feature
@@ -17,6 +15,7 @@
 import { cookies } from "next/headers";
 import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
 import { resolveFont, resolveTheme } from "@/lib/domain/rules/theme-rules";
+import { getLayoutAuthStatus } from "@/lib/services/auth-service";
 import Header from "./_components/Header";
 
 interface WebLayoutProps {
@@ -27,17 +26,26 @@ interface WebLayoutProps {
  * Web UI 共通レイアウト（Server Component）
  *
  * リクエストごとに実行され（dynamic rendering）、Cookie を読み取る。
- * edge-token Cookie が存在する場合は isAuthenticated=true を Header に渡し、
- * マイページへのリンクを表示する。
+ * edge-token Cookie が存在する場合は AuthService.getLayoutAuthStatus() で
+ * 認証状態と本登録状態を取得し、Header に渡す。
  *
  * See: features/mypage.feature @マイページに基本情報が表示される
  * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
  */
 export default async function WebLayout({ children }: WebLayoutProps) {
-	// edge-token Cookie の存在をチェックして認証状態を判定する。
-	// DB呼び出しは行わない（トークン有効性の検証は API 境界で実施）。
 	const cookieStore = await cookies();
-	const isAuthenticated = cookieStore.has(EDGE_TOKEN_COOKIE);
+	const edgeToken = cookieStore.get(EDGE_TOKEN_COOKIE)?.value;
+
+	// Cookie なし → DB 問い合わせスキップ（未認証確定）
+	// Cookie あり → 軽量 DB 問い合わせで認証状態 + 本登録状態を取得
+	let isAuthenticated = false;
+	let isRegistered = false;
+
+	if (edgeToken) {
+		const status = await getLayoutAuthStatus(edgeToken);
+		isAuthenticated = status.isAuthenticated;
+		isRegistered = status.isRegistered;
+	}
 
 	// テーマ/フォントをCookieから取得し解決する
 	// 未設定や不正値はデフォルトにフォールバック
@@ -58,10 +66,11 @@ export default async function WebLayout({ children }: WebLayoutProps) {
 			style={{ fontFamily: font.cssFontFamily }}
 		>
 			{/* ヘッダー: 全 Web ページに表示
-          isAuthenticated は edge-token Cookie の存在で判定（動的）。
+          isAuthenticated: 認証済み（マイページリンク表示）
+          isRegistered: 本登録済み（ログインリンク非表示）
           See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
       */}
-			<Header isAuthenticated={isAuthenticated} />
+			<Header isAuthenticated={isAuthenticated} isRegistered={isRegistered} />
 
 			{/* ページコンテンツ */}
 			{children}

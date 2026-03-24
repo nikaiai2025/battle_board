@@ -189,6 +189,41 @@ export async function verifyEdgeToken(
 	};
 }
 
+// ---------------------------------------------------------------------------
+// Layout 用認証ステータス
+// ---------------------------------------------------------------------------
+
+/**
+ * Layout（Server Component）向けの軽量認証ステータス取得。
+ * Header の表示制御（ログインリンク/マイページリンクの出し分け）に使用する。
+ *
+ * verifyEdgeToken と同じ DB クエリ（edge_tokens + users）を行うが、
+ * 返却値を UI 表示判定に必要な最小限に絞っている。
+ *
+ * @param token - Cookie から読み取った edge-token 文字列
+ * @returns isAuthenticated: 認証済み（マイページ表示用）
+ *          isRegistered: 本登録済み（ログインリンク非表示用）
+ */
+export async function getLayoutAuthStatus(token: string): Promise<{
+	isAuthenticated: boolean;
+	isRegistered: boolean;
+}> {
+	const edgeToken = await EdgeTokenRepository.findByToken(token);
+	if (!edgeToken) {
+		return { isAuthenticated: false, isRegistered: false };
+	}
+
+	const user = await UserRepository.findById(edgeToken.userId);
+	if (!user || !user.isVerified) {
+		return { isAuthenticated: false, isRegistered: false };
+	}
+
+	return {
+		isAuthenticated: true,
+		isRegistered: user.supabaseAuthId !== null,
+	};
+}
+
 /**
  * 新しい edge-token を発行し、ユーザーを作成する。
  * CSPRNG（crypto.randomUUID）でトークンを生成する。
