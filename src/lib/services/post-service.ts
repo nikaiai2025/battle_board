@@ -469,6 +469,10 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				// See: tmp/reports/2026-03-22_cf_error_investigation.md §問題1 修正方針 案A
 				userId: input.botUserId ?? resolvedAuthorId ?? "",
 				dailyId, // Step 4 で生成済み。ハンドラの表示文字列（"名無しさん(ID:xxx)"）に使用
+				// BOT草付与フラグ: BOT書き込み時は grass_reactions INSERT をスキップさせる。
+				// BOTのbotUserIdはusersテーブルに存在しないため、giver_idのFK制約違反を回避する。
+				// See: tmp/reports/debug_TASK-DEBUG-119.md
+				...(input.isBotWrite ? { isBotGiver: true } : {}),
 			});
 		} catch (err) {
 			// コマンド実行失敗は書き込みを巻き戻さない

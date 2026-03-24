@@ -174,8 +174,14 @@ export class GrassHandler implements CommandHandler {
 		// ステップ4: 自己草チェック
 		// authorId が null のレス（ボット書き込み）への自己草は有り得ないため、
 		// authorId が自分自身と一致する場合のみチェックする
+		// BOT草付与パス: BOTのuserIdはusersテーブルに存在しないため自己草チェックをスキップ
 		// See: features/reactions.feature @自分が書いたレスには草を生やせない
-		if (targetPost.authorId !== null && targetPost.authorId === ctx.userId) {
+		// See: tmp/reports/debug_TASK-DEBUG-119.md
+		if (
+			!ctx.isBotGiver &&
+			targetPost.authorId !== null &&
+			targetPost.authorId === ctx.userId
+		) {
 			return {
 				success: false,
 				systemMessage: "自分のレスには草を生やせません",
@@ -210,34 +216,40 @@ export class GrassHandler implements CommandHandler {
 			}
 		}
 
-		// ステップ6: 同日重複チェック
-		// See: features/reactions.feature @同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
-		const today = new Date(Date.now()).toISOString().split("T")[0]; // YYYY-MM-DD
-		const alreadyGiven = await this.grassRepository.existsForToday(
-			ctx.userId,
-			receiverId,
-			receiverBotId,
-			today,
-		);
-		if (alreadyGiven) {
-			return {
-				success: false,
-				systemMessage: "今日は既にこのユーザーに草を生やしています",
-			};
+		// BOT草付与パス: ステップ6（重複チェック）・ステップ7（grass_reactions INSERT）をスキップ
+		// BOTのbotUserIdはusersテーブルに存在しないため、grass_reactions.giver_idのFK制約違反を回避する。
+		// チュートリアルBOTは1回限りの !w デモであり、重複チェック不要。
+		// See: tmp/reports/debug_TASK-DEBUG-119.md
+		if (!ctx.isBotGiver) {
+			// ステップ6: 同日重複チェック
+			// See: features/reactions.feature @同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
+			const today = new Date(Date.now()).toISOString().split("T")[0]; // YYYY-MM-DD
+			const alreadyGiven = await this.grassRepository.existsForToday(
+				ctx.userId,
+				receiverId,
+				receiverBotId,
+				today,
+			);
+			if (alreadyGiven) {
+				return {
+					success: false,
+					systemMessage: "今日は既にこのユーザーに草を生やしています",
+				};
+			}
+
+			// ステップ7: 草記録作成
+			// UNIQUE制約違反の場合は null が返る（existsForToday で事前チェック済みだが二重防御）
+			await this.grassRepository.create({
+				giverId: ctx.userId,
+				receiverId,
+				receiverBotId,
+				targetPostId: targetArg,
+				threadId: ctx.threadId,
+				givenDate: today,
+			});
 		}
 
-		// ステップ7: 草記録作成
-		// UNIQUE制約違反の場合は null が返る（existsForToday で事前チェック済みだが二重防御）
-		await this.grassRepository.create({
-			giverId: ctx.userId,
-			receiverId,
-			receiverBotId,
-			targetPostId: targetArg,
-			threadId: ctx.threadId,
-			givenDate: today,
-		});
-
-		// ステップ8: 草カウント加算
+		// ステップ8: 草カウント加算（BOT草付与パスでも実行する）
 		// - 人間: users.grass_count を +1（GrassRepository.incrementGrassCount）
 		// - ボット: bots.grass_count を +1（GrassRepository.incrementBotGrassCount）
 		//   LEAK-1修正: ボットへの草も正しいカウントを表示する（「計0本」固定を解消）

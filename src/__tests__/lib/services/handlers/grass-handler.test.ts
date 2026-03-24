@@ -588,3 +588,162 @@ describe("GrassHandler エッジケース", () => {
 		);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// BOT草付与パステスト（FK制約違反回避）
+// See: tmp/reports/debug_TASK-DEBUG-119.md
+// See: docs/operations/incidents/2026-03-24_welcome_bot_w_command_silent_failure.md
+//
+// BOTが !w コマンドを実行する場合、grass_reactions.giver_id のFK制約違反を回避するため、
+// grass_reactions INSERTをスキップし、草カウント加算+システムメッセージ生成のみ実行する。
+// ---------------------------------------------------------------------------
+
+describe("GrassHandler BOT草付与パス (isBotGiver)", () => {
+	// ---
+	// 正常系: BOT草付与が成功する
+	// ---
+	describe("正常系", () => {
+		it("isBotGiver=true の場合、草付与に成功する", async () => {
+			const grassRepo = createMockGrassRepository({
+				incrementGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const handler = createHandler(createMockPostRepository(), grassRepo);
+			const ctx = createCtx({ isBotGiver: true });
+			const result = await handler.execute(ctx);
+
+			expect(result.success).toBe(true);
+		});
+
+		it("isBotGiver=true の場合、システムメッセージが正しく生成される", async () => {
+			const post = createHumanPost({
+				postNumber: 5,
+				dailyId: "Bx9kQ3",
+				authorId: "user-a-001",
+			});
+			const grassRepo = createMockGrassRepository({
+				incrementGrassCount: vi.fn().mockResolvedValue(3),
+			});
+			const handler = createHandler(createMockPostRepository(post), grassRepo);
+			const ctx = createCtx({ isBotGiver: true });
+			const result = await handler.execute(ctx);
+
+			expect(result.success).toBe(true);
+			expect(result.systemMessage).toBe(">>5 (ID:Bx9kQ3) に草 🌱(計3本)");
+		});
+	});
+
+	// ---
+	// grass_reactions INSERTスキップ: FK制約違反の回避
+	// ---
+	describe("grass_reactions INSERTスキップ", () => {
+		it("isBotGiver=true の場合、GrassRepository.create が呼ばれない", async () => {
+			const grassRepo = createMockGrassRepository({
+				incrementGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const handler = createHandler(createMockPostRepository(), grassRepo);
+			const ctx = createCtx({ isBotGiver: true });
+			await handler.execute(ctx);
+
+			expect(grassRepo.create).not.toHaveBeenCalled();
+		});
+	});
+
+	// ---
+	// 草カウント加算: スキップしない
+	// ---
+	describe("草カウント加算", () => {
+		it("isBotGiver=true でも人間受領者への incrementGrassCount は呼ばれる", async () => {
+			const post = createHumanPost({ authorId: "user-a-001" });
+			const grassRepo = createMockGrassRepository({
+				incrementGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const handler = createHandler(createMockPostRepository(post), grassRepo);
+			const ctx = createCtx({ isBotGiver: true });
+			await handler.execute(ctx);
+
+			expect(grassRepo.incrementGrassCount).toHaveBeenCalledWith("user-a-001");
+		});
+
+		it("isBotGiver=true でボット受領者への incrementBotGrassCount は呼ばれる", async () => {
+			const botPost = createBotPost();
+			const grassRepo = createMockGrassRepository({
+				incrementBotGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
+			const handler = createHandler(
+				createMockPostRepository(botPost),
+				grassRepo,
+				botPostRepo,
+			);
+			const ctx = createCtx({ isBotGiver: true });
+			await handler.execute(ctx);
+
+			expect(grassRepo.incrementBotGrassCount).toHaveBeenCalledWith("bot-001");
+		});
+	});
+
+	// ---
+	// 自己草チェック・重複チェックのスキップ
+	// ---
+	describe("バリデーションスキップ", () => {
+		it("isBotGiver=true の場合、自己草チェックをスキップする", async () => {
+			// BOTのuserIdが対象レスのauthorIdと一致するケースでも通過する
+			// （通常のBOTでは発生しないが、明示的にスキップされることを確認）
+			const post = createHumanPost({ authorId: "bot-user-001" });
+			const grassRepo = createMockGrassRepository({
+				incrementGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const handler = createHandler(createMockPostRepository(post), grassRepo);
+			const ctx = createCtx({ userId: "bot-user-001", isBotGiver: true });
+			const result = await handler.execute(ctx);
+
+			expect(result.success).toBe(true);
+		});
+
+		it("isBotGiver=true の場合、重複チェックをスキップする", async () => {
+			const grassRepo = createMockGrassRepository({
+				existsForToday: vi.fn().mockResolvedValue(true), // 重複ありでも通過
+				incrementGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const handler = createHandler(createMockPostRepository(), grassRepo);
+			const ctx = createCtx({ isBotGiver: true });
+			const result = await handler.execute(ctx);
+
+			expect(result.success).toBe(true);
+		});
+
+		it("isBotGiver=true の場合、existsForToday は呼ばれない", async () => {
+			const grassRepo = createMockGrassRepository({
+				incrementGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const handler = createHandler(createMockPostRepository(), grassRepo);
+			const ctx = createCtx({ isBotGiver: true });
+			await handler.execute(ctx);
+
+			expect(grassRepo.existsForToday).not.toHaveBeenCalled();
+		});
+	});
+
+	// ---
+	// isBotGiver=false は従来の動作に影響しない（回帰確認）
+	// ---
+	describe("回帰確認: isBotGiver=false/undefined", () => {
+		it("isBotGiver=false の場合、GrassRepository.create が呼ばれる", async () => {
+			const grassRepo = createMockGrassRepository();
+			const handler = createHandler(createMockPostRepository(), grassRepo);
+			const ctx = createCtx({ isBotGiver: false });
+			await handler.execute(ctx);
+
+			expect(grassRepo.create).toHaveBeenCalledOnce();
+		});
+
+		it("isBotGiver=undefined の場合、GrassRepository.create が呼ばれる", async () => {
+			const grassRepo = createMockGrassRepository();
+			const handler = createHandler(createMockPostRepository(), grassRepo);
+			const ctx = createCtx(); // isBotGiver 未設定
+			await handler.execute(ctx);
+
+			expect(grassRepo.create).toHaveBeenCalledOnce();
+		});
+	});
+});

@@ -102,6 +102,13 @@ export interface CommandExecutionInput {
 	userId: string;
 	/** 実行ユーザーの日次ID（表示用。ハンドラはビジネスロジックには userId を使う） */
 	dailyId: string;
+	/**
+	 * BOT草付与フラグ。BOT書き込み時に true を設定する。
+	 * GrassHandler に伝播し、grass_reactions INSERT をスキップさせる。
+	 *
+	 * See: tmp/reports/debug_TASK-DEBUG-119.md
+	 */
+	isBotGiver?: boolean;
 }
 
 /**
@@ -185,6 +192,16 @@ export interface CommandContext {
 	userId: string;
 	/** 実行ユーザーの日次ID（表示用。"名無しさん(ID:xxx)" の xxx に使用） */
 	dailyId: string;
+	/**
+	 * BOT草付与フラグ。true の場合、GrassHandler は grass_reactions INSERT をスキップし、
+	 * 草カウント加算+システムメッセージ生成のみを実行する。
+	 * BOT の botUserId は users テーブルに存在しないため、grass_reactions.giver_id の
+	 * FK制約違反を回避する目的で使用する。
+	 *
+	 * See: tmp/reports/debug_TASK-DEBUG-119.md
+	 * See: docs/operations/incidents/2026-03-24_welcome_bot_w_command_silent_failure.md
+	 */
+	isBotGiver?: boolean;
 }
 
 /**
@@ -804,6 +821,8 @@ export class CommandService {
 		}
 
 		// Step 5: ハンドラ実行
+		// isBotGiver: BOT書き込み時のFK制約違反回避フラグを伝播する
+		// See: tmp/reports/debug_TASK-DEBUG-119.md
 		const ctx: CommandContext = {
 			args: parsed.args,
 			rawArgs,
@@ -811,6 +830,7 @@ export class CommandService {
 			threadId: input.threadId,
 			userId: input.userId,
 			dailyId: input.dailyId,
+			...(input.isBotGiver ? { isBotGiver: true } : {}),
 		};
 
 		const result = await handler.execute(ctx);
