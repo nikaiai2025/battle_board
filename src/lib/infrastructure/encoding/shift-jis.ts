@@ -126,8 +126,7 @@ export class ShiftJisEncoder {
 	 * HTML数値参照（&#NNNNN;）に変換する。これにより専ブラでHTMLとして解釈し元の文字を表示できる。
 	 * 異体字セレクタ（U+FE0F, U+FE0E）は除去する（専ブラで文字化けマークになるため）。
 	 *
-	 * NOTE: BOT絵文字（🤖等）はDAT出力時にDatFormatterで[BOT]に事前置換される。
-	 * それ以外のCP932非対応文字（ユーザー入力の任意の絵文字等）はここでHTML数値参照に変換される。
+	 * BOT絵文字（🤖等）を含むすべてのCP932非対応文字はここでHTML数値参照に変換される。
 	 *
 	 * See: features/specialist_browser_compat.feature
 	 *   @scenario すべてのレスポンスがShift_JIS（CP932）でエンコードされる

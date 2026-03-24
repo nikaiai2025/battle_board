@@ -53,7 +53,7 @@ class DatFormatter {
 名前<>メール<>YYYY/MM/DD(曜) HH:mm:ss.SS ID:dailyId<>本文（<br>区切り）<>スレッドタイトル（第1レスのみ）\n
 ```
 
-BOTマーク絵文字（🤖等）の Shift_JIS 変換不可問題：DAT出力時は `[BOT]` テキストに置換する。この置換はDatFormatter内で行う。
+絵文字等のCP932非対応文字は `ShiftJisEncoder.sanitizeForCp932()` でHTML数値参照に変換される。BOT絵文字（🤖等）も他の絵文字と同じ変換パスを通る。
 
 ### SubjectFormatter
 

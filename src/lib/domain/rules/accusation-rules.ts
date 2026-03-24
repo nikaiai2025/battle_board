@@ -95,7 +95,7 @@ export function buildHitSystemMessage(
 	targetPostNumber: number,
 ): string {
 	return (
-		`[システム] 名無しさん(ID:${accuserDailyId})が >>${targetPostNumber} をAI告発！\n` +
+		`名無しさん(ID:${accuserDailyId})が >>${targetPostNumber} をAI告発！\n` +
 		`判定結果：>>${targetPostNumber} は… AIでした！🤖`
 	);
 }
@@ -118,7 +118,7 @@ export function buildMissSystemMessage(
 	accusationCost: number,
 ): string {
 	return (
-		`[システム] 名無しさん(ID:${accuserDailyId})が >>${targetPostNumber} をAI告発！\n` +
+		`名無しさん(ID:${accuserDailyId})が >>${targetPostNumber} をAI告発！\n` +
 		`判定結果：>>${targetPostNumber} は… 人間でした！\n` +
 		`ID:${accuserDailyId} の通貨 -${accusationCost}`
 	);

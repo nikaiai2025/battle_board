@@ -125,7 +125,7 @@ describe("NewspaperHandler", () => {
 				invokerUserId: "user-xyz",
 				payload: {
 					category: "スポーツ",
-					model_id: "gemini-3-flash-preview",
+					model_id: "gemini-2.5-flash",
 				},
 			});
 		});
@@ -149,7 +149,7 @@ describe("NewspaperHandler", () => {
 				expect.objectContaining({
 					payload: {
 						category: "経済",
-						model_id: "gemini-3-flash-preview",
+						model_id: "gemini-2.5-flash",
 					},
 				}),
 			);

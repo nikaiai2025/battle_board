@@ -79,7 +79,7 @@ function createSystemPost(overrides: Partial<Post> = {}): Post {
 		displayName: "★システム",
 		dailyId: "SYSTEM",
 		isSystemMessage: true,
-		body: "[システム] テストメッセージ",
+		body: "テストメッセージ",
 		...overrides,
 	});
 }
@@ -199,7 +199,7 @@ describe("AccusationService", () => {
 			const result = await service.accuse(createAccusationInput());
 
 			expect(result.systemMessage).toContain("AIでした");
-			expect(result.systemMessage).toContain("[システム]");
+			expect(result.systemMessage).toContain("をAI告発");
 		});
 
 		it("hit時のシステムメッセージにボーナス付与行が含まれない", async () => {

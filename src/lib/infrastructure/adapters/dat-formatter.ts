@@ -23,22 +23,11 @@ import { ShiftJisEncoder } from "../encoding/shift-jis";
 const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 /**
- * Shift_JISで表現できない絵文字等をテキストに置換するマッピング。
- * 新しいBOT絵文字が追加された場合はここに追記する。
- */
-/**
  * inlineSystemInfo の区切り線（全角ダッシュ10個）。
  * See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される
  * See: docs/architecture/components/posting.md §5 方式A
  */
 const INLINE_SYSTEM_INFO_SEPARATOR = "──────────";
-
-const BOT_EMOJI_REPLACEMENTS: [RegExp, string][] = [
-	[/🤖/g, "[BOT]"],
-	[/🦾/g, "[BOT]"],
-	[/🦿/g, "[BOT]"],
-	[/🧠/g, "[BOT]"],
-];
 
 /**
  * DAT形式テキストの構築クラス。
@@ -64,7 +53,7 @@ export class DatFormatter {
 		return (
 			posts
 				.map((post, index) => {
-					const name = this.replaceBotEmoji(post.displayName);
+					const name = post.displayName;
 					const mail = ""; // メールフィールド（現仕様では空）
 					const dateId = this.formatDateId(post.createdAt, post.dailyId);
 					const body = this.formatBody(post);
@@ -95,7 +84,6 @@ export class DatFormatter {
 	 *
 	 * - isDeleted=trueの場合は「このレスは削除されました」に置換
 	 * - HTML特殊文字をエスケープ（XSS対策）
-	 * - BOT絵文字を[BOT]に置換（Shift_JIS変換不可のため）
 	 * - 改行(\n)を<br>に変換（DAT形式では1レス=1物理行）
 	 * - inlineSystemInfoが存在する場合、区切り線付きで本文末尾に連結
 	 *
@@ -111,16 +99,14 @@ export class DatFormatter {
 			return "このレスは削除されました";
 		}
 		const escaped = this.escapeHtml(post.body);
-		const botReplaced = this.replaceBotEmoji(escaped);
 		// 改行を<br>に変換（1レス=1物理行にする）
-		let body = botReplaced.replace(/\n/g, "<br>");
+		let body = escaped.replace(/\n/g, "<br>");
 
 		// inlineSystemInfo が存在する場合、区切り線付きで末尾に連結する
 		// See: features/command_system.feature @書き込み報酬がレス末尾に表示される
 		if (post.inlineSystemInfo && post.inlineSystemInfo.length > 0) {
 			const escapedInfo = this.escapeHtml(post.inlineSystemInfo);
-			const botReplacedInfo = this.replaceBotEmoji(escapedInfo);
-			const formattedInfo = botReplacedInfo.replace(/\n/g, "<br>");
+			const formattedInfo = escapedInfo.replace(/\n/g, "<br>");
 			body += `<br>${INLINE_SYSTEM_INFO_SEPARATOR}<br>${formattedInfo}`;
 		}
 
@@ -141,23 +127,6 @@ export class DatFormatter {
 			.replace(/>/g, "&gt;")
 			.replace(/"/g, "&quot;")
 			.replace(/'/g, "&#39;");
-	}
-
-	/**
-	 * Shift_JISで表現できないBOT絵文字を[BOT]テキストに置換する。
-	 *
-	 * See: docs/architecture/components/senbra-adapter.md §2 DatFormatter
-	 *   "BOTマーク絵文字（🤖等）の Shift_JIS 変換不可問題：DAT出力時は `[BOT]` テキストに置換する"
-	 *
-	 * @param text - 置換対象の文字列
-	 * @returns BOT絵文字を[BOT]に置換した文字列
-	 */
-	private replaceBotEmoji(text: string): string {
-		let result = text;
-		for (const [pattern, replacement] of BOT_EMOJI_REPLACEMENTS) {
-			result = result.replace(pattern, replacement);
-		}
-		return result;
 	}
 
 	/**

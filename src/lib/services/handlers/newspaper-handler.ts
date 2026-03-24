@@ -2,7 +2,7 @@
  * CommandHandler 実装: !newspaper（最新ニュース取得）
  *
  * 同期フェーズでは pending_async_commands に INSERT するのみ。
- * AI API 呼び出し・★システムレス投稿は Cron フェーズ（processNewspaperCommands）で実行する。
+ * AI API 呼び出し・★システムレス投稿は GH Actions（newspaper-worker.ts）で非同期実行する。
  *
  * - コスト: 10
  * - ステルス: false（コマンド文字列は本文に残る）
@@ -12,7 +12,10 @@
  * See: tmp/workers/bdd-architect_271/newspaper_design.md §2
  */
 
-import { NEWSPAPER_CATEGORIES } from "../../../../config/newspaper-categories";
+import {
+	NEWSPAPER_CATEGORIES,
+	NEWSPAPER_MODEL_ID,
+} from "../../../../config/newspaper-categories";
 import type {
 	CommandContext,
 	CommandHandler,
@@ -105,7 +108,7 @@ export class NewspaperHandler implements CommandHandler {
 			invokerUserId: ctx.userId,
 			payload: {
 				category,
-				model_id: "gemini-3-flash-preview",
+				model_id: NEWSPAPER_MODEL_ID,
 			},
 		});
 

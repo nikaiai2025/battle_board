@@ -244,9 +244,7 @@ export default function PostItem({ post }: PostItemProps) {
 							: "text-green-700 dark:text-green-400"
 					}`}
 				>
-					{isSystemMessage
-						? `[システム] ${post.displayName}`
-						: post.displayName}
+					{post.displayName}
 				</span>
 
 				{/* post-daily-id: 日次リセットID

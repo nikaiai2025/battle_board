@@ -90,7 +90,7 @@ export async function triggerWorkflow(workflowFile: string): Promise<void> {
  *
  * fire-and-forget の設計根拠:
  *   - pending INSERT の成功とワークフロートリガーの成否は独立。
- *   - トリガー失敗時も cron（4時間ごと）がフォールバックとして機能する。
+ *   - トリガー失敗時は pending が滞留するため、ログ監視で検知・対応する。
  *   - ユーザー体験への影響なし（INSERT が成功すればコマンドは受理済み）。
  *
  * @param repo             — ラップ対象の pending リポジトリ

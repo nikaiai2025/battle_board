@@ -168,10 +168,10 @@ describe("buildHitSystemMessage", () => {
 		expect(message).toContain(">>5");
 	});
 
-	it("告発成功のシステムメッセージに[システム]ヘッダが含まれる", () => {
+	it("告発成功のシステムメッセージに告発行動の記述が含まれる", () => {
 		const message = buildHitSystemMessage("AbCd1234", 5);
 
-		expect(message).toContain("[システム]");
+		expect(message).toContain("をAI告発");
 	});
 
 	it("告発成功のシステムメッセージにAI判定結果が含まれる", () => {
@@ -224,10 +224,10 @@ describe("buildMissSystemMessage", () => {
 		expect(message).toContain("人間でした");
 	});
 
-	it("告発失敗のシステムメッセージに[システム]ヘッダが含まれる", () => {
+	it("告発失敗のシステムメッセージに告発行動の記述が含まれる", () => {
 		const message = buildMissSystemMessage("AbCd1234", 5, 10);
 
-		expect(message).toContain("[システム]");
+		expect(message).toContain("をAI告発");
 	});
 
 	it("告発失敗のシステムメッセージに冤罪ボーナス関連文言が含まれない", () => {

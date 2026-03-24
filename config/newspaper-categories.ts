@@ -19,3 +19,13 @@ export const NEWSPAPER_CATEGORIES = [
 ] as const;
 
 export type NewspaperCategory = (typeof NEWSPAPER_CATEGORIES)[number];
+
+/**
+ * !newspaper で使用する AI モデル ID。
+ *
+ * Gemini 2.5 Flash を使用する。Gemini 3 系は無料 API キーで
+ * Google Search Grounding が利用不可（429 エラー）のため使用しない。
+ *
+ * See: docs/architecture/architecture.md TDR-015
+ */
+export const NEWSPAPER_MODEL_ID = "gemini-2.5-flash";

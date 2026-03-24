@@ -20,6 +20,7 @@
  * See: tmp/workers/bdd-architect_275/newspaper_gh_actions_migration.md §1
  */
 
+import { NEWSPAPER_MODEL_ID } from "../config/newspaper-categories";
 import { NEWSPAPER_SYSTEM_PROMPT } from "../config/newspaper-prompt";
 import { GoogleAiAdapter } from "../src/lib/infrastructure/adapters/google-ai-adapter";
 
@@ -129,7 +130,7 @@ async function main(): Promise<void> {
 			model_id?: string;
 		} | null;
 		const category = payload?.category ?? "IT";
-		const modelId = payload?.model_id ?? "gemini-2.5-flash";
+		const modelId = payload?.model_id ?? NEWSPAPER_MODEL_ID;
 
 		console.log(
 			`[newspaper-worker] Processing pending=${pending.id} category=${category}`,

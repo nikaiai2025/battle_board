@@ -1,5 +1,5 @@
 /**
- * NewspaperService — !newspaper コマンドの非同期処理（Cron フェーズ）
+ * NewspaperService — !newspaper コマンドの非同期処理
  *
  * pending_async_commands から "newspaper" エントリを読み取り、
  * AI API でニュースを取得して「★システム」名義の独立レスとして投稿する。
@@ -8,15 +8,17 @@
  *   - !newspaper は BOT エンティティを生成しない
  *   - BotService の責務（BOT ライフサイクル管理）とは無関係
  *
- * アーキテクチャ（GH Actions 移行後）:
+ * アーキテクチャ:
+ *   - Vercel: コマンド受理 → pending INSERT → workflow_dispatch で GH Actions を即時起動
  *   - GH Actions: AI API 呼び出し → POST /complete で結果送信
- *   - Vercel: GET /pending でキュー取得 → completeNewspaperCommand で DB 書き込み
+ *   - Vercel: completeNewspaperCommand で DB 書き込み（投稿・通貨返却・pending 削除）
  *
  * See: features/command_newspaper.feature
  * See: tmp/workers/bdd-architect_271/newspaper_design.md §3.2
  * See: tmp/workers/bdd-architect_275/newspaper_gh_actions_migration.md §3
  */
 
+import { NEWSPAPER_MODEL_ID } from "../../../config/newspaper-categories";
 import { NEWSPAPER_SYSTEM_PROMPT } from "../../../config/newspaper-prompt";
 import type { IGoogleAiAdapter } from "../infrastructure/adapters/google-ai-adapter";
 
@@ -95,11 +97,9 @@ export interface NewspaperResult {
 // ---------------------------------------------------------------------------
 
 /**
- * 1 回の Cron 実行で処理する pending 件数の上限。
- * Vercel Hobby プランのタイムアウト（10 秒）対策として 1 件に制限する。
- * ※ GH Actions 移行後はこの制限は使用しない（newspaper-worker.ts 側で上限管理）。
- *
- * See: tmp/workers/bdd-architect_271/newspaper_design.md §3.5
+ * processNewspaperCommands 1 回の呼び出しで処理する pending 件数の上限。
+ * 本番では GH Actions の newspaper-worker.ts が処理するため、この関数は
+ * BDD テスト互換のためのみ残置。
  */
 const MAX_PROCESS_PER_EXECUTION = 1;
 
@@ -247,7 +247,7 @@ export async function processNewspaperCommands(
 				model_id: string;
 			} | null;
 			const category = payload?.category ?? "IT";
-			const modelId = payload?.model_id ?? "gemini-3-flash-preview";
+			const modelId = payload?.model_id ?? NEWSPAPER_MODEL_ID;
 
 			// Step 1: AI API 呼び出し（Google Search Grounding）
 			const aiResult = await deps.googleAiAdapter.generateWithSearch({

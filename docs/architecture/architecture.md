@@ -681,7 +681,7 @@ app/
 | **HTMLエスケープ** | 本文の `<`, `>`, `"` を `&lt;`, `&gt;`, `&quot;` に変換 |
 | **改行変換** | 本文の改行を `<br>` に変換（DAT上では1レス=1物理行） |
 | **システムメッセージ統合** | コマンド実行結果のシステムメッセージを後続レスとして DAT に含める |
-| **BOTマーク絵文字変換** | `🤖` 等の絵文字は Shift_JIS 変換不可のため、DAT出力時は `[BOT]` テキスト代替に置換。Web UI では絵文字をそのまま表示 |
+| **Shift_JIS非対応文字変換** | 絵文字等のCP932非対応文字は `ShiftJisEncoder.sanitizeForCp932()` でHTML数値参照（`&#NNNNN;`）に変換。専ブラがHTMLとして解釈し表示する |
 
 ### 6.3 認証連携（専ブラ）
 
@@ -1216,15 +1216,16 @@ supabase/
 - **影響範囲**: `src/app/(web)/dev/page.tsx`（全面書き換え）、`src/app/api/dev/posts/route.ts`（新設）、`src/lib/services/dev-post-service.ts`（新設）、`src/lib/infrastructure/repositories/dev-post-repository.ts`（新設）、`dev_posts` テーブル（新設）
 - **詳細**: See features/dev_board.feature
 
-### TDR-015: BOTコンテンツ生成の初期モデルに Gemini 3 Flash を採用
+### TDR-015: BOTコンテンツ生成の初期モデルに Gemini 2.5 Flash を採用
 
-- **ステータス**: 決定
-- **決定日**: 2026-03-22
+- **ステータス**: 改訂（2026-03-24）
+- **決定日**: 2026-03-22（初版）、2026-03-24（モデル変更）
 - **背景**: コマンドによるAI生成コンテンツ（!newspaper, !hiroyuki 等）の導入により、AI APIによるコンテンツ生成が必要になる。§2.2 で AiApiClient による複数プロバイダ使い分けを想定済み（v6）だが、初期実装でどのプロバイダを採用するかが未決定であった
-- **決定**: 初期実装では Google Gemini 3 Flash Preview（`gemini-3-flash-preview`）に統一する。データ構造（`pending_async_commands.model_id` 等）には将来のマルチモデル対応のためプロバイダ識別子を含めるが、実行時のプロバイダ分岐や抽象化レイヤーは構築しない
+- **決定**: 初期実装では Google Gemini 2.5 Flash（`gemini-2.5-flash`）を使用する。データ構造（`pending_async_commands.model_id` 等）には将来のマルチモデル対応のためプロバイダ識別子を含めるが、実行時のプロバイダ分岐や抽象化レイヤーは構築しない
+- **改訂理由**: 初版では Gemini 3 Flash Preview を採用したが、無料 API キーでは Google Search Grounding が利用不可（429エラー）であることが判明。Gemini 2.5 Flash では無料枠で Grounding が利用可能
 - **理由**:
   - Google Search Grounding が組み込みツールとして利用可能。!newspaper のWeb検索+生成が1 API callで完結し、別途検索APIの追加が不要
-  - 無料枠が十分: 月5,000検索クエリ無料、モデルの入出力も無料枠あり。MVP段階のコスト負担なし
+  - **Grounding の無料枠制約**: Gemini 3 系は無料 API キーで Grounding 非対応。Gemini 2.5 Flash は無料枠で対応（2026-03 時点）
   - 1プロバイダに統一することでAPI統合・エラーハンドリング・認証管理の複雑度を最小化（KISS原則）
 - **代替案**:
   - Claude API: Web検索機能がなく、!newspaper に別途検索APIが必要。インフラ追加が発生する
@@ -1253,6 +1254,29 @@ supabase/
 - **既存資産との関係**: `globals.css` の `:root`（デフォルトテーマ）と `.dark`（ダークテーマ）をそのまま活用する。テーマ機能導入で既存ユーザーの見た目は変わらない
 - **影響範囲**: `globals.css`（有料テーマのCSS変数追加）、`src/lib/domain/models/theme.ts`（新規）、`users` テーブル（カラム追加）、マイページUI（テーマ設定セクション追加）
 - **関連**: TDR-011（shadcn/ui基盤）、features/theme.feature
+
+### TDR-017: !newspaper の非同期処理を GitHub Actions workflow_dispatch で実行
+
+- **ステータス**: 決定
+- **決定日**: 2026-03-23
+- **背景**: !newspaper コマンドは AI API 呼び出し（Google Search Grounding 付き）を伴う。Vercel Hobby プランのサーバーレス関数タイムアウト（10秒）では AI API のレイテンシを吸収できないため、外部実行基盤が必要
+- **決定**: GitHub Actions の `workflow_dispatch` イベントで即時起動する。Vercel 側は pending INSERT 後に fire-and-forget で dispatch を発火し、GH Actions 内で AI API 呼び出し → 結果を Vercel Internal API に送信する
+- **理由**:
+  - 既存インフラ（GitHub）で完結し、追加コストなし
+  - GH Actions のタイムアウト上限が 6 時間と余裕がある
+  - `workflow_dispatch` による即時起動で、定期ポーリングより低レイテンシ
+- **代替案**:
+  - Vercel Pro プラン（タイムアウト延長）: コスト増
+  - Cloudflare Workers: AI API 呼び出しの実行時間上限が不明確
+  - 定期 cron ポーリング: ユーザー体験が悪い（次回 cron まで最大数時間待ち）
+- **運用実測値（2026-03-24 観測）**:
+  - GH Actions ランナー割り当て待ち: **≒39分**（Free tier。時間帯・負荷状況で大きく変動する）
+  - `npm ci`（キャッシュあり）: ≒23秒
+  - AI API 呼び出し + Internal API 送信: ≒8秒
+  - **コマンド投稿からニュース表示まで: 約40分。大部分はランナー待ち**
+  - 定期 cron（`5 */4 * * *`）を併用していたが、GitHub 側の cron 実行が不安定（4時間ごとの設定に対し実測で30〜90分間隔で過剰実行）かつ dispatch との同時実行でレースコンディション（2重投稿）のリスクがあったため廃止した
+- **影響範囲**: `.github/workflows/newspaper-scheduler.yml`、`scripts/newspaper-worker.ts`、`src/lib/infrastructure/adapters/github-workflow-trigger.ts`、`src/app/api/internal/newspaper/`
+- **関連**: TDR-010（BOT定期実行）、TDR-015（Gemini 採用）、features/command_newspaper.feature
 
 ---
 

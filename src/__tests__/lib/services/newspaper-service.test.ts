@@ -349,7 +349,7 @@ describe("processNewspaperCommands", () => {
 			expect(call.userPrompt).toContain("IT");
 		});
 
-		it("payload に model_id がない場合、'gemini-3-flash-preview' にフォールバックする", async () => {
+		it("payload に model_id がない場合、'gemini-2.5-flash' にフォールバックする", async () => {
 			const pending = createPending({ payload: { category: "科学" } });
 			const { deps, mocks } = createDeps({
 				pendingAsyncCommandRepository: {
@@ -359,7 +359,7 @@ describe("processNewspaperCommands", () => {
 			});
 			await processNewspaperCommands(deps);
 			const call = mocks.generateWithSearch.mock.calls[0][0];
-			expect(call.modelId).toBe("gemini-3-flash-preview");
+			expect(call.modelId).toBe("gemini-2.5-flash");
 		});
 	});
 });

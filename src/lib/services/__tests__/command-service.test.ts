@@ -135,7 +135,7 @@ function createMockAccusationService(): AccusationService {
 		accuse: vi.fn().mockResolvedValue({
 			result: "hit",
 			bonusAmount: 20,
-			systemMessage: "[システム] AI告発成功！",
+			systemMessage: "AI告発成功！",
 			alreadyAccused: false,
 		}),
 	} as unknown as AccusationService;

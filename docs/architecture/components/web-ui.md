@@ -155,7 +155,7 @@ app/(web)/  →  app/api/posts/route.ts
 
 ### BOTマーク表示
 
-Web UIでは絵文字（🤖）をそのまま表示する。DAT出力では `[BOT]` に置換するが（Shift_JIS変換不可のため）、Web UIは絵文字を使用する。この分岐はDatFormatterが担い、Web UIは関与しない。
+Web UI・専ブラともに絵文字（🤖）をそのまま表示する。専ブラ向けDAT出力では `ShiftJisEncoder.sanitizeForCp932()` がHTML数値参照に変換し、専ブラがHTMLとして解釈して表示する。
 
 ### `dangerouslySetInnerHTML` 使用禁止
 
