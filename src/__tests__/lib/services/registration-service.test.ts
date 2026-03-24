@@ -193,7 +193,10 @@ describe("RegistrationService", () => {
 			expect(mockSupabaseAuth.signUp).toHaveBeenCalledWith({
 				email: EMAIL,
 				password: PASSWORD,
-				options: { emailRedirectTo: REDIRECT_URL },
+				options: {
+					emailRedirectTo: REDIRECT_URL,
+					data: { battleboard_user_id: USER_ID },
+				},
 			});
 		});
 
@@ -211,7 +214,10 @@ describe("RegistrationService", () => {
 			expect(mockSupabaseAuth.signUp).toHaveBeenCalledWith({
 				email: EMAIL,
 				password: PASSWORD,
-				options: { emailRedirectTo: "https://example.com/callback" },
+				options: {
+					emailRedirectTo: "https://example.com/callback",
+					data: { battleboard_user_id: USER_ID },
+				},
 			});
 		});
 
@@ -584,6 +590,72 @@ describe("RegistrationService", () => {
 			const result = await RegistrationService.handleOAuthCallback(
 				"oauth-code-123",
 				// pendingUserId を渡さない
+			);
+
+			expect(result).toEqual({ success: false, reason: "not_registered" });
+		});
+	});
+
+	// =========================================================================
+	// handleEmailConfirmCallback
+	// =========================================================================
+
+	describe("handleEmailConfirmCallback", () => {
+		it("正常(新規本登録): 仮ユーザーを本登録し edgeToken を返す", async () => {
+			// supabase_auth_id で既存ユーザーは見つからない（新規）
+			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(null);
+			// completeRegistration の内部呼び出し
+			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
+			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
+			// 本登録完了後に findById で取得
+			mockUserRepository.findById.mockResolvedValue(createRegisteredUser());
+			mockEdgeTokenRepository.create.mockResolvedValue({});
+
+			const result = await RegistrationService.handleEmailConfirmCallback(
+				SUPABASE_AUTH_ID,
+				USER_ID,
+			);
+
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.userId).toBe(USER_ID);
+				expect(result.edgeToken).toBeDefined();
+			}
+			// completeRegistration が "email" タイプで呼ばれること
+			expect(mockUserRepository.updateSupabaseAuthId).toHaveBeenCalledWith(
+				USER_ID,
+				SUPABASE_AUTH_ID,
+				"email",
+			);
+		});
+
+		it("正常(二重完了防止): 既に本登録済みの場合は既存ユーザーで edge-token を発行する", async () => {
+			// 既に supabase_auth_id で見つかる（本登録済み）
+			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(
+				createRegisteredUser(),
+			);
+			mockEdgeTokenRepository.create.mockResolvedValue({});
+
+			const result = await RegistrationService.handleEmailConfirmCallback(
+				SUPABASE_AUTH_ID,
+				USER_ID,
+			);
+
+			expect(result.success).toBe(true);
+			// completeRegistration は呼ばれない（既に登録済み）
+			expect(mockUserRepository.updateSupabaseAuthId).not.toHaveBeenCalled();
+		});
+
+		it("異常系: 本登録完了後にユーザーが見つからない場合は not_registered を返す", async () => {
+			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(null);
+			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
+			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
+			// findById が null を返す（異常状態）
+			mockUserRepository.findById.mockResolvedValue(null);
+
+			const result = await RegistrationService.handleEmailConfirmCallback(
+				SUPABASE_AUTH_ID,
+				USER_ID,
 			);
 
 			expect(result).toEqual({ success: false, reason: "not_registered" });

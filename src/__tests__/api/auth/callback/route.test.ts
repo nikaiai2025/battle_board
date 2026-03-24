@@ -12,10 +12,11 @@
  * カバレッジ対象:
  *   - Discord本登録フロー: code + flow=register + userId → handleOAuthCallback呼び出し → リダイレクト + Cookie設定
  *   - Discordログインフロー: code + flow=login → handleOAuthCallback呼び出し → リダイレクト + Cookie設定
- *   - メール確認フロー: code + flow=email_confirm + userId → handleOAuthCallback呼び出し
  *   - codeなし → エラーリダイレクト
  *   - handleOAuthCallback失敗 → エラーリダイレクト
- *   - email_confirm で userId なし → ログインフローにフォールスルー
+ *
+ * 注: メール確認フロー（email_confirm）は /api/auth/confirm に移行済み。
+ * See: src/__tests__/api/auth/confirm/route.test.ts
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -241,85 +242,6 @@ describe("GET /api/auth/callback", () => {
 			);
 			expect(response.status).toBe(307);
 			expect(response.headers.get("location")).toBe(`${ORIGIN}/mypage`);
-		});
-	});
-
-	// =========================================================================
-	// メール確認フロー (flow=email_confirm)
-	// =========================================================================
-
-	describe("メール確認フロー (flow=email_confirm + userId)", () => {
-		it("正常: URL の userId を使って handleOAuthCallback(code, userId, 'email') を呼び出す", async () => {
-			// Discord 本登録と同パターン: userId は URL パラメータから取得
-			// Gmailアプリ等 Cookie 非共有環境でも動作する
-			// See: docs/architecture/components/user-registration.md §7.1 メール認証
-			mockRegistrationService.handleOAuthCallback.mockResolvedValue({
-				success: true,
-				userId: USER_ID,
-				edgeToken: NEW_EDGE_TOKEN,
-			});
-
-			const req = createRequest({
-				code: "email-confirm-code",
-				flow: "email_confirm",
-				userId: USER_ID,
-			});
-
-			const response = await GET(req);
-
-			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
-				"email-confirm-code",
-				USER_ID,
-				"email",
-			);
-			expect(response.status).toBe(307);
-			expect(response.headers.get("location")).toBe(`${ORIGIN}/mypage`);
-
-			// edge-token Cookie が設定されること
-			const setCookieHeader = response.headers.get("set-cookie");
-			expect(setCookieHeader).toContain("edge-token");
-			expect(setCookieHeader).toContain(NEW_EDGE_TOKEN);
-		});
-
-		it("異常系: userId なし → ログインフローにフォールスルー", async () => {
-			// flow=email_confirm だが userId がない場合、条件不一致で else 節に落ちる
-			mockRegistrationService.handleOAuthCallback.mockResolvedValue({
-				success: false,
-				reason: "not_registered",
-			});
-
-			const req = createRequest({
-				code: "email-confirm-code",
-				flow: "email_confirm",
-				// userId なし
-			});
-
-			const response = await GET(req);
-
-			// pendingUserId なしのログインフローとして処理される
-			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
-				"email-confirm-code",
-			);
-			expect(response.status).toBe(307);
-			expect(response.headers.get("location")).toBe(`${ORIGIN}/auth/error`);
-		});
-
-		it("異常系: handleOAuthCallback が失敗 → /auth/error にリダイレクト", async () => {
-			mockRegistrationService.handleOAuthCallback.mockResolvedValue({
-				success: false,
-				reason: "invalid_credentials",
-			});
-
-			const req = createRequest({
-				code: "email-confirm-code",
-				flow: "email_confirm",
-				userId: USER_ID,
-			});
-
-			const response = await GET(req);
-
-			expect(response.status).toBe(307);
-			expect(response.headers.get("location")).toBe(`${ORIGIN}/auth/error`);
 		});
 	});
 

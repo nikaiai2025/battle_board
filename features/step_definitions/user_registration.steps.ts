@@ -106,8 +106,7 @@ const TEST_PASSWORD = "test-password-secure";
 const TEST_WRONG_PASSWORD = "wrong-password";
 
 /** テスト用リダイレクトURL（BDDではHTTPフローを通過しないためダミー値） */
-const TEST_REDIRECT_URL =
-	"http://localhost:3000/api/auth/callback?flow=email_confirm&userId=test";
+const TEST_REDIRECT_URL = "/mypage";
 
 // ---------------------------------------------------------------------------
 // ヘルパー関数: 認証済み仮ユーザーを作成する

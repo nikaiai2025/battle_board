@@ -1,17 +1,19 @@
 /**
- * GET /api/auth/callback — OAuth / メール確認共通コールバック
+ * GET /api/auth/callback — OAuth コールバック（Discord 本登録/ログイン）
  *
  * See: features/user_registration.feature
- * See: docs/architecture/components/user-registration.md §7.1, §7.2, §7.3 フロー詳細
+ * See: docs/architecture/components/user-registration.md §7.2, §7.3 フロー詳細
  * See: docs/architecture/components/user-registration.md §12 新規APIルート
  *
  * 責務:
  *   - Discord本登録フロー（flow=register + userId）の処理
  *   - Discordログインフロー（flow=login または flow なし）の処理
- *   - メール確認フロー（flow=email_confirm + userId）の処理
  *   - handleOAuthCallback の呼び出しと edge-token Cookie 設定
  *   - 成功時: /mypage へリダイレクト
  *   - 失敗時: /auth/error へリダイレクト
+ *
+ * 注: メール確認フロー（email_confirm）は /api/auth/confirm に移行済み。
+ * See: src/app/api/auth/confirm/route.ts
  *
  * 設計上の判断:
  *   - GETメソッド（ブラウザリダイレクトで呼ばれるため）
@@ -30,17 +32,18 @@ import * as RegistrationService from "@/lib/services/registration-service";
 /**
  * GET /api/auth/callback
  *
- * Supabase Auth の OAuth フローおよびメール確認完了後のリダイレクト先。
- * 3つのフローを処理する:
+ * Supabase Auth の OAuth フロー（Discord）完了後のリダイレクト先。
+ * 2つのフローを処理する:
  *
  * 1. Discord本登録フロー: flow=register かつ userId あり
- * 2. Discord/メールログインフロー: flow=login または flow なし
- * 3. メール確認フロー: flow=email_confirm かつ userId あり
+ * 2. Discordログインフロー: flow=login または flow なし
+ *
+ * 注: メール確認フローは /api/auth/confirm で処理する（verifyOtp パターン）。
  *
  * クエリパラメータ:
  *   - code: Supabase Auth コールバックコード（必須）
- *   - flow: フロー種別（"register" | "login" | "email_confirm" | なし）
- *   - userId: 本登録フローの仮ユーザーID（flow=register / flow=email_confirm 時）
+ *   - flow: フロー種別（"register" | "login" | なし）
+ *   - userId: Discord本登録フローの仮ユーザーID（flow=register 時）
  *
  * リダイレクト先:
  *   - 成功時: /mypage
@@ -66,18 +69,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 		// フロー1: Discord本登録フロー（flow=register + userId あり）
 		// See: docs/architecture/components/user-registration.md §7.2 Discord連携
 		result = await RegistrationService.handleOAuthCallback(code, userId);
-	} else if (flow === "email_confirm" && userId) {
-		// フロー3: メール確認フロー（flow=email_confirm + userId）
-		// Discord 本登録フローと同パターン: userId は URL パラメータから取得
-		// （Gmailアプリ等 Cookie 非共有環境でも動作する）
-		// See: docs/architecture/components/user-registration.md §7.1 メール認証
-		result = await RegistrationService.handleOAuthCallback(
-			code,
-			userId,
-			"email",
-		);
 	} else {
-		// フロー2: Discord/メールログインフロー（flow=login または flow なし）
+		// フロー2: Discordログインフロー（flow=login または flow なし）
 		// See: docs/architecture/components/user-registration.md §7.3 ログイン（新デバイス）
 		result = await RegistrationService.handleOAuthCallback(code);
 	}

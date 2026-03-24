@@ -99,11 +99,14 @@ export async function registerWithEmail(
 	}
 
 	// Step 3: Supabase Auth signUp() で確認メール送信
+	// user_metadata に battleboard_user_id を格納し、メール確認時に userId を復元する
+	// See: src/app/api/auth/confirm/route.ts（verifyOtp 後に user_metadata から取得）
 	const { error } = await supabaseAdmin.auth.signUp({
 		email,
 		password,
 		options: {
 			emailRedirectTo: redirectTo,
+			data: { battleboard_user_id: userId },
 		},
 	});
 
@@ -189,6 +192,43 @@ export async function completeRegistration(
 	// See: docs/architecture/components/user-registration.md §8.1 自動発行
 	const patToken = randomBytes(16).toString("hex");
 	await UserRepository.updatePatToken(userId, patToken);
+}
+
+/**
+ * メール確認完了コールバックを処理する。
+ * verifyOtp() で取得した supabaseAuthId を使い、本登録 + edge-token 発行を行う。
+ *
+ * handleOAuthCallback() の email_confirm 版。code 交換ではなく、
+ * verifyOtp() で既に認証済みの supabaseAuthId を受け取る点が異なる。
+ *
+ * See: src/app/api/auth/confirm/route.ts（呼び出し元）
+ * See: docs/architecture/components/user-registration.md §7.1 メール認証
+ *
+ * @param supabaseAuthId - verifyOtp() から取得した Supabase Auth ユーザー ID
+ * @param pendingUserId - 仮ユーザーの users.id（signUp 時に user_metadata に格納済み）
+ * @returns LoginResult
+ */
+export async function handleEmailConfirmCallback(
+	supabaseAuthId: string,
+	pendingUserId: string,
+): Promise<LoginResult> {
+	// supabase_auth_id で既登録チェック（二重完了防止）
+	let user = await UserRepository.findBySupabaseAuthId(supabaseAuthId);
+
+	if (!user) {
+		// 本登録完了: 仮ユーザーを昇格
+		await completeRegistration(pendingUserId, supabaseAuthId, "email");
+		user = await UserRepository.findById(pendingUserId);
+		if (!user) {
+			return { success: false, reason: "not_registered" };
+		}
+	}
+
+	// edge-token 発行
+	const newEdgeToken = randomUUID();
+	await EdgeTokenRepository.create(user.id, newEdgeToken);
+
+	return { success: true, userId: user.id, edgeToken: newEdgeToken };
 }
 
 // ---------------------------------------------------------------------------
