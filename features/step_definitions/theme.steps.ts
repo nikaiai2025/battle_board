@@ -143,8 +143,12 @@ Given(
 	"現在のフォントがゴシック以外である",
 	async function (this: BattleBoardWorld) {
 		assert(this.currentUserId, "ユーザーが作成されていません");
-		// 有料ユーザーであることが前提。有料フォント(mincho)に設定する
-		await InMemoryUserRepo.updateTheme(this.currentUserId, "default", "mincho");
+		// 有料ユーザーであることが前提。有料フォント(noto-sans-jp)に設定する
+		await InMemoryUserRepo.updateTheme(
+			this.currentUserId,
+			"default",
+			"noto-sans-jp",
+		);
 	},
 );
 
@@ -173,7 +177,11 @@ Given(
 		// 有料ユーザーとしてテーマ設定後、無料に変更
 		await createLoggedInUser(this, { isPremium: true });
 		const ThemeService = getThemeService();
-		await ThemeService.updateTheme(this.currentUserId!, "ocean", "mincho");
+		await ThemeService.updateTheme(
+			this.currentUserId!,
+			"ocean",
+			"noto-sans-jp",
+		);
 		// 無料ユーザーに変更（ダウングレード）
 		await InMemoryUserRepo.updateIsPremium(this.currentUserId!, false);
 		this.currentIsPremium = false;
@@ -224,7 +232,11 @@ When("有料フォントを選択する", async function (this: BattleBoardWorld
 	const ThemeService = getThemeService();
 	const user = await InMemoryUserRepo.findById(this.currentUserId);
 	const currentThemeId = user?.themeId ?? "default";
-	await ThemeService.updateTheme(this.currentUserId, currentThemeId, "mincho");
+	await ThemeService.updateTheme(
+		this.currentUserId,
+		currentThemeId,
+		"noto-sans-jp",
+	);
 });
 
 When("スレッド一覧ページを表示する", async function (this: BattleBoardWorld) {
@@ -359,7 +371,7 @@ Then(
 		const user = await InMemoryUserRepo.findById(this.currentUserId);
 		assert(user, "ユーザーが見つかりません");
 		const resolved = resolveFont(user.fontId, user.isPremium);
-		assert.strictEqual(resolved.id, "mincho");
+		assert.strictEqual(resolved.id, "noto-sans-jp");
 	},
 );
 
@@ -372,7 +384,7 @@ Then(
 );
 
 Then("有料フォントは選択できない", function (this: BattleBoardWorld) {
-	const result = validateThemeSelection("default", "mincho", false);
+	const result = validateThemeSelection("default", "noto-sans-jp", false);
 	assert.strictEqual(result.valid, false);
 	if (!result.valid) {
 		assert.strictEqual(result.code, "PREMIUM_REQUIRED");
@@ -388,7 +400,7 @@ Then(
 		const resolvedTheme = resolveTheme(user.themeId, user.isPremium);
 		const resolvedFont = resolveFont(user.fontId, user.isPremium);
 		assert.strictEqual(resolvedTheme.id, "ocean");
-		assert.strictEqual(resolvedFont.id, "mincho");
+		assert.strictEqual(resolvedFont.id, "noto-sans-jp");
 	},
 );
 
