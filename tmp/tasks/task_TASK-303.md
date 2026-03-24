@@ -79,3 +79,17 @@ locked_files:
 
 - `npx vitest run`: 91ファイル / 1769テスト PASS（リグレッションなし）
 - `npx cucumber-js`: 341シナリオ（325 passed / 16 pending）PASS（pendingは変更前から存在）
+
+#### 本番スモークテスト（bdd-smoke / Sprint-112 TASK-303）
+
+| 項目 | 内容 |
+|---|---|
+| 結果 | PASS |
+| PASS/TOTAL | 29/34（5 skipped: ローカル限定テスト） |
+| 所要時間 | 55.3s |
+| 失敗テスト | なし |
+
+- デプロイ確認: 最新デプロイ `2026-03-24T01:17:14Z` はコミット（JST 10:15）以降であることを確認
+- 対象URL: `https://battle-board.shika.workers.dev`
+- 管理画面系（/admin、/admin/users、/admin/users/[userId]、/admin/ip-bans）: 全4テスト PASS
+- スキップ5件は `isProduction=true` 時の `test.skip` によるローカル限定テスト（期待動作）
