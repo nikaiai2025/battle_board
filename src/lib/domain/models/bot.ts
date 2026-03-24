@@ -48,6 +48,13 @@ export interface Bot {
 	 */
 	timesAttacked: number;
 	/**
+	 * 草カウント（通算）。ボットが受け取った !w リアクションの累計本数。
+	 * 人間の users.grass_count に相当するボット側の草カウント。
+	 * See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+	 * See: supabase/migrations/00029_bot_grass_count.sql
+	 */
+	grassCount: number;
+	/**
 	 * config/bot_profiles.yaml 内のプロファイルキー。
 	 * 固定文リスト・報酬パラメータの参照キーとして使用する。
 	 * 例: '荒らし役'

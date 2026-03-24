@@ -1035,6 +1035,7 @@ export class BotService {
 					isActive: true,
 					isRevealed: false,
 					revealedAt: null,
+					grassCount: 0,
 					botProfileKey: "tutorial",
 					nextPostAt: new Date(),
 				});
@@ -1128,6 +1129,7 @@ export class BotService {
 					isActive: true,
 					isRevealed: false,
 					revealedAt: null,
+					grassCount: 0,
 					botProfileKey: "aori",
 					nextPostAt: null,
 				});
@@ -1429,6 +1431,7 @@ export class BotService {
 			totalPosts: 0,
 			accusedCount: 0,
 			timesAttacked: 0,
+			grassCount: 0,
 			botProfileKey,
 			nextPostAt: null,
 			eliminatedAt: null,

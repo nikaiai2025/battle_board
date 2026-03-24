@@ -8,9 +8,9 @@
  * !w コマンドの仕様:
  *   - 引数: ">>postNumber" 形式でレスを指定する（例: "!w >>3"）
  *   - 通貨コスト: 0（無料コマンド）
- *   - 対象レスの書き込み主（ユーザー）の草カウントを +1 する
+ *   - 対象レスの書き込み主（ユーザー / ボット）の草カウントを +1 する
  *   - システムメッセージ形式: ">>N (ID:xxxxxxxx) に草 ICON(計M本)"
- *   - ボットの書き込みへの草: MVP では記録のみ（草カウント非加算）
+ *   - ボットの書き込みへの草: ボットの草カウント（bots.grass_count）を加算する（LEAK-1修正）
  *
  * バリデーション一覧（詳細は §3.3 参照）:
  *   - 引数なし → エラー "対象レスを指定してください（例: !w >>3）"
@@ -48,6 +48,7 @@ export interface IGrassPostRepository {
  * 草記録の作成・重複チェック・草カウント加算に使用する。
  *
  * See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §2.1
+ * See: tmp/design_bot_leak_fix.md §2.2.4 GrassHandler（incrementBotGrassCount 追加）
  */
 export interface IGrassRepository {
 	existsForToday(
@@ -65,6 +66,8 @@ export interface IGrassRepository {
 		givenDate: string;
 	}): Promise<{ id: string } | null>;
 	incrementGrassCount(userId: string): Promise<number>;
+	/** ボットの草カウント（bots.grass_count）を +1 する。See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される */
+	incrementBotGrassCount(botId: string): Promise<number>;
 }
 
 /**
@@ -94,11 +97,14 @@ export interface IGrassBotPostRepository {
  *      - authorId == null → botPostRepository.findByPostId() でボット判定 (receiverBotId)
  *   6. 重複チェック（GrassRepository.existsForToday）
  *   7. 草記録作成（GrassRepository.create）
- *   8. 草カウント加算（GrassRepository.incrementGrassCount）※ボットの場合はスキップ
+ *   8. 草カウント加算
+ *      - 人間: GrassRepository.incrementGrassCount(receiverId)
+ *      - ボット: GrassRepository.incrementBotGrassCount(receiverBotId)（LEAK-1修正）
  *   9. システムメッセージ生成（formatGrassMessage）
  *
  * See: features/reactions.feature
  * See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §4.1
+ * See: tmp/design_bot_leak_fix.md §2.2.4 GrassHandler
  * See: docs/architecture/components/command.md §2.2
  */
 export class GrassHandler implements CommandHandler {
@@ -231,17 +237,22 @@ export class GrassHandler implements CommandHandler {
 			givenDate: today,
 		});
 
-		// ステップ8: 草カウント加算（ボットの場合はスキップ — Phase 4 で実装）
-		// See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §4.3 ボットへの草 最終推奨
-		// See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §8 D-3
+		// ステップ8: 草カウント加算
+		// - 人間: users.grass_count を +1（GrassRepository.incrementGrassCount）
+		// - ボット: bots.grass_count を +1（GrassRepository.incrementBotGrassCount）
+		//   LEAK-1修正: ボットへの草も正しいカウントを表示する（「計0本」固定を解消）
+		// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+		// See: tmp/design_bot_leak_fix.md §2.2.4
 		let newGrassCount = 0;
 		if (!isBot && receiverId !== null) {
 			newGrassCount =
 				await this.grassRepository.incrementGrassCount(receiverId);
+		} else if (isBot && receiverBotId !== null) {
+			newGrassCount =
+				await this.grassRepository.incrementBotGrassCount(receiverBotId);
 		}
 
 		// ステップ9: システムメッセージ生成
-		// ボットへの草の場合は草カウント 0 のまま（MVP: カウント非加算）
 		// See: features/reactions.feature §草を生やした結果がレス末尾にマージ表示される
 		const systemMessage = formatGrassMessage(
 			targetPost.postNumber,

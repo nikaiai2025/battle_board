@@ -2,7 +2,7 @@
  * POST /api/auth/verify -- Turnstile 認証検証 API エンドポイント
  *
  * 6桁認証コードは廃止済み（Sprint-110: 認証フロー簡素化）。
- * edge-token (Cookie) + Turnstile トークンのみで認証を行う。
+ * edge-token (Cookie またはリクエストボディ) + Turnstile トークンで認証を行う。
  *
  * See: features/authentication.feature @Turnstile通過で認証に成功する
  * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
@@ -11,7 +11,7 @@
  *
  * 責務:
  *   - リクエストの受付・バリデーション
- *   - Cookie から edge-token と IP を読み取る
+ *   - リクエストボディまたは Cookie から edge-token を、ヘッダから IP を読み取る
  *   - AuthService.verifyAuth() への委譲
  *   - レスポンス整形
  *   - Cookie 操作（edge-token の更新は Route Handler で行う）
@@ -38,6 +38,16 @@ import { hashIp } from "@/lib/services/auth-service";
 interface VerifyAuthRequest {
 	/** Turnstile チャレンジレスポンストークン */
 	turnstileToken: string;
+	/**
+	 * edge-token（専ブラ向け: Cookie非共有環境でのフォールバック）。
+	 * 専ブラの認証案内URL /auth/verify?token=XXX 経由でブラウザに渡され、
+	 * フロントエンドがリクエストボディに含めて送信する。
+	 * Cookie が使えない場合（専ブラ→通常ブラウザ間）にこの値を使用する。
+	 *
+	 * Sprint-110 で6桁認証コードを廃止した際、コードが担っていた
+	 * 「ブラウザ横断の識別子」の役割を引き継ぐために必要。
+	 */
+	edgeToken?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,8 +80,8 @@ async function getIpHash(req: NextRequest): Promise<string> {
  *
  * リクエスト:
  *   Content-Type: application/json
- *   Body: { turnstileToken: string }
- *   Cookie: edge-token（edge-token 発行時に発行済みのトークン）
+ *   Body: { turnstileToken: string; edgeToken?: string }
+ *   Cookie: edge-token（Web UI 向け。Body に edgeToken がある場合はそちらを優先）
  *
  * レスポンス:
  *   200: { success: true; writeToken?: string }（認証成功。writeToken は専ブラ向け認証橋渡しトークン）
@@ -90,7 +100,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 		);
 	}
 
-	const { turnstileToken } = body;
+	const { turnstileToken, edgeToken: bodyEdgeToken } = body;
 
 	// --- バリデーション ---
 	if (!turnstileToken || typeof turnstileToken !== "string") {
@@ -101,11 +111,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 	}
 
 	// --- edge-token の取得 ---
-	// Cookie から取得する
+	// 優先順位: リクエストボディ（専ブラ向け） > Cookie（Web UI）
+	//
+	// 専ブラユーザーは通常ブラウザで /auth/verify?token=XXX を開いて認証する。
+	// この場合ブラウザの Cookie には専ブラの edge-token が存在しないため、
+	// フロントエンドが URL パラメータからリクエストボディに含めて送信する。
+	//
+	// See: src/app/(web)/auth/verify/page.tsx — edgeTokenParam → body.edgeToken
 	// See: docs/architecture/components/authentication.md §5 > Cookie 命名規則
 	// See: src/lib/constants/cookie-names.ts
 	const cookieStore = await cookies();
-	const edgeToken = cookieStore.get(EDGE_TOKEN_COOKIE)?.value;
+	const edgeToken =
+		(typeof bodyEdgeToken === "string" && bodyEdgeToken) ||
+		cookieStore.get(EDGE_TOKEN_COOKIE)?.value;
 
 	if (!edgeToken) {
 		return NextResponse.json(

@@ -3,7 +3,7 @@
  *
  * 調査系コマンド（!hissi, !kinou）に関するシナリオを実装する。
  *
- * カバーするシナリオ（11件）:
+ * カバーするシナリオ（13件）:
  *   - !hissi: 対象ユーザーの本日の書き込み3件が独立システムレスで表示される
  *   - !hissi: 書き込みが4件以上ある場合は最新3件が表示される
  *   - !hissi: 書き込みが1件のみの場合は1件だけ表示される
@@ -15,15 +15,21 @@
  *   - エラー: 削除済みレスを対象に !hissi を実行するとエラーになる
  *   - エラー: システムメッセージを対象に !kinou を実行するとエラーになる
  *   - エラー: 削除済みレスを対象に !kinou を実行するとエラーになる
+ *   - BOT: ボットの書き込みに !hissi を実行すると書き込み履歴が表示される（TASK-308）
+ *   - BOT: ボットの書き込みに !kinou を実行すると昨日のID情報が表示される（TASK-308）
  *
  * See: features/investigation.feature
+ * See: features/investigation.feature @ボットの書き込みへの調査
  * See: tmp/workers/bdd-architect_TASK-208/implementation_plan.md §4
+ * See: tmp/design_bot_leak_fix.md §3.4 §3.5
  * See: docs/architecture/bdd_test_strategy.md
  */
 
 import { Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
 import {
+	InMemoryBotPostRepo,
+	InMemoryBotRepo,
 	InMemoryCurrencyRepo,
 	InMemoryIncentiveLogRepo,
 	InMemoryPostRepo,
@@ -34,6 +40,11 @@ import type { BattleBoardWorld } from "../support/world";
 // ウェルカムシーケンス抑止用ヘルパー（TASK-248 で追加）
 // See: features/welcome.feature
 import { seedDummyPost } from "./common.steps";
+// BOT書き込みシナリオで grassState.lastCreatedBotId を設定するために import する。
+// reactions.feature と investigation.feature の両方から「レス >>N はボットの書き込みである」
+// および「ボットの正体は暴露されない」を参照するため、このファイルで統一実装する。
+// See: features/reactions.feature @ボットの書き込みに草を生やせる
+import { grassState } from "./reactions.steps";
 
 // ---------------------------------------------------------------------------
 // サービス層の動的 require ヘルパー
@@ -75,6 +86,12 @@ const threadNameToId = new Map<string, string>();
 /** 被調査者のレス一覧（postNumber → postId） */
 const targetPostNumberToId = new Map<number, string>();
 
+/** BOTシナリオ用: 現在の BOT ID */
+let currentBotId: string | null = null;
+
+/** BOTシナリオ用: BOTの dailyId */
+let currentBotDailyId: string | null = null;
+
 /**
  * シナリオ間で状態をリセットする。
  * investigation.steps.ts 内のモジュールスコープ変数をリセットする。
@@ -85,6 +102,8 @@ function resetInvestigationState(): void {
 	targetDailyId = null;
 	threadNameToId.clear();
 	targetPostNumberToId.clear();
+	currentBotId = null;
+	currentBotDailyId = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -966,6 +985,449 @@ Then(
 		assert(
 			systemPost.body.includes(expectedText),
 			`システムレスに "${expectedText}" が含まれることを期待しましたが "${systemPost.body}" でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// BOTシナリオ: ボットの書き込みへの調査（TASK-308）
+// See: features/investigation.feature §ボットの書き込みへの調査
+// See: tmp/design_bot_leak_fix.md §3.4 §3.5
+// ---------------------------------------------------------------------------
+
+/**
+ * 運営ボットがスレッドで潜伏中である。
+ *
+ * BOT をインメモリリポジトリに作成し、スレッドをセットアップする。
+ * BOT の書き込みは後続の Given ステップで設定する。
+ *
+ * See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
+ */
+Given(
+	"運営ボットがスレッドで潜伏中である",
+	async function (this: BattleBoardWorld) {
+		resetInvestigationState();
+
+		// スレッドセットアップ（コマンド実行用ユーザーを作成）
+		const AuthService = getAuthService();
+		const { token, userId } = await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
+		this.currentEdgeToken = token;
+		this.currentUserId = userId;
+		this.currentIpHash = DEFAULT_IP_HASH;
+		await InMemoryUserRepo.updateIsVerified(userId, true);
+		seedDummyPost(userId);
+
+		// スレッド作成
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: `investigation-bot-${Date.now()}`,
+			boardId: TEST_BOARD_ID,
+			title: "BOT調査テスト用スレッド",
+			createdBy: userId,
+		});
+		this.currentThreadId = thread.id;
+		threadNameToId.set("BOT調査テスト用スレッド", thread.id);
+
+		// BOT をインメモリリポジトリに作成する
+		const botId = crypto.randomUUID();
+		currentBotId = botId;
+		// reactions.feature の「ボットの草カウントが N である」ステップで参照するために設定する
+		// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+		grassState.lastCreatedBotId = botId;
+
+		// BOTの dailyId を生成する（post-service の authorIdSeed 形式 "bot-{botId}" に従う）
+		const jstOffset = 9 * 60 * 60 * 1000;
+		const now = new Date(Date.now());
+		const jstDate = new Date(now.getTime() + jstOffset);
+		const todayJst = jstDate.toISOString().slice(0, 10);
+		const { generateDailyId } =
+			require("../../src/lib/domain/rules/daily-id") as typeof import("../../src/lib/domain/rules/daily-id");
+		const botAuthorIdSeed = `bot-${botId}`;
+		currentBotDailyId = generateDailyId(
+			botAuthorIdSeed,
+			TEST_BOARD_ID,
+			todayJst,
+		);
+
+		// InMemoryBotRepo に BOT を登録する
+		InMemoryBotRepo._insert({
+			id: botId,
+			name: "潜伏中テストBOT",
+			persona: "テスト用ペルソナ",
+			hp: 10,
+			maxHp: 10,
+			dailyId: currentBotDailyId,
+			dailyIdDate: todayJst,
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			survivalDays: 0,
+			totalPosts: 0,
+			accusedCount: 0,
+			timesAttacked: 0,
+			botProfileKey: "潜伏中テストBOT",
+			nextPostAt: null,
+			eliminatedAt: null,
+			eliminatedBy: null,
+			createdAt: new Date(Date.now()),
+		});
+	},
+);
+
+/**
+ * ボットが本日 N 件の書き込みを行っている。
+ *
+ * BOT の書き込みを InMemoryPostRepo と InMemoryBotPostRepo に登録する。
+ * BOT の書き込みは authorId=null、dailyId はBOTの dailyId で設定する。
+ *
+ * See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
+ */
+Given(
+	/^ボットが本日(\d+)件の書き込みを行っている$/,
+	async function (this: BattleBoardWorld, countStr: string) {
+		assert(currentBotId, "BOTが設定されていません");
+		assert(currentBotDailyId, "BOTのdailyIdが設定されていません");
+		assert(this.currentThreadId, "スレッドが設定されていません");
+
+		const count = parseInt(countStr, 10);
+		const today = new Date(Date.now()).toISOString().slice(0, 10);
+
+		for (let i = 1; i <= count; i++) {
+			const postId = crypto.randomUUID();
+			const timeStr = `0${i + 9}:00:00`;
+			InMemoryPostRepo._insert({
+				id: postId,
+				threadId: this.currentThreadId,
+				postNumber: i,
+				authorId: null, // BOT書き込み
+				displayName: "名無しさん",
+				dailyId: currentBotDailyId,
+				body: `BOTの書き込み${i}`,
+				inlineSystemInfo: null,
+				isSystemMessage: false,
+				isDeleted: false,
+				createdAt: new Date(`${today}T${timeStr}Z`),
+			});
+			// bot_posts にも登録する（!hissi / !kinou の BOT 判定で使用）
+			InMemoryBotPostRepo._insert(postId, currentBotId);
+			targetPostNumberToId.set(i, postId);
+		}
+	},
+);
+
+/**
+ * レス >>5 はボットの書き込みである。
+ *
+ * BOT の書き込みを InMemoryPostRepo と InMemoryBotPostRepo に登録する。
+ * 既に登録済みの場合はスキップする（前の Given で設定済みの場合を考慮）。
+ *
+ * See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
+ * See: features/investigation.feature @ボットの書き込みに !kinou を実行すると昨日のID情報が表示される
+ */
+Given(
+	/^レス >>(\d+) はボットの書き込みである$/,
+	async function (this: BattleBoardWorld, postNumberStr: string) {
+		const postNumber = parseInt(postNumberStr, 10);
+		// 既に設定済みの場合はスキップ
+		if (targetPostNumberToId.has(postNumber)) return;
+
+		assert(currentBotId, "BOTが設定されていません");
+		assert(currentBotDailyId, "BOTのdailyIdが設定されていません");
+		assert(this.currentThreadId, "スレッドが設定されていません");
+
+		// reactions.feature の「ボットの草カウントが N である」ステップで参照するために設定する
+		// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+		grassState.lastCreatedBotId = currentBotId;
+
+		const today = new Date(Date.now()).toISOString().slice(0, 10);
+		const postId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: postId,
+			threadId: this.currentThreadId,
+			postNumber,
+			authorId: null, // BOT書き込み
+			displayName: "名無しさん",
+			dailyId: currentBotDailyId,
+			body: "BOTの書き込み",
+			inlineSystemInfo: null,
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(`${today}T12:00:00Z`),
+		});
+		InMemoryBotPostRepo._insert(postId, currentBotId);
+		targetPostNumberToId.set(postNumber, postId);
+	},
+);
+
+/**
+ * 運営ボットが昨日も書き込みを行っている。
+ *
+ * BOTをセットアップし、昨日の書き込みを登録する。
+ * !kinou の BOT対応シナリオで使用する。
+ *
+ * See: features/investigation.feature @ボットの書き込みに !kinou を実行すると昨日のID情報が表示される
+ */
+Given(
+	"運営ボットが昨日も書き込みを行っている",
+	async function (this: BattleBoardWorld) {
+		resetInvestigationState();
+
+		// スレッドセットアップ
+		const AuthService = getAuthService();
+		const { token, userId } = await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
+		this.currentEdgeToken = token;
+		this.currentUserId = userId;
+		this.currentIpHash = DEFAULT_IP_HASH;
+		await InMemoryUserRepo.updateIsVerified(userId, true);
+		seedDummyPost(userId);
+
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: `investigation-bot-kinou-${Date.now()}`,
+			boardId: TEST_BOARD_ID,
+			title: "BOT調査テスト用スレッド",
+			createdBy: userId,
+		});
+		this.currentThreadId = thread.id;
+
+		// BOT をセットアップ
+		const botId = crypto.randomUUID();
+		currentBotId = botId;
+
+		// JST基準でdailyIdを計算
+		const jstOffset = 9 * 60 * 60 * 1000;
+		const now = new Date(Date.now());
+		const jstDate = new Date(now.getTime() + jstOffset);
+		const todayJst = jstDate.toISOString().slice(0, 10);
+		const yesterdayJstDate = new Date(jstDate.getTime());
+		yesterdayJstDate.setUTCDate(yesterdayJstDate.getUTCDate() - 1);
+		const yesterdayJst = yesterdayJstDate.toISOString().slice(0, 10);
+
+		const { generateDailyId } =
+			require("../../src/lib/domain/rules/daily-id") as typeof import("../../src/lib/domain/rules/daily-id");
+		const botAuthorIdSeed = `bot-${botId}`;
+		currentBotDailyId = generateDailyId(
+			botAuthorIdSeed,
+			TEST_BOARD_ID,
+			todayJst,
+		);
+		const yesterdayBotDailyId = generateDailyId(
+			botAuthorIdSeed,
+			TEST_BOARD_ID,
+			yesterdayJst,
+		);
+
+		// InMemoryBotRepo に BOT を登録する
+		InMemoryBotRepo._insert({
+			id: botId,
+			name: "潜伏中テストBOT",
+			persona: "テスト用ペルソナ",
+			hp: 10,
+			maxHp: 10,
+			dailyId: currentBotDailyId,
+			dailyIdDate: todayJst,
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			survivalDays: 1,
+			totalPosts: 2,
+			accusedCount: 0,
+			timesAttacked: 0,
+			botProfileKey: "潜伏中テストBOT",
+			nextPostAt: null,
+			eliminatedAt: null,
+			eliminatedBy: null,
+			createdAt: new Date(Date.now()),
+		});
+
+		// 昨日の書き込みを登録する（dailyId は昨日のdailyId）
+		const yesterdayPostId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: yesterdayPostId,
+			threadId: this.currentThreadId,
+			postNumber: 3,
+			authorId: null,
+			displayName: "名無しさん",
+			dailyId: yesterdayBotDailyId,
+			body: "昨日のBOTの書き込み",
+			inlineSystemInfo: null,
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(`${yesterdayJst}T10:00:00Z`),
+		});
+		InMemoryBotPostRepo._insert(yesterdayPostId, botId);
+	},
+);
+
+/**
+ * レス >>5 はボットの本日の書き込みである。
+ *
+ * BOT の今日の書き込みを InMemoryPostRepo と InMemoryBotPostRepo に登録する。
+ * !kinou シナリオで「昨日と今日両方書き込んでいるBOT」の今日分として使用する。
+ *
+ * See: features/investigation.feature @ボットの書き込みに !kinou を実行すると昨日のID情報が表示される
+ */
+Given(
+	/^レス >>(\d+) はボットの本日の書き込みである$/,
+	async function (this: BattleBoardWorld, postNumberStr: string) {
+		const postNumber = parseInt(postNumberStr, 10);
+
+		assert(currentBotId, "BOTが設定されていません");
+		assert(currentBotDailyId, "BOTのdailyIdが設定されていません");
+		assert(this.currentThreadId, "スレッドが設定されていません");
+
+		const today = new Date(Date.now()).toISOString().slice(0, 10);
+		const postId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: postId,
+			threadId: this.currentThreadId,
+			postNumber,
+			authorId: null,
+			displayName: "名無しさん",
+			dailyId: currentBotDailyId,
+			body: "今日のBOTの書き込み",
+			inlineSystemInfo: null,
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(`${today}T12:00:00Z`),
+		});
+		InMemoryBotPostRepo._insert(postId, currentBotId);
+		targetPostNumberToId.set(postNumber, postId);
+	},
+);
+
+// NOTE: "{string} を実行する" は command_system.steps.ts で定義済み。
+// BOT シナリオでも command_system.steps.ts の When ステップを再利用する。
+// （運営ボットがスレッドで潜伏中である で this.currentThreadId が設定済みのため）
+// See: features/step_definitions/command_system.steps.ts
+
+// ---------------------------------------------------------------------------
+// Then: 独立システムレスでボットの書き込み履歴が表示される
+// See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
+// ---------------------------------------------------------------------------
+
+/**
+ * 独立システムレスでボットの書き込み履歴が表示される。
+ *
+ * 独立システムレスに BOT の dailyId を含む書き込み履歴が表示されることを検証する。
+ * BOT の正体（"BOT"という文字列）は表示されないことも確認する。
+ *
+ * See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
+ */
+Then(
+	"独立システムレスでボットの書き込み履歴が表示される",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+		assert(currentBotDailyId, "BOTのdailyIdが設定されていません");
+
+		const systemPost = await findLatestSystemPost(this.currentThreadId);
+		assert(systemPost !== null, "独立システムレスが見つかりません");
+
+		// BOT の dailyId が表示されていることを確認する
+		assert(
+			systemPost.body.includes(`ID:${currentBotDailyId}`),
+			`独立システムレスに "ID:${currentBotDailyId}" が含まれることを期待しましたが "${systemPost.body}" でした`,
+		);
+		// 「このレスは対象にできません」のような BOT 固有エラーが表示されていないことを確認する
+		assert(
+			!systemPost.body.includes("対象にできません"),
+			`BOT固有エラー「対象にできません」が表示されてしまいました: "${systemPost.body}"`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: ボットの正体は暴露されない
+// See: features/investigation.feature @ボットの書き込みへの調査
+// ---------------------------------------------------------------------------
+
+/**
+ * ボットの正体は暴露されない。
+ *
+ * reactions.feature と investigation.feature の両方から参照される統合実装。
+ *
+ * 【草コマンドコンテキスト（reactions.feature）】
+ *   this.lastGrassResult が設定されている場合:
+ *   草コマンドのシステムメッセージにボット識別キーワードが含まれないことを確認する。
+ *   See: features/reactions.feature @ボットの書き込みに草を生やせる
+ *
+ * 【調査コマンドコンテキスト（investigation.feature）】
+ *   this.lastGrassResult が null の場合:
+ *   独立システムレスに「このレスは対象にできません」などの BOT 固有エラーが
+ *   含まれないことを確認する。
+ *   See: features/investigation.feature @ボットの書き込みへの調査
+ */
+Then("ボットの正体は暴露されない", async function (this: BattleBoardWorld) {
+	// reactions.feature コンテキスト: lastGrassResult を優先確認する
+	if (this.lastGrassResult !== null) {
+		const message = this.lastGrassResult.systemMessage ?? "";
+		// 「ボット」「AIボット」「正体」などのキーワードが含まれないことを確認する
+		const botRevealKeywords = ["ボット", "AIボット", "正体", "撃破", "bot_id"];
+		for (const keyword of botRevealKeywords) {
+			assert(
+				!message.includes(keyword),
+				`システムメッセージにボット正体暴露のキーワード "${keyword}" が含まれています: "${message}"`,
+			);
+		}
+		return;
+	}
+
+	// investigation.feature コンテキスト: 独立システムレスと inline を確認する
+	assert(this.currentThreadId, "スレッドが設定されていません");
+
+	// 独立システムレスが BOT固有エラーを返していないことを確認する
+	const systemPost = await findLatestSystemPost(this.currentThreadId);
+	// 独立システムレスが作成されているとき: 「このレスは対象にできません」でないことを確認する
+	if (systemPost !== null) {
+		assert(
+			!systemPost.body.includes("このレスは対象にできません"),
+			`BOT固有エラーが表示されてしまいました: "${systemPost.body}"`,
+		);
+	}
+	// コマンド実行者のレス inlineSystemInfo も「このレスは対象にできません」でないことを確認する
+	// （エラー時はインラインに表示される）
+	const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+	const lastUserPost = posts.filter((p) => !p.isSystemMessage).slice(-1)[0];
+	if (lastUserPost?.inlineSystemInfo) {
+		assert(
+			!lastUserPost.inlineSystemInfo.includes("このレスは対象にできません"),
+			`インラインにBOT固有エラーが表示されてしまいました: "${lastUserPost.inlineSystemInfo}"`,
+		);
+	}
+});
+
+// ---------------------------------------------------------------------------
+// Then: 独立システムレスで昨日のID情報が表示される
+// See: features/investigation.feature @ボットの書き込みに !kinou を実行すると昨日のID情報が表示される
+// ---------------------------------------------------------------------------
+
+/**
+ * 独立システムレスで昨日のID情報が表示される。
+ *
+ * 独立システムレスに "昨日のID" または "昨日の書き込みがありません" のメッセージが
+ * 含まれることを検証する。
+ *
+ * See: features/investigation.feature @ボットの書き込みに !kinou を実行すると昨日のID情報が表示される
+ */
+Then(
+	"独立システムレスで昨日のID情報が表示される",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+		assert(currentBotDailyId, "BOTのdailyIdが設定されていません");
+
+		const systemPost = await findLatestSystemPost(this.currentThreadId);
+		assert(systemPost !== null, "独立システムレスが見つかりません");
+
+		// "の昨日のID" または "は昨日の書き込みがありません" のいずれかが含まれていることを確認する
+		const hasYesterdayIdInfo =
+			systemPost.body.includes("の昨日のID") ||
+			systemPost.body.includes("は昨日の書き込みがありません");
+		assert(
+			hasYesterdayIdInfo,
+			`独立システムレスに昨日のID情報が含まれることを期待しましたが "${systemPost.body}" でした`,
+		);
+		// BOT 固有エラーが表示されていないことを確認する
+		assert(
+			!systemPost.body.includes("対象にできません"),
+			`BOT固有エラー「対象にできません」が表示されてしまいました: "${systemPost.body}"`,
 		);
 	},
 );

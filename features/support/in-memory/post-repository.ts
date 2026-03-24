@@ -337,6 +337,32 @@ export async function findByAuthorIdAndDate(
 }
 
 /**
+ * 日次リセットID（daily_id）でレス一覧を取得する。
+ * LEAK-2/3 修正: BOT書き込み（authorId=null）への !hissi / !kinou コマンド対応。
+ * システムメッセージと削除済みレスは除外する。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > findByDailyId
+ * See: features/investigation.feature §ボットの書き込みへの調査
+ */
+export async function findByDailyId(
+	dailyId: string,
+	options: { limit?: number } = {},
+): Promise<Post[]> {
+	const filtered = Array.from(store.values())
+		.filter((p) => {
+			if (p.dailyId !== dailyId) return false;
+			if (p.isSystemMessage) return false;
+			if (p.isDeleted) return false;
+			return true;
+		})
+		.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+	return options.limit !== undefined
+		? filtered.slice(0, options.limit)
+		: filtered;
+}
+
+/**
  * 指定日の書き込み数を集計する（非システムメッセージのみ）。
  * ダッシュボードのリアルタイムサマリーに使用する。
  *

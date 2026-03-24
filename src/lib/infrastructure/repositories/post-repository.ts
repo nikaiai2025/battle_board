@@ -504,6 +504,43 @@ export async function countActiveThreadsByDate(date: string): Promise<number> {
 }
 
 /**
+ * 日次リセットID（daily_id）でレス一覧を取得する。
+ * LEAK-2/3 修正: BOT書き込み（authorId=null）への !hissi / !kinou コマンド対応。
+ * dailyId は当日分のみ含むため日付フィルタ不要。システムメッセージ・削除済みレスを除外する。
+ *
+ * See: features/investigation.feature §ボットの書き込みへの調査
+ * See: tmp/design_bot_leak_fix.md §3.3
+ *
+ * @param dailyId - 日次リセットID（8文字の16進数文字列）
+ * @param options.limit - 取得件数（省略時は全件）
+ * @returns Post 配列（created_at DESC ソート済み）
+ */
+export async function findByDailyId(
+	dailyId: string,
+	options: { limit?: number } = {},
+): Promise<Post[]> {
+	let query = supabaseAdmin
+		.from("posts")
+		.select("*")
+		.eq("daily_id", dailyId)
+		.eq("is_system_message", false)
+		.eq("is_deleted", false)
+		.order("created_at", { ascending: false });
+
+	if (options.limit !== undefined) {
+		query = query.limit(options.limit);
+	}
+
+	const { data, error } = await query;
+
+	if (error) {
+		throw new Error(`PostRepository.findByDailyId failed: ${error.message}`);
+	}
+
+	return (data as PostRow[]).map(rowToPost);
+}
+
+/**
  * レスを論理削除する（is_deleted = true に設定）。
  * 表示時は本文を「このレスは削除されました」に置換する（表示ロジックはプレゼンテーション層）。
  *

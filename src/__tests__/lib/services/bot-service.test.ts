@@ -45,6 +45,7 @@ function createLurkingBot(overrides: Partial<Bot> = {}): Bot {
 		totalPosts: 0,
 		accusedCount: 0,
 		timesAttacked: 0,
+		grassCount: 0,
 		botProfileKey: "荒らし役",
 		nextPostAt: null,
 		eliminatedAt: null,

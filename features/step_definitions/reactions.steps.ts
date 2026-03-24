@@ -175,6 +175,14 @@ const grassReactionsStore: GrassReactionRecord[] = [];
 const grassCountsStore = new Map<string, number>();
 
 /**
+ * ボットの草カウントストア（シナリオ間でリセットされる）。
+ * bots.grass_count カラムのインメモリキャッシュ。
+ * key: botId（UUID）
+ * See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+ */
+const botGrassCountsStore = new Map<string, number>();
+
+/**
  * インメモリ GrassRepository。
  *
  * See: src/lib/infrastructure/repositories/grass-repository.ts
@@ -187,6 +195,7 @@ const InMemoryGrassRepo = {
 	reset(): void {
 		grassReactionsStore.length = 0;
 		grassCountsStore.clear();
+		botGrassCountsStore.clear();
 	},
 
 	/**
@@ -276,6 +285,38 @@ const InMemoryGrassRepo = {
 	async getGrassCount(userId: string): Promise<number> {
 		return grassCountsStore.get(userId) ?? 0;
 	},
+
+	/**
+	 * ボットの草カウントを +1 する。
+	 *
+	 * bots.grass_count カラムのインメモリ実装。
+	 * GrassHandler.execute のステップ8（ボットパス）で呼び出される。
+	 *
+	 * See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+	 * See: src/lib/infrastructure/repositories/grass-repository.ts > incrementBotGrassCount
+	 * See: tmp/design_bot_leak_fix.md §2.2.3 GrassRepository
+	 */
+	async incrementBotGrassCount(botId: string): Promise<number> {
+		const current = botGrassCountsStore.get(botId) ?? 0;
+		const newCount = current + 1;
+		botGrassCountsStore.set(botId, newCount);
+		return newCount;
+	},
+
+	/**
+	 * ボットの草カウントを直接設定する（テスト用ヘルパー）。
+	 * 「ボットの草カウントが N である」Given ステップで使用する。
+	 */
+	setBotGrassCount(botId: string, count: number): void {
+		botGrassCountsStore.set(botId, count);
+	},
+
+	/**
+	 * ボットの現在の草カウントを取得する（テスト用ヘルパー）。
+	 */
+	getBotGrassCount(botId: string): number {
+		return botGrassCountsStore.get(botId) ?? 0;
+	},
 };
 
 // ---------------------------------------------------------------------------
@@ -286,10 +327,20 @@ const InMemoryGrassRepo = {
  * 草コマンドシナリオで共有される状態。
  *
  * シナリオ間の独立性は Before フックで resetGrassState() を呼ぶことで保証する。
+ *
+ * `export` することで investigation.steps.ts から lastCreatedBotId を参照可能にする。
+ * See: features/step_definitions/investigation.steps.ts @レス >>N はボットの書き込みである
  */
-const grassState = {
+export const grassState = {
 	/** ユーザー名 -> userId のマッピング（草カウント検証用） */
 	userNameToId: new Map<string, string>(),
+	/**
+	 * 最後に生成されたボットIDの追跡。
+	 * 「レス >>N はボットの書き込みである」ステップで設定し、
+	 * 「ボットの草カウントが N である」ステップで参照する。
+	 * See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+	 */
+	lastCreatedBotId: null as string | null,
 };
 
 /**
@@ -297,6 +348,7 @@ const grassState = {
  */
 function resetGrassState(): void {
 	grassState.userNameToId.clear();
+	grassState.lastCreatedBotId = null;
 	InMemoryGrassRepo.reset();
 }
 
@@ -1081,58 +1133,42 @@ Given(
 );
 
 // ---------------------------------------------------------------------------
-// Given: エラーケース設定（reactions.feature 固有のもの）
+// Given: ボット書き込みセットアップ
+// NOTE: 以下のステップ定義は investigation.steps.ts に移管済み（重複排除）。
+//   - 運営ボットがスレッドで潜伏中である
+//   - /^レス >>(\d+) はボットの書き込みである$/
+//   - ボットの正体は暴露されない
+// reactions.feature と investigation.feature の両方から参照されるため、
+// investigation.steps.ts で統一的に実装する。
+// grassState.lastCreatedBotId の設定も investigation.steps.ts で行う。
+// See: features/step_definitions/investigation.steps.ts
 // ---------------------------------------------------------------------------
 
 /**
- * 運営ボットがスレッドで潜伏中である。
+ * ボットの草カウントが N である。
  *
- * ボットが存在するシナリオのセットアップ。
- * スレッドとユーザーを確保した状態にする。
+ * 「レス >>N はボットの書き込みである」ステップで生成されたボットの草カウントを
+ * 指定した値に設定する。
  *
- * See: features/reactions.feature @ボットの書き込みに草を生やせる
+ * このステップは「レス >>N はボットの書き込みである」の後に実行される前提。
+ * grassState.lastCreatedBotId に保存されたボットIDを使用する。
+ *
+ * See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+ * See: tmp/design_bot_leak_fix.md §2 LEAK-1
  */
 Given(
-	"運営ボットがスレッドで潜伏中である",
-	async function (this: BattleBoardWorld) {
-		await ensureCurrentUserAndThread(this);
-		// ボットは潜伏中（正体を暴露しない）ため、追加設定なし
-		// 次のステップ「レス >>N はボットの書き込みである」で具体的なレスを設置する
-	},
-);
-
-/**
- * レス >>N はボットの書き込みである。
- *
- * authorId = null のレスを設定し、bot_posts に紐付ける。
- *
- * See: features/reactions.feature @ボットの書き込みに草を生やせる
- */
-Given(
-	/^レス >>(\d+) はボットの書き込みである$/,
-	async function (this: BattleBoardWorld, postNumberStr: string) {
-		const postNumber = parseInt(postNumberStr, 10);
-		await ensureCurrentUserAndThread(this);
-
-		const botId = crypto.randomUUID();
-		const postId = crypto.randomUUID();
-
-		InMemoryPostRepo._insert({
-			id: postId,
-			threadId: this.currentThreadId!,
-			postNumber,
-			authorId: null, // ボット書き込みは authorId = null
-			displayName: "名無しさん",
-			dailyId: "BotDly1",
-			body: "ボットのテスト書き込み",
-			inlineSystemInfo: null,
-			isSystemMessage: false,
-			isDeleted: false,
-			createdAt: new Date(Date.now()),
-		});
-
-		// bot_posts に紐付ける
-		InMemoryBotPostRepo._insert(postId, botId);
+	/^ボットの草カウントが (\d+) である$/,
+	function (this: BattleBoardWorld, countStr: string) {
+		const count = parseInt(countStr, 10);
+		const botId = grassState.lastCreatedBotId;
+		assert.ok(
+			botId,
+			"ボットIDが設定されていません。先に「レス >>N はボットの書き込みである」を実行してください",
+		);
+		// ボットの草カウントをストアに直接設定する
+		// incrementBotGrassCount はカウント加算時に botGrassCountsStore を参照するため、
+		// ここで初期値を設定することで正しい累積値が計算される
+		InMemoryGrassRepo.setBotGrassCount(botId, count);
 	},
 );
 
@@ -1462,24 +1498,7 @@ Then("草カウントは変化しない", async function (this: BattleBoardWorld
 	);
 });
 
-/**
- * ボットの正体は暴露されない。
- *
- * 草コマンドがボットの正体をシステムメッセージに含めないことを確認する。
- *
- * See: features/reactions.feature @ボットの書き込みに草を生やせる
- */
-Then("ボットの正体は暴露されない", async function (this: BattleBoardWorld) {
-	assert(this.lastGrassResult, "草コマンドの実行結果が存在しません");
-
-	const message = this.lastGrassResult.systemMessage ?? "";
-	// "BotDly1" は dailyId であり、これを含むことは正体暴露ではない
-	// 「ボット」「AIボット」「正体」などのキーワードが含まれないことを確認する
-	const botRevealKeywords = ["ボット", "AIボット", "正体", "撃破", "bot_id"];
-	for (const keyword of botRevealKeywords) {
-		assert(
-			!message.includes(keyword),
-			`システムメッセージにボット正体暴露のキーワード "${keyword}" が含まれています: "${message}"`,
-		);
-	}
-});
+// NOTE: Then("ボットの正体は暴露されない") は investigation.steps.ts に移管済み。
+// reactions.feature と investigation.feature の両方から参照されるため、
+// investigation.steps.ts で統一的に実装する。
+// See: features/step_definitions/investigation.steps.ts

@@ -2,19 +2,25 @@
  * 単体テスト: HissiHandler（!hissi コマンド）
  *
  * See: features/investigation.feature @対象ユーザーの本日の書き込み3件が独立システムレスで表示される
+ * See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
  * See: tmp/workers/bdd-architect_TASK-208/implementation_plan.md §3.1
+ * See: tmp/design_bot_leak_fix.md §3.4
  *
  * テスト方針:
- *   - PostRepository / ThreadRepository は DI でモック化（外部DBに依存しない）
+ *   - PostRepository / ThreadRepository / BotPostRepository は DI でモック化（外部DBに依存しない）
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
- *   - エッジケース（0件・3件・4件以上・エラー系）を網羅する
+ *   - エッジケース（0件・3件・4件以上・エラー系・BOTパス）を網羅する
  *
  * カバレッジ対象:
  *   - 引数なし → エラー
  *   - 対象レスが見つからない → エラー
  *   - システムメッセージ → エラー
  *   - 削除済みレス → エラー
- *   - authorId が null → エラー
+ *   - authorId が null + BotPostRepository 未提供 → エラー
+ *   - authorId が null + bot_posts に記録なし → エラー
+ *   - authorId が null + BOT書き込み → dailyId で検索し書き込み履歴を返す（BOTパス）
+ *   - BOTパス: 書き込み0件 → "本日の書き込みはありません"
+ *   - BOTパス: 書き込み2件 → 件数表示
  *   - 書き込み0件 → "本日の書き込みはありません"
  *   - 書き込み1件 → 1件表示 + "1件"
  *   - 書き込み3件 → 3件表示 + "3件"
@@ -26,6 +32,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Post } from "../../../../lib/domain/models/post";
 import type { Thread } from "../../../../lib/domain/models/thread";
 import type {
+	IHissiBotPostRepository,
 	IHissiPostRepository,
 	IHissiThreadRepository,
 } from "../../../../lib/services/handlers/hissi-handler";
@@ -36,6 +43,7 @@ import { HissiHandler } from "../../../../lib/services/handlers/hissi-handler";
 // ---------------------------------------------------------------------------
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
+const BOT_ID = "22222222-2222-2222-2222-222222222222";
 const TARGET_POST_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const THREAD_1_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const THREAD_2_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
@@ -89,6 +97,7 @@ function makeMockPostRepo(
 	return {
 		findById: vi.fn().mockResolvedValue(makePost()),
 		findByAuthorIdAndDate: vi.fn().mockResolvedValue([]),
+		findByDailyId: vi.fn().mockResolvedValue([]),
 		...overrides,
 	};
 }
@@ -102,6 +111,15 @@ function makeMockThreadRepo(
 	};
 }
 
+function makeMockBotPostRepo(
+	overrides: Partial<IHissiBotPostRepository> = {},
+): IHissiBotPostRepository {
+	return {
+		findByPostId: vi.fn().mockResolvedValue({ botId: BOT_ID }),
+		...overrides,
+	};
+}
+
 // ---------------------------------------------------------------------------
 // テスト
 // ---------------------------------------------------------------------------
@@ -109,12 +127,14 @@ function makeMockThreadRepo(
 describe("HissiHandler", () => {
 	let postRepo: IHissiPostRepository;
 	let threadRepo: IHissiThreadRepository;
+	let botPostRepo: IHissiBotPostRepository;
 	let handler: HissiHandler;
 
 	beforeEach(() => {
 		postRepo = makeMockPostRepo();
 		threadRepo = makeMockThreadRepo();
-		handler = new HissiHandler(postRepo, threadRepo);
+		botPostRepo = makeMockBotPostRepo();
+		handler = new HissiHandler(postRepo, threadRepo, botPostRepo);
 	});
 
 	it("commandName が 'hissi' である", () => {
@@ -185,12 +205,32 @@ describe("HissiHandler", () => {
 		expect(result.systemMessage).toBe("削除されたレスは対象にできません");
 	});
 
-	// --- バリデーション: authorId が null ---
+	// --- バリデーション: authorId が null + BotPostRepository 未提供 ---
 
-	it("authorId が null のレスを対象にした場合はエラーを返す", async () => {
+	it("authorId が null かつ BotPostRepository 未提供の場合はエラーを返す", async () => {
+		// BotPostRepository なし（従来動作の後方互換テスト）
+		const handlerNoBotRepo = new HissiHandler(postRepo, threadRepo);
 		vi.mocked(postRepo.findById).mockResolvedValue(
 			makePost({ authorId: null }),
 		);
+		const result = await handlerNoBotRepo.execute({
+			args: [TARGET_POST_ID],
+			postId: "p1",
+			threadId: THREAD_1_ID,
+			userId: USER_ID,
+			dailyId: "test-daily-id",
+		});
+		expect(result.success).toBe(false);
+		expect(result.systemMessage).toBe("このレスは対象にできません");
+	});
+
+	// --- バリデーション: authorId が null + bot_posts に記録なし ---
+
+	it("authorId が null かつ bot_posts に記録がない場合はエラーを返す", async () => {
+		vi.mocked(postRepo.findById).mockResolvedValue(
+			makePost({ authorId: null }),
+		);
+		vi.mocked(botPostRepo.findByPostId).mockResolvedValue(null);
 		const result = await handler.execute({
 			args: [TARGET_POST_ID],
 			postId: "p1",
@@ -200,6 +240,94 @@ describe("HissiHandler", () => {
 		});
 		expect(result.success).toBe(false);
 		expect(result.systemMessage).toBe("このレスは対象にできません");
+	});
+
+	// --- BOTパス: authorId が null + BOT書き込み ---
+
+	it("BOT書き込みに !hissi を実行すると dailyId で検索した書き込み履歴が返る", async () => {
+		// See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
+		const botPost1 = makePost({
+			id: "bot-post-1",
+			authorId: null,
+			dailyId: "BotDailyX",
+			postNumber: 5,
+			body: "BOTの書き込み1",
+			createdAt: new Date("2026-03-20T06:00:00.000Z"),
+		});
+		const botPost2 = makePost({
+			id: "bot-post-2",
+			authorId: null,
+			dailyId: "BotDailyX",
+			postNumber: 3,
+			body: "BOTの書き込み2",
+			createdAt: new Date("2026-03-20T04:00:00.000Z"),
+		});
+		vi.mocked(postRepo.findById).mockResolvedValue(
+			makePost({ authorId: null, dailyId: "BotDailyX" }),
+		);
+		// findByDailyId が DESC で 2件返す
+		vi.mocked(postRepo.findByDailyId).mockResolvedValue([botPost1, botPost2]);
+
+		const result = await handler.execute({
+			args: [TARGET_POST_ID],
+			postId: "p1",
+			threadId: THREAD_1_ID,
+			userId: USER_ID,
+			dailyId: "test-daily-id",
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.systemMessage).toBeNull();
+		expect(result.independentMessage).toContain("ID:BotDailyX");
+		expect(result.independentMessage).toContain("（2件）");
+	});
+
+	it("BOT書き込みへの !hissi は「このレスは対象にできません」エラーを返さない（正体暴露されない）", async () => {
+		// See: features/investigation.feature @ボットの正体は暴露されない
+		// 「このレスは対象にできません」というBOT固有エラーが返らないことを検証する
+		vi.mocked(postRepo.findById).mockResolvedValue(
+			makePost({ authorId: null, dailyId: "BotDailyX" }),
+		);
+		const botPost = makePost({
+			id: "bot-post-1",
+			authorId: null,
+			dailyId: "BotDailyX",
+			postNumber: 5,
+			body: "こんにちは",
+			createdAt: new Date("2026-03-20T06:00:00.000Z"),
+		});
+		vi.mocked(postRepo.findByDailyId).mockResolvedValue([botPost]);
+
+		const result = await handler.execute({
+			args: [TARGET_POST_ID],
+			postId: "p1",
+			threadId: THREAD_1_ID,
+			userId: USER_ID,
+			dailyId: "test-daily-id",
+		});
+
+		expect(result.success).toBe(true);
+		// BOT固有エラーが含まれないこと
+		expect(result.systemMessage).not.toBe("このレスは対象にできません");
+		expect(result.independentMessage).not.toContain("対象にできません");
+	});
+
+	it("BOT書き込みへの !hissi で書き込みが0件の場合は「本日の書き込みはありません」を返す", async () => {
+		vi.mocked(postRepo.findById).mockResolvedValue(
+			makePost({ authorId: null, dailyId: "BotDailyX" }),
+		);
+		vi.mocked(postRepo.findByDailyId).mockResolvedValue([]);
+
+		const result = await handler.execute({
+			args: [TARGET_POST_ID],
+			postId: "p1",
+			threadId: THREAD_1_ID,
+			userId: USER_ID,
+			dailyId: "test-daily-id",
+		});
+
+		expect(result.success).toBe(true);
+		expect(result.independentMessage).toBe("本日の書き込みはありません");
 	});
 
 	// --- 正常系: 0件 ---

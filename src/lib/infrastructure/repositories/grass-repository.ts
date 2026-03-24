@@ -4,11 +4,12 @@
  * See: features/reactions.feature
  * See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §2.1
  * See: supabase/migrations/00008_grass_system.sql
+ * See: supabase/migrations/00029_bot_grass_count.sql
  *
  * 責務:
  *   - grass_reactions テーブルへの CRUD 操作
  *   - 同日重複チェック（existsForToday）
- *   - 草カウントの INCREMENT（users.grass_count）
+ *   - 草カウントの INCREMENT（users.grass_count / bots.grass_count）
  *   - DB カラム名（snake_case）とドメインモデル（camelCase）の相互変換
  *   - ビジネスロジックを含まない薄いデータアクセス層
  */
@@ -213,5 +214,31 @@ export async function incrementGrassCount(userId: string): Promise<number> {
 	}
 
 	// RPC の戻り値は更新後の grass_count
+	return data as number;
+}
+
+/**
+ * ボットの草カウントを +1 する。
+ *
+ * bots.grass_count をアトミックに INCREMENT する。
+ * increment_bot_column RPC（00029マイグレーションで grass_count を許可リストに追加済み）を使用する。
+ *
+ * See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+ * See: supabase/migrations/00029_bot_grass_count.sql
+ * See: tmp/design_bot_leak_fix.md §2.2.3 GrassRepository
+ *
+ * @param botId - 対象ボットのUUID
+ * @returns 更新後の草カウント
+ */
+export async function incrementBotGrassCount(botId: string): Promise<number> {
+	const { data, error } = await supabaseAdmin.rpc("increment_bot_column", {
+		p_bot_id: botId,
+		p_column: "grass_count",
+	});
+
+	if (error) {
+		throw new Error(`incrementBotGrassCount failed: ${error.message}`);
+	}
+
 	return data as number;
 }

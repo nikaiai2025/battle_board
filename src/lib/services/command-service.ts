@@ -43,12 +43,14 @@ import {
 // eslint-disable-next-line no-restricted-imports
 import {
 	HissiHandler,
+	type IHissiBotPostRepository,
 	type IHissiPostRepository,
 	type IHissiThreadRepository,
 } from "./handlers/hissi-handler";
 import { IamsystemHandler } from "./handlers/iamsystem-handler";
 // eslint-disable-next-line no-restricted-imports
 import {
+	type IKinouBotPostRepository,
 	type IKinouPostRepository,
 	KinouHandler,
 } from "./handlers/kinou-handler";
@@ -380,6 +382,9 @@ export class CommandService {
 	 * @param hissiHandler - HissiHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
 	 * @param kinouHandler - KinouHandler（DI。テスト時はモックを注入する。省略時は本番用実装を内部生成）
 	 * @param pendingAsyncCommandRepository - PendingAsyncCommandRepository（DI。!aori 用。省略時は本番用を動的 require）
+	 * @param livingBotHandler - LivingBotHandler（DI。テスト時はモックを注入する）
+	 * @param hissiBotPostRepository - !hissi BOT 判定用 BotPostRepository（DI。省略時は本番用を動的 require）
+	 * @param kinouBotPostRepository - !kinou BOT 判定用 BotPostRepository（DI。省略時は本番用を動的 require）
 	 *
 	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
 	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
@@ -399,6 +404,8 @@ export class CommandService {
 		kinouHandler?: KinouHandler | null,
 		pendingAsyncCommandRepository?: IAoriPendingRepository | null,
 		livingBotHandler?: LivingBotHandler | null,
+		hissiBotPostRepository?: IHissiBotPostRepository | null,
+		kinouBotPostRepository?: IKinouBotPostRepository | null,
 	) {
 		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
 		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
@@ -508,6 +515,7 @@ export class CommandService {
 		// DI で提供される場合はそれを使用する。
 		// YAML に hissi コマンドが有効化されている場合のみ本番用ファクトリで生成する。
 		// See: features/investigation.feature
+		// See: features/investigation.feature @ボットの書き込みに !hissi を実行すると書き込み履歴が表示される
 		let resolvedHissiHandler: CommandHandler | null = null;
 		if (hissiHandler !== undefined) {
 			// 明示的に DI された場合（null を含む）
@@ -518,13 +526,23 @@ export class CommandService {
 			const postRepository: IHissiPostRepository = require("../infrastructure/repositories/post-repository");
 			// eslint-disable-next-line @typescript-eslint/no-require-imports
 			const threadRepository: IHissiThreadRepository = require("../infrastructure/repositories/thread-repository");
-			resolvedHissiHandler = new HissiHandler(postRepository, threadRepository);
+			// BOT 判定用リポジトリ: DI 未提供の場合は本番実装を動的 require
+			const resolvedHissiBotPostRepo: IHissiBotPostRepository =
+				hissiBotPostRepository ??
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				require("../infrastructure/repositories/bot-post-repository");
+			resolvedHissiHandler = new HissiHandler(
+				postRepository,
+				threadRepository,
+				resolvedHissiBotPostRepo,
+			);
 		}
 
 		// KinouHandler の解決
 		// DI で提供される場合はそれを使用する。
 		// YAML に kinou コマンドが有効化されている場合のみ本番用ファクトリで生成する。
 		// See: features/investigation.feature
+		// See: features/investigation.feature @ボットの書き込みに !kinou を実行すると昨日のID情報が表示される
 		let resolvedKinouHandler: CommandHandler | null = null;
 		if (kinouHandler !== undefined) {
 			// 明示的に DI された場合（null を含む）
@@ -533,7 +551,15 @@ export class CommandService {
 			// YAML で kinou が有効化されており、DI がない場合のみ本番用生成
 			// eslint-disable-next-line @typescript-eslint/no-require-imports
 			const postRepository: IKinouPostRepository = require("../infrastructure/repositories/post-repository");
-			resolvedKinouHandler = new KinouHandler(postRepository);
+			// BOT 判定用リポジトリ: DI 未提供の場合は本番実装を動的 require
+			const resolvedKinouBotPostRepo: IKinouBotPostRepository =
+				kinouBotPostRepository ??
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				require("../infrastructure/repositories/bot-post-repository");
+			resolvedKinouHandler = new KinouHandler(
+				postRepository,
+				resolvedKinouBotPostRepo,
+			);
 		}
 
 		// AoriHandler / NewspaperHandler の解決

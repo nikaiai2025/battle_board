@@ -101,6 +101,8 @@ function createBotRow(overrides: Partial<Record<string, unknown>> = {}) {
 		eliminated_at: null,
 		eliminated_by: null,
 		created_at: NOW_ISO,
+		// TASK-307: ボット草カウント（00029マイグレーションで追加）
+		grass_count: 0,
 		...overrides,
 	};
 }
@@ -127,6 +129,8 @@ function createExpectedBot(overrides: Partial<Record<string, unknown>> = {}) {
 		eliminatedAt: null,
 		eliminatedBy: null,
 		createdAt: NOW,
+		// TASK-307: ボット草カウント（00029マイグレーションで追加）
+		grassCount: 0,
 		...overrides,
 	};
 }
@@ -762,6 +766,7 @@ describe("BotRepository", () => {
 				isActive: true,
 				isRevealed: false,
 				revealedAt: null,
+				grassCount: 0,
 				botProfileKey: "荒らし役",
 				// See: docs/architecture/architecture.md §13 TDR-010
 				nextPostAt: null,
@@ -787,6 +792,7 @@ describe("BotRepository", () => {
 					isActive: true,
 					isRevealed: false,
 					revealedAt: null,
+					grassCount: 0,
 					botProfileKey: null,
 					// See: docs/architecture/architecture.md §13 TDR-010
 					nextPostAt: null,

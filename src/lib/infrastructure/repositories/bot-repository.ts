@@ -40,6 +40,8 @@ interface BotRow {
 	eliminated_at: string | null;
 	eliminated_by: string | null;
 	created_at: string;
+	/** TASK-307追加: ボットへの草カウント（通算）。See: supabase/migrations/00029_bot_grass_count.sql */
+	grass_count: number;
 }
 
 /**
@@ -94,6 +96,9 @@ function rowToBot(row: BotRow): Bot {
 		eliminatedAt: row.eliminated_at ? new Date(row.eliminated_at) : null,
 		eliminatedBy: row.eliminated_by,
 		createdAt: new Date(row.created_at),
+		// TASK-307: ボット草カウント。00029マイグレーションで追加。DEFAULT 0 のため undefined 時は 0 にフォールバック
+		// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+		grassCount: row.grass_count ?? 0,
 	};
 }
 

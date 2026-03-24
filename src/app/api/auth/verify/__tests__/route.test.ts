@@ -247,7 +247,7 @@ describe("POST /api/auth/verify", () => {
 			expect(res.status).toBe(400);
 		});
 
-		it("edge-token Cookie が存在しない場合に 400 を返す", async () => {
+		it("Cookie もボディも edge-token がない場合に 400 を返す", async () => {
 			mockCookies(undefined);
 
 			const req = makeRequest({ turnstileToken: "valid" });
@@ -260,7 +260,98 @@ describe("POST /api/auth/verify", () => {
 	});
 
 	// =========================================================================
-	// エッジケース: リクエストに code フィールドは不要
+	// 専ブラ向け: リクエストボディの edgeToken フォールバック
+	// Sprint-110 で6桁コードを廃止した際のリグレッション修正
+	// See: features/specialist_browser_compat.feature @専ブラ認証フロー
+	// =========================================================================
+
+	describe("専ブラ向け: ボディの edgeToken フォールバック", () => {
+		it("Cookie がなくてもボディの edgeToken で認証できる", async () => {
+			mockCookies(undefined);
+			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
+				success: true,
+				writeToken: "senbra-write-token",
+			});
+
+			const req = makeRequest({
+				turnstileToken: "valid-turnstile",
+				edgeToken: "senbra-edge-token",
+			});
+			const res = await POST(req);
+
+			expect(res.status).toBe(200);
+			const body = (await res.json()) as {
+				success: boolean;
+				writeToken?: string;
+			};
+			expect(body.success).toBe(true);
+			expect(body.writeToken).toBe("senbra-write-token");
+		});
+
+		it("ボディの edgeToken で AuthService.verifyAuth が呼ばれる", async () => {
+			mockCookies(undefined);
+			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
+				success: true,
+				writeToken: "token",
+			});
+
+			const req = makeRequest({
+				turnstileToken: "some-turnstile",
+				edgeToken: "senbra-edge-token",
+			});
+			await POST(req);
+
+			expect(AuthService.verifyAuth).toHaveBeenCalledWith(
+				"senbra-edge-token",
+				"some-turnstile",
+				expect.any(String),
+			);
+		});
+
+		it("ボディの edgeToken は Cookie より優先される", async () => {
+			mockCookies("browser-edge-token");
+			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
+				success: true,
+				writeToken: "token",
+			});
+
+			const req = makeRequest({
+				turnstileToken: "valid-turnstile",
+				edgeToken: "senbra-edge-token",
+			});
+			await POST(req);
+
+			// Cookie の "browser-edge-token" ではなくボディの "senbra-edge-token" が使われる
+			expect(AuthService.verifyAuth).toHaveBeenCalledWith(
+				"senbra-edge-token",
+				"valid-turnstile",
+				expect.any(String),
+			);
+		});
+
+		it("ボディの edgeToken が空文字の場合は Cookie にフォールバックする", async () => {
+			mockCookies("browser-edge-token");
+			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
+				success: true,
+				writeToken: "token",
+			});
+
+			const req = makeRequest({
+				turnstileToken: "valid-turnstile",
+				edgeToken: "",
+			});
+			await POST(req);
+
+			expect(AuthService.verifyAuth).toHaveBeenCalledWith(
+				"browser-edge-token",
+				"valid-turnstile",
+				expect.any(String),
+			);
+		});
+	});
+
+	// =========================================================================
+	// エッジケース
 	// =========================================================================
 
 	describe("エッジケース", () => {

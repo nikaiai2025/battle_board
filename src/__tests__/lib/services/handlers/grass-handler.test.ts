@@ -106,6 +106,7 @@ function createMockGrassRepository(
 		existsForToday: vi.fn().mockResolvedValue(false),
 		create: vi.fn().mockResolvedValue({ id: "grass-001" }),
 		incrementGrassCount: vi.fn().mockResolvedValue(1),
+		incrementBotGrassCount: vi.fn().mockResolvedValue(1),
 		...overrides,
 	};
 }
@@ -386,14 +387,17 @@ describe("GrassHandler 正常系", () => {
 	});
 
 	// ---
-	// ボットへの草（MVP: 記録のみ・カウント非加算）
+	// ボットへの草（LEAK-1修正: ボットの草カウントも加算するよう変更）
 	// See: features/reactions.feature @ボットの書き込みに草を生やせる
-	// See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §4.3 ボットへの草 最終推奨
+	// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+	// See: tmp/design_bot_leak_fix.md §2.2.4 GrassHandler
 	// ---
-	describe("ボットへの草（MVP）", () => {
+	describe("ボットへの草（LEAK-1修正済み）", () => {
 		it("ボットのレスへの草に成功する", async () => {
 			const botPost = createBotPost();
-			const grassRepo = createMockGrassRepository();
+			const grassRepo = createMockGrassRepository({
+				incrementBotGrassCount: vi.fn().mockResolvedValue(1),
+			});
 			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
 			const handler = createHandler(
 				createMockPostRepository(botPost),
@@ -405,9 +409,28 @@ describe("GrassHandler 正常系", () => {
 			expect(result.success).toBe(true);
 		});
 
-		it("ボットへの草では incrementGrassCount が呼ばれない（MVPではボットのカウント非加算）", async () => {
+		it("ボットへの草では incrementBotGrassCount が呼ばれる（LEAK-1修正）", async () => {
+			// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
 			const botPost = createBotPost();
-			const grassRepo = createMockGrassRepository();
+			const grassRepo = createMockGrassRepository({
+				incrementBotGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
+			const handler = createHandler(
+				createMockPostRepository(botPost),
+				grassRepo,
+				botPostRepo,
+			);
+			await handler.execute(createCtx());
+
+			expect(grassRepo.incrementBotGrassCount).toHaveBeenCalledWith("bot-001");
+		});
+
+		it("ボットへの草では incrementGrassCount（ユーザー向け）が呼ばれない", async () => {
+			const botPost = createBotPost();
+			const grassRepo = createMockGrassRepository({
+				incrementBotGrassCount: vi.fn().mockResolvedValue(1),
+			});
 			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
 			const handler = createHandler(
 				createMockPostRepository(botPost),
@@ -419,9 +442,45 @@ describe("GrassHandler 正常系", () => {
 			expect(grassRepo.incrementGrassCount).not.toHaveBeenCalled();
 		});
 
+		it("ボットへの草: incrementBotGrassCount の戻り値がシステムメッセージに反映される", async () => {
+			// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
+			// ボットの草カウントが 0 → 1 に増加し、「🌱(計1本)」が表示される
+			const botPost = createBotPost();
+			const grassRepo = createMockGrassRepository({
+				incrementBotGrassCount: vi.fn().mockResolvedValue(1),
+			});
+			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
+			const handler = createHandler(
+				createMockPostRepository(botPost),
+				grassRepo,
+				botPostRepo,
+			);
+			const result = await handler.execute(createCtx());
+
+			expect(result.systemMessage).toContain("🌱(計1本)");
+		});
+
+		it("ボットへの草: 草カウントが増えるとアイコンが変化する（計10本で🌿）", async () => {
+			const botPost = createBotPost();
+			const grassRepo = createMockGrassRepository({
+				incrementBotGrassCount: vi.fn().mockResolvedValue(10),
+			});
+			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
+			const handler = createHandler(
+				createMockPostRepository(botPost),
+				grassRepo,
+				botPostRepo,
+			);
+			const result = await handler.execute(createCtx());
+
+			expect(result.systemMessage).toContain("🌿(計10本)");
+		});
+
 		it("ボットへの草では GrassRepository.create に receiverBotId が渡される", async () => {
 			const botPost = createBotPost();
-			const grassRepo = createMockGrassRepository();
+			const grassRepo = createMockGrassRepository({
+				incrementBotGrassCount: vi.fn().mockResolvedValue(1),
+			});
 			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
 			const handler = createHandler(
 				createMockPostRepository(botPost),
