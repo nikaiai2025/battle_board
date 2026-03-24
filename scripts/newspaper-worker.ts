@@ -129,7 +129,7 @@ async function main(): Promise<void> {
 			model_id?: string;
 		} | null;
 		const category = payload?.category ?? "IT";
-		const modelId = payload?.model_id ?? "gemini-3-flash-preview";
+		const modelId = payload?.model_id ?? "gemini-2.5-flash";
 
 		console.log(
 			`[newspaper-worker] Processing pending=${pending.id} category=${category}`,

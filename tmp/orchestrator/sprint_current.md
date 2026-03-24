@@ -4,15 +4,19 @@
 
 ## 現在のフェーズ
 
-**Sprint-112 完了 — 管理者課金ステータス変更機能 + テーマ反映バグ修正**
+**Sprint-112 完了 — 管理者課金ステータス変更 + 管理画面修正 + 開発環境整備**
 
 ### Sprint-112の成果
 - TASK-301: Backend — API（PUT/DELETE `/api/admin/users/[userId]/premium`）+ Service + BDDステップ + 単体テスト
 - TASK-302: Frontend — 管理画面ユーザー詳細ページに課金ステータス切り替えボタン追加
-- テーマ反映バグ修正（人間による手動修正、全UIコンポーネント）
+- TASK-303: 管理画面を`(admin)`ルートグループに分離（テーマ漏れ・Header重複解消）
+- TASK-304: 管理スレッド詳細からユーザー詳細へのリンク追加
+- TASK-305: ダークテーマbody背景色修正（`:root:has(.dark)`セレクタ追加）
+- TASK-306: ローカル開発用seed.sql（admin@local.test / admin1234）
+- プレミアムテーマCSS追加（ocean/forest/sunset）、エージェント設定更新（人間作業）
+- E2Eリファクタリング: 共有スレッド方式に変更（人間作業）
 - admin.feature v4: シナリオ2件追加（有料化/無料化）
 - vitest 1769 PASS / cucumber-js 341シナリオ（325 passed, 16 pending）
-- コミット: 51f665a
 - 本番スモーク: **29/34 PASS**（5件は設計上のスキップ）
 
 ### Sprint-111の成果

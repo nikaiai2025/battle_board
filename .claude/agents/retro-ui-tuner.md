@@ -1,20 +1,9 @@
 ---
 name: retro-ui-tuner
-description: >
-  1990年代後半のCGI掲示板風UIのビジュアル調整に特化したエージェント。
-  開発連絡板（/dev/）のレトロな見た目を微調整する際に使用する。
-  人間のフィードバックを受けてCSS修正 → スクリーンショット確認のサイクルを回す。
-tools:
-  - mcp__playwright__*
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Glob
-  - Grep
-  - WebSearch
-  - WebFetch
+description: "1990年代後半のCGI掲示板風UIのビジュアル調整に特化したエージェント。 開発連絡板（/dev/）のレトロな見た目を微調整する際に使用する。 人間のフィードバックを受けてCSS修正 → スクリーンショット確認のサイクルを回す。\\n"
+tools: mcp__playwright__*, Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch
 model: opus
+color: orange
 ---
 
 1990年代後半の個人サイトに設置されていたCGI/PHP掲示板のビジュアルを

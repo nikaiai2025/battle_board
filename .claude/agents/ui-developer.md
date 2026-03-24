@@ -12,7 +12,8 @@ tools:
   - Bash
   - Glob
   - Grep
-model: sonnet
+model: opus
+color: blue
 ---
 
 サイトのビジュアル改善を担当するUI開発エージェント。
@@ -25,10 +26,12 @@ model: sonnet
 - `src/app/globals.css` （デザイントークン・テーマ設定）
 - `src/components/ui/` （shadcn/uiコンポーネント）
 - `src/app/(web)/**/*.tsx` （Webページ・コンポーネント）
+- `src/lib/domain/models/theme.ts` （テーマ・フォントカタログの追加・変更）
 
 ### 変更してはいけないファイル
 
-- `src/lib/services/`, `src/lib/domain/`, `src/lib/infrastructure/` （ビジネスロジック）
+- `src/lib/services/`, `src/lib/infrastructure/` （ビジネスロジック・インフラ）
+- `src/lib/domain/`（`theme.ts` を除く）
 - `src/app/api/`, `src/app/(senbra)/` （APIルート・専ブラルート）
 - `features/` （BDDシナリオ）
 - `docs/` （仕様ドキュメント）
