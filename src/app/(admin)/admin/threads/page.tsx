@@ -19,6 +19,7 @@
  *     （レス削除時にコメント入力欄が必要なため）
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { Post } from "@/lib/domain/models/post";
 import type { Thread } from "@/lib/domain/models/thread";
@@ -561,9 +562,18 @@ export default function AdminThreadsPage() {
 									<td className="px-3 py-2 text-right text-xs font-mono text-muted-foreground">
 										{post.postNumber}
 									</td>
-									{/* 名前 */}
+									{/* 名前 — authorId がある場合はユーザー詳細へのリンクを表示 */}
 									<td className="px-3 py-2 text-xs whitespace-nowrap">
-										{post.displayName}
+										{post.authorId ? (
+											<Link
+												href={`/admin/users/${post.authorId}`}
+												className="text-blue-600 hover:underline"
+											>
+												{post.displayName}
+											</Link>
+										) : (
+											post.displayName
+										)}
 									</td>
 									{/* 本文（先頭50文字）*/}
 									<td className="px-3 py-2 text-xs text-foreground max-w-xs">
