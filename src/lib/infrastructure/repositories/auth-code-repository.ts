@@ -149,8 +149,11 @@ export async function create(
 }
 
 /**
- * edge-token の識別子（token_id）で未検証レコードを取得する。
+ * edge-token の識別子（token_id）で最新の認証レコードを取得する。
  * verifyAuth で edge-token に紐づく認証レコードを検索する際に使用する。
+ *
+ * 同一 token_id のレコードが複数存在しうるため（not_verified 時の再発行）、
+ * created_at DESC + limit(1) で最新レコードのみを返す。
  *
  * @param tokenId edge-token の識別子
  * @returns 認証コードレコード、または存在しない場合は null
@@ -160,6 +163,8 @@ export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
 		.from("auth_codes")
 		.select("*")
 		.eq("token_id", tokenId)
+		.order("created_at", { ascending: false })
+		.limit(1)
 		.single();
 
 	if (error) {
@@ -192,6 +197,33 @@ export async function markVerified(id: string): Promise<void> {
 	if (error) {
 		throw new Error(`AuthCodeRepository.markVerified failed: ${error.message}`);
 	}
+}
+
+/**
+ * 指定 token_id の未検証レコードを全削除する。
+ * issueAuthCode が新規レコード作成前に古いレコードを掃除するために使用する。
+ * 同一 token_id の重複レコード蓄積を防ぐ。
+ *
+ * @param tokenId - edge-token の識別子
+ * @returns 削除した件数
+ */
+export async function deleteUnverifiedByTokenId(
+	tokenId: string,
+): Promise<number> {
+	const { data, error } = await supabaseAdmin
+		.from("auth_codes")
+		.delete()
+		.eq("token_id", tokenId)
+		.eq("verified", false)
+		.select("id");
+
+	if (error) {
+		throw new Error(
+			`AuthCodeRepository.deleteUnverifiedByTokenId failed: ${error.message}`,
+		);
+	}
+
+	return (data as { id: string }[]).length;
 }
 
 /**

@@ -45,6 +45,7 @@ vi.mock("@/lib/infrastructure/repositories/auth-code-repository", () => ({
 	create: vi.fn(),
 	markVerified: vi.fn(),
 	updateWriteToken: vi.fn(),
+	deleteUnverifiedByTokenId: vi.fn().mockResolvedValue(0),
 	// write_token 検証用（verifyWriteToken が使用）
 	// See: features/specialist_browser_compat.feature @専ブラ認証フロー
 	findByWriteToken: vi.fn(),

@@ -53,16 +53,39 @@ export async function create(
 }
 
 /**
- * edge-token の識別子（token_id）でレコードを取得する。
+ * edge-token の識別子（token_id）で最新のレコードを取得する。
  * verifyAuth が認証レコード検索に使用する。
+ * 同一 token_id のレコードが複数存在しうるため、createdAt が最新のものを返す。
  * See: src/lib/infrastructure/repositories/auth-code-repository.ts
  */
 export async function findByTokenId(tokenId: string): Promise<AuthCode | null> {
 	assertUUID(tokenId, "AuthCodeRepository.findByTokenId.tokenId");
+	let latest: AuthCode | null = null;
 	for (const authCode of store.values()) {
-		if (authCode.tokenId === tokenId) return authCode;
+		if (authCode.tokenId === tokenId) {
+			if (!latest || authCode.createdAt > latest.createdAt) {
+				latest = authCode;
+			}
+		}
 	}
-	return null;
+	return latest;
+}
+
+/**
+ * 指定 token_id の未検証レコードを全削除する。
+ * See: src/lib/infrastructure/repositories/auth-code-repository.ts
+ */
+export async function deleteUnverifiedByTokenId(
+	tokenId: string,
+): Promise<number> {
+	let count = 0;
+	for (const [id, authCode] of store.entries()) {
+		if (authCode.tokenId === tokenId && !authCode.verified) {
+			store.delete(id);
+			count++;
+		}
+	}
+	return count;
 }
 
 /**

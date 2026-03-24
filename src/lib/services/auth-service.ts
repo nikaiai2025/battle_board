@@ -255,6 +255,11 @@ export async function issueAuthCode(
 	ipHash: string,
 	edgeToken: string,
 ): Promise<{ expiresAt: Date }> {
+	// 同一 token_id の古い未検証レコードを削除する（重複蓄積防止）。
+	// not_verified パスで繰り返し呼ばれた場合に auth_codes が重複し、
+	// findByTokenId(.single()) が失敗するバグの根本対処。
+	await AuthCodeRepository.deleteUnverifiedByTokenId(edgeToken);
+
 	// 有効期限: 10分（600秒）
 	const expiresAt = new Date(Date.now() + 600 * 1000);
 
