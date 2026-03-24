@@ -10,7 +10,7 @@
  *
  * テスト方針:
  *   - UserRepository, PostRepository, CurrencyRepository はモック化する
- *   - getUserList: balance フィールドの付加、ページネーション、空リスト、N+1 回避の並列取得を検証
+ *   - getUserList: balance フィールドの付加、ページネーション、空リスト、N+1 回避の一括取得を検証
  *   - getUserDetail: PostWithThread（threadTitle 付き）の取得、ユーザー未存在時の null 返却を検証
  *   - getUserPosts: searchByAuthorId 経由の PostWithThread 取得、ページネーション伝播を検証
  */
@@ -46,6 +46,7 @@ vi.mock("@/lib/infrastructure/repositories/currency-repository", () => ({
 	credit: vi.fn(),
 	deduct: vi.fn(),
 	getBalance: vi.fn().mockResolvedValue(0),
+	getBalancesByUserIds: vi.fn().mockResolvedValue(new Map()),
 	sumAllBalances: vi.fn(),
 }));
 
@@ -181,10 +182,13 @@ describe("AdminService getUserList", () => {
 				users: [user1, user2],
 				total: 2,
 			});
-			// user1: 残高 100, user2: 残高 250
-			vi.mocked(CurrencyRepository.getBalance)
-				.mockResolvedValueOnce(100)
-				.mockResolvedValueOnce(250);
+			// user1: 残高 100, user2: 残高 250 を一括返却するMapで返す
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map([
+					[user1.id, 100],
+					[user2.id, 250],
+				]),
+			);
 
 			// Act
 			const result = await getUserList();
@@ -202,7 +206,10 @@ describe("AdminService getUserList", () => {
 				users: [user],
 				total: 1,
 			});
-			vi.mocked(CurrencyRepository.getBalance).mockResolvedValue(0);
+			// Mapに該当ユーザーが存在しない場合は 0 として扱われる
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
 
 			const result = await getUserList();
 
@@ -210,7 +217,7 @@ describe("AdminService getUserList", () => {
 			expect(typeof result.users[0].balance).toBe("number");
 		});
 
-		it("UserListItem に必要なフィールドが全て含まれる", async () => {
+		it("UserListItem に必要なフィールドが全て含まれる（streakDays/lastPostDate を含む）", async () => {
 			// See: features/admin.feature @各ユーザーのID、登録日時、ステータス、通貨残高が表示される
 			const userId = crypto.randomUUID();
 			const user = makeUser({
@@ -220,12 +227,16 @@ describe("AdminService getUserList", () => {
 				isPremium: true,
 				registrationType: "email",
 				username: "testuser",
+				streakDays: 7,
+				lastPostDate: "2026-02-15",
 			});
 			vi.mocked(UserRepository.findAll).mockResolvedValue({
 				users: [user],
 				total: 1,
 			});
-			vi.mocked(CurrencyRepository.getBalance).mockResolvedValue(500);
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map([[userId, 500]]),
+			);
 
 			const result = await getUserList();
 
@@ -237,9 +248,12 @@ describe("AdminService getUserList", () => {
 			expect(item.registrationType).toBe("email");
 			expect(item.username).toBe("testuser");
 			expect(item.balance).toBe(500);
+			expect(item.streakDays).toBe(7);
+			expect(item.lastPostDate).toBe("2026-02-15");
 		});
 
-		it("CurrencyRepository.getBalance が各ユーザーの ID で呼ばれる", async () => {
+		it("CurrencyRepository.getBalancesByUserIds が全ユーザーのIDをまとめて1回で呼ばれる（N+1 解消）", async () => {
+			// N+1 問題修正: getBalance を個別に呼ぶのではなく getBalancesByUserIds で一括取得
 			const user1 = makeUser({ id: crypto.randomUUID() });
 			const user2 = makeUser({ id: crypto.randomUUID() });
 			const user3 = makeUser({ id: crypto.randomUUID() });
@@ -247,15 +261,19 @@ describe("AdminService getUserList", () => {
 				users: [user1, user2, user3],
 				total: 3,
 			});
-			vi.mocked(CurrencyRepository.getBalance).mockResolvedValue(0);
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
 
 			await getUserList();
 
-			// 各ユーザーの ID で getBalance が呼ばれたことを確認
-			expect(CurrencyRepository.getBalance).toHaveBeenCalledTimes(3);
-			expect(CurrencyRepository.getBalance).toHaveBeenCalledWith(user1.id);
-			expect(CurrencyRepository.getBalance).toHaveBeenCalledWith(user2.id);
-			expect(CurrencyRepository.getBalance).toHaveBeenCalledWith(user3.id);
+			// getBalancesByUserIds が1回だけ呼ばれ、全ユーザーIDを含む配列が渡されることを確認
+			expect(CurrencyRepository.getBalancesByUserIds).toHaveBeenCalledTimes(1);
+			expect(CurrencyRepository.getBalancesByUserIds).toHaveBeenCalledWith(
+				expect.arrayContaining([user1.id, user2.id, user3.id]),
+			);
+			// 旧来の getBalance は getUserList では呼ばれない（N+1 解消）
+			expect(CurrencyRepository.getBalance).not.toHaveBeenCalled();
 		});
 	});
 
@@ -314,13 +332,16 @@ describe("AdminService getUserList", () => {
 				users: [],
 				total: 0,
 			});
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
 
 			const result = await getUserList();
 
 			expect(result.users).toEqual([]);
 			expect(result.total).toBe(0);
-			// getBalance は呼ばれない（ユーザーがいないため）
-			expect(CurrencyRepository.getBalance).not.toHaveBeenCalled();
+			// 空配列が渡されて getBalancesByUserIds は呼ばれる（空Mapを返す）
+			expect(CurrencyRepository.getBalancesByUserIds).toHaveBeenCalledWith([]);
 		});
 
 		it("total がユーザー配列の件数より大きい場合（ページネーション時）", async () => {
@@ -331,7 +352,9 @@ describe("AdminService getUserList", () => {
 				users: [user1, user2],
 				total: 50,
 			});
-			vi.mocked(CurrencyRepository.getBalance).mockResolvedValue(0);
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
 
 			const result = await getUserList({ limit: 2, offset: 0 });
 
@@ -345,7 +368,9 @@ describe("AdminService getUserList", () => {
 				users: [bannedUser],
 				total: 1,
 			});
-			vi.mocked(CurrencyRepository.getBalance).mockResolvedValue(300);
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map([[bannedUser.id, 300]]),
+			);
 
 			const result = await getUserList();
 
@@ -360,7 +385,9 @@ describe("AdminService getUserList", () => {
 				users: [user],
 				total: 1,
 			});
-			vi.mocked(CurrencyRepository.getBalance).mockResolvedValue(0);
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
 
 			const result = await getUserList();
 
@@ -374,11 +401,44 @@ describe("AdminService getUserList", () => {
 				users: [user],
 				total: 1,
 			});
-			vi.mocked(CurrencyRepository.getBalance).mockResolvedValue(0);
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
 
 			const result = await getUserList();
 
 			expect(result.users[0].registrationType).toBeNull();
+		});
+
+		it("lastPostDate が null のユーザーも正常に返される", async () => {
+			// Null 入力のエッジケース
+			const user = makeUser({ lastPostDate: null });
+			vi.mocked(UserRepository.findAll).mockResolvedValue({
+				users: [user],
+				total: 1,
+			});
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
+
+			const result = await getUserList();
+
+			expect(result.users[0].lastPostDate).toBeNull();
+		});
+
+		it("streakDays が 0 のユーザーも正常に返される", async () => {
+			const user = makeUser({ streakDays: 0 });
+			vi.mocked(UserRepository.findAll).mockResolvedValue({
+				users: [user],
+				total: 1,
+			});
+			vi.mocked(CurrencyRepository.getBalancesByUserIds).mockResolvedValue(
+				new Map(),
+			);
+
+			const result = await getUserList();
+
+			expect(result.users[0].streakDays).toBe(0);
 		});
 	});
 });

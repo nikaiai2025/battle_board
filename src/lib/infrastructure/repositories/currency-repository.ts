@@ -203,6 +203,43 @@ export async function getBalance(userId: string): Promise<number> {
 }
 
 /**
+ * 複数ユーザーの通貨残高を一括取得する（N+1 問題解消）。
+ * WHERE user_id IN (...) で1クエリにまとめて取得し、userId → balance の Map を返す。
+ * 空配列が渡された場合はDBクエリを実行せず空の Map を返す。
+ *
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ *
+ * @param userIds - 取得対象ユーザーID の配列
+ * @returns userId → balance のMap（レコードが存在しないユーザーは 0 として扱われる）
+ */
+export async function getBalancesByUserIds(
+	userIds: string[],
+): Promise<Map<string, number>> {
+	// 空配列の場合はクエリ不要
+	if (userIds.length === 0) {
+		return new Map();
+	}
+
+	const { data, error } = await supabaseAdmin
+		.from("currencies")
+		.select("user_id, balance")
+		.in("user_id", userIds);
+
+	if (error) {
+		throw new Error(
+			`CurrencyRepository.getBalancesByUserIds failed: ${error.message}`,
+		);
+	}
+
+	// userId → balance の Map を構築する（レコードが存在しないユーザーは後続で 0 として扱う）
+	const map = new Map<string, number>();
+	for (const row of data as { user_id: string; balance: number }[]) {
+		map.set(row.user_id, row.balance);
+	}
+	return map;
+}
+
+/**
  * 全ユーザーの通貨残高合計を集計する。
  * ダッシュボードの通貨流通量表示に使用する。
  *

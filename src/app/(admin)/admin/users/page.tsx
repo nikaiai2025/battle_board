@@ -18,7 +18,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import type { User } from "@/lib/domain/models/user";
+import type { UserListItem } from "@/lib/services/admin-service";
 import { formatDateTime } from "@/lib/utils/date";
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ import { formatDateTime } from "@/lib/utils/date";
 // ---------------------------------------------------------------------------
 
 interface UserListResponse {
-	users: User[];
+	users: UserListItem[];
 	total: number;
 	limit: number;
 	offset: number;
@@ -43,7 +43,7 @@ const PAGE_SIZE = 50;
  * BANされているかどうか、本登録/仮ユーザー、有料/無料を組み合わせて表示する。
  * See: tmp/feature_plan_admin_expansion.md §6-d カラム：ステータス
  */
-function StatusBadges({ user }: { user: User }) {
+function StatusBadges({ user }: { user: UserListItem }) {
 	return (
 		<div className="flex flex-wrap gap-1">
 			{user.isBanned && (
@@ -87,7 +87,7 @@ export default function AdminUsersPage() {
 	// 状態管理
 	// ---------------------------------------------------------------------------
 
-	const [users, setUsers] = useState<User[]>([]);
+	const [users, setUsers] = useState<UserListItem[]>([]);
 	const [total, setTotal] = useState(0);
 	const [currentPage, setCurrentPage] = useState(0); // 0-indexed
 	const [isLoading, setIsLoading] = useState(true);
@@ -224,10 +224,10 @@ export default function AdminUsersPage() {
 									<td className="px-3 py-2">
 										<StatusBadges user={user} />
 									</td>
-									{/* 通貨残高（別途 API から取得は行わない。一覧では表示省略する）
-                      Note: ユーザー一覧APIはbalanceを返さない。詳細ページで確認する。 */}
-									<td className="px-3 py-2 text-right text-xs text-muted-foreground">
-										詳細で確認
+									{/* 通貨残高
+                      See: features/admin.feature @各ユーザーのID、登録日時、ステータス、通貨残高が表示される */}
+									<td className="px-3 py-2 text-right text-xs">
+										{user.balance.toLocaleString("ja-JP")}
 									</td>
 									{/* 最終書き込み日 */}
 									<td className="px-3 py-2 text-xs whitespace-nowrap">

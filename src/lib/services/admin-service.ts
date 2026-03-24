@@ -436,6 +436,10 @@ export interface UserListItem {
 	username: string | null;
 	/** 通貨残高 */
 	balance: number;
+	/** 連続書き込み日数（ストリーク） */
+	streakDays: number;
+	/** 最終書き込み日（YYYY-MM-DD） */
+	lastPostDate: string | null;
 }
 
 /**
@@ -484,25 +488,26 @@ export async function getUserList(
 		orderBy?: "created_at" | "last_post_date";
 	} = {},
 ): Promise<{ users: UserListItem[]; total: number }> {
-	// ユーザー一覧を取得する
+	// ユーザー一覧を取得する（1クエリ）
 	const { users, total } = await UserRepository.findAll(options);
 
-	// 各ユーザーの通貨残高を並列取得し UserListItem に集約する
+	// 全ユーザーの通貨残高を一括取得する（N+1 → 1クエリに解消）
 	// See: features/admin.feature @各ユーザーのID、登録日時、ステータス、通貨残高が表示される
-	const usersWithBalance: UserListItem[] = await Promise.all(
-		users.map(async (user) => {
-			const balance = await CurrencyRepository.getBalance(user.id);
-			return {
-				id: user.id,
-				createdAt: user.createdAt,
-				isBanned: user.isBanned,
-				isPremium: user.isPremium,
-				registrationType: user.registrationType,
-				username: user.username,
-				balance,
-			};
-		}),
-	);
+	const userIds = users.map((u) => u.id);
+	const balanceMap = await CurrencyRepository.getBalancesByUserIds(userIds);
+
+	// UserListItem に集約する（balance が未登録のユーザーは 0 とする）
+	const usersWithBalance: UserListItem[] = users.map((user) => ({
+		id: user.id,
+		createdAt: user.createdAt,
+		isBanned: user.isBanned,
+		isPremium: user.isPremium,
+		registrationType: user.registrationType,
+		username: user.username,
+		balance: balanceMap.get(user.id) ?? 0,
+		streakDays: user.streakDays,
+		lastPostDate: user.lastPostDate,
+	}));
 
 	return { users: usersWithBalance, total };
 }

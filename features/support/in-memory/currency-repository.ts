@@ -141,6 +141,35 @@ export async function getBalance(userId: string): Promise<number> {
 }
 
 /**
+ * 複数ユーザーの通貨残高を一括取得する（N+1 問題解消）。
+ * 空配列が渡された場合はクエリ不要で空の Map を返す。
+ * レコードが存在しないユーザーは Map に含まれない（呼び出し元で 0 として扱う）。
+ *
+ * See: src/lib/infrastructure/repositories/currency-repository.ts > getBalancesByUserIds
+ * See: features/admin.feature @管理者がユーザー一覧を閲覧できる
+ */
+export async function getBalancesByUserIds(
+	userIds: string[],
+): Promise<Map<string, number>> {
+	if (userIds.length === 0) {
+		return new Map();
+	}
+
+	for (const id of userIds) {
+		assertUUID(id, "CurrencyRepository.getBalancesByUserIds.userIds[]");
+	}
+
+	const map = new Map<string, number>();
+	for (const id of userIds) {
+		const currency = store.get(id);
+		if (currency) {
+			map.set(id, currency.balance);
+		}
+	}
+	return map;
+}
+
+/**
  * 全ユーザーの通貨残高合計を集計する。
  * ダッシュボードの通貨流通量表示に使用する。
  *
