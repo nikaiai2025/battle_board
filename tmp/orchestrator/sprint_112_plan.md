@@ -24,5 +24,12 @@
 
 | TASK_ID | ステータス | 備考 |
 |---|---|---|
-| TASK-301 | assigned | |
-| TASK-302 | pending | TASK-301完了後に開始 |
+| TASK-301 | completed | BDD 325 passed / vitest 1769 PASS |
+| TASK-302 | completed | vitest 1769 PASS / 確認ダイアログ付き切り替えボタン実装 |
+
+## デプロイ・検証
+
+- コミット: 51f665a（テーマバグ修正と合わせてコミット）
+- Vercel: ● Ready
+- Cloudflare: デプロイ済み
+- 本番スモーク: 29/34 PASS（5件は設計上のスキップ）
