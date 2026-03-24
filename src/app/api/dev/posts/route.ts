@@ -54,6 +54,10 @@ export async function POST(req: NextRequest): Promise<Response> {
 		const message = err instanceof Error ? err.message : "投稿に失敗しました";
 		const redirectUrl = new URL("/dev/", req.url);
 		redirectUrl.searchParams.set("error", message);
+		if (name) redirectUrl.searchParams.set("name", name);
+		if (title) redirectUrl.searchParams.set("title", title);
+		if (body) redirectUrl.searchParams.set("body", body);
+		if (url) redirectUrl.searchParams.set("url", url);
 		return Response.redirect(redirectUrl, 302);
 	}
 

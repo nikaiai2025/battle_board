@@ -51,12 +51,25 @@ function formatDate(date: Date): string {
 export default async function DevBoardPage({
 	searchParams,
 }: {
-	searchParams: Promise<{ error?: string; page?: string }>;
+	searchParams: Promise<{
+		error?: string;
+		page?: string;
+		name?: string;
+		title?: string;
+		body?: string;
+		url?: string;
+	}>;
 }) {
 	const params = await searchParams;
 
 	// ページ番号の取得（クエリパラメータ ?page=N）
 	const pageNum = Math.max(1, Number(params.page) || 1);
+
+	// エラー時の入力値復元用
+	const prevName = params.name ?? "";
+	const prevTitle = params.title ?? "";
+	const prevBody = params.body ?? "";
+	const prevUrl = params.url ?? "";
 
 	// 投稿一覧を取得（新しい順、ページネーション付き）
 	let paginated: PaginatedPosts = {
@@ -137,10 +150,11 @@ export default async function DevBoardPage({
 
 				/* ---- 左ナビ（フレーム風） ---- */
 				.dev-nav {
-					width: 160px;
+					width: 190px;
 					background: #c0c8d8;
 					border-right: 2px solid #808080;
 					padding: 8px;
+					font-size: 12px;
 				}
 				.dev-nav-title {
 					font-size: 11px;
@@ -157,6 +171,7 @@ export default async function DevBoardPage({
 					color: #404040;
 					margin-top: 10px;
 					margin-bottom: 3px;
+					white-space: nowrap;
 				}
 				.dev-nav ul {
 					list-style: none;
@@ -165,6 +180,7 @@ export default async function DevBoardPage({
 				}
 				.dev-nav li {
 					margin-bottom: 3px;
+					white-space: nowrap;
 				}
 				.dev-nav li a {
 					text-decoration: none;
@@ -211,6 +227,7 @@ export default async function DevBoardPage({
 					color: #cc0000;
 					font-weight: bold;
 					margin-top: 2px;
+					white-space: nowrap;
 				}
 				.dev-nav-update {
 					font-size: 10px;
@@ -335,6 +352,7 @@ export default async function DevBoardPage({
 					padding: 2px 16px;
 					font-family: inherit;
 					cursor: pointer;
+					white-space: nowrap;
 				}
 				.dev-submit:active {
 					border-top: 2px solid #404040;
@@ -415,6 +433,7 @@ export default async function DevBoardPage({
 					height: 16px;
 					vertical-align: middle;
 					margin-right: 2px;
+					display: inline !important;
 				}
 				/* ---- フッター ---- */
 				.dev-footer {
@@ -485,10 +504,7 @@ export default async function DevBoardPage({
 							</div>
 
 							{/* 管理人プロフィール */}
-							<div className="dev-nav-section">
-								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
-								Profile -
-							</div>
+							<div className="dev-nav-section">- Profile -</div>
 							<div className="dev-profile">
 								<div className="dev-profile-name">†Eternal_Coder†</div>
 								<dl>
@@ -510,23 +526,21 @@ export default async function DevBoardPage({
 									<br />
 									画像の無断転載は禁止!!
 								</div>
-								<div style={{ marginTop: "6px" }}>
+								<div style={{ marginTop: "6px", whiteSpace: "nowrap" }}>
 									<img src="/dev/icons/mail.png" alt="" className="dev-icon" />
 									管理人にメール{" "}
 									<img
 										src="/dev/icons/construction.png"
-										alt="工事中"
+										alt=""
 										className="dev-icon"
 									/>
+									<span className="dev-construction">工事中</span>
 								</div>
 							</div>
 
 							<hr className="dev-nav-sep" />
 
-							<div className="dev-nav-section">
-								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
-								Links -
-							</div>
+							<div className="dev-nav-section">- Links -</div>
 							<ul>
 								<li>
 									<img src="/dev/icons/home.png" alt="" className="dev-icon" />
@@ -539,18 +553,16 @@ export default async function DevBoardPage({
 									GitHub{" "}
 									<img
 										src="/dev/icons/construction.png"
-										alt="工事中"
+										alt=""
 										className="dev-icon"
 									/>
+									<span className="dev-construction">工事中</span>
 								</li>
 							</ul>
 
 							<hr className="dev-nav-sep" />
 
-							<div className="dev-nav-section">
-								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
-								Tools -
-							</div>
+							<div className="dev-nav-section">- Tools -</div>
 							<ul>
 								<li>
 									<img
@@ -561,9 +573,10 @@ export default async function DevBoardPage({
 									ログビューア{" "}
 									<img
 										src="/dev/icons/construction.png"
-										alt="工事中"
+										alt=""
 										className="dev-icon"
 									/>
+									<span className="dev-construction">工事中</span>
 								</li>
 								<li>
 									<img
@@ -574,19 +587,17 @@ export default async function DevBoardPage({
 									テストデータ生成{" "}
 									<img
 										src="/dev/icons/construction.png"
-										alt="工事中"
+										alt=""
 										className="dev-icon"
 									/>
+									<span className="dev-construction">工事中</span>
 								</li>
 							</ul>
 
 							<hr className="dev-nav-sep" />
 
 							{/* 更新履歴 */}
-							<div className="dev-nav-section">
-								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
-								更新履歴 -
-							</div>
+							<div className="dev-nav-section">- 更新履歴 -</div>
 							<dl className="dev-nav-update">
 								<dt>2025/03/22</dt>
 								<dd>
@@ -609,7 +620,7 @@ export default async function DevBoardPage({
 							<div className="dev-counter-box">
 								<div className="dev-counter-label">あなたは</div>
 								<div className="dev-counter">
-									<span className="dev-counter-error">ERR</span>
+									{String(totalCount * 137 + 4649).padStart(6, "0")}
 								</div>
 								<div className="dev-counter-label">人目の訪問者です</div>
 								<div className="dev-counter-kiriban">
@@ -667,14 +678,14 @@ export default async function DevBoardPage({
 										<tr>
 											<td className="dev-label">おなまえ</td>
 											<td>
-												{/* name-input: 名前フィールド（任意。空の場合は「名無しさん」） */}
+												{/* name-input: 名前フィールド（必須） */}
 												<input
 													type="text"
 													name="name"
 													id="name-input"
 													placeholder=""
 													maxLength={50}
-													required
+													defaultValue={prevName}
 												/>
 											</td>
 										</tr>
@@ -687,6 +698,7 @@ export default async function DevBoardPage({
 													name="title"
 													id="title-input"
 													placeholder=""
+													defaultValue={prevTitle}
 												/>
 											</td>
 										</tr>
@@ -694,7 +706,11 @@ export default async function DevBoardPage({
 											<td className="dev-label">メッセージ</td>
 											<td>
 												{/* body-input: 本文フィールド（必須） */}
-												<textarea name="body" id="body-input" />
+												<textarea
+													name="body"
+													id="body-input"
+													defaultValue={prevBody}
+												/>
 											</td>
 										</tr>
 										<tr>
@@ -706,6 +722,7 @@ export default async function DevBoardPage({
 													name="url"
 													id="url-input"
 													placeholder="http://"
+													defaultValue={prevUrl}
 												/>
 											</td>
 										</tr>
@@ -770,19 +787,19 @@ export default async function DevBoardPage({
 												<span className="dev-post-name" data-testid="post-name">
 													{post.name}
 												</span>
-												{post.url && (
-													<span className="dev-post-url">
-														[
-														<a
-															href={post.url}
-															target="_blank"
-															rel="noopener noreferrer"
-														>
-															HP
-														</a>
-														]
-													</span>
-												)}
+												<span className="dev-post-url">
+													<a
+														href={post.url || "#"}
+														target="_blank"
+														rel="noopener noreferrer"
+													>
+														<img
+															src="/dev/icons/home.png"
+															alt="HP"
+															className="dev-icon"
+														/>
+													</a>
+												</span>
 												<span className="dev-post-date" data-testid="post-date">
 													{formatDate(post.createdAt)}
 												</span>
