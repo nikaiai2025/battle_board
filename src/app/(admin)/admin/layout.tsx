@@ -14,6 +14,8 @@
  *   - ナビゲーションは Server Component 内に直接記述する（軽量なため別コンポーネント化しない）
  *   - /admin/login は (admin-public) ルートグループに配置し、本レイアウトの認証ガードを回避する
  *     （無限リダイレクト防止。See: tmp/escalations/escalation_ESC-TASK-284-1.md 案A）
+ *   - (admin) ルートグループに配置することで、(web)/layout.tsx のテーマ適用・Header 描画を回避する
+ *     （See: TASK-303 管理画面テーマ漏れ・Header 非表示問題の修正）
  *
  * See: docs/architecture/components/web-ui.md §3 コンポーネント境界
  */
@@ -47,6 +49,9 @@ const NAV_LINKS = [
  *
  * /admin/login は (admin-public) ルートグループに配置されているため、
  * 本レイアウトの認証ガードは適用されない（無限リダイレクト防止）。
+ *
+ * (web) ルートグループの外に配置することで、ユーザーテーマ・Header が
+ * 管理画面に伝播しない構造になっている。
  *
  * See: features/authentication.feature @管理者が正しいメールアドレスとパスワードでログインする
  */
