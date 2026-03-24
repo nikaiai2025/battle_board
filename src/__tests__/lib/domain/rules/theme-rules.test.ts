@@ -63,13 +63,18 @@ describe("resolveFont", () => {
 		expect(result.id).toBe("gothic");
 	});
 
-	it("有料フォント(mincho)は有料ユーザーなら適用可", () => {
-		const result = resolveFont("mincho", true);
+	it("無料フォント(mincho)は無料ユーザーでも適用可", () => {
+		const result = resolveFont("mincho", false);
 		expect(result.id).toBe("mincho");
 	});
 
-	it("有料フォント(mincho)は無料ユーザーでフォールバック", () => {
-		const result = resolveFont("mincho", false);
+	it("有料フォント(noto-sans-jp)は有料ユーザーなら適用可", () => {
+		const result = resolveFont("noto-sans-jp", true);
+		expect(result.id).toBe("noto-sans-jp");
+	});
+
+	it("有料フォント(noto-sans-jp)は無料ユーザーでフォールバック", () => {
+		const result = resolveFont("noto-sans-jp", false);
 		expect(result.id).toBe("gothic");
 	});
 
@@ -103,7 +108,7 @@ describe("validateThemeSelection", () => {
 	});
 
 	it("有料フォント + 無料ユーザー は PREMIUM_REQUIRED", () => {
-		const result = validateThemeSelection("default", "mincho", false);
+		const result = validateThemeSelection("default", "noto-sans-jp", false);
 		expect(result.valid).toBe(false);
 		if (!result.valid) {
 			expect(result.code).toBe("PREMIUM_REQUIRED");
@@ -126,8 +131,8 @@ describe("validateThemeSelection", () => {
 		}
 	});
 
-	it("有料テーマ + 有料ユーザー は valid", () => {
-		const result = validateThemeSelection("ocean", "mincho", true);
+	it("有料テーマ + 有料フォント + 有料ユーザー は valid", () => {
+		const result = validateThemeSelection("ocean", "noto-sans-jp", true);
 		expect(result.valid).toBe(true);
 	});
 

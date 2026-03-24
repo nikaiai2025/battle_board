@@ -45,6 +45,7 @@ import {
 	isTemporaryUser,
 } from "@/lib/domain/rules/mypage-display-rules";
 import type { MypageInfo } from "@/lib/services/mypage-service";
+import FontPickerModal from "./_components/FontPickerModal";
 import PostHistorySection from "./_components/PostHistorySection";
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ export default function MypagePage() {
 	// See: features/theme.feature
 	const [selectedThemeId, setSelectedThemeId] = useState<string>("default");
 	const [selectedFontId, setSelectedFontId] = useState<string>("gothic");
+	const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
 
 	// ---------------------------------------------------------------------------
 	// データ取得
@@ -554,41 +556,39 @@ export default function MypagePage() {
 					</div>
 				</div>
 
-				{/* フォント一覧
+				{/* フォント選択
             See: features/theme.feature @テーマ一覧とフォント一覧が表示される */}
 				<div>
 					<h3 className="text-sm font-medium text-muted-foreground mb-2">
 						フォント
 					</h3>
-					<div className="flex flex-wrap gap-2">
-						{FONT_CATALOG.map((font) => {
-							const isSelected = selectedFontId === font.id;
-							const isLocked = !font.isFree && !mypageInfo.isPremium;
-							return (
-								<button
-									key={font.id}
-									data-testid={`font-card-${font.id}`}
-									type="button"
-									aria-pressed={isSelected}
-									disabled={isLocked}
-									onClick={() => {
-										void handleFontChange(font.id);
-									}}
-									className={`px-4 py-2 text-sm rounded border ${
-										isSelected
-											? "border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold"
-											: isLocked
-												? "border-border bg-muted text-muted-foreground cursor-not-allowed"
-												: "border-border bg-card text-foreground hover:border-blue-300"
-									}`}
-								>
-									{font.name}
-									{isSelected && " \u2713"}
-									{isLocked && " \uD83D\uDD12"}
-								</button>
-							);
-						})}
+					<div className="flex items-center gap-3">
+						<span
+							data-testid={`font-card-${selectedFontId}`}
+							className="text-sm font-bold text-foreground"
+							style={{
+								fontFamily: findFont(selectedFontId)?.cssFontFamily,
+							}}
+						>
+							{findFont(selectedFontId)?.name ?? selectedFontId}
+						</span>
+						<button
+							type="button"
+							onClick={() => setIsFontPickerOpen(true)}
+							className="px-3 py-1.5 text-xs rounded border border-border bg-card text-foreground hover:border-primary hover:bg-accent/50 transition-colors"
+						>
+							変更する
+						</button>
 					</div>
+					<FontPickerModal
+						open={isFontPickerOpen}
+						onOpenChange={setIsFontPickerOpen}
+						selectedFontId={selectedFontId}
+						isPremium={mypageInfo.isPremium}
+						onSelectFont={(fontId) => {
+							void handleFontChange(fontId);
+						}}
+					/>
 				</div>
 			</section>
 
