@@ -82,7 +82,15 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
+/*
+ * ダークテーマのCSS変数定義。
+ * .dark クラスが付与された要素（Web UIでは (web)/layout.tsx の div）と、
+ * .dark の子孫要素を内包する :root（<html>）の両方に適用する。
+ * :root:has(.dark) により、<body> の bg-background もダーク色を参照できる。
+ * See: features/theme.feature
+ */
+.dark,
+:root:has(.dark) {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
