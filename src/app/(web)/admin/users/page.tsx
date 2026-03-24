@@ -47,25 +47,25 @@ function StatusBadges({ user }: { user: User }) {
 	return (
 		<div className="flex flex-wrap gap-1">
 			{user.isBanned && (
-				<span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded">
+				<span className="inline-block px-1.5 py-0.5 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 text-xs font-bold rounded">
 					BAN
 				</span>
 			)}
 			{user.registrationType ? (
-				<span className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+				<span className="inline-block px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 text-xs rounded">
 					本登録
 				</span>
 			) : (
-				<span className="inline-block px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+				<span className="inline-block px-1.5 py-0.5 bg-muted text-muted-foreground text-xs rounded">
 					仮
 				</span>
 			)}
 			{user.isPremium ? (
-				<span className="inline-block px-1.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded">
+				<span className="inline-block px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-300 text-xs rounded">
 					有料
 				</span>
 			) : (
-				<span className="inline-block px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+				<span className="inline-block px-1.5 py-0.5 bg-muted text-muted-foreground text-xs rounded">
 					無料
 				</span>
 			)}
@@ -143,8 +143,8 @@ export default function AdminUsersPage() {
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-bold text-gray-800">ユーザー一覧</h2>
-				<span className="text-sm text-gray-500">
+				<h2 className="text-lg font-bold text-foreground">ユーザー一覧</h2>
+				<span className="text-sm text-muted-foreground">
 					全 {total.toLocaleString("ja-JP")} 件
 				</span>
 			</div>
@@ -154,32 +154,32 @@ export default function AdminUsersPage() {
 			{/* ユーザー一覧テーブル
           See: features/admin.feature @管理者がユーザー一覧を閲覧できる
           See: features/admin.feature @各ユーザーのID、登録日時、ステータス、通貨残高が表示される */}
-			<div className="bg-white border border-gray-200 rounded shadow-sm overflow-x-auto">
+			<div className="bg-card border border-border rounded shadow-sm overflow-x-auto">
 				<table
 					id="user-list-table"
 					className="w-full text-sm text-left border-collapse"
 				>
 					<thead>
-						<tr className="bg-gray-50 border-b border-gray-200">
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+						<tr className="bg-muted border-b border-border">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								ユーザーID（短縮）
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								登録日時
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								ステータス
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 								通貨残高
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								最終書き込み日
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 								ストリーク
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								操作
 							</th>
 						</tr>
@@ -189,7 +189,7 @@ export default function AdminUsersPage() {
 							<tr>
 								<td
 									colSpan={7}
-									className="px-3 py-6 text-center text-gray-500 text-sm"
+									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									読み込み中...
 								</td>
@@ -198,7 +198,7 @@ export default function AdminUsersPage() {
 							<tr>
 								<td
 									colSpan={7}
-									className="px-3 py-6 text-center text-gray-400 text-sm"
+									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									ユーザーが見つかりません
 								</td>
@@ -207,13 +207,13 @@ export default function AdminUsersPage() {
 							users.map((user) => (
 								<tr
 									key={user.id}
-									className={`border-b border-gray-100 hover:bg-gray-50 ${
-										user.isBanned ? "bg-red-50" : ""
+									className={`border-b border-border hover:bg-accent ${
+										user.isBanned ? "bg-red-50 dark:bg-red-950/30" : ""
 									}`}
 								>
 									{/* ユーザーID（短縮表示）
                       See: features/admin.feature @各ユーザーのID、登録日時、ステータス、通貨残高が表示される */}
-									<td className="px-3 py-2 font-mono text-xs text-gray-600">
+									<td className="px-3 py-2 font-mono text-xs text-muted-foreground">
 										{user.id.slice(0, 8)}...
 									</td>
 									{/* 登録日時 */}
@@ -226,7 +226,7 @@ export default function AdminUsersPage() {
 									</td>
 									{/* 通貨残高（別途 API から取得は行わない。一覧では表示省略する）
                       Note: ユーザー一覧APIはbalanceを返さない。詳細ページで確認する。 */}
-									<td className="px-3 py-2 text-right text-xs text-gray-500">
+									<td className="px-3 py-2 text-right text-xs text-muted-foreground">
 										詳細で確認
 									</td>
 									{/* 最終書き込み日 */}
@@ -261,18 +261,18 @@ export default function AdminUsersPage() {
 						type="button"
 						onClick={() => setCurrentPage((p) => p - 1)}
 						disabled={!hasPrev}
-						className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+						className="px-3 py-1.5 text-sm bg-muted text-foreground rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						前へ
 					</button>
-					<span className="text-sm text-gray-600">
+					<span className="text-sm text-muted-foreground">
 						{currentPage + 1} / {totalPages} ページ
 					</span>
 					<button
 						type="button"
 						onClick={() => setCurrentPage((p) => p + 1)}
 						disabled={!hasNext}
-						className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+						className="px-3 py-1.5 text-sm bg-muted text-foreground rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						次へ
 					</button>

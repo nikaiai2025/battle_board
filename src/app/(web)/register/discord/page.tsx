@@ -141,15 +141,15 @@ export default function RegisterDiscordPage() {
 			{/* register-discord-page: Discord本登録ページコンテナ */}
 			<div
 				id="register-discord-page"
-				className="border border-gray-400 bg-white rounded p-6"
+				className="border border-border bg-card rounded p-6"
 			>
 				{/* ページタイトル */}
-				<h1 className="text-lg font-bold text-gray-800 mb-2">
+				<h1 className="text-lg font-bold text-foreground mb-2">
 					Discord で本登録
 				</h1>
 
 				{/* 説明文 */}
-				<p className="text-sm text-gray-600 mb-6">
+				<p className="text-sm text-muted-foreground mb-6">
 					Discord アカウントと連携することで、Cookie
 					喪失・端末変更時でも同一ユーザーとして復帰できます。 ボタンを押すと
 					Discord の認可画面に移動します。
@@ -182,12 +182,12 @@ export default function RegisterDiscordPage() {
 				</button>
 
 				{/* 注意事項 */}
-				<p className="text-xs text-gray-500 mt-3">
+				<p className="text-xs text-muted-foreground mt-3">
 					※ 認可画面で「承認」を押すと本登録が完了します。
 				</p>
 
 				{/* マイページへの戻りリンク */}
-				<div className="mt-4 pt-4 border-t border-gray-200">
+				<div className="mt-4 pt-4 border-t border-border">
 					<Link
 						href="/mypage"
 						className="text-sm text-blue-600 hover:underline"

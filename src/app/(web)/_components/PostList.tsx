@@ -37,7 +37,11 @@ interface PostListProps {
  */
 export default function PostList({ posts }: PostListProps) {
 	if (posts.length === 0) {
-		return <p className="text-gray-500 text-sm py-4">まだレスがありません。</p>;
+		return (
+			<p className="text-muted-foreground text-sm py-4">
+				まだレスがありません。
+			</p>
+		);
 	}
 
 	return (

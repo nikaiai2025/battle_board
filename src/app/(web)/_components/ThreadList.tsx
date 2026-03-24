@@ -32,7 +32,7 @@ export default function ThreadList({ threads }: ThreadListProps) {
 	if (threads.length === 0) {
 		return (
 			<div
-				className="text-gray-500 text-sm text-center py-8"
+				className="text-muted-foreground text-sm text-center py-8"
 				id="thread-list-empty"
 			>
 				スレッドがありません

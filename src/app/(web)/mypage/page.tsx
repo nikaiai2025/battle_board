@@ -27,8 +27,14 @@
  *   - 通知欄（Phase 2 プレースホルダー）
  */
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { FONT_CATALOG, THEME_CATALOG } from "@/lib/domain/models/theme";
+import {
+	FONT_CATALOG,
+	findFont,
+	findTheme,
+	THEME_CATALOG,
+} from "@/lib/domain/models/theme";
 import {
 	buildPatCopyValue,
 	canUpgrade,
@@ -59,6 +65,7 @@ export default function MypagePage() {
 	// 状態管理
 	// ---------------------------------------------------------------------------
 
+	const router = useRouter();
 	const [mypageInfo, setMypageInfo] = useState<MypageInfo | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -290,9 +297,37 @@ export default function MypagePage() {
 	 * See: features/theme.feature @ダークテーマに切り替える
 	 * See: features/theme.feature @デフォルトテーマに戻す
 	 */
+	/**
+	 * テーマ/フォントのCSSクラスをlayout divに即時反映する。
+	 * layout.tsx の Server Component は Cookie 更新だけでは再レンダリングされないため、
+	 * クライアント側で DOM を直接更新して即時反映を実現する。
+	 *
+	 * See: features/theme.feature @画面がダークテーマに切り替わる
+	 */
+	const applyThemeToDOM = (themeId: string, fontId: string) => {
+		const layoutDiv = document.querySelector("[class*='min-h-screen']");
+		if (!layoutDiv) return;
+
+		// 既存のテーマクラスを除去し、新しいテーマクラスを付与する
+		const themeEntry = findTheme(themeId);
+		for (const t of THEME_CATALOG) {
+			if (t.cssClass) layoutDiv.classList.remove(t.cssClass);
+		}
+		if (themeEntry?.cssClass) {
+			layoutDiv.classList.add(themeEntry.cssClass);
+		}
+
+		// フォントを即時反映する
+		const fontEntry = findFont(fontId);
+		if (fontEntry) {
+			(layoutDiv as HTMLElement).style.fontFamily = fontEntry.cssFontFamily;
+		}
+	};
+
 	const handleThemeChange = async (newThemeId: string) => {
 		const prevThemeId = selectedThemeId;
 		setSelectedThemeId(newThemeId); // 楽観的更新
+		applyThemeToDOM(newThemeId, selectedFontId); // 即時反映
 
 		try {
 			const res = await fetch("/api/mypage/theme", {
@@ -301,10 +336,14 @@ export default function MypagePage() {
 				body: JSON.stringify({ themeId: newThemeId, fontId: selectedFontId }),
 			});
 			if (!res.ok) {
-				setSelectedThemeId(prevThemeId); // ロールバック
+				setSelectedThemeId(prevThemeId);
+				applyThemeToDOM(prevThemeId, selectedFontId); // ロールバック
+			} else {
+				router.refresh(); // Server Component を再レンダリング（Cookie反映）
 			}
 		} catch {
 			setSelectedThemeId(prevThemeId);
+			applyThemeToDOM(prevThemeId, selectedFontId);
 		}
 	};
 
@@ -315,6 +354,7 @@ export default function MypagePage() {
 	const handleFontChange = async (newFontId: string) => {
 		const prevFontId = selectedFontId;
 		setSelectedFontId(newFontId); // 楽観的更新
+		applyThemeToDOM(selectedThemeId, newFontId); // 即時反映
 
 		try {
 			const res = await fetch("/api/mypage/theme", {
@@ -323,10 +363,14 @@ export default function MypagePage() {
 				body: JSON.stringify({ themeId: selectedThemeId, fontId: newFontId }),
 			});
 			if (!res.ok) {
-				setSelectedFontId(prevFontId); // ロールバック
+				setSelectedFontId(prevFontId);
+				applyThemeToDOM(selectedThemeId, prevFontId); // ロールバック
+			} else {
+				router.refresh();
 			}
 		} catch {
 			setSelectedFontId(prevFontId);
+			applyThemeToDOM(selectedThemeId, prevFontId);
 		}
 	};
 
@@ -337,7 +381,7 @@ export default function MypagePage() {
 	if (isLoading) {
 		return (
 			<main className="max-w-2xl mx-auto px-4 py-8">
-				<p className="text-gray-500 text-sm">読み込み中...</p>
+				<p className="text-muted-foreground text-sm">読み込み中...</p>
 			</main>
 		);
 	}
@@ -355,7 +399,7 @@ export default function MypagePage() {
 	if (!mypageInfo) {
 		return (
 			<main className="max-w-2xl mx-auto px-4 py-8">
-				<p className="text-gray-500 text-sm">
+				<p className="text-muted-foreground text-sm">
 					マイページ情報を取得できませんでした。
 				</p>
 			</main>
@@ -379,7 +423,7 @@ export default function MypagePage() {
 	return (
 		<main id="mypage" className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 			{/* ページタイトル */}
-			<h1 className="text-xl font-bold text-gray-800">マイページ</h1>
+			<h1 className="text-xl font-bold text-foreground">マイページ</h1>
 
 			{/* =============================
           アカウント情報セクション
@@ -389,13 +433,13 @@ export default function MypagePage() {
           ============================= */}
 			<section
 				id="account-info"
-				className="bg-white border border-gray-300 rounded p-4 space-y-2"
+				className="bg-card border border-border rounded p-4 space-y-2"
 			>
-				<h2 className="text-base font-bold text-gray-700">アカウント情報</h2>
+				<h2 className="text-base font-bold text-foreground">アカウント情報</h2>
 
 				{/* アカウント種別（仮ユーザー / 本登録ユーザー）
             See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される */}
-				<div className="text-sm text-gray-600">
+				<div className="text-sm text-muted-foreground">
 					<span className="font-medium">アカウント種別: </span>
 					{/* account-type-badge: 仮ユーザー/本登録ユーザー表示
               See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される */}
@@ -403,7 +447,7 @@ export default function MypagePage() {
 						data-testid="account-type-badge"
 						className={
 							isTemporaryUser(mypageInfo)
-								? "inline-block px-2 py-0.5 bg-gray-200 text-gray-600 text-xs font-bold rounded"
+								? "inline-block px-2 py-0.5 bg-muted text-muted-foreground text-xs font-bold rounded"
 								: "inline-block px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-bold rounded"
 						}
 					>
@@ -414,7 +458,7 @@ export default function MypagePage() {
 				{/* 認証方法（本登録ユーザーのみ表示）
             See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される */}
 				{registrationMethodLabel !== null && (
-					<div className="text-sm text-gray-600">
+					<div className="text-sm text-muted-foreground">
 						<span className="font-medium">認証方法: </span>
 						<span data-testid="registration-method">
 							{registrationMethodLabel}
@@ -424,14 +468,14 @@ export default function MypagePage() {
 
 				{/* 有料/無料ステータス表示
             See: features/mypage.feature @マイページに基本情報が表示される */}
-				<div className="text-sm text-gray-600">
+				<div className="text-sm text-muted-foreground">
 					<span className="font-medium">プラン: </span>
 					<span
 						id="premium-badge"
 						className={
 							mypageInfo.isPremium
 								? "inline-block px-2 py-0.5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded"
-								: "inline-block px-2 py-0.5 bg-gray-200 text-gray-600 text-xs font-bold rounded"
+								: "inline-block px-2 py-0.5 bg-muted text-muted-foreground text-xs font-bold rounded"
 						}
 					>
 						{mypageInfo.isPremium ? "有料ユーザー" : "無料ユーザー"}
@@ -439,7 +483,7 @@ export default function MypagePage() {
 				</div>
 
 				{/* 連続書き込み日数 */}
-				<div className="text-sm text-gray-600">
+				<div className="text-sm text-muted-foreground">
 					<span className="font-medium">連続書き込み: </span>
 					{mypageInfo.streakDays}日
 				</div>
@@ -469,14 +513,16 @@ export default function MypagePage() {
           ============================= */}
 			<section
 				data-testid="theme-section"
-				className="bg-white border border-gray-300 rounded p-4 space-y-4"
+				className="bg-card border border-border rounded p-4 space-y-4"
 			>
-				<h2 className="text-base font-bold text-gray-700">テーマ設定</h2>
+				<h2 className="text-base font-bold text-foreground">テーマ設定</h2>
 
 				{/* テーマ一覧
             See: features/theme.feature @テーマ一覧とフォント一覧が表示される */}
 				<div>
-					<h3 className="text-sm font-medium text-gray-600 mb-2">テーマ</h3>
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
+						テーマ
+					</h3>
 					<div className="flex flex-wrap gap-2">
 						{THEME_CATALOG.map((theme) => {
 							const isSelected = selectedThemeId === theme.id;
@@ -493,10 +539,10 @@ export default function MypagePage() {
 									}}
 									className={`px-4 py-2 text-sm rounded border ${
 										isSelected
-											? "border-blue-500 bg-blue-50 text-blue-700 font-bold"
+											? "border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold"
 											: isLocked
-												? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
-												: "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+												? "border-border bg-muted text-muted-foreground cursor-not-allowed"
+												: "border-border bg-card text-foreground hover:border-blue-300"
 									}`}
 								>
 									{theme.name}
@@ -511,7 +557,9 @@ export default function MypagePage() {
 				{/* フォント一覧
             See: features/theme.feature @テーマ一覧とフォント一覧が表示される */}
 				<div>
-					<h3 className="text-sm font-medium text-gray-600 mb-2">フォント</h3>
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
+						フォント
+					</h3>
 					<div className="flex flex-wrap gap-2">
 						{FONT_CATALOG.map((font) => {
 							const isSelected = selectedFontId === font.id;
@@ -528,10 +576,10 @@ export default function MypagePage() {
 									}}
 									className={`px-4 py-2 text-sm rounded border ${
 										isSelected
-											? "border-blue-500 bg-blue-50 text-blue-700 font-bold"
+											? "border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold"
 											: isLocked
-												? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
-												: "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+												? "border-border bg-muted text-muted-foreground cursor-not-allowed"
+												: "border-border bg-card text-foreground hover:border-blue-300"
 									}`}
 								>
 									{font.name}
@@ -591,9 +639,9 @@ export default function MypagePage() {
 			{isPermanentUser(mypageInfo) && (
 				<section
 					data-testid="pat-section"
-					className="bg-white border border-gray-300 rounded p-4 space-y-3"
+					className="bg-card border border-border rounded p-4 space-y-3"
 				>
-					<h2 className="text-base font-bold text-gray-700">
+					<h2 className="text-base font-bold text-foreground">
 						専ブラ連携トークン（PAT）
 					</h2>
 
@@ -601,7 +649,7 @@ export default function MypagePage() {
               See: features/user_registration.feature @マイページでPATを確認できる */}
 					<div
 						data-testid="pat-display"
-						className="bg-gray-50 border border-gray-200 rounded px-3 py-2 font-mono text-sm break-all"
+						className="bg-muted border border-border rounded px-3 py-2 font-mono text-sm break-all"
 					>
 						{mypageInfo.patToken}
 					</div>
@@ -609,12 +657,12 @@ export default function MypagePage() {
 					{/* コピー用文字列（#pat_ プレフィックス付き）
               See: docs/architecture/components/user-registration.md §8.2 マイページ表示
               See: docs/architecture/components/user-registration.md §6 認証判定フロー */}
-					<div className="text-xs text-gray-500">
+					<div className="text-xs text-muted-foreground">
 						専ブラのメール欄に以下を設定：
 					</div>
 					<div
 						data-testid="pat-copy-value"
-						className="bg-gray-50 border border-gray-200 rounded px-3 py-2 font-mono text-sm break-all text-green-800"
+						className="bg-muted border border-border rounded px-3 py-2 font-mono text-sm break-all text-green-800 dark:text-green-400"
 					>
 						{patCopyValue}
 					</div>
@@ -633,7 +681,10 @@ export default function MypagePage() {
 
 					{/* PAT 最終使用日時
               See: features/user_registration.feature @マイページでPATを確認できる */}
-					<div data-testid="pat-last-used" className="text-xs text-gray-500">
+					<div
+						data-testid="pat-last-used"
+						className="text-xs text-muted-foreground"
+					>
 						最終使用: {patLastUsedLabel}
 					</div>
 
@@ -662,9 +713,9 @@ export default function MypagePage() {
           ============================= */}
 			<section
 				id="currency-section"
-				className="bg-white border border-gray-300 rounded p-4"
+				className="bg-card border border-border rounded p-4"
 			>
-				<h2 className="text-base font-bold text-gray-700 mb-2">通貨残高</h2>
+				<h2 className="text-base font-bold text-foreground mb-2">通貨残高</h2>
 				{/* currency-balance: 通貨残高の表示要素
             See: features/currency.feature @マイページで通貨残高を確認する */}
 				<p id="currency-balance" className="text-2xl font-bold text-yellow-600">
@@ -679,9 +730,9 @@ export default function MypagePage() {
           ============================= */}
 			<section
 				id="username-section"
-				className="bg-white border border-gray-300 rounded p-4 space-y-3"
+				className="bg-card border border-border rounded p-4 space-y-3"
 			>
-				<h2 className="text-base font-bold text-gray-700">
+				<h2 className="text-base font-bold text-foreground">
 					ユーザーネーム設定
 				</h2>
 
@@ -700,7 +751,7 @@ export default function MypagePage() {
 							onChange={(e) => setUsernameInput(e.target.value)}
 							placeholder="ユーザーネームを入力（最大20文字）"
 							maxLength={20}
-							className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+							className="w-full border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
 						/>
 						{usernameError && (
 							<p id="username-error" className="text-red-600 text-xs">
@@ -724,7 +775,10 @@ export default function MypagePage() {
 				) : (
 					/* 無料ユーザー: 利用不可メッセージ
              See: features/mypage.feature @無料ユーザーはユーザーネームを設定できない */
-					<p id="username-unavailable" className="text-gray-500 text-sm">
+					<p
+						id="username-unavailable"
+						className="text-muted-foreground text-sm"
+					>
 						ユーザーネームの設定は有料ユーザー限定の機能です
 					</p>
 				)}
@@ -739,10 +793,10 @@ export default function MypagePage() {
           ============================= */}
 			<section
 				id="upgrade-section"
-				className="bg-white border border-gray-300 rounded p-4 space-y-2"
+				className="bg-card border border-border rounded p-4 space-y-2"
 			>
-				<h2 className="text-base font-bold text-gray-700">有料プラン</h2>
-				<p className="text-sm text-gray-600">
+				<h2 className="text-base font-bold text-foreground">有料プラン</h2>
+				<p className="text-sm text-muted-foreground">
 					有料プランに加入するとユーザーネームが設定できます。
 				</p>
 
@@ -780,7 +834,7 @@ export default function MypagePage() {
 					className={
 						upgradeEnabled
 							? "px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
-							: "px-4 py-1.5 bg-gray-300 text-gray-500 text-sm rounded cursor-not-allowed"
+							: "px-4 py-1.5 bg-gray-300 text-muted-foreground text-sm rounded cursor-not-allowed"
 					}
 				>
 					{mypageInfo.isPremium
@@ -801,9 +855,9 @@ export default function MypagePage() {
           ============================= */}
 			<section
 				id="grass-section"
-				className="bg-white border border-gray-300 rounded p-4"
+				className="bg-card border border-border rounded p-4"
 			>
-				<h2 className="text-base font-bold text-gray-700 mb-2">草カウント</h2>
+				<h2 className="text-base font-bold text-foreground mb-2">草カウント</h2>
 				{/* grass-count-display: 草カウントの表示要素（"{grassIcon} {grassCount}本" フォーマット）
           See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる */}
 				<p
@@ -831,11 +885,11 @@ export default function MypagePage() {
           ============================= */}
 			<section
 				id="notifications"
-				className="bg-white border border-gray-300 rounded p-4"
+				className="bg-card border border-border rounded p-4"
 			>
-				<h2 className="text-base font-bold text-gray-700 mb-2">通知</h2>
+				<h2 className="text-base font-bold text-foreground mb-2">通知</h2>
 				{/* Phase 2 以降: AI告発結果、AIボット状況、ゲームコマンド結果等がここに通知される */}
-				<p className="text-gray-400 text-sm">
+				<p className="text-muted-foreground text-sm">
 					通知はありません（Phase 2 で実装予定）
 				</p>
 			</section>

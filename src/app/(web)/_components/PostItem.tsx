@@ -145,7 +145,7 @@ export function parsePostBody(body: string): (string | React.ReactElement)[] {
 					href={match.url}
 					target="_blank"
 					rel="noopener noreferrer"
-					className="text-blue-600 hover:underline break-all"
+					className="text-blue-600 dark:text-blue-400 hover:underline break-all"
 				>
 					{match.url}
 				</a>,
@@ -215,8 +215,8 @@ export default function PostItem({ post }: PostItemProps) {
 	return (
 		<article
 			id={`post-${post.postNumber}`}
-			className={`py-2 border-b border-gray-200 text-sm ${
-				isSystemMessage ? "bg-yellow-50" : ""
+			className={`py-2 border-b border-border text-sm ${
+				isSystemMessage ? "bg-yellow-50 dark:bg-yellow-950" : ""
 			}`}
 			style={post.botMark ? { opacity: 0.5 } : undefined}
 		>
@@ -228,7 +228,7 @@ export default function PostItem({ post }: PostItemProps) {
             See: features/thread.feature @post_number_display */}
 				<button
 					type="button"
-					className="font-bold text-gray-700 hover:text-blue-600 cursor-pointer"
+					className="font-bold text-foreground hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
 					onClick={handlePostNumberClick}
 					data-testid={`post-number-btn-${post.postNumber}`}
 				>
@@ -239,7 +239,9 @@ export default function PostItem({ post }: PostItemProps) {
             See: docs/specs/screens/thread-view.yaml > post-display-name */}
 				<span
 					className={`font-semibold ${
-						isSystemMessage ? "text-red-700" : "text-green-700"
+						isSystemMessage
+							? "text-red-700 dark:text-red-400"
+							: "text-green-700 dark:text-green-400"
 					}`}
 				>
 					{isSystemMessage
@@ -249,11 +251,14 @@ export default function PostItem({ post }: PostItemProps) {
 
 				{/* post-daily-id: 日次リセットID
             See: docs/specs/screens/thread-view.yaml > post-daily-id */}
-				<span className="text-gray-500 text-xs">ID:{post.dailyId}</span>
+				<span className="text-muted-foreground text-xs">ID:{post.dailyId}</span>
 
 				{/* post-datetime: 書き込み日時（YYYY/MM/DD(ddd) HH:mm:ss）
             See: docs/specs/screens/thread-view.yaml > post-datetime */}
-				<time className="text-gray-500 text-xs" dateTime={post.createdAt}>
+				<time
+					className="text-muted-foreground text-xs"
+					dateTime={post.createdAt}
+				>
 					{formatDateTime(post.createdAt)}
 				</time>
 			</div>
@@ -267,11 +272,11 @@ export default function PostItem({ post }: PostItemProps) {
           See: features/thread.feature @image_preview */}
 			<div
 				className={`pl-6 whitespace-pre-wrap break-words ${
-					isDeleted ? "text-gray-400 line-through" : "text-gray-800"
+					isDeleted ? "text-muted-foreground line-through" : "text-foreground"
 				}`}
 			>
 				{isDeleted ? (
-					<span className="text-gray-400 not-italic">
+					<span className="text-muted-foreground not-italic">
 						このレスは削除されました
 					</span>
 				) : (
@@ -287,10 +292,10 @@ export default function PostItem({ post }: PostItemProps) {
 				<div data-testid="post-inline-system-info" className="pl-6 mt-1">
 					{/* inline-separator: 本文とシステム情報を視覚的に分離する区切り線
 						See: docs/specs/screens/thread-view.yaml > inline-separator */}
-					<hr className="border-gray-300 mb-1" />
+					<hr className="border-border mb-1" />
 					{/* inline-system-content: システム情報テキスト（控えめなフォント）
 						See: docs/specs/screens/thread-view.yaml > inline-system-content */}
-					<p className="text-gray-500 text-xs whitespace-pre-wrap">
+					<p className="text-muted-foreground text-xs whitespace-pre-wrap">
 						{post.inlineSystemInfo}
 					</p>
 				</div>

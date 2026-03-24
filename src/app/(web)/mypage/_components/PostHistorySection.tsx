@@ -206,9 +206,9 @@ export default function PostHistorySection() {
 	return (
 		<section
 			id="post-history"
-			className="bg-white border border-gray-300 rounded p-4 space-y-3"
+			className="bg-card border border-border rounded p-4 space-y-3"
 		>
-			<h2 className="text-base font-bold text-gray-700">書き込み履歴</h2>
+			<h2 className="text-base font-bold text-foreground">書き込み履歴</h2>
 
 			{/* =============================
           検索フォーム
@@ -232,7 +232,7 @@ export default function PostHistorySection() {
 					}
 					placeholder="本文を検索（キーワード）"
 					maxLength={200}
-					className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+					className="w-full border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
 				/>
 
 				{/* 日付範囲
@@ -248,9 +248,9 @@ export default function PostHistorySection() {
 								startDate: e.target.value,
 							}))
 						}
-						className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+						className="border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
 					/>
-					<span className="text-gray-500 text-sm">〜</span>
+					<span className="text-muted-foreground text-sm">〜</span>
 					<input
 						id="history-end-date"
 						type="date"
@@ -258,7 +258,7 @@ export default function PostHistorySection() {
 						onChange={(e) =>
 							setSearchInput((prev) => ({ ...prev, endDate: e.target.value }))
 						}
-						className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+						className="border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
 					/>
 				</div>
 
@@ -279,7 +279,7 @@ export default function PostHistorySection() {
 							id="history-clear-btn"
 							type="button"
 							onClick={handleClearSearch}
-							className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300"
+							className="px-4 py-1.5 bg-muted text-foreground text-sm rounded hover:bg-accent"
 						>
 							クリア
 						</button>
@@ -292,26 +292,29 @@ export default function PostHistorySection() {
           See: features/mypage.feature @自分の書き込み履歴を確認できる
           ============================= */}
 			{isLoading ? (
-				<p className="text-gray-400 text-sm">読み込み中...</p>
+				<p className="text-muted-foreground text-sm">読み込み中...</p>
 			) : posts.length === 0 ? (
 				isSearchActive ? (
 					/* 検索条件あり + 0件
               See: features/mypage.feature @検索結果が0件の場合はメッセージが表示される
               See: tmp/workers/bdd-architect_TASK-237/design.md §6.6 検索結果メッセージ */
-					<p id="no-search-results-message" className="text-gray-500 text-sm">
+					<p
+						id="no-search-results-message"
+						className="text-muted-foreground text-sm"
+					>
 						該当する書き込みはありません
 					</p>
 				) : (
 					/* 検索条件なし + 0件（まだ書き込みなし）
               See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される */
-					<p id="no-posts-message" className="text-gray-500 text-sm">
+					<p id="no-posts-message" className="text-muted-foreground text-sm">
 						まだ書き込みがありません
 					</p>
 				)
 			) : (
 				<>
 					{/* 件数表示 */}
-					<p className="text-xs text-gray-400">全 {total} 件</p>
+					<p className="text-xs text-muted-foreground">全 {total} 件</p>
 
 					{/* 書き込み一覧
               See: features/mypage.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる */}
@@ -319,12 +322,12 @@ export default function PostHistorySection() {
 						{posts.map((post) => (
 							<li
 								key={post.id}
-								className="border-b border-gray-100 pb-2 last:border-b-0"
+								className="border-b border-border pb-2 last:border-b-0"
 							>
 								{/* スレッドタイトル（スレッドへのリンク）
                     See: features/mypage.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる
                     See: tmp/workers/bdd-architect_TASK-237/design.md §6.4 > history-thread-title */}
-								<div className="text-xs text-gray-500 mb-0.5">
+								<div className="text-xs text-muted-foreground mb-0.5">
 									<a
 										href={`/threads/${post.threadId}`}
 										className="font-medium text-blue-600 hover:underline"
@@ -333,7 +336,7 @@ export default function PostHistorySection() {
 									</a>
 									<span className="ml-2">{formatDateTime(post.createdAt)}</span>
 								</div>
-								<p className="text-sm text-gray-800 line-clamp-2">
+								<p className="text-sm text-foreground line-clamp-2">
 									{post.body}
 								</p>
 							</li>
@@ -361,7 +364,7 @@ export default function PostHistorySection() {
 						type="button"
 						onClick={() => handlePageChange(currentPage - 1)}
 						disabled={currentPage <= 1}
-						className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+						className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						前へ
 					</button>
@@ -379,7 +382,7 @@ export default function PostHistorySection() {
 							className={
 								page === currentPage
 									? "px-3 py-1 text-sm border border-blue-500 rounded bg-blue-600 text-white font-bold cursor-default"
-									: "px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
+									: "px-3 py-1 text-sm border border-border rounded hover:bg-accent"
 							}
 						>
 							{page}
@@ -392,14 +395,17 @@ export default function PostHistorySection() {
 						type="button"
 						onClick={() => handlePageChange(currentPage + 1)}
 						disabled={currentPage >= totalPages}
-						className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+						className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						次へ
 					</button>
 
 					{/* ページ情報テキスト
               See: tmp/workers/bdd-architect_TASK-237/design.md §6.4 > history-page-info */}
-					<span id="history-page-info" className="text-xs text-gray-500 ml-1">
+					<span
+						id="history-page-info"
+						className="text-xs text-muted-foreground ml-1"
+					>
 						全{totalPages}ページ
 					</span>
 				</nav>

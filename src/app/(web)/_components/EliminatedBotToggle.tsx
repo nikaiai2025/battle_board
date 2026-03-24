@@ -25,7 +25,7 @@ export default function EliminatedBotToggle() {
 	const { showEliminatedBotPosts, toggle } = useEliminatedBotToggle();
 
 	return (
-		<label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+		<label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
 			<input
 				type="checkbox"
 				checked={showEliminatedBotPosts}

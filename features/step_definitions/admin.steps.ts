@@ -2089,3 +2089,219 @@ Then("日付ごとの統計推移が確認できる", function (this: BattleBoar
 		);
 	}
 });
+
+// ---------------------------------------------------------------------------
+// 課金ステータス管理ステップ定義
+// See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+// See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * AdminService を動的 require で取得するヘルパー（課金ステータス管理用）。
+ * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
+ */
+function getAdminServiceForPremium() {
+	return require("../../src/lib/services/admin-service") as typeof import("../../src/lib/services/admin-service");
+}
+
+// ---------------------------------------------------------------------------
+// Given: ユーザー "UserA" は無料ユーザーである
+// See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" を無料ユーザーとしてインメモリストアに登録する。
+ * isPremium = false の状態でユーザーを作成する。
+ *
+ * See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+ */
+Given(
+	"ユーザー {string} は無料ユーザーである",
+	async function (this: BattleBoardWorld, userName: string) {
+		const user = await InMemoryUserRepo.create({
+			authToken: `test-token-free-${userName}`,
+			authorIdSeed: `test-seed-free-${userName}`,
+			isPremium: false,
+			username: null,
+		});
+
+		this.setNamedUser(userName, {
+			userId: user.id,
+			edgeToken: user.authToken,
+			ipHash: user.authorIdSeed,
+			isPremium: false,
+			username: null,
+		});
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Given: ユーザー "UserA" は有料ユーザーである
+// See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" を有料ユーザーとしてインメモリストアに登録する。
+ * isPremium = true の状態でユーザーを作成する。
+ *
+ * See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+ */
+Given(
+	"ユーザー {string} は有料ユーザーである",
+	async function (this: BattleBoardWorld, userName: string) {
+		const user = await InMemoryUserRepo.create({
+			authToken: `test-token-premium-${userName}`,
+			authorIdSeed: `test-seed-premium-${userName}`,
+			isPremium: true,
+			username: null,
+		});
+
+		this.setNamedUser(userName, {
+			userId: user.id,
+			edgeToken: user.authToken,
+			ipHash: user.authorIdSeed,
+			isPremium: true,
+			username: null,
+		});
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: ユーザー "UserA" を有料ステータスに変更する
+// See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理者がユーザー "UserA" を有料ステータスに変更する。
+ * AdminService.setPremiumStatus を isPremium=true で呼び出す。
+ *
+ * See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+ * See: src/lib/services/admin-service.ts > setPremiumStatus
+ */
+When(
+	"ユーザー {string} を有料ステータスに変更する",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const AdminService = getAdminServiceForPremium();
+		const result = await AdminService.setPremiumStatus(
+			namedUser.userId,
+			true,
+			this.currentAdminId,
+		);
+
+		this.lastResult = result.success
+			? { type: "success", data: result }
+			: {
+					type: "error",
+					message: "有料ステータス変更に失敗しました",
+					code: result.reason,
+				};
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: ユーザー "UserA" を無料ステータスに変更する
+// See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * 管理者がユーザー "UserA" を無料ステータスに変更する。
+ * AdminService.setPremiumStatus を isPremium=false で呼び出す。
+ *
+ * See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+ * See: src/lib/services/admin-service.ts > setPremiumStatus
+ */
+When(
+	"ユーザー {string} を無料ステータスに変更する",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const AdminService = getAdminServiceForPremium();
+		const result = await AdminService.setPremiumStatus(
+			namedUser.userId,
+			false,
+			this.currentAdminId,
+		);
+
+		this.lastResult = result.success
+			? { type: "success", data: result }
+			: {
+					type: "error",
+					message: "無料ステータス変更に失敗しました",
+					code: result.reason,
+				};
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: ユーザー "UserA" が有料ユーザーになる
+// See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" の isPremium フラグが true になっていることを確認する。
+ *
+ * See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+ */
+Then(
+	"ユーザー {string} が有料ユーザーになる",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.lastResult, "操作結果が存在しません");
+		assert.strictEqual(
+			this.lastResult.type,
+			"success",
+			`有料ステータス変更成功を期待しましたが "${this.lastResult.type}" でした`,
+		);
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const user = await InMemoryUserRepo.findById(namedUser.userId);
+		assert(user !== null, `ユーザー "${userName}" が見つかりません`);
+		assert.strictEqual(
+			user.isPremium,
+			true,
+			`ユーザー "${userName}" の isPremium が true であることを期待しましたが false でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: ユーザー "UserA" が無料ユーザーになる
+// See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * ユーザー "UserA" の isPremium フラグが false になっていることを確認する。
+ *
+ * See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+ */
+Then(
+	"ユーザー {string} が無料ユーザーになる",
+	async function (this: BattleBoardWorld, userName: string) {
+		assert(this.lastResult, "操作結果が存在しません");
+		assert.strictEqual(
+			this.lastResult.type,
+			"success",
+			`無料ステータス変更成功を期待しましたが "${this.lastResult.type}" でした`,
+		);
+
+		const namedUser = this.getNamedUser(userName);
+		assert(namedUser, `ユーザー "${userName}" が存在しません`);
+
+		const user = await InMemoryUserRepo.findById(namedUser.userId);
+		assert(user !== null, `ユーザー "${userName}" が見つかりません`);
+		assert.strictEqual(
+			user.isPremium,
+			false,
+			`ユーザー "${userName}" の isPremium が false であることを期待しましたが true でした`,
+		);
+	},
+);

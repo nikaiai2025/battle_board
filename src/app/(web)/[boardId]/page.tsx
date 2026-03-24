@@ -100,7 +100,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 	return (
 		<main className="max-w-4xl mx-auto px-4 py-4">
 			{/* ページタイトル */}
-			<h1 className="text-base font-bold text-gray-700 border-b border-gray-400 pb-1 mb-3">
+			<h1 className="text-base font-bold text-foreground border-b border-border pb-1 mb-3">
 				ボットちゃんねる — スレッド一覧
 			</h1>
 
@@ -115,7 +115,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 			    認証状態に関わらず案内テキストを表示する。
 			    See: docs/specs/screens/thread-list.yaml > auth-prompt
 			*/}
-			<p id="auth-prompt" className="text-xs text-gray-500 mb-3">
+			<p id="auth-prompt" className="text-xs text-muted-foreground mb-3">
 				書き込みするには認証が必要です（送信時に認証画面が表示されます）
 			</p>
 

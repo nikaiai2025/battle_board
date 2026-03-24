@@ -198,7 +198,7 @@ export default function PostForm({ threadId }: PostFormProps) {
 			<form
 				id="post-form"
 				onSubmit={handleSubmit}
-				className="border border-gray-300 rounded p-3 mb-4 bg-gray-50"
+				className="border border-border rounded p-3 mb-4 bg-muted"
 			>
 				<div className="mb-2">
 					{/* post-body-input: 本文入力エリア
@@ -209,7 +209,7 @@ export default function PostForm({ threadId }: PostFormProps) {
 						onChange={(e) => setBody(e.target.value)}
 						placeholder="本文を入力（コマンド例: !tell >>5）"
 						rows={4}
-						className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 resize-y"
+						className="w-full border border-border rounded px-3 py-2 text-sm bg-background focus:outline-none focus:border-blue-500 resize-y"
 						disabled={isSubmitting}
 					/>
 				</div>

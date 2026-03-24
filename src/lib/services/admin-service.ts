@@ -520,6 +520,58 @@ export async function getUserPosts(
 }
 
 // ---------------------------------------------------------------------------
+// 課金ステータス管理
+// See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+// See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+// ---------------------------------------------------------------------------
+
+/**
+ * 課金ステータス変更結果。
+ * See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+ * See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+ */
+export type SetPremiumStatusResult =
+	| { success: true }
+	| { success: false; reason: "not_found" };
+
+/**
+ * 指定ユーザーの有料/無料ステータスを変更する（users.is_premium を更新）。
+ *
+ * 課金トラブル対応として管理者が手動でユーザーのプレミアムフラグを切り替える。
+ * 無料への変更時のテーマ・フォント影響は resolveTheme/resolveFont による
+ * 動的フォールバックで対応済みのため、このメソッドではフラグ更新のみを行う。
+ *
+ * See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+ * See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param isPremium - 設定する有料ステータス（true: 有料, false: 無料）
+ * @param adminId - 操作を行う管理者の UUID（認証済み前提）
+ * @returns 変更結果
+ */
+export async function setPremiumStatus(
+	userId: string,
+	isPremium: boolean,
+	adminId: string,
+): Promise<SetPremiumStatusResult> {
+	// ユーザーの存在確認
+	const user = await UserRepository.findById(userId);
+	if (!user) {
+		return { success: false, reason: "not_found" };
+	}
+
+	// is_premium フラグを更新する
+	// See: src/lib/infrastructure/repositories/user-repository.ts > updateIsPremium
+	await UserRepository.updateIsPremium(userId, isPremium);
+
+	console.info(
+		`[AdminService] setPremiumStatus: userId=${userId} isPremium=${isPremium} adminId=${adminId}`,
+	);
+
+	return { success: true };
+}
+
+// ---------------------------------------------------------------------------
 // ダッシュボード
 // See: features/admin.feature @ダッシュボードシナリオ群
 // See: tmp/feature_plan_admin_expansion.md §5 ダッシュボード

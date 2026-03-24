@@ -76,11 +76,11 @@ export default async function AdminLayout({
 	// See: tmp/feature_plan_admin_expansion.md §6-b 管理画面レイアウト図
 	// ---------------------------------------------------------------------------
 	return (
-		<div className="min-h-screen bg-gray-50">
+		<div className="min-h-screen bg-background">
 			{/* ヘッダー */}
 			<header className="bg-gray-800 text-white px-4 py-3 flex items-center justify-between">
 				<h1 className="text-base font-bold">ボットちゃんねる 管理</h1>
-				<span className="text-xs text-gray-400">管理者パネル</span>
+				<span className="text-xs text-gray-300">管理者パネル</span>
 			</header>
 
 			<div className="flex">

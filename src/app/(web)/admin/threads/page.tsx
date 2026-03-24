@@ -60,27 +60,27 @@ interface DeletePostConfirm {
 function ThreadStatusBadge({ thread }: { thread: Thread }) {
 	if (thread.isDeleted) {
 		return (
-			<span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded">
+			<span className="inline-block px-1.5 py-0.5 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 text-xs font-bold rounded">
 				削除済
 			</span>
 		);
 	}
 	if (thread.isPinned) {
 		return (
-			<span className="inline-block px-1.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded">
+			<span className="inline-block px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-300 text-xs rounded">
 				固定
 			</span>
 		);
 	}
 	if (thread.isDormant) {
 		return (
-			<span className="inline-block px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+			<span className="inline-block px-1.5 py-0.5 bg-muted text-muted-foreground text-xs rounded">
 				休眠
 			</span>
 		);
 	}
 	return (
-		<span className="inline-block px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+		<span className="inline-block px-1.5 py-0.5 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 text-xs rounded">
 			通常
 		</span>
 	);
@@ -98,13 +98,13 @@ function ThreadStatusBadge({ thread }: { thread: Thread }) {
 function PostStatusBadge({ post }: { post: Post }) {
 	if (post.isDeleted) {
 		return (
-			<span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded">
+			<span className="inline-block px-1.5 py-0.5 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 text-xs font-bold rounded">
 				削除済
 			</span>
 		);
 	}
 	return (
-		<span className="inline-block px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+		<span className="inline-block px-1.5 py-0.5 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 text-xs rounded">
 			通常
 		</span>
 	);
@@ -314,8 +314,8 @@ export default function AdminThreadsPage() {
 			<div className="space-y-4">
 				{/* ページヘッダー */}
 				<div className="flex items-center justify-between">
-					<h2 className="text-lg font-bold text-gray-800">スレッド管理</h2>
-					<span className="text-sm text-gray-500">
+					<h2 className="text-lg font-bold text-foreground">スレッド管理</h2>
+					<span className="text-sm text-muted-foreground">
 						全 {threads.length.toLocaleString("ja-JP")} 件
 					</span>
 				</div>
@@ -326,29 +326,29 @@ export default function AdminThreadsPage() {
 
 				{/* スレッド一覧テーブル
             See: features/admin.feature @管理者が指定したスレッドを削除する */}
-				<div className="bg-white border border-gray-200 rounded shadow-sm overflow-x-auto">
+				<div className="bg-card border border-border rounded shadow-sm overflow-x-auto">
 					<table
 						id="thread-list-table"
 						className="w-full text-sm text-left border-collapse"
 					>
 						<thead>
-							<tr className="bg-gray-50 border-b border-gray-200">
-								<th className="px-3 py-2 font-medium text-gray-600">
+							<tr className="bg-muted border-b border-border">
+								<th className="px-3 py-2 font-medium text-muted-foreground">
 									タイトル
 								</th>
-								<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+								<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 									レス数
 								</th>
-								<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+								<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 									作成日時
 								</th>
-								<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+								<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 									最終書き込み
 								</th>
-								<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+								<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 									状態
 								</th>
-								<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+								<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 									操作
 								</th>
 							</tr>
@@ -358,7 +358,7 @@ export default function AdminThreadsPage() {
 								<tr>
 									<td
 										colSpan={6}
-										className="px-3 py-6 text-center text-gray-500 text-sm"
+										className="px-3 py-6 text-center text-muted-foreground text-sm"
 									>
 										読み込み中...
 									</td>
@@ -367,7 +367,7 @@ export default function AdminThreadsPage() {
 								<tr>
 									<td
 										colSpan={6}
-										className="px-3 py-6 text-center text-gray-400 text-sm"
+										className="px-3 py-6 text-center text-muted-foreground text-sm"
 									>
 										スレッドが見つかりません
 									</td>
@@ -376,12 +376,12 @@ export default function AdminThreadsPage() {
 								threads.map((thread) => (
 									<tr
 										key={thread.id}
-										className={`border-b border-gray-100 hover:bg-gray-50 ${
-											thread.isDeleted ? "bg-gray-100 opacity-60" : ""
+										className={`border-b border-border hover:bg-accent ${
+											thread.isDeleted ? "bg-muted opacity-60" : ""
 										}`}
 									>
 										{/* タイトル */}
-										<td className="px-3 py-2 text-xs text-gray-800 max-w-xs truncate">
+										<td className="px-3 py-2 text-xs text-foreground max-w-xs truncate">
 											{thread.title}
 										</td>
 										{/* レス数 */}
@@ -434,15 +434,15 @@ export default function AdminThreadsPage() {
             See: features/admin.feature @管理者が指定したスレッドを削除する */}
 				{deleteThreadConfirm && (
 					<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-						<div className="bg-white rounded shadow-lg p-6 max-w-md w-full mx-4">
-							<h3 className="text-base font-bold text-gray-800 mb-4">
+						<div className="bg-card rounded shadow-lg p-6 max-w-md w-full mx-4">
+							<h3 className="text-base font-bold text-foreground mb-4">
 								スレッドを削除しますか？
 							</h3>
-							<div className="bg-gray-50 rounded p-3 mb-4 text-sm space-y-1">
-								<p className="text-gray-700 font-medium">
+							<div className="bg-muted rounded p-3 mb-4 text-sm space-y-1">
+								<p className="text-foreground font-medium">
 									{deleteThreadConfirm.thread.title}
 								</p>
-								<p className="text-gray-500">
+								<p className="text-muted-foreground">
 									レス数:{" "}
 									{deleteThreadConfirm.thread.postCount.toLocaleString("ja-JP")}{" "}
 									件
@@ -456,7 +456,7 @@ export default function AdminThreadsPage() {
 									type="button"
 									onClick={() => setDeleteThreadConfirm(null)}
 									disabled={isDeleting}
-									className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-40"
+									className="px-4 py-2 text-sm bg-muted text-foreground rounded hover:bg-accent disabled:opacity-40"
 								>
 									キャンセル
 								</button>
@@ -487,14 +487,14 @@ export default function AdminThreadsPage() {
 				<button
 					type="button"
 					onClick={handleBackToList}
-					className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+					className="px-3 py-1.5 text-sm bg-muted text-foreground rounded hover:bg-accent"
 				>
 					一覧に戻る
 				</button>
-				<h2 className="text-lg font-bold text-gray-800 truncate max-w-lg">
+				<h2 className="text-lg font-bold text-foreground truncate max-w-lg">
 					{selectedThread.title}
 				</h2>
-				<span className="text-sm text-gray-500 whitespace-nowrap">
+				<span className="text-sm text-muted-foreground whitespace-nowrap">
 					{posts.length.toLocaleString("ja-JP")} 件
 				</span>
 			</div>
@@ -503,27 +503,29 @@ export default function AdminThreadsPage() {
 
 			{/* レス一覧テーブル
           See: features/admin.feature @管理者がコメント付きでレスを削除する */}
-			<div className="bg-white border border-gray-200 rounded shadow-sm overflow-x-auto">
+			<div className="bg-card border border-border rounded shadow-sm overflow-x-auto">
 				<table
 					id="post-list-table"
 					className="w-full text-sm text-left border-collapse"
 				>
 					<thead>
-						<tr className="bg-gray-50 border-b border-gray-200">
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+						<tr className="bg-muted border-b border-border">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 								番号
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								名前
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600">本文</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground">
+								本文
+							</th>
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								投稿日時
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								状態
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								操作
 							</th>
 						</tr>
@@ -533,7 +535,7 @@ export default function AdminThreadsPage() {
 							<tr>
 								<td
 									colSpan={6}
-									className="px-3 py-6 text-center text-gray-500 text-sm"
+									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									読み込み中...
 								</td>
@@ -542,7 +544,7 @@ export default function AdminThreadsPage() {
 							<tr>
 								<td
 									colSpan={6}
-									className="px-3 py-6 text-center text-gray-400 text-sm"
+									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									レスが見つかりません
 								</td>
@@ -551,12 +553,12 @@ export default function AdminThreadsPage() {
 							posts.map((post) => (
 								<tr
 									key={post.id}
-									className={`border-b border-gray-100 hover:bg-gray-50 ${
-										post.isDeleted ? "bg-gray-100 opacity-60" : ""
+									className={`border-b border-border hover:bg-accent ${
+										post.isDeleted ? "bg-muted opacity-60" : ""
 									}`}
 								>
 									{/* レス番号 */}
-									<td className="px-3 py-2 text-right text-xs font-mono text-gray-600">
+									<td className="px-3 py-2 text-right text-xs font-mono text-muted-foreground">
 										{post.postNumber}
 									</td>
 									{/* 名前 */}
@@ -564,7 +566,7 @@ export default function AdminThreadsPage() {
 										{post.displayName}
 									</td>
 									{/* 本文（先頭50文字）*/}
-									<td className="px-3 py-2 text-xs text-gray-700 max-w-xs">
+									<td className="px-3 py-2 text-xs text-foreground max-w-xs">
 										{post.body.slice(0, 50)}
 										{post.body.length > 50 && "…"}
 									</td>
@@ -600,15 +602,15 @@ export default function AdminThreadsPage() {
           See: features/admin.feature @管理者がコメント付きでレスを削除する */}
 			{deletePostConfirm && (
 				<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-					<div className="bg-white rounded shadow-lg p-6 max-w-md w-full mx-4">
-						<h3 className="text-base font-bold text-gray-800 mb-4">
+					<div className="bg-card rounded shadow-lg p-6 max-w-md w-full mx-4">
+						<h3 className="text-base font-bold text-foreground mb-4">
 							レスを削除しますか？
 						</h3>
-						<div className="bg-gray-50 rounded p-3 mb-4 text-sm space-y-1">
-							<p className="text-gray-500 text-xs">
+						<div className="bg-muted rounded p-3 mb-4 text-sm space-y-1">
+							<p className="text-muted-foreground text-xs">
 								レス番号: {deletePostConfirm.post.postNumber}
 							</p>
-							<p className="text-gray-700">
+							<p className="text-foreground">
 								{deletePostConfirm.post.body.slice(0, 80)}
 								{deletePostConfirm.post.body.length > 80 && "…"}
 							</p>
@@ -618,7 +620,7 @@ export default function AdminThreadsPage() {
 						<div className="mb-4">
 							<label
 								htmlFor="delete-comment"
-								className="block text-sm font-medium text-gray-700 mb-1"
+								className="block text-sm font-medium text-foreground mb-1"
 							>
 								削除コメント（任意）
 							</label>
@@ -632,7 +634,7 @@ export default function AdminThreadsPage() {
 									)
 								}
 								placeholder="システムレスに表示するコメント"
-								className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+								className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
 							/>
 						</div>
 						<div className="flex justify-end gap-2">
@@ -640,7 +642,7 @@ export default function AdminThreadsPage() {
 								type="button"
 								onClick={() => setDeletePostConfirm(null)}
 								disabled={isDeleting}
-								className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-40"
+								className="px-4 py-2 text-sm bg-muted text-foreground rounded hover:bg-accent disabled:opacity-40"
 							>
 								キャンセル
 							</button>

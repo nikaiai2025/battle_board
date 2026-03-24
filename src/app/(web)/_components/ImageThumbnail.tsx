@@ -57,7 +57,7 @@ export default function ImageThumbnail({ url }: ImageThumbnailProps) {
 					<img
 						src={url}
 						alt="画像プレビュー"
-						className="max-w-[150px] max-h-[150px] object-contain border border-gray-300 rounded cursor-pointer hover:opacity-80"
+						className="max-w-[150px] max-h-[150px] object-contain border border-border rounded cursor-pointer hover:opacity-80"
 						loading="lazy"
 						onError={() => setImgError(true)}
 					/>
@@ -71,7 +71,7 @@ export default function ImageThumbnail({ url }: ImageThumbnailProps) {
 				href={url}
 				target="_blank"
 				rel="noopener noreferrer"
-				className="text-blue-600 hover:underline text-xs break-all"
+				className="text-blue-600 dark:text-blue-400 hover:underline text-xs break-all"
 			>
 				{url}
 			</a>

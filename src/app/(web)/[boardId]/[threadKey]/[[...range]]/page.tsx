@@ -272,7 +272,7 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 			<EliminatedBotToggleProvider>
 				{/* thread-header: スレッドヘッダ
 				    See: docs/specs/screens/thread-view.yaml > thread-header */}
-				<div id="thread-header" className="border-b border-gray-400 pb-2 mb-3">
+				<div id="thread-header" className="border-b border-border pb-2 mb-3">
 					{/* back-to-list: 一覧に戻るリンク
 					    新URL構造: /{boardId}/ に統一する。
 					    See: tmp/workers/bdd-architect_TASK-162/design.md §1.3.7 */}
@@ -286,10 +286,12 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 
 					{/* thread-title: スレッドタイトル
 					    See: docs/specs/screens/thread-view.yaml > thread-title */}
-					<h1 id="thread-title" className="text-base font-bold text-gray-800">
+					<h1 id="thread-title" className="text-base font-bold text-foreground">
 						{thread.title}
 					</h1>
-					<p className="text-xs text-gray-500">レス数: {thread.postCount}</p>
+					<p className="text-xs text-muted-foreground">
+						レス数: {thread.postCount}
+					</p>
 
 					{/* eliminated-bot-toggle: 撃破済みBOTレス表示トグル
 					    BDDシナリオ「全体メニューの撃破済みBOTレス表示トグル」に対応する。

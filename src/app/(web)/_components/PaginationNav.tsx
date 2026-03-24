@@ -159,7 +159,7 @@ export default function PaginationNav({
 				<Link
 					key={link.href}
 					href={link.href}
-					className="text-blue-600 hover:underline px-1 border border-gray-300 bg-gray-50 hover:bg-gray-100"
+					className="text-blue-600 dark:text-blue-400 hover:underline px-1 border border-border bg-muted hover:bg-accent"
 				>
 					{link.label}
 				</Link>

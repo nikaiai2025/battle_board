@@ -149,12 +149,9 @@ export default function LoginPage() {
 
 	return (
 		<main className="max-w-sm mx-auto px-4 py-12">
-			<div
-				id="login-page"
-				className="border border-gray-400 bg-white rounded p-6"
-			>
+			<div id="login-page" className="border border-border bg-card rounded p-6">
 				{/* ページタイトル */}
-				<h1 className="text-lg font-bold text-gray-800 mb-6 text-center">
+				<h1 className="text-lg font-bold text-foreground mb-6 text-center">
 					ログイン
 				</h1>
 
@@ -166,7 +163,7 @@ export default function LoginPage() {
 					<div className="mb-3">
 						<label
 							htmlFor="login-email-input"
-							className="block text-sm font-medium text-gray-700 mb-1"
+							className="block text-sm font-medium text-foreground mb-1"
 						>
 							メールアドレス
 						</label>
@@ -176,7 +173,7 @@ export default function LoginPage() {
 							placeholder="example@example.com"
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
-							className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+							className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
 							required
 							autoComplete="email"
 						/>
@@ -186,7 +183,7 @@ export default function LoginPage() {
 					<div className="mb-4">
 						<label
 							htmlFor="login-password-input"
-							className="block text-sm font-medium text-gray-700 mb-1"
+							className="block text-sm font-medium text-foreground mb-1"
 						>
 							パスワード
 						</label>
@@ -196,7 +193,7 @@ export default function LoginPage() {
 							placeholder="パスワード"
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
-							className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+							className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
 							required
 							autoComplete="current-password"
 						/>
@@ -228,9 +225,9 @@ export default function LoginPage() {
 				    区切り線
 				    ============================= */}
 				<div className="flex items-center my-5">
-					<div className="flex-1 border-t border-gray-300" />
-					<span className="px-3 text-xs text-gray-500">または</span>
-					<div className="flex-1 border-t border-gray-300" />
+					<div className="flex-1 border-t border-border" />
+					<span className="px-3 text-xs text-muted-foreground">または</span>
+					<div className="flex-1 border-t border-border" />
 				</div>
 
 				{/* =============================
@@ -251,8 +248,8 @@ export default function LoginPage() {
 				{/* =============================
 				    本登録への案内
 				    ============================= */}
-				<div className="mt-6 pt-4 border-t border-gray-200 text-center">
-					<p className="text-xs text-gray-500 mb-2">
+				<div className="mt-6 pt-4 border-t border-border text-center">
+					<p className="text-xs text-muted-foreground mb-2">
 						本登録がまだの方は、掲示板に書き込み後
 						<br />
 						マイページから本登録できます。

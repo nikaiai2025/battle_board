@@ -91,12 +91,12 @@ export default function ThreadCard({
 	const relativeTime = formatRelativeTime(lastPostAt);
 
 	return (
-		<li className="border-b border-gray-300 py-2 px-2 hover:bg-gray-50">
+		<li className="border-b border-border py-2 px-2 hover:bg-accent">
 			<div className="flex items-baseline gap-2 flex-wrap">
 				{/* thread-title: スレッドタイトルリンク（/{boardId}/{threadKey}/ 形式） */}
 				<Link
 					href={`/${boardId}/${threadKey}/`}
-					className="text-blue-700 hover:underline hover:text-blue-900 text-sm"
+					className="text-blue-700 dark:text-blue-400 hover:underline hover:text-blue-900 dark:hover:text-blue-300 text-sm"
 					data-testid="thread-title"
 				>
 					{title}
@@ -104,7 +104,7 @@ export default function ThreadCard({
 
 				{/* thread-post-count: レス数 */}
 				<span
-					className="text-gray-600 text-xs whitespace-nowrap"
+					className="text-muted-foreground text-xs whitespace-nowrap"
 					data-testid="thread-post-count"
 				>
 					({postCount})
@@ -112,7 +112,7 @@ export default function ThreadCard({
 
 				{/* thread-last-post-at: 最終書き込み日時（相対表示） */}
 				<span
-					className="text-gray-400 text-xs whitespace-nowrap"
+					className="text-muted-foreground text-xs whitespace-nowrap"
 					data-testid="thread-last-post-at"
 					title={lastPostAt}
 				>

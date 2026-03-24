@@ -92,7 +92,7 @@ export default function AnchorPopup() {
 						width: `${POPUP_WIDTH}px`,
 						zIndex: Z_INDEX_BASE + stackIndex,
 					}}
-					className="bg-white border border-gray-300 rounded shadow-lg p-2 text-sm overflow-y-auto max-h-64"
+					className="bg-card border border-border rounded shadow-lg p-2 text-sm overflow-y-auto max-h-64"
 					onClick={(e) => {
 						// ポップアップ内部のクリックは伝播を停止する（外側クリック判定を回避）
 						// See: tmp/workers/bdd-architect_TASK-162/design.md §3.6
@@ -100,13 +100,13 @@ export default function AnchorPopup() {
 					}}
 				>
 					{/* ポップアップヘッダー（レス番号表示） */}
-					<div className="flex justify-between items-center mb-1 border-b border-gray-200 pb-1">
-						<span className="text-xs text-gray-500">
+					<div className="flex justify-between items-center mb-1 border-b border-border pb-1">
+						<span className="text-xs text-muted-foreground">
 							{`>>${entry.postNumber}`}
 						</span>
 						<button
 							type="button"
-							className="text-gray-400 hover:text-gray-600 text-xs"
+							className="text-muted-foreground hover:text-foreground text-xs"
 							onClick={(e) => {
 								e.stopPropagation();
 								closeTopPopup();

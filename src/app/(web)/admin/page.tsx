@@ -45,16 +45,16 @@ function StatCard({
 	unit?: string;
 }) {
 	return (
-		<div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
-			<p className="text-xs text-gray-500 mb-1">{label}</p>
-			<p className="text-2xl font-bold text-gray-800">
+		<div className="bg-card border border-border rounded p-4 shadow-sm">
+			<p className="text-xs text-muted-foreground mb-1">{label}</p>
+			<p className="text-2xl font-bold text-foreground">
 				{value === null ? (
-					<span className="text-gray-400 text-base">読み込み中...</span>
+					<span className="text-muted-foreground text-base">読み込み中...</span>
 				) : (
 					<>
 						{value.toLocaleString("ja-JP")}
 						{unit && (
-							<span className="text-sm font-normal text-gray-500 ml-1">
+							<span className="text-sm font-normal text-muted-foreground ml-1">
 								{unit}
 							</span>
 						)}
@@ -152,7 +152,7 @@ export default function AdminDashboardPage() {
 
 	return (
 		<div className="space-y-6">
-			<h2 className="text-lg font-bold text-gray-800">ダッシュボード</h2>
+			<h2 className="text-lg font-bold text-foreground">ダッシュボード</h2>
 
 			{/* =============================
           統計カードセクション
@@ -201,11 +201,11 @@ export default function AdminDashboardPage() {
           ============================= */}
 			<section
 				id="history-section"
-				className="bg-white border border-gray-200 rounded p-4 shadow-sm"
+				className="bg-card border border-border rounded p-4 shadow-sm"
 			>
 				{/* 期間切替ボタン */}
 				<div className="flex items-center justify-between mb-4">
-					<h3 className="text-base font-bold text-gray-700">日次推移</h3>
+					<h3 className="text-base font-bold text-foreground">日次推移</h3>
 					<div className="flex gap-2">
 						{([7, 30] as HistoryDays[]).map((days) => (
 							<button
@@ -215,7 +215,7 @@ export default function AdminDashboardPage() {
 								className={
 									historyDays === days
 										? "px-3 py-1 text-xs rounded bg-gray-700 text-white"
-										: "px-3 py-1 text-xs rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+										: "px-3 py-1 text-xs rounded bg-muted text-foreground hover:bg-accent"
 								}
 							>
 								{days}日
@@ -228,9 +228,9 @@ export default function AdminDashboardPage() {
 				{historyError ? (
 					<p className="text-red-600 text-sm">{historyError}</p>
 				) : isLoadingHistory ? (
-					<p className="text-gray-500 text-sm">読み込み中...</p>
+					<p className="text-muted-foreground text-sm">読み込み中...</p>
 				) : history.length === 0 ? (
-					<p className="text-gray-400 text-sm">
+					<p className="text-muted-foreground text-sm">
 						推移データがありません（daily_stats
 						テーブルへのデータ投入後に表示されます）
 					</p>
@@ -241,29 +241,29 @@ export default function AdminDashboardPage() {
 							className="w-full text-xs text-left border-collapse"
 						>
 							<thead>
-								<tr className="bg-gray-50 border-b border-gray-200">
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+								<tr className="bg-muted border-b border-border">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 										日付
 									</th>
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 										ユーザー数
 									</th>
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 										新規
 									</th>
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 										書き込み数
 									</th>
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 										アクティブユーザー
 									</th>
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 										通貨流通量
 									</th>
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 										通貨付与
 									</th>
-									<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap text-right">
+									<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap text-right">
 										通貨消費
 									</th>
 								</tr>
@@ -272,7 +272,7 @@ export default function AdminDashboardPage() {
 								{history.map((stat) => (
 									<tr
 										key={stat.statDate}
-										className="border-b border-gray-100 hover:bg-gray-50"
+										className="border-b border-border hover:bg-accent"
 									>
 										<td className="px-3 py-2 font-medium whitespace-nowrap">
 											{stat.statDate}

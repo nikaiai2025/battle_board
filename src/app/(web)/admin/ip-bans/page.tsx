@@ -130,14 +130,14 @@ export default function AdminIpBansPage() {
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
-				<h2 className="text-lg font-bold text-gray-800">IP BAN管理</h2>
-				<span className="text-sm text-gray-500">
+				<h2 className="text-lg font-bold text-foreground">IP BAN管理</h2>
+				<span className="text-sm text-muted-foreground">
 					有効なBAN: {bans.length.toLocaleString("ja-JP")} 件
 				</span>
 			</div>
 
 			{/* セキュリティ注意書き */}
-			<p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+			<p className="text-xs text-muted-foreground bg-muted border border-border rounded px-3 py-2">
 				IP
 				ハッシュはセキュリティ上の理由から表示されません。ユーザー詳細ページの
 				「このIPをBANする」ボタンからBANを追加できます。
@@ -156,21 +156,23 @@ export default function AdminIpBansPage() {
 
 			{/* IP BAN 一覧テーブル
           See: features/admin.feature @管理者がIP BANを解除する */}
-			<div className="bg-white border border-gray-200 rounded shadow-sm overflow-x-auto">
+			<div className="bg-card border border-border rounded shadow-sm overflow-x-auto">
 				<table
 					id="ip-ban-list-table"
 					className="w-full text-sm text-left border-collapse"
 				>
 					<thead>
-						<tr className="bg-gray-50 border-b border-gray-200">
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+						<tr className="bg-muted border-b border-border">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								BAN日時
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								有効期限
 							</th>
-							<th className="px-3 py-2 font-medium text-gray-600">理由</th>
-							<th className="px-3 py-2 font-medium text-gray-600 whitespace-nowrap">
+							<th className="px-3 py-2 font-medium text-muted-foreground">
+								理由
+							</th>
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								操作
 							</th>
 						</tr>
@@ -180,7 +182,7 @@ export default function AdminIpBansPage() {
 							<tr>
 								<td
 									colSpan={4}
-									className="px-3 py-6 text-center text-gray-500 text-sm"
+									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									読み込み中...
 								</td>
@@ -189,7 +191,7 @@ export default function AdminIpBansPage() {
 							<tr>
 								<td
 									colSpan={4}
-									className="px-3 py-6 text-center text-gray-400 text-sm"
+									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									有効なIP BANはありません
 								</td>
@@ -198,7 +200,7 @@ export default function AdminIpBansPage() {
 							bans.map((ban) => (
 								<tr
 									key={ban.id}
-									className="border-b border-gray-100 hover:bg-gray-50"
+									className="border-b border-border hover:bg-accent"
 								>
 									{/* BAN日時 */}
 									<td className="px-3 py-2 text-xs whitespace-nowrap">
@@ -213,8 +215,10 @@ export default function AdminIpBansPage() {
 										)}
 									</td>
 									{/* 理由 */}
-									<td className="px-3 py-2 text-xs text-gray-600">
-										{ban.reason ?? <span className="text-gray-400">—</span>}
+									<td className="px-3 py-2 text-xs text-muted-foreground">
+										{ban.reason ?? (
+											<span className="text-muted-foreground">—</span>
+										)}
 									</td>
 									{/* 解除ボタン
                       See: features/admin.feature @管理者がIP BANを解除する */}

@@ -8,12 +8,14 @@
  * See: features/admin.feature @管理者がユーザーをBANする
  * See: features/admin.feature @管理者がユーザーのIPをBANする
  * See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+ * See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+ * See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
  * See: tmp/feature_plan_admin_expansion.md §6-e ユーザー詳細ページ
  *
  * 提供機能:
  *   - 基本情報セクション（ID / 登録日時 / ステータス / 通貨残高 / ストリーク / 草カウント）
  *   - 書き込み履歴セクション（スレッドID / 本文 / 日時）
- *   - 管理操作セクション（通貨付与フォーム / ユーザーBAN / IP BAN ボタン）
+ *   - 管理操作セクション（通貨付与フォーム / ユーザーBAN / IP BAN / 課金ステータス切り替えボタン）
  *
  * 設計方針:
  *   - Client Component として実装し、use パラメータ for params
@@ -75,6 +77,13 @@ export default function AdminUserDetailPage({
 	const [isBanning, setIsBanning] = useState(false);
 	const [isIpBanning, setIsIpBanning] = useState(false);
 	const [banMessage, setBanMessage] = useState<{
+		type: "success" | "error";
+		text: string;
+	} | null>(null);
+
+	// 課金ステータス操作の状態
+	const [isPremiumChanging, setIsPremiumChanging] = useState(false);
+	const [premiumMessage, setPremiumMessage] = useState<{
 		type: "success" | "error";
 		text: string;
 	} | null>(null);
@@ -296,6 +305,82 @@ export default function AdminUserDetailPage({
 		}
 	};
 
+	/**
+	 * 課金ステータスを有料に変更する。
+	 * See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+	 */
+	const handleSetPremium = async () => {
+		if (!userDetail) return;
+		if (!confirm(`ユーザー ${userDetail.id} を有料ステータスに変更しますか？`))
+			return;
+		setPremiumMessage(null);
+		setIsPremiumChanging(true);
+		try {
+			const res = await fetch(`/api/admin/users/${userId}/premium`, {
+				method: "PUT",
+			});
+			const data = (await res.json()) as { success?: boolean; error?: string };
+			if (!res.ok) {
+				setPremiumMessage({
+					type: "error",
+					text: data.error ?? "有料ステータス変更に失敗しました。",
+				});
+				return;
+			}
+			setPremiumMessage({
+				type: "success",
+				text: "有料ステータスに変更しました。",
+			});
+			// ユーザー詳細を再取得してステータスを更新する
+			void fetchUserDetail();
+		} catch {
+			setPremiumMessage({
+				type: "error",
+				text: "ネットワークエラーが発生しました。",
+			});
+		} finally {
+			setIsPremiumChanging(false);
+		}
+	};
+
+	/**
+	 * 課金ステータスを無料に変更する。
+	 * See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
+	 */
+	const handleUnsetPremium = async () => {
+		if (!userDetail) return;
+		if (!confirm(`ユーザー ${userDetail.id} を無料ステータスに変更しますか？`))
+			return;
+		setPremiumMessage(null);
+		setIsPremiumChanging(true);
+		try {
+			const res = await fetch(`/api/admin/users/${userId}/premium`, {
+				method: "DELETE",
+			});
+			const data = (await res.json()) as { success?: boolean; error?: string };
+			if (!res.ok) {
+				setPremiumMessage({
+					type: "error",
+					text: data.error ?? "無料ステータス変更に失敗しました。",
+				});
+				return;
+			}
+			setPremiumMessage({
+				type: "success",
+				text: "無料ステータスに変更しました。",
+			});
+			// ユーザー詳細を再取得してステータスを更新する
+			void fetchUserDetail();
+		} catch {
+			setPremiumMessage({
+				type: "error",
+				text: "ネットワークエラーが発生しました。",
+			});
+		} finally {
+			setIsPremiumChanging(false);
+		}
+	};
+
 	// ---------------------------------------------------------------------------
 	// ローディング・エラー表示
 	// ---------------------------------------------------------------------------
@@ -305,11 +390,11 @@ export default function AdminUserDetailPage({
 			<div className="space-y-4">
 				<Link
 					href="/admin/users"
-					className="text-sm text-blue-600 hover:underline"
+					className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
 				>
 					← ユーザー一覧に戻る
 				</Link>
-				<p className="text-gray-500 text-sm">読み込み中...</p>
+				<p className="text-muted-foreground text-sm">読み込み中...</p>
 			</div>
 		);
 	}
@@ -319,7 +404,7 @@ export default function AdminUserDetailPage({
 			<div className="space-y-4">
 				<Link
 					href="/admin/users"
-					className="text-sm text-blue-600 hover:underline"
+					className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
 				>
 					← ユーザー一覧に戻る
 				</Link>
@@ -347,13 +432,13 @@ export default function AdminUserDetailPage({
 			<div className="flex items-center gap-2">
 				<Link
 					href="/admin/users"
-					className="text-sm text-blue-600 hover:underline"
+					className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
 				>
 					← ユーザー一覧に戻る
 				</Link>
 			</div>
 
-			<h2 className="text-lg font-bold text-gray-800">ユーザー詳細</h2>
+			<h2 className="text-lg font-bold text-foreground">ユーザー詳細</h2>
 
 			{/* =============================
           基本情報セクション
@@ -362,35 +447,35 @@ export default function AdminUserDetailPage({
           ============================= */}
 			<section
 				id="user-basic-info"
-				className="bg-white border border-gray-200 rounded p-4 shadow-sm space-y-2"
+				className="bg-card border border-border rounded p-4 shadow-sm space-y-2"
 			>
-				<h3 className="text-base font-bold text-gray-700">基本情報</h3>
+				<h3 className="text-base font-bold text-foreground">基本情報</h3>
 
 				<div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
 					{/* ユーザーID */}
 					<div>
-						<span className="text-gray-500 text-xs">ユーザーID</span>
-						<p className="font-mono text-xs text-gray-700 break-all">
+						<span className="text-muted-foreground text-xs">ユーザーID</span>
+						<p className="font-mono text-xs text-foreground break-all">
 							{userDetail.id}
 						</p>
 					</div>
 					{/* 登録日時 */}
 					<div>
-						<span className="text-gray-500 text-xs">登録日時</span>
-						<p className="text-gray-700">
+						<span className="text-muted-foreground text-xs">登録日時</span>
+						<p className="text-foreground">
 							{formatDateTime(userDetail.createdAt)}
 						</p>
 					</div>
 					{/* BANステータス */}
 					<div>
-						<span className="text-gray-500 text-xs">BANステータス</span>
+						<span className="text-muted-foreground text-xs">BANステータス</span>
 						<p>
 							{userDetail.isBanned ? (
-								<span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded">
+								<span className="inline-block px-2 py-0.5 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 text-xs font-bold rounded">
 									BAN済み
 								</span>
 							) : (
-								<span className="inline-block px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+								<span className="inline-block px-2 py-0.5 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 text-xs rounded">
 									有効
 								</span>
 							)}
@@ -398,19 +483,21 @@ export default function AdminUserDetailPage({
 					</div>
 					{/* アカウント種別 */}
 					<div>
-						<span className="text-gray-500 text-xs">アカウント種別</span>
-						<p className="text-gray-700">{registrationLabel}</p>
+						<span className="text-muted-foreground text-xs">
+							アカウント種別
+						</span>
+						<p className="text-foreground">{registrationLabel}</p>
 					</div>
 					{/* 有料/無料 */}
 					<div>
-						<span className="text-gray-500 text-xs">プラン</span>
+						<span className="text-muted-foreground text-xs">プラン</span>
 						<p>
 							{userDetail.isPremium ? (
-								<span className="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded">
+								<span className="inline-block px-2 py-0.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-300 text-xs rounded">
 									有料
 								</span>
 							) : (
-								<span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+								<span className="inline-block px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded">
 									無料
 								</span>
 							)}
@@ -418,25 +505,27 @@ export default function AdminUserDetailPage({
 					</div>
 					{/* ユーザーネーム */}
 					<div>
-						<span className="text-gray-500 text-xs">ユーザーネーム</span>
-						<p className="text-gray-700">{userDetail.username ?? "—"}</p>
+						<span className="text-muted-foreground text-xs">
+							ユーザーネーム
+						</span>
+						<p className="text-foreground">{userDetail.username ?? "—"}</p>
 					</div>
 					{/* 通貨残高 */}
 					<div>
-						<span className="text-gray-500 text-xs">通貨残高</span>
-						<p className="text-gray-700 font-bold text-yellow-700">
+						<span className="text-muted-foreground text-xs">通貨残高</span>
+						<p className="text-foreground font-bold text-yellow-700">
 							{userDetail.balance.toLocaleString("ja-JP")} BT
 						</p>
 					</div>
 					{/* ストリーク */}
 					<div>
-						<span className="text-gray-500 text-xs">ストリーク</span>
-						<p className="text-gray-700">{userDetail.streakDays}日</p>
+						<span className="text-muted-foreground text-xs">ストリーク</span>
+						<p className="text-foreground">{userDetail.streakDays}日</p>
 					</div>
 					{/* 草カウント */}
 					<div>
-						<span className="text-gray-500 text-xs">草カウント</span>
-						<p className="text-gray-700">{userDetail.grassCount}本</p>
+						<span className="text-muted-foreground text-xs">草カウント</span>
+						<p className="text-foreground">{userDetail.grassCount}本</p>
 					</div>
 				</div>
 			</section>
@@ -446,13 +535,15 @@ export default function AdminUserDetailPage({
           See: features/admin.feature @管理者がユーザーをBANする
           See: features/admin.feature @管理者がユーザーのIPをBANする
           See: features/admin.feature @管理者が指定ユーザーに通貨を付与する
+          See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+          See: features/admin.feature @管理者がユーザーを無料ステータスに変更する
           See: tmp/feature_plan_admin_expansion.md §6-e 管理操作
           ============================= */}
 			<section
 				id="admin-operations"
-				className="bg-white border border-gray-200 rounded p-4 shadow-sm space-y-4"
+				className="bg-card border border-border rounded p-4 shadow-sm space-y-4"
 			>
-				<h3 className="text-base font-bold text-gray-700">管理操作</h3>
+				<h3 className="text-base font-bold text-foreground">管理操作</h3>
 
 				{/* メッセージ表示 */}
 				{banMessage && (
@@ -466,7 +557,7 @@ export default function AdminUserDetailPage({
 				{/* 通貨付与フォーム
             See: features/admin.feature @管理者が指定ユーザーに通貨を付与する */}
 				<div>
-					<h4 className="text-sm font-medium text-gray-700 mb-2">通貨付与</h4>
+					<h4 className="text-sm font-medium text-foreground mb-2">通貨付与</h4>
 					<form
 						onSubmit={(e) => {
 							void handleGrantCurrency(e);
@@ -480,7 +571,7 @@ export default function AdminUserDetailPage({
 							value={currencyAmount}
 							onChange={(e) => setCurrencyAmount(e.target.value)}
 							placeholder="付与額（BT）"
-							className="w-32 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+							className="w-32 border border-border rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-400"
 						/>
 						<button
 							id="grant-currency-button"
@@ -504,7 +595,7 @@ export default function AdminUserDetailPage({
             See: features/admin.feature @管理者がユーザーをBANする
             See: features/admin.feature @管理者がユーザーBANを解除する */}
 				<div>
-					<h4 className="text-sm font-medium text-gray-700 mb-2">
+					<h4 className="text-sm font-medium text-foreground mb-2">
 						ユーザーBAN
 					</h4>
 					<div className="flex gap-2">
@@ -540,8 +631,8 @@ export default function AdminUserDetailPage({
             See: features/admin.feature @管理者がユーザーのIPをBANする
             See: tmp/feature_plan_admin_expansion.md §2-d IP BAN 対象の特定方法 */}
 				<div>
-					<h4 className="text-sm font-medium text-gray-700 mb-2">IP BAN</h4>
-					<p className="text-xs text-gray-500 mb-2">
+					<h4 className="text-sm font-medium text-foreground mb-2">IP BAN</h4>
+					<p className="text-xs text-muted-foreground mb-2">
 						このユーザーの最終アクセスIPをBANします。
 						IPが変わると効果がありません（IP BANの本質的限界）。
 					</p>
@@ -557,6 +648,47 @@ export default function AdminUserDetailPage({
 						{isIpBanning ? "処理中..." : "このIPをBANする"}
 					</button>
 				</div>
+
+				{/* 課金ステータス切り替えボタン
+            See: features/admin.feature @管理者がユーザーを有料ステータスに変更する
+            See: features/admin.feature @管理者がユーザーを無料ステータスに変更する */}
+				<div>
+					<h4 className="text-sm font-medium text-foreground mb-2">
+						課金ステータス
+					</h4>
+					{premiumMessage && (
+						<p
+							className={`text-xs mb-2 ${premiumMessage.type === "success" ? "text-green-600" : "text-red-600"}`}
+						>
+							{premiumMessage.text}
+						</p>
+					)}
+					{userDetail.isPremium ? (
+						<button
+							id="unset-premium-button"
+							type="button"
+							onClick={() => {
+								void handleUnsetPremium();
+							}}
+							disabled={isPremiumChanging}
+							className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 disabled:opacity-50"
+						>
+							{isPremiumChanging ? "処理中..." : "無料に変更"}
+						</button>
+					) : (
+						<button
+							id="set-premium-button"
+							type="button"
+							onClick={() => {
+								void handleSetPremium();
+							}}
+							disabled={isPremiumChanging}
+							className="px-3 py-1.5 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 disabled:opacity-50"
+						>
+							{isPremiumChanging ? "処理中..." : "有料に変更"}
+						</button>
+					)}
+				</div>
 			</section>
 
 			{/* =============================
@@ -566,24 +698,26 @@ export default function AdminUserDetailPage({
           ============================= */}
 			<section
 				id="post-history"
-				className="bg-white border border-gray-200 rounded p-4 shadow-sm space-y-3"
+				className="bg-card border border-border rounded p-4 shadow-sm space-y-3"
 			>
-				<h3 className="text-base font-bold text-gray-700">書き込み履歴</h3>
+				<h3 className="text-base font-bold text-foreground">書き込み履歴</h3>
 
 				{isLoadingPosts ? (
-					<p className="text-gray-500 text-sm">読み込み中...</p>
+					<p className="text-muted-foreground text-sm">読み込み中...</p>
 				) : posts.length === 0 ? (
-					<p className="text-gray-400 text-sm">書き込み履歴がありません。</p>
+					<p className="text-muted-foreground text-sm">
+						書き込み履歴がありません。
+					</p>
 				) : (
 					<ul id="post-history-list" className="space-y-2">
 						{posts.map((post) => (
 							<li
 								key={post.id}
-								className="border-b border-gray-100 pb-2 last:border-b-0"
+								className="border-b border-border pb-2 last:border-b-0"
 							>
 								{/* スレッドID・本文・日時
                     See: features/admin.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる */}
-								<div className="text-xs text-gray-500 mb-0.5 flex gap-3">
+								<div className="text-xs text-muted-foreground mb-0.5 flex gap-3">
 									<span>
 										<span className="font-medium">スレッドID:</span>{" "}
 										<span className="font-mono">
@@ -596,8 +730,8 @@ export default function AdminUserDetailPage({
 								<p
 									className={`text-sm line-clamp-2 ${
 										post.isDeleted
-											? "text-gray-400 line-through"
-											: "text-gray-800"
+											? "text-muted-foreground line-through"
+											: "text-foreground"
 									}`}
 								>
 									{post.isDeleted ? "（削除済み）" : post.body}

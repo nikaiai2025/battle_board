@@ -202,14 +202,14 @@ export default function AuthModal({
 			aria-modal="true"
 			aria-labelledby="auth-header"
 		>
-			<div className="bg-white border border-gray-400 rounded shadow-lg p-6 w-full max-w-sm mx-4">
+			<div className="bg-card border border-border rounded shadow-lg p-6 w-full max-w-sm mx-4">
 				{/* auth-header: 書き込み認証タイトル */}
-				<h2 id="auth-header" className="text-lg font-bold text-gray-800 mb-2">
+				<h2 id="auth-header" className="text-lg font-bold text-foreground mb-2">
 					書き込み認証
 				</h2>
 
 				{/* auth-description: 説明文 */}
-				<p id="auth-description" className="text-sm text-gray-600 mb-4">
+				<p id="auth-description" className="text-sm text-muted-foreground mb-4">
 					書き込みするには認証が必要です。
 					以下のボタンを押して認証を完了してください。
 				</p>
@@ -246,7 +246,7 @@ export default function AuthModal({
 						<button
 							type="button"
 							onClick={onClose}
-							className="flex-1 bg-gray-200 text-gray-700 text-sm py-2 px-4 rounded hover:bg-gray-300"
+							className="flex-1 bg-muted text-foreground text-sm py-2 px-4 rounded hover:bg-accent"
 						>
 							キャンセル
 						</button>

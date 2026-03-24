@@ -82,7 +82,7 @@ export default function VerifyPage() {
 	return (
 		<Suspense
 			fallback={
-				<div className="max-w-lg mx-auto px-4 py-8 text-center text-gray-500">
+				<div className="max-w-lg mx-auto px-4 py-8 text-center text-muted-foreground">
 					読み込み中...
 				</div>
 			}
@@ -299,13 +299,13 @@ function VerifyPageContent() {
 								次の書き込み時に、メール欄に以下のコードを入力してください（有効期限:
 								10分）。
 							</p>
-							<p className="text-xs text-gray-500 mb-1">
+							<p className="text-xs text-muted-foreground mb-1">
 								メール欄に入力するコード:
 							</p>
 							{/* write-token-display: write_token の表示 */}
 							<code
 								id="write-token-display"
-								className="block bg-white border border-yellow-300 rounded px-3 py-2 font-mono text-sm text-gray-800 break-all"
+								className="block bg-card border border-yellow-300 rounded px-3 py-2 font-mono text-sm text-foreground break-all"
 							>
 								#{writeToken}
 							</code>
@@ -318,7 +318,7 @@ function VerifyPageContent() {
 							>
 								{copied ? "コピーしました" : "コピー"}
 							</button>
-							<p className="text-xs text-gray-500 mt-2">
+							<p className="text-xs text-muted-foreground mt-2">
 								※ このコードは一度だけ使用できます
 							</p>
 						</div>
@@ -337,13 +337,13 @@ function VerifyPageContent() {
 			{/* auth-verify-form: 認証フォームコンテナ */}
 			<div
 				id="auth-verify-form"
-				className="border border-gray-400 bg-white rounded p-6"
+				className="border border-border bg-card rounded p-6"
 			>
 				{/* ページタイトル */}
-				<h1 className="text-lg font-bold text-gray-800 mb-2">書き込み認証</h1>
+				<h1 className="text-lg font-bold text-foreground mb-2">書き込み認証</h1>
 
 				{/* auth-description: 説明文 */}
-				<p id="auth-description" className="text-sm text-gray-600 mb-4">
+				<p id="auth-description" className="text-sm text-muted-foreground mb-4">
 					書き込みするには認証が必要です。
 					以下のボタンを押して認証を完了してください。
 				</p>

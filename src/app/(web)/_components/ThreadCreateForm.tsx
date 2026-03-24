@@ -132,9 +132,9 @@ export default function ThreadCreateForm({
 			{/* thread-create-form: スレッド作成フォーム */}
 			<section
 				id="thread-create-form"
-				className="border border-gray-400 bg-gray-50 p-4 mb-4 rounded"
+				className="border border-border bg-muted p-4 mb-4 rounded"
 			>
-				<h2 className="text-sm font-bold text-gray-700 mb-3 border-b border-gray-300 pb-1">
+				<h2 className="text-sm font-bold text-foreground mb-3 border-b border-border pb-1">
 					新規スレッド作成
 				</h2>
 
@@ -143,7 +143,7 @@ export default function ThreadCreateForm({
 					<div className="mb-2">
 						<label
 							htmlFor="thread-title-input"
-							className="block text-xs font-medium text-gray-600 mb-1"
+							className="block text-xs font-medium text-muted-foreground mb-1"
 						>
 							スレッドタイトル
 						</label>
@@ -154,7 +154,7 @@ export default function ThreadCreateForm({
 							maxLength={96}
 							value={title}
 							onChange={(e) => setTitle(e.target.value)}
-							className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400"
+							className="w-full border border-border rounded px-2 py-1 text-sm bg-background focus:outline-none focus:border-blue-400"
 							required
 						/>
 					</div>
@@ -163,7 +163,7 @@ export default function ThreadCreateForm({
 					<div className="mb-3">
 						<label
 							htmlFor="thread-body-input"
-							className="block text-xs font-medium text-gray-600 mb-1"
+							className="block text-xs font-medium text-muted-foreground mb-1"
 						>
 							本文（1レス目）
 						</label>
@@ -172,7 +172,7 @@ export default function ThreadCreateForm({
 							placeholder="本文を入力"
 							value={body}
 							onChange={(e) => setBody(e.target.value)}
-							className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-400 resize-y min-h-[80px]"
+							className="w-full border border-border rounded px-2 py-1 text-sm bg-background focus:outline-none focus:border-blue-400 resize-y min-h-[80px]"
 							required
 						/>
 					</div>

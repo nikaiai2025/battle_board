@@ -202,15 +202,15 @@ export default function RegisterEmailPage() {
 			{/* register-email-form: メール本登録フォームコンテナ */}
 			<div
 				id="register-email-form"
-				className="border border-gray-400 bg-white rounded p-6"
+				className="border border-border bg-card rounded p-6"
 			>
 				{/* ページタイトル */}
-				<h1 className="text-lg font-bold text-gray-800 mb-2">
+				<h1 className="text-lg font-bold text-foreground mb-2">
 					メールアドレスで本登録
 				</h1>
 
 				{/* 説明文 */}
-				<p className="text-sm text-gray-600 mb-4">
+				<p className="text-sm text-muted-foreground mb-4">
 					メールアドレスとパスワードを登録することで、Cookie
 					喪失・端末変更時でも同一ユーザーとして復帰できます。
 				</p>
@@ -220,7 +220,7 @@ export default function RegisterEmailPage() {
 					<div className="mb-3">
 						<label
 							htmlFor="register-email-input"
-							className="block text-sm font-medium text-gray-700 mb-1"
+							className="block text-sm font-medium text-foreground mb-1"
 						>
 							メールアドレス
 						</label>
@@ -230,7 +230,7 @@ export default function RegisterEmailPage() {
 							placeholder="example@example.com"
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
-							className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+							className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
 							required
 							autoComplete="email"
 						/>
@@ -240,7 +240,7 @@ export default function RegisterEmailPage() {
 					<div className="mb-4">
 						<label
 							htmlFor="register-password-input"
-							className="block text-sm font-medium text-gray-700 mb-1"
+							className="block text-sm font-medium text-foreground mb-1"
 						>
 							パスワード（8文字以上）
 						</label>
@@ -250,7 +250,7 @@ export default function RegisterEmailPage() {
 							placeholder="8文字以上のパスワード"
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
-							className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+							className="w-full border border-border rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
 							required
 							minLength={8}
 							autoComplete="new-password"
@@ -280,7 +280,7 @@ export default function RegisterEmailPage() {
 				</form>
 
 				{/* マイページへの戻りリンク */}
-				<div className="mt-4 pt-4 border-t border-gray-200">
+				<div className="mt-4 pt-4 border-t border-border">
 					<Link
 						href="/mypage"
 						className="text-sm text-blue-600 hover:underline"
