@@ -180,6 +180,48 @@ const dummyClient = {
 				status: 400,
 			},
 		}),
+
+		/**
+		 * パスワード再設定メール送信スタブ。
+		 * Supabase Auth resetPasswordForEmail() のインメモリ実装。
+		 * BDDテストでは実際のメール送信は行わない。
+		 *
+		 * See: features/user_registration.feature @本登録ユーザーがパスワード再設定を申請する
+		 */
+		resetPasswordForEmail: async (
+			_email: string,
+			_options?: { redirectTo?: string },
+		) => ({
+			data: {},
+			error: null,
+		}),
+
+		/**
+		 * Supabase Auth Admin API スタブ。
+		 * updateUserById でパスワード更新をシミュレートする。
+		 *
+		 * See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+		 */
+		admin: {
+			updateUserById: async (id: string, attrs: { password?: string }) => {
+				// supabaseAuthStore のパスワードを更新する
+				for (const [email, user] of supabaseAuthStore.entries()) {
+					if (user.id === id) {
+						if (attrs.password) {
+							supabaseAuthStore.set(email, {
+								...user,
+								password: attrs.password,
+							});
+						}
+						return { data: { user: { id, email } }, error: null };
+					}
+				}
+				return {
+					data: { user: null },
+					error: { message: "User not found", status: 404 },
+				};
+			},
+		},
 	},
 };
 

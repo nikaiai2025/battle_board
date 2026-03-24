@@ -199,6 +199,18 @@ export default function LoginPage() {
 						/>
 					</div>
 
+					{/* login-forgot-password-link: パスワードを忘れた方への導線
+				    See: docs/specs/screens/auth-forgot-password.yaml SCR-006 ログインページへの追加要素 */}
+					<div className="mb-4 text-right">
+						<Link
+							id="login-forgot-password-link"
+							href="/auth/forgot-password"
+							className="text-xs text-blue-600 hover:underline"
+						>
+							パスワードを忘れた方はこちら
+						</Link>
+					</div>
+
 					{/* エラーメッセージ */}
 					{error && (
 						<p

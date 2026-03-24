@@ -44,6 +44,10 @@ const { mockSupabaseAuth, mockUserRepository, mockEdgeTokenRepository } =
 			signInWithOAuth: vi.fn(),
 			signInWithPassword: vi.fn(),
 			exchangeCodeForSession: vi.fn(),
+			resetPasswordForEmail: vi.fn(),
+			admin: {
+				updateUserById: vi.fn(),
+			},
 		};
 
 		const mockUserRepository = {
@@ -659,6 +663,179 @@ describe("RegistrationService", () => {
 			);
 
 			expect(result).toEqual({ success: false, reason: "not_registered" });
+		});
+	});
+
+	// =========================================================================
+	// requestPasswordReset
+	// See: features/user_registration.feature @本登録ユーザーがパスワード再設定を申請する
+	// =========================================================================
+
+	describe("requestPasswordReset", () => {
+		it("正常: resetPasswordForEmail を呼び出し success: true を返す", async () => {
+			mockSupabaseAuth.resetPasswordForEmail.mockResolvedValue({
+				data: {},
+				error: null,
+			});
+
+			const result = await RegistrationService.requestPasswordReset(
+				EMAIL,
+				"/auth/reset-password",
+			);
+
+			expect(result).toEqual({ success: true });
+			expect(mockSupabaseAuth.resetPasswordForEmail).toHaveBeenCalledWith(
+				EMAIL,
+				{
+					redirectTo: "/auth/reset-password",
+				},
+			);
+		});
+
+		it("セキュリティ: Supabase Auth がエラーを返しても success: true を返す（列挙攻撃防止）", async () => {
+			// See: features/user_registration.feature @未登録のメールアドレスでパスワード再設定を申請してもエラーを明かさない
+			mockSupabaseAuth.resetPasswordForEmail.mockResolvedValue({
+				data: {},
+				error: { message: "User not found" },
+			});
+
+			const result = await RegistrationService.requestPasswordReset(
+				"nonexistent@example.com",
+				"/auth/reset-password",
+			);
+
+			// エラーがあっても success を返す
+			expect(result).toEqual({ success: true });
+		});
+	});
+
+	// =========================================================================
+	// handleRecoveryCallback
+	// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+	// =========================================================================
+
+	describe("handleRecoveryCallback", () => {
+		it("正常: supabaseAuthId でユーザーを特定し edgeToken を返す", async () => {
+			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(
+				createRegisteredUser(),
+			);
+			mockEdgeTokenRepository.create.mockResolvedValue({});
+
+			const result =
+				await RegistrationService.handleRecoveryCallback(SUPABASE_AUTH_ID);
+
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.userId).toBe(USER_ID);
+				expect(result.edgeToken).toMatch(
+					/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+				);
+			}
+			expect(mockUserRepository.findBySupabaseAuthId).toHaveBeenCalledWith(
+				SUPABASE_AUTH_ID,
+			);
+		});
+
+		it("正常: 新しい edge-token が edge_tokens テーブルに INSERT される", async () => {
+			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(
+				createRegisteredUser(),
+			);
+			mockEdgeTokenRepository.create.mockResolvedValue({});
+
+			await RegistrationService.handleRecoveryCallback(SUPABASE_AUTH_ID);
+
+			expect(mockEdgeTokenRepository.create).toHaveBeenCalledWith(
+				USER_ID,
+				expect.any(String),
+			);
+		});
+
+		it("異常系: supabaseAuthId に対応するユーザーがいない場合は not_registered を返す", async () => {
+			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(null);
+
+			const result = await RegistrationService.handleRecoveryCallback(
+				"nonexistent-supabase-id",
+			);
+
+			expect(result).toEqual({
+				success: false,
+				reason: "not_registered",
+			});
+			expect(mockEdgeTokenRepository.create).not.toHaveBeenCalled();
+		});
+	});
+
+	// =========================================================================
+	// updatePassword
+	// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+	// =========================================================================
+
+	describe("updatePassword", () => {
+		const NEW_PASSWORD = "newpassword123";
+
+		it("正常: Supabase Auth Admin API でパスワードを更新し success: true を返す", async () => {
+			mockUserRepository.findById.mockResolvedValue(createRegisteredUser());
+			mockSupabaseAuth.admin.updateUserById.mockResolvedValue({
+				data: { user: { id: SUPABASE_AUTH_ID } },
+				error: null,
+			});
+
+			const result = await RegistrationService.updatePassword(
+				USER_ID,
+				NEW_PASSWORD,
+			);
+
+			expect(result).toEqual({ success: true });
+			expect(mockSupabaseAuth.admin.updateUserById).toHaveBeenCalledWith(
+				SUPABASE_AUTH_ID,
+				{
+					password: NEW_PASSWORD,
+				},
+			);
+		});
+
+		it("異常系: ユーザーが見つからない場合は not_registered を返す", async () => {
+			mockUserRepository.findById.mockResolvedValue(null);
+
+			const result = await RegistrationService.updatePassword(
+				"nonexistent-user",
+				NEW_PASSWORD,
+			);
+
+			expect(result).toEqual({
+				success: false,
+				reason: "not_registered",
+			});
+			expect(mockSupabaseAuth.admin.updateUserById).not.toHaveBeenCalled();
+		});
+
+		it("異常系: supabaseAuthId がないユーザー（仮登録）は not_registered を返す", async () => {
+			mockUserRepository.findById.mockResolvedValue(
+				createTemporaryUser(), // supabaseAuthId: null
+			);
+
+			const result = await RegistrationService.updatePassword(
+				USER_ID,
+				NEW_PASSWORD,
+			);
+
+			expect(result).toEqual({
+				success: false,
+				reason: "not_registered",
+			});
+			expect(mockSupabaseAuth.admin.updateUserById).not.toHaveBeenCalled();
+		});
+
+		it("異常系: Supabase Auth Admin API がエラーを返す場合はエラーをスローする", async () => {
+			mockUserRepository.findById.mockResolvedValue(createRegisteredUser());
+			mockSupabaseAuth.admin.updateUserById.mockResolvedValue({
+				data: { user: null },
+				error: { message: "internal error" },
+			});
+
+			await expect(
+				RegistrationService.updatePassword(USER_ID, NEW_PASSWORD),
+			).rejects.toThrow("updatePassword failed");
 		});
 	});
 

@@ -23,6 +23,7 @@ const { mockVerifyOtp, mockRegistrationService } = vi.hoisted(() => {
 		mockVerifyOtp: vi.fn(),
 		mockRegistrationService: {
 			handleEmailConfirmCallback: vi.fn(),
+			handleRecoveryCallback: vi.fn(),
 		},
 	};
 });
@@ -42,6 +43,8 @@ vi.mock("@/lib/infrastructure/supabase/client", () => ({
 vi.mock("@/lib/services/registration-service", () => ({
 	handleEmailConfirmCallback: (...args: unknown[]) =>
 		mockRegistrationService.handleEmailConfirmCallback(...args),
+	handleRecoveryCallback: (...args: unknown[]) =>
+		mockRegistrationService.handleRecoveryCallback(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -282,6 +285,142 @@ describe("GET /api/auth/confirm", () => {
 
 			expect(response.status).toBe(307);
 			expect(response.headers.get("location")).toBe(`${ORIGIN}/auth/error`);
+		});
+	});
+
+	// =========================================================================
+	// type=recovery（パスワード再設定フロー）
+	// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+	// =========================================================================
+
+	describe("type=recovery（パスワード再設定）", () => {
+		/** recovery 用の verifyOtp 成功モック（user_metadata 不要） */
+		function mockVerifyOtpRecoverySuccess(supabaseAuthId = SUPABASE_AUTH_ID) {
+			mockVerifyOtp.mockResolvedValue({
+				data: {
+					user: {
+						id: supabaseAuthId,
+						user_metadata: {},
+					},
+					session: {},
+				},
+				error: null,
+			});
+		}
+
+		it("正常: type=recovery で handleRecoveryCallback が呼ばれ /auth/reset-password にリダイレクトする", async () => {
+			mockVerifyOtpRecoverySuccess();
+			mockRegistrationService.handleRecoveryCallback.mockResolvedValue({
+				success: true,
+				userId: USER_ID,
+				edgeToken: NEW_EDGE_TOKEN,
+			});
+
+			const req = createRequest({
+				token_hash: "recovery-hash-123",
+				type: "recovery",
+			});
+
+			const response = await GET(req);
+
+			// verifyOtp が recovery タイプで呼ばれること
+			expect(mockVerifyOtp).toHaveBeenCalledWith({
+				type: "recovery",
+				token_hash: "recovery-hash-123",
+			});
+
+			// handleRecoveryCallback が supabaseAuthId で呼ばれること
+			expect(
+				mockRegistrationService.handleRecoveryCallback,
+			).toHaveBeenCalledWith(SUPABASE_AUTH_ID);
+
+			// handleEmailConfirmCallback は呼ばれないこと
+			expect(
+				mockRegistrationService.handleEmailConfirmCallback,
+			).not.toHaveBeenCalled();
+
+			// デフォルトの /auth/reset-password へリダイレクト
+			expect(response.status).toBe(307);
+			expect(response.headers.get("location")).toBe(
+				`${ORIGIN}/auth/reset-password`,
+			);
+
+			// edge-token Cookie が設定されること
+			const setCookieHeader = response.headers.get("set-cookie");
+			expect(setCookieHeader).toContain("edge-token");
+			expect(setCookieHeader).toContain(NEW_EDGE_TOKEN);
+		});
+
+		it("正常: type=recovery + next パラメータ指定時はその URL にリダイレクトする", async () => {
+			mockVerifyOtpRecoverySuccess();
+			mockRegistrationService.handleRecoveryCallback.mockResolvedValue({
+				success: true,
+				userId: USER_ID,
+				edgeToken: NEW_EDGE_TOKEN,
+			});
+
+			const req = createRequest({
+				token_hash: "recovery-hash-123",
+				type: "recovery",
+				next: "/custom-reset-page",
+			});
+
+			const response = await GET(req);
+
+			expect(response.status).toBe(307);
+			expect(response.headers.get("location")).toBe(
+				`${ORIGIN}/custom-reset-page`,
+			);
+		});
+
+		it("異常系: handleRecoveryCallback が失敗した場合は /auth/error にリダイレクトする", async () => {
+			mockVerifyOtpRecoverySuccess();
+			mockRegistrationService.handleRecoveryCallback.mockResolvedValue({
+				success: false,
+				reason: "not_registered",
+			});
+
+			const req = createRequest({
+				token_hash: "recovery-hash-123",
+				type: "recovery",
+			});
+
+			const response = await GET(req);
+
+			expect(response.status).toBe(307);
+			expect(response.headers.get("location")).toBe(`${ORIGIN}/auth/error`);
+		});
+
+		it("recovery では user_metadata.battleboard_user_id が不要（user_metadata 空でも成功する）", async () => {
+			// recovery フローでは supabaseAuthId のみで検索する
+			mockVerifyOtp.mockResolvedValue({
+				data: {
+					user: {
+						id: SUPABASE_AUTH_ID,
+						user_metadata: {}, // battleboard_user_id なし
+					},
+					session: {},
+				},
+				error: null,
+			});
+			mockRegistrationService.handleRecoveryCallback.mockResolvedValue({
+				success: true,
+				userId: USER_ID,
+				edgeToken: NEW_EDGE_TOKEN,
+			});
+
+			const req = createRequest({
+				token_hash: "recovery-hash-123",
+				type: "recovery",
+			});
+
+			const response = await GET(req);
+
+			// recovery は成功する（email と違い user_metadata 不要）
+			expect(response.status).toBe(307);
+			expect(response.headers.get("location")).toBe(
+				`${ORIGIN}/auth/reset-password`,
+			);
 		});
 	});
 });

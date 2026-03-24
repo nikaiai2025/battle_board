@@ -370,6 +370,92 @@ export async function handleOAuthCallback(
 }
 
 // ---------------------------------------------------------------------------
+// パスワード再設定
+// ---------------------------------------------------------------------------
+
+/**
+ * パスワード再設定メールを送信する。
+ * Supabase Auth resetPasswordForEmail() を呼び出す。
+ *
+ * セキュリティ: 未登録メールでも常に成功を返す（ユーザー列挙攻撃防止）。
+ *
+ * See: features/user_registration.feature @本登録ユーザーがパスワード再設定を申請する
+ * See: features/user_registration.feature @未登録のメールアドレスでパスワード再設定を申請してもエラーを明かさない
+ *
+ * @param email - 再設定対象のメールアドレス
+ * @param redirectTo - メールテンプレートの {{ .RedirectTo }} に展開される値
+ * @returns 常に { success: true }
+ */
+export async function requestPasswordReset(
+	email: string,
+	redirectTo: string,
+): Promise<{ success: true }> {
+	const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+		redirectTo,
+	});
+	if (error) {
+		// エラーがあってもユーザーには公開しない（列挙攻撃防止）
+		console.error(`requestPasswordReset: ${error.message}`);
+	}
+	return { success: true };
+}
+
+/**
+ * パスワード再設定トークン検証後のコールバック処理。
+ * verifyOtp(type=recovery) で取得した supabaseAuthId からユーザーを特定し、
+ * edge-token を発行する。
+ *
+ * See: src/app/api/auth/confirm/route.ts（呼び出し元）
+ *
+ * @param supabaseAuthId - verifyOtp() から取得した Supabase Auth ユーザー ID
+ * @returns LoginResult
+ */
+export async function handleRecoveryCallback(
+	supabaseAuthId: string,
+): Promise<LoginResult> {
+	const user = await UserRepository.findBySupabaseAuthId(supabaseAuthId);
+	if (!user) {
+		return { success: false, reason: "not_registered" };
+	}
+
+	const newEdgeToken = randomUUID();
+	await EdgeTokenRepository.create(user.id, newEdgeToken);
+
+	return { success: true, userId: user.id, edgeToken: newEdgeToken };
+}
+
+/**
+ * パスワードを更新する。
+ * Supabase Auth Admin API でパスワードを変更する。
+ *
+ * See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+ *
+ * @param userId - BattleBoard ユーザー ID
+ * @param newPassword - 新しいパスワード
+ * @returns 成功時 { success: true }、失敗時 { success: false; reason: string }
+ */
+export async function updatePassword(
+	userId: string,
+	newPassword: string,
+): Promise<{ success: true } | { success: false; reason: string }> {
+	const user = await UserRepository.findById(userId);
+	if (!user || !user.supabaseAuthId) {
+		return { success: false, reason: "not_registered" };
+	}
+
+	const { error } = await supabaseAdmin.auth.admin.updateUserById(
+		user.supabaseAuthId,
+		{ password: newPassword },
+	);
+
+	if (error) {
+		throw new Error(`updatePassword failed: ${error.message}`);
+	}
+
+	return { success: true };
+}
+
+// ---------------------------------------------------------------------------
 // ログアウト
 // ---------------------------------------------------------------------------
 

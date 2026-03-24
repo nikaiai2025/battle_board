@@ -105,6 +105,9 @@ const TEST_PASSWORD = "test-password-secure";
 /** テスト用間違いパスワード */
 const TEST_WRONG_PASSWORD = "wrong-password";
 
+/** テスト用新パスワード（パスワード再設定テスト用） */
+const TEST_NEW_PASSWORD = "new-secure-password-123";
+
 /** テスト用リダイレクトURL（BDDではHTTPフローを通過しないためダミー値） */
 const TEST_REDIRECT_URL = "/mypage";
 
@@ -2399,3 +2402,228 @@ Then(
 		);
 	},
 );
+
+// ===========================================================================
+// パスワード再設定
+// See: features/user_registration.feature @パスワード再設定
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Given: 本登録ユーザーがパスワード再設定メールを受信している
+// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+// ---------------------------------------------------------------------------
+
+/**
+ * 本登録ユーザーがパスワード再設定メールを受信している状態を作る。
+ * 実際のメール送信は行わず、本登録ユーザーが存在することを確認する。
+ *
+ * See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+ */
+Given(
+	"本登録ユーザーがパスワード再設定メールを受信している",
+	async function (this: BattleBoardWorld) {
+		// 本登録ユーザーを作成する
+		await setupVerifiedUser(this);
+		const supabaseAuthId = crypto.randomUUID();
+		this.currentSupabaseAuthId = supabaseAuthId;
+		await getRegistrationService().completeRegistration(
+			this.currentUserId!,
+			supabaseAuthId,
+			"email",
+		);
+		// Supabase Auth にユーザーを登録する
+		InMemorySupabaseClient._registerSupabaseUser(
+			supabaseAuthId,
+			TEST_EMAIL,
+			TEST_PASSWORD,
+		);
+		this.registrationEmail = TEST_EMAIL;
+		this.registrationPassword = TEST_PASSWORD;
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: パスワード再設定を申請する
+// See: features/user_registration.feature @本登録ユーザーがパスワード再設定を申請する
+// ---------------------------------------------------------------------------
+
+/**
+ * RegistrationService.requestPasswordReset() を呼んでパスワード再設定を申請する。
+ *
+ * See: features/user_registration.feature @本登録ユーザーがパスワード再設定を申請する
+ */
+When("パスワード再設定を申請する", async function (this: BattleBoardWorld) {
+	const RegistrationService = getRegistrationService();
+	const email = this.registrationEmail ?? TEST_EMAIL;
+	const result = await RegistrationService.requestPasswordReset(
+		email,
+		"/auth/reset-password",
+	);
+	this.lastResult = { type: "success", data: result };
+});
+
+// ---------------------------------------------------------------------------
+// When: メール内の再設定リンクをクリックする
+// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+// ---------------------------------------------------------------------------
+
+/**
+ * パスワード再設定リンクのクリックをシミュレートする。
+ * handleRecoveryCallback() を直接呼び出して edge-token を取得する。
+ *
+ * See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+ */
+When(
+	"メール内の再設定リンクをクリックする",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentSupabaseAuthId, "Supabase Auth ID が設定されていません");
+		const RegistrationService = getRegistrationService();
+		const result = await RegistrationService.handleRecoveryCallback(
+			this.currentSupabaseAuthId,
+		);
+		if (result.success) {
+			this.currentEdgeToken = result.edgeToken;
+			this.lastResult = { type: "success", data: result };
+		} else {
+			this.lastResult = {
+				type: "error",
+				message: result.reason,
+				code: result.reason,
+			};
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: 新しいパスワードを入力して確定する
+// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+// ---------------------------------------------------------------------------
+
+/**
+ * RegistrationService.updatePassword() を呼んで新しいパスワードを設定する。
+ *
+ * See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+ */
+When(
+	"新しいパスワードを入力して確定する",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentUserId, "ユーザーIDが設定されていません");
+		const RegistrationService = getRegistrationService();
+		const result = await RegistrationService.updatePassword(
+			this.currentUserId,
+			TEST_NEW_PASSWORD,
+		);
+		this.lastResult = { type: "success", data: result };
+		// 新しいパスワードを World に記録する
+		this.registrationPassword = TEST_NEW_PASSWORD;
+	},
+);
+
+// ---------------------------------------------------------------------------
+// When: 未登録のメールアドレスでパスワード再設定を申請する
+// See: features/user_registration.feature @未登録のメールアドレスでパスワード再設定を申請してもエラーを明かさない
+// ---------------------------------------------------------------------------
+
+/**
+ * 未登録のメールアドレスでパスワード再設定を申請する。
+ *
+ * See: features/user_registration.feature @未登録のメールアドレスでパスワード再設定を申請してもエラーを明かさない
+ */
+When(
+	"未登録のメールアドレスでパスワード再設定を申請する",
+	async function (this: BattleBoardWorld) {
+		const RegistrationService = getRegistrationService();
+		const result = await RegistrationService.requestPasswordReset(
+			"nonexistent@example.com",
+			"/auth/reset-password",
+		);
+		this.lastResult = { type: "success", data: result };
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: メールアドレスにパスワード再設定リンクが送信される
+// See: features/user_registration.feature @本登録ユーザーがパスワード再設定を申請する
+// ---------------------------------------------------------------------------
+
+/**
+ * パスワード再設定メールの送信が成功したことを確認する。
+ *
+ * See: features/user_registration.feature @本登録ユーザーがパスワード再設定を申請する
+ */
+Then(
+	"メールアドレスにパスワード再設定リンクが送信される",
+	function (this: BattleBoardWorld) {
+		assert(this.lastResult, "操作結果が存在しません");
+		assert.strictEqual(
+			this.lastResult.type,
+			"success",
+			`パスワード再設定メール送信が成功することを期待しましたが "${this.lastResult.type}" でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: パスワードが更新される
+// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+// ---------------------------------------------------------------------------
+
+/**
+ * パスワードの更新が成功したことを確認する。
+ *
+ * See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+ */
+Then("パスワードが更新される", function (this: BattleBoardWorld) {
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"success",
+		`パスワード更新が成功することを期待しましたが "${this.lastResult.type}" でした`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Then: 新しいパスワードでログインできる
+// See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+// ---------------------------------------------------------------------------
+
+/**
+ * 新しいパスワードでログインできることを確認する。
+ * loginWithEmail() を新パスワードで呼び出して成功を確認する。
+ *
+ * See: features/user_registration.feature @パスワード再設定リンクから新しいパスワードを設定する
+ */
+Then(
+	"新しいパスワードでログインできる",
+	async function (this: BattleBoardWorld) {
+		const RegistrationService = getRegistrationService();
+		const email = this.registrationEmail ?? TEST_EMAIL;
+		const result = await RegistrationService.loginWithEmail(
+			email,
+			TEST_NEW_PASSWORD,
+		);
+		assert(
+			result.success,
+			`新しいパスワードでログインが成功することを期待しましたが失敗しました: ${!result.success ? result.reason : ""}`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: 登録済みの場合と同じ応答が返る
+// See: features/user_registration.feature @未登録のメールアドレスでパスワード再設定を申請してもエラーを明かさない
+// ---------------------------------------------------------------------------
+
+/**
+ * 未登録メールでも登録済みと同じ応答（success）が返ることを確認する。
+ *
+ * See: features/user_registration.feature @未登録のメールアドレスでパスワード再設定を申請してもエラーを明かさない
+ */
+Then("登録済みの場合と同じ応答が返る", function (this: BattleBoardWorld) {
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"success",
+		`未登録メールでも成功応答が返ることを期待しましたが "${this.lastResult.type}" でした`,
+	);
+});
