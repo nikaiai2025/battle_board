@@ -6,9 +6,13 @@
 --   Email: admin@local.test
 --   Password: admin1234
 --
--- 一般ユーザー（本登録済み）:
+-- 一般ユーザー（無料・本登録済み）:
 --   Email: user@local.test
 --   Password: user1234
+--
+-- 一般ユーザー（有料・本登録済み）:
+--   Email: premium@local.test
+--   Password: premium1234
 
 -- -----------------------------------------------------------------------------
 -- 管理者アカウント (UUID固定: 00000000-0000-0000-0000-000000000001)
@@ -206,6 +210,121 @@ ON CONFLICT DO NOTHING;
 INSERT INTO currencies (user_id, balance)
 VALUES (
     '00000000-0000-0000-0000-000000000002',
+    10000
+)
+ON CONFLICT DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 有料ユーザー（本登録済み）
+-- UUID: 00000000-0000-0000-0000-000000000003（auth.users と users で共通）
+--
+-- Email: premium@local.test / Password: premium1234 でログインできる。
+-- is_premium = true、有料テーマ・フォントの動作確認用。
+-- -----------------------------------------------------------------------------
+
+-- ステップ1: Supabase Auth ユーザーを作成
+INSERT INTO auth.users (
+    id,
+    instance_id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    created_at,
+    updated_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    is_super_admin,
+    confirmation_token,
+    recovery_token,
+    email_change_token_new,
+    email_change
+)
+VALUES (
+    '00000000-0000-0000-0000-000000000003',
+    '00000000-0000-0000-0000-000000000000',
+    'authenticated',
+    'authenticated',
+    'premium@local.test',
+    crypt('premium1234', gen_salt('bf')),
+    now(),
+    now(),
+    now(),
+    '{"provider":"email","providers":["email"]}',
+    '{}',
+    false,
+    '',
+    '',
+    '',
+    ''
+)
+ON CONFLICT DO NOTHING;
+
+-- ステップ2: auth.identities にINSERT
+INSERT INTO auth.identities (
+    id,
+    user_id,
+    provider_id,
+    identity_data,
+    provider,
+    last_sign_in_at,
+    created_at,
+    updated_at
+)
+VALUES (
+    '00000000-0000-0000-0000-000000000003',
+    '00000000-0000-0000-0000-000000000003',
+    'premium@local.test',
+    jsonb_build_object(
+        'sub', '00000000-0000-0000-0000-000000000003',
+        'email', 'premium@local.test',
+        'email_verified', true
+    ),
+    'email',
+    now(),
+    now(),
+    now()
+)
+ON CONFLICT DO NOTHING;
+
+-- ステップ3: users テーブルに有料ユーザーを作成
+INSERT INTO users (
+    id,
+    auth_token,
+    author_id_seed,
+    is_verified,
+    is_premium,
+    username,
+    supabase_auth_id,
+    registration_type,
+    registered_at
+)
+VALUES (
+    '00000000-0000-0000-0000-000000000003',
+    'local-dev-premium-token',
+    'LOCAL_DEV_PREMIUM',
+    true,
+    true,
+    'premiumuser',
+    '00000000-0000-0000-0000-000000000003',
+    'email',
+    now()
+)
+ON CONFLICT DO NOTHING;
+
+-- ステップ4: edge_tokens テーブルにトークンを登録
+INSERT INTO edge_tokens (user_id, token)
+VALUES (
+    '00000000-0000-0000-0000-000000000003',
+    'local-dev-premium-token'
+)
+ON CONFLICT DO NOTHING;
+
+-- ステップ5: currencies テーブルに初期残高を付与
+INSERT INTO currencies (user_id, balance)
+VALUES (
+    '00000000-0000-0000-0000-000000000003',
     10000
 )
 ON CONFLICT DO NOTHING;

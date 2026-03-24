@@ -15,8 +15,8 @@
  * See: docs/architecture/architecture.md §13 TDR-014
  */
 
-import type { DevPost } from "@/lib/services/dev-post-service";
-import { getPosts } from "@/lib/services/dev-post-service";
+import type { DevPost, PaginatedPosts } from "@/lib/services/dev-post-service";
+import { getPosts, POSTS_PER_PAGE } from "@/lib/services/dev-post-service";
 
 // リクエストごとにSSRを実行し、Vercelのページキャッシュを無効化する。
 // See: docs/architecture/architecture.md §13 TDR-006
@@ -51,18 +51,30 @@ function formatDate(date: Date): string {
 export default async function DevBoardPage({
 	searchParams,
 }: {
-	searchParams: Promise<{ error?: string }>;
+	searchParams: Promise<{ error?: string; page?: string }>;
 }) {
-	// 投稿一覧を取得（新しい順）
-	let posts: DevPost[] = [];
+	const params = await searchParams;
+
+	// ページ番号の取得（クエリパラメータ ?page=N）
+	const pageNum = Math.max(1, Number(params.page) || 1);
+
+	// 投稿一覧を取得（新しい順、ページネーション付き）
+	let paginated: PaginatedPosts = {
+		posts: [],
+		totalCount: 0,
+		currentPage: 1,
+		totalPages: 1,
+	};
 	try {
-		posts = await getPosts();
+		paginated = await getPosts(pageNum);
 	} catch {
 		// DB エラー時は空一覧で表示する（開発連絡板は常に利用可能であることが重要）
 	}
 
+	const { posts, totalCount, currentPage, totalPages } = paginated;
+
 	// バリデーションエラーメッセージの取得
-	const { error: errorMessage } = await searchParams;
+	const errorMessage = params.error;
 
 	return (
 		<>
@@ -189,6 +201,10 @@ export default async function DevBoardPage({
 					border-left: 2px solid #404040;
 					border-right: 2px solid #ffffff;
 					border-bottom: 2px solid #ffffff;
+				}
+				.dev-counter-error {
+					color: #ff0000;
+					animation: dev-blink 1s infinite;
 				}
 				.dev-counter-kiriban {
 					font-size: 9px;
@@ -368,6 +384,9 @@ export default async function DevBoardPage({
 					font-weight: bold;
 					color: #008000;
 				}
+				.dev-post-url {
+					margin-left: 6px;
+				}
 				.dev-post-date {
 					color: #606060;
 					margin-left: 6px;
@@ -376,6 +395,26 @@ export default async function DevBoardPage({
 					border: none;
 					border-top: 1px solid #c0c0c0;
 					margin: 4px 0;
+				}
+				/* ---- ページ送り ---- */
+				.dev-pager {
+					margin: 8px 0;
+					text-align: center;
+				}
+				.dev-pager a,
+				.dev-pager span {
+					margin: 0 2px;
+				}
+				.dev-pager-current {
+					font-weight: bold;
+					color: #cc0000;
+				}
+				/* ---- ミニアイコン ---- */
+				.dev-icon {
+					width: 16px;
+					height: 16px;
+					vertical-align: middle;
+					margin-right: 2px;
 				}
 				/* ---- フッター ---- */
 				.dev-footer {
@@ -445,17 +484,11 @@ export default async function DevBoardPage({
 								Dev Menu
 							</div>
 
-							<div className="dev-nav-section">- Menu -</div>
-							<ul>
-								<li>
-									<a href="/dev">開発連絡板</a>
-								</li>
-							</ul>
-
-							<hr className="dev-nav-sep" />
-
 							{/* 管理人プロフィール */}
-							<div className="dev-nav-section">- Profile -</div>
+							<div className="dev-nav-section">
+								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
+								Profile -
+							</div>
 							<div className="dev-profile">
 								<div className="dev-profile-name">†Eternal_Coder†</div>
 								<dl>
@@ -477,52 +510,93 @@ export default async function DevBoardPage({
 									<br />
 									画像の無断転載は禁止!!
 								</div>
+								<div style={{ marginTop: "6px" }}>
+									<img src="/dev/icons/mail.png" alt="" className="dev-icon" />
+									管理人にメール{" "}
+									<img
+										src="/dev/icons/construction.png"
+										alt="工事中"
+										className="dev-icon"
+									/>
+								</div>
 							</div>
 
 							<hr className="dev-nav-sep" />
 
-							<div className="dev-nav-section">- Links -</div>
+							<div className="dev-nav-section">
+								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
+								Links -
+							</div>
 							<ul>
 								<li>
+									<img src="/dev/icons/home.png" alt="" className="dev-icon" />
 									<a href="/" className="dev-blink">
 										ボットちゃんねる 本番
 									</a>
 								</li>
 								<li>
-									<a href="#">デプロイ状況</a>
-								</li>
-								<li>
-									<a href="#">DB管理画面</a>
-								</li>
-								<li>
-									<a href="#">GitHub</a>
-								</li>
-								<li>
-									<a href="#">API仕様書</a>
+									<img src="/dev/icons/link.png" alt="" className="dev-icon" />
+									GitHub{" "}
+									<img
+										src="/dev/icons/construction.png"
+										alt="工事中"
+										className="dev-icon"
+									/>
 								</li>
 							</ul>
 
 							<hr className="dev-nav-sep" />
 
-							<div className="dev-nav-section">- Tools -</div>
+							<div className="dev-nav-section">
+								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
+								Tools -
+							</div>
 							<ul>
 								<li>
-									<a href="#">ログビューア</a>{" "}
-									<span className="dev-construction">工事中</span>
+									<img
+										src="/dev/icons/folder.png"
+										alt=""
+										className="dev-icon"
+									/>
+									ログビューア{" "}
+									<img
+										src="/dev/icons/construction.png"
+										alt="工事中"
+										className="dev-icon"
+									/>
 								</li>
 								<li>
-									<a href="#">テストデータ生成</a>{" "}
-									<span className="dev-construction">工事中</span>
+									<img
+										src="/dev/icons/folder.png"
+										alt=""
+										className="dev-icon"
+									/>
+									テストデータ生成{" "}
+									<img
+										src="/dev/icons/construction.png"
+										alt="工事中"
+										className="dev-icon"
+									/>
 								</li>
 							</ul>
 
 							<hr className="dev-nav-sep" />
 
 							{/* 更新履歴 */}
-							<div className="dev-nav-section">- 更新履歴 -</div>
+							<div className="dev-nav-section">
+								<img src="/dev/icons/star.png" alt="" className="dev-icon" />-
+								更新履歴 -
+							</div>
 							<dl className="dev-nav-update">
 								<dt>2025/03/22</dt>
-								<dd>掲示板UI刷新(^_^)</dd>
+								<dd>
+									掲示板UI刷新(^_^){" "}
+									<img
+										src="/dev/icons/new.png"
+										alt="NEW!"
+										className="dev-icon"
+									/>
+								</dd>
 								<dt>2025/03/15</dt>
 								<dd>開発連絡板を設置</dd>
 								<dt>2025/03/01</dt>
@@ -531,14 +605,23 @@ export default async function DevBoardPage({
 
 							<hr className="dev-nav-sep" />
 
-							{/* キリ番カウンター */}
+							{/* キリ番カウンター（故障中） */}
 							<div className="dev-counter-box">
 								<div className="dev-counter-label">あなたは</div>
 								<div className="dev-counter">
-									{String(posts.length * 137 + 4649).padStart(6, "0")}
+									<span className="dev-counter-error">ERR</span>
 								</div>
 								<div className="dev-counter-label">人目の訪問者です</div>
-								<div className="dev-counter-kiriban">キリ番踏み逃げ禁止!!</div>
+								<div className="dev-counter-kiriban">
+									<img
+										src="/dev/icons/warning.png"
+										alt=""
+										className="dev-icon"
+									/>
+									※カウンターがバグってます
+									<br />
+									修正中です(^_^;)
+								</div>
 							</div>
 
 							<div className="dev-nav-env">
@@ -589,16 +672,22 @@ export default async function DevBoardPage({
 													type="text"
 													name="name"
 													id="name-input"
-													placeholder="名無しさん"
+													placeholder=""
 													maxLength={50}
+													required
 												/>
 											</td>
 										</tr>
 										<tr>
 											<td className="dev-label">タイトル</td>
 											<td>
-												{/* title-input: タイトルフィールド（任意。バックエンド未対応） */}
-												<input type="text" id="title-input" placeholder="" />
+												{/* title-input: タイトルフィールド（任意） */}
+												<input
+													type="text"
+													name="title"
+													id="title-input"
+													placeholder=""
+												/>
 											</td>
 										</tr>
 										<tr>
@@ -611,9 +700,10 @@ export default async function DevBoardPage({
 										<tr>
 											<td className="dev-label">ホームページ</td>
 											<td>
-												{/* url-input: URLフィールド（任意。バックエンド未対応） */}
+												{/* url-input: URLフィールド（任意） */}
 												<input
 													type="text"
+													name="url"
 													id="url-input"
 													placeholder="http://"
 												/>
@@ -627,6 +717,11 @@ export default async function DevBoardPage({
 													className="dev-submit"
 													id="submit-button"
 												>
+													<img
+														src="/dev/icons/pencil.png"
+														alt=""
+														className="dev-icon"
+													/>
 													投稿する
 												</button>
 											</td>
@@ -645,35 +740,98 @@ export default async function DevBoardPage({
 							{posts.length === 0 ? (
 								<p style={{ color: "#808080" }}>まだ書き込みがありません。</p>
 							) : (
-								posts.map((post, index) => (
-									<div
-										key={post.id}
-										id={`post-${post.id}`}
-										className="dev-post"
-									>
-										{/* タイトル行: 通番＋タイトル（左寄せ） */}
-										<div className="dev-post-title-line">
-											<span className="dev-post-num" data-testid="post-number">
-												[{index + 1}]
-											</span>{" "}
-											<span data-testid="post-title">（無題）</span>
+								posts.map((post, index) => {
+									const postNumber =
+										totalCount - (currentPage - 1) * POSTS_PER_PAGE - index;
+									return (
+										<div
+											key={post.id}
+											id={`post-${post.id}`}
+											className="dev-post"
+										>
+											{/* タイトル行: 通番＋タイトル（左寄せ） */}
+											<div className="dev-post-title-line">
+												<span
+													className="dev-post-num"
+													data-testid="post-number"
+												>
+													[{postNumber}]
+												</span>{" "}
+												<span data-testid="post-title">
+													{post.title || "（無題）"}
+												</span>
+											</div>
+											{/* 投稿本文 */}
+											<div className="dev-post-body" data-testid="post-body">
+												{post.body}
+											</div>
+											{/* フッター行: 名前・日時・ホームページ（右寄せ） */}
+											<div className="dev-post-footer">
+												<span className="dev-post-name" data-testid="post-name">
+													{post.name}
+												</span>
+												{post.url && (
+													<span className="dev-post-url">
+														[
+														<a
+															href={post.url}
+															target="_blank"
+															rel="noopener noreferrer"
+														>
+															HP
+														</a>
+														]
+													</span>
+												)}
+												<span className="dev-post-date" data-testid="post-date">
+													{formatDate(post.createdAt)}
+												</span>
+											</div>
+											<hr className="dev-post-hr" />
 										</div>
-										{/* 投稿本文 */}
-										<div className="dev-post-body" data-testid="post-body">
-											{post.body}
-										</div>
-										{/* フッター行: 名前・日時・ホームページ（右寄せ） */}
-										<div className="dev-post-footer">
-											<span className="dev-post-name" data-testid="post-name">
-												{post.name}
-											</span>
-											<span className="dev-post-date" data-testid="post-date">
-												{formatDate(post.createdAt)}
-											</span>
-										</div>
-										<hr className="dev-post-hr" />
-									</div>
-								))
+									);
+								})
+							)}
+
+							{/* =====================================================
+							    ページ送り — CGI掲示板風 [1] [2] [3] [次へ>>]
+							    See: features/dev_board.feature @書き込みが10件ごとにページ分割される
+							    ===================================================== */}
+							{totalPages > 1 && (
+								<div className="dev-pager">
+									{currentPage > 1 && (
+										<a href={`/dev?page=${currentPage - 1}`}>
+											<img
+												src="/dev/icons/back.png"
+												alt=""
+												className="dev-icon"
+											/>
+											前へ
+										</a>
+									)}
+									{Array.from({ length: totalPages }, (_, i) => i + 1).map(
+										(p) =>
+											p === currentPage ? (
+												<span key={p} className="dev-pager-current">
+													[{p}]
+												</span>
+											) : (
+												<a key={p} href={`/dev?page=${p}`}>
+													[{p}]
+												</a>
+											),
+									)}
+									{currentPage < totalPages && (
+										<a href={`/dev?page=${currentPage + 1}`}>
+											次へ
+											<img
+												src="/dev/icons/next.png"
+												alt=""
+												className="dev-icon"
+											/>
+										</a>
+									)}
+								</div>
 							)}
 
 							{/* フッター */}

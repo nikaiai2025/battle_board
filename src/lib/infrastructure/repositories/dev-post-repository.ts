@@ -25,8 +25,12 @@ export interface DevPost {
 	id: number;
 	/** 投稿者名。未入力時は「名無しさん」 */
 	name: string;
+	/** 投稿タイトル。未入力時は空文字 */
+	title: string;
 	/** 投稿本文 */
 	body: string;
+	/** 投稿者のホームページURL。未入力時は空文字 */
+	url: string;
 	/** 投稿日時 */
 	createdAt: Date;
 }
@@ -35,7 +39,9 @@ export interface DevPost {
 interface DevPostRow {
 	id: number;
 	name: string;
+	title: string;
 	body: string;
+	url: string;
 	created_at: string;
 }
 
@@ -50,7 +56,9 @@ function rowToDevPost(row: DevPostRow): DevPost {
 	return {
 		id: row.id,
 		name: row.name,
+		title: row.title,
 		body: row.body,
+		url: row.url,
 		createdAt: new Date(row.created_at),
 	};
 }
@@ -60,19 +68,40 @@ function rowToDevPost(row: DevPostRow): DevPost {
 // ---------------------------------------------------------------------------
 
 /**
- * 開発連絡板の投稿一覧を新しい順で取得する。
+ * 開発連絡板の総投稿件数を取得する。
+ *
+ * See: features/dev_board.feature @書き込みが10件ごとにページ分割される
+ *
+ * @returns 総投稿件数
+ */
+export async function count(): Promise<number> {
+	const { count: total, error } = await supabaseAdmin
+		.from("dev_posts")
+		.select("*", { count: "exact", head: true });
+
+	if (error) {
+		throw new Error(`DevPostRepository.count failed: ${error.message}`);
+	}
+
+	return total ?? 0;
+}
+
+/**
+ * 開発連絡板の投稿一覧を新しい順で取得する（ページネーション対応）。
  *
  * See: features/dev_board.feature @書き込みが新しい順に通番付きで表示される
+ * See: features/dev_board.feature @書き込みが10件ごとにページ分割される
  *
- * @param limit - 取得件数上限（デフォルト 100）
+ * @param limit - 取得件数上限（デフォルト 10）
+ * @param offset - 取得開始位置（デフォルト 0）
  * @returns DevPost 配列（created_at DESC ソート済み）
  */
-export async function findAll(limit = 100): Promise<DevPost[]> {
+export async function findAll(limit = 10, offset = 0): Promise<DevPost[]> {
 	const { data, error } = await supabaseAdmin
 		.from("dev_posts")
 		.select("*")
 		.order("created_at", { ascending: false })
-		.limit(limit);
+		.range(offset, offset + limit - 1);
 
 	if (error) {
 		throw new Error(`DevPostRepository.findAll failed: ${error.message}`);
@@ -90,10 +119,15 @@ export async function findAll(limit = 100): Promise<DevPost[]> {
  * @param body - 投稿本文（空文字は Service 層でバリデーション済み）
  * @returns 挿入された DevPost
  */
-export async function insert(name: string, body: string): Promise<DevPost> {
+export async function insert(
+	name: string,
+	title: string,
+	body: string,
+	url: string,
+): Promise<DevPost> {
 	const { data, error } = await supabaseAdmin
 		.from("dev_posts")
-		.insert({ name, body })
+		.insert({ name, title, body, url })
 		.select()
 		.single();
 

@@ -136,6 +136,11 @@ border-bottom: 2px solid #ffffff;
 - 本文は左に20px程度のインデント
 - レス間の区切りは余白のみ（罫線なし）
 
+## アイコン素材
+
+16x16px のドット絵アイコンが `public/dev/icons/` に配置されている（自作、著作権フリー）。
+追加・修正したいアイコンがあればドットパターンを編集して `node ゴミ箱/generate-icons.mjs` で再生成できる。
+
 ## 参考資料
 
 - [平成レトロWebデザイン再現 (ACEWEB)](https://aceweb.jp/column/heiseiretro/)

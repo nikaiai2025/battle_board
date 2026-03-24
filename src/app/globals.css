@@ -125,126 +125,129 @@
 }
 
 /*
- * オーシャンテーマ（有料）
- * 深海をイメージした深いネイビー × シアンアクセント。
- * ダークベースで目に優しく、掲示板の長時間閲覧に適する。
+ * オーシャンテーマ（有料・ダーク系）
+ * 深海の静けさをイメージしたダークブルーグレー。
+ * 落ち着いたスレートブルーの下地に、くすんだティールのアクセント。
+ * background(0.25) → card(0.32) の明度差で面の階層を表現。
  * See: src/lib/domain/models/theme.ts THEME_CATALOG
  */
 .ocean,
 :root:has(.ocean) {
-  --background: oklch(0.175 0.03 250);
-  --foreground: oklch(0.94 0.01 230);
-  --card: oklch(0.22 0.035 250);
-  --card-foreground: oklch(0.94 0.01 230);
-  --popover: oklch(0.22 0.035 250);
-  --popover-foreground: oklch(0.94 0.01 230);
-  --primary: oklch(0.74 0.14 200);
-  --primary-foreground: oklch(0.15 0.03 250);
-  --secondary: oklch(0.27 0.04 250);
-  --secondary-foreground: oklch(0.92 0.01 230);
-  --muted: oklch(0.27 0.035 250);
-  --muted-foreground: oklch(0.65 0.04 230);
-  --accent: oklch(0.30 0.05 215);
-  --accent-foreground: oklch(0.92 0.01 230);
-  --destructive: oklch(0.68 0.19 25);
-  --border: oklch(0.34 0.04 250);
-  --input: oklch(0.30 0.04 250);
-  --ring: oklch(0.65 0.12 210);
-  --chart-1: oklch(0.74 0.14 200);
-  --chart-2: oklch(0.62 0.16 220);
-  --chart-3: oklch(0.55 0.18 240);
-  --chart-4: oklch(0.50 0.15 260);
-  --chart-5: oklch(0.45 0.12 270);
-  --sidebar: oklch(0.20 0.035 250);
-  --sidebar-foreground: oklch(0.94 0.01 230);
-  --sidebar-primary: oklch(0.74 0.14 200);
-  --sidebar-primary-foreground: oklch(0.15 0.03 250);
-  --sidebar-accent: oklch(0.27 0.04 250);
-  --sidebar-accent-foreground: oklch(0.92 0.01 230);
-  --sidebar-border: oklch(0.34 0.04 250);
-  --sidebar-ring: oklch(0.55 0.08 220);
+  --background: oklch(0.25 0.025 235);
+  --foreground: oklch(0.92 0.010 225);
+  --card: oklch(0.38 0.030 225);
+  --card-foreground: oklch(0.92 0.010 225);
+  --popover: oklch(0.38 0.030 225);
+  --popover-foreground: oklch(0.92 0.010 225);
+  --primary: oklch(0.65 0.06 215);
+  --primary-foreground: oklch(0.20 0.02 235);
+  --secondary: oklch(0.30 0.020 232);
+  --secondary-foreground: oklch(0.88 0.010 228);
+  --muted: oklch(0.30 0.018 230);
+  --muted-foreground: oklch(0.62 0.02 228);
+  --accent: oklch(0.33 0.025 220);
+  --accent-foreground: oklch(0.90 0.010 225);
+  --destructive: oklch(0.60 0.14 25);
+  --border: oklch(0.38 0.020 232);
+  --input: oklch(0.30 0.020 232);
+  --ring: oklch(0.65 0.06 215);
+  --chart-1: oklch(0.65 0.06 215);
+  --chart-2: oklch(0.58 0.05 200);
+  --chart-3: oklch(0.52 0.04 250);
+  --chart-4: oklch(0.60 0.04 190);
+  --chart-5: oklch(0.55 0.05 240);
+  --sidebar: oklch(0.22 0.028 236);
+  --sidebar-foreground: oklch(0.92 0.010 225);
+  --sidebar-primary: oklch(0.65 0.06 215);
+  --sidebar-primary-foreground: oklch(0.20 0.02 235);
+  --sidebar-accent: oklch(0.30 0.020 232);
+  --sidebar-accent-foreground: oklch(0.88 0.010 228);
+  --sidebar-border: oklch(0.35 0.020 233);
+  --sidebar-ring: oklch(0.60 0.05 218);
 }
 
 /*
- * フォレストテーマ（有料）
- * 深い森をイメージした落ち着いたグリーン × ウォームアクセント。
- * 木漏れ日のような温かみのある暗色配色。
+ * フォレストテーマ（有料・ライト系）
+ * 木漏れ日の差す森をイメージした淡いセージグリーン。
+ * グレイッシュなモスグリーンの下地に、白に近いカード面。
+ * background(0.90) → card(0.97) の明度差で面の階層を表現。
  * See: src/lib/domain/models/theme.ts THEME_CATALOG
  */
 .forest,
 :root:has(.forest) {
-  --background: oklch(0.175 0.025 150);
-  --foreground: oklch(0.93 0.015 100);
-  --card: oklch(0.22 0.03 148);
-  --card-foreground: oklch(0.93 0.015 100);
-  --popover: oklch(0.22 0.03 148);
-  --popover-foreground: oklch(0.93 0.015 100);
-  --primary: oklch(0.70 0.14 152);
-  --primary-foreground: oklch(0.15 0.025 150);
-  --secondary: oklch(0.27 0.03 148);
-  --secondary-foreground: oklch(0.91 0.015 100);
-  --muted: oklch(0.27 0.025 145);
-  --muted-foreground: oklch(0.63 0.04 140);
-  --accent: oklch(0.30 0.04 130);
-  --accent-foreground: oklch(0.91 0.015 100);
-  --destructive: oklch(0.68 0.17 30);
-  --border: oklch(0.33 0.035 148);
-  --input: oklch(0.30 0.03 148);
-  --ring: oklch(0.60 0.10 155);
-  --chart-1: oklch(0.70 0.14 152);
-  --chart-2: oklch(0.62 0.12 135);
-  --chart-3: oklch(0.55 0.10 120);
-  --chart-4: oklch(0.65 0.09 85);
-  --chart-5: oklch(0.50 0.08 160);
-  --sidebar: oklch(0.20 0.03 148);
-  --sidebar-foreground: oklch(0.93 0.015 100);
-  --sidebar-primary: oklch(0.70 0.14 152);
-  --sidebar-primary-foreground: oklch(0.15 0.025 150);
-  --sidebar-accent: oklch(0.27 0.03 148);
-  --sidebar-accent-foreground: oklch(0.91 0.015 100);
-  --sidebar-border: oklch(0.33 0.035 148);
-  --sidebar-ring: oklch(0.52 0.07 150);
+  --background: oklch(0.90 0.022 148);
+  --foreground: oklch(0.22 0.020 155);
+  --card: oklch(0.97 0.006 145);
+  --card-foreground: oklch(0.22 0.020 155);
+  --popover: oklch(0.97 0.006 145);
+  --popover-foreground: oklch(0.22 0.020 155);
+  --primary: oklch(0.48 0.06 158);
+  --primary-foreground: oklch(0.97 0.005 150);
+  --secondary: oklch(0.92 0.014 145);
+  --secondary-foreground: oklch(0.28 0.020 150);
+  --muted: oklch(0.91 0.016 146);
+  --muted-foreground: oklch(0.48 0.020 150);
+  --accent: oklch(0.88 0.022 130);
+  --accent-foreground: oklch(0.26 0.020 150);
+  --destructive: oklch(0.55 0.12 25);
+  --border: oklch(0.84 0.020 145);
+  --input: oklch(0.89 0.014 146);
+  --ring: oklch(0.48 0.06 158);
+  --chart-1: oklch(0.48 0.06 158);
+  --chart-2: oklch(0.55 0.05 135);
+  --chart-3: oklch(0.50 0.04 170);
+  --chart-4: oklch(0.58 0.04 110);
+  --chart-5: oklch(0.45 0.05 162);
+  --sidebar: oklch(0.88 0.024 148);
+  --sidebar-foreground: oklch(0.22 0.020 155);
+  --sidebar-primary: oklch(0.48 0.06 158);
+  --sidebar-primary-foreground: oklch(0.97 0.005 150);
+  --sidebar-accent: oklch(0.90 0.016 145);
+  --sidebar-accent-foreground: oklch(0.28 0.020 150);
+  --sidebar-border: oklch(0.84 0.020 145);
+  --sidebar-ring: oklch(0.48 0.05 158);
 }
 
 /*
- * サンセットテーマ（有料）
- * 夕焼けをイメージした深いウォームブラウン × アンバー/ローズアクセント。
- * 温かみのある暗色で、夜間の閲覧に最適。
+ * サンドテーマ（有料・ライト系）
+ * 砂浜の温もりをイメージした淡いサンドベージュ。
+ * やわらかな暖色の下地に、クリームホワイトのカード面。
+ * background(0.90) → card(0.97) の明度差で面の階層を表現。
  * See: src/lib/domain/models/theme.ts THEME_CATALOG
  */
-.sunset,
-:root:has(.sunset) {
-  --background: oklch(0.17 0.02 45);
-  --foreground: oklch(0.94 0.015 75);
-  --card: oklch(0.22 0.025 42);
-  --card-foreground: oklch(0.94 0.015 75);
-  --popover: oklch(0.22 0.025 42);
-  --popover-foreground: oklch(0.94 0.015 75);
-  --primary: oklch(0.78 0.145 65);
-  --primary-foreground: oklch(0.15 0.02 45);
-  --secondary: oklch(0.27 0.03 42);
-  --secondary-foreground: oklch(0.92 0.015 75);
-  --muted: oklch(0.27 0.025 40);
-  --muted-foreground: oklch(0.63 0.04 55);
-  --accent: oklch(0.30 0.045 20);
-  --accent-foreground: oklch(0.92 0.015 75);
-  --destructive: oklch(0.65 0.20 25);
-  --border: oklch(0.33 0.03 42);
-  --input: oklch(0.30 0.03 42);
-  --ring: oklch(0.65 0.12 55);
-  --chart-1: oklch(0.78 0.145 65);
-  --chart-2: oklch(0.68 0.15 40);
-  --chart-3: oklch(0.60 0.16 20);
-  --chart-4: oklch(0.55 0.13 5);
-  --chart-5: oklch(0.50 0.10 350);
-  --sidebar: oklch(0.20 0.025 42);
-  --sidebar-foreground: oklch(0.94 0.015 75);
-  --sidebar-primary: oklch(0.78 0.145 65);
-  --sidebar-primary-foreground: oklch(0.15 0.02 45);
-  --sidebar-accent: oklch(0.27 0.03 42);
-  --sidebar-accent-foreground: oklch(0.92 0.015 75);
-  --sidebar-border: oklch(0.33 0.03 42);
-  --sidebar-ring: oklch(0.55 0.08 50);
+.sand,
+:root:has(.sand) {
+  --background: oklch(0.90 0.022 62);
+  --foreground: oklch(0.24 0.020 50);
+  --card: oklch(0.97 0.008 58);
+  --card-foreground: oklch(0.24 0.020 50);
+  --popover: oklch(0.97 0.008 58);
+  --popover-foreground: oklch(0.24 0.020 50);
+  --primary: oklch(0.52 0.06 45);
+  --primary-foreground: oklch(0.97 0.005 55);
+  --secondary: oklch(0.92 0.016 58);
+  --secondary-foreground: oklch(0.28 0.020 48);
+  --muted: oklch(0.91 0.016 60);
+  --muted-foreground: oklch(0.50 0.020 52);
+  --accent: oklch(0.88 0.024 42);
+  --accent-foreground: oklch(0.26 0.020 48);
+  --destructive: oklch(0.52 0.12 20);
+  --border: oklch(0.84 0.020 58);
+  --input: oklch(0.89 0.016 60);
+  --ring: oklch(0.52 0.06 45);
+  --chart-1: oklch(0.52 0.06 45);
+  --chart-2: oklch(0.58 0.05 65);
+  --chart-3: oklch(0.48 0.05 30);
+  --chart-4: oklch(0.56 0.04 80);
+  --chart-5: oklch(0.50 0.04 15);
+  --sidebar: oklch(0.88 0.024 62);
+  --sidebar-foreground: oklch(0.24 0.020 50);
+  --sidebar-primary: oklch(0.52 0.06 45);
+  --sidebar-primary-foreground: oklch(0.97 0.005 55);
+  --sidebar-accent: oklch(0.90 0.018 58);
+  --sidebar-accent-foreground: oklch(0.28 0.020 48);
+  --sidebar-border: oklch(0.84 0.020 58);
+  --sidebar-ring: oklch(0.52 0.05 45);
 }
 
 @layer base {

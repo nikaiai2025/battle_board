@@ -8,7 +8,7 @@
 
 CREATE TABLE IF NOT EXISTS dev_posts (
   id         SERIAL      PRIMARY KEY,
-  name       TEXT        NOT NULL DEFAULT '名無しさん',
+  name       TEXT        NOT NULL,
   body       TEXT        NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

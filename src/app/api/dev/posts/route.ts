@@ -21,7 +21,9 @@ import { createPost } from "@/lib/services/dev-post-service";
  *
  * フォームフィールド:
  *   - name: 投稿者名（任意。空の場合は「名無しさん」）
+ *   - title: 投稿タイトル（任意）
  *   - body: 投稿本文（必須）
+ *   - url: 投稿者のホームページURL（任意）
  *
  * See: features/dev_board.feature @認証なしで書き込みができる
  *
@@ -41,10 +43,12 @@ export async function POST(req: NextRequest): Promise<Response> {
 	}
 
 	const name = (formData.get("name") as string) ?? "";
+	const title = (formData.get("title") as string) ?? "";
 	const body = (formData.get("body") as string) ?? "";
+	const url = (formData.get("url") as string) ?? "";
 
 	try {
-		await createPost(name, body);
+		await createPost(name, title, body, url);
 	} catch (err) {
 		// バリデーションエラー（本文が空など）の場合はエラーパラメータ付きでリダイレクト
 		const message = err instanceof Error ? err.message : "投稿に失敗しました";
