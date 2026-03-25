@@ -1,10 +1,23 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-25
+> 最終更新: 2026-03-26
 
 ## 現在のフェーズ
 
-**Sprint-119 完了 — BOT !wコマンド FK制約違反修正**
+**Sprint-120 完了 — !newspaper 403修正 + BOT !w 本番復旧**
+
+### Sprint-120の成果
+- TASK-317: !newspaper GitHub workflow_dispatch 403修正
+  - `github-workflow-trigger.ts` に `User-Agent: "BattleBoard-Worker"` ヘッダ追加
+  - CF Workers の fetch は User-Agent を自動付与しないため、GitHub API 必須要件を満たせていなかった
+- TASK-318: welcome bot !w 診断・本番復旧確認
+  - BOT !w 統合テスト14件追加（GrassHandler単体/CommandService経由/PostService経由の3レベル）
+  - `[BOT-DIAG]` 診断ログ追加（post-service.ts, command-service.ts）
+  - テスト環境ではバグ再現せず。CFの再デプロイによりワーカーインスタンスがリフレッシュされ問題解消
+  - 根本修正はSprint-119（isBotGiver フラグ）
+- vitest: 1891テスト 全PASS / cucumber-js: 331 passed, 16 pending
+- コミット: dbb7b74
+- 本番スモーク: **29/34 PASS**（5件は設計上のスキップ）
 
 ### Sprint-119の成果
 - TASK-316: GrassHandler BOT草付与パス実装
