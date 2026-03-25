@@ -73,6 +73,8 @@ describe("triggerWorkflow", () => {
 			expect(headers.Authorization).toBe("Bearer ghp_test_token_123");
 			expect(headers.Accept).toBe("application/vnd.github+json");
 			expect(headers["X-GitHub-Api-Version"]).toBe("2022-11-28");
+			// GitHub API は User-Agent ヘッダを必須とする。未設定時は HTTP 403 になる
+			expect(headers["User-Agent"]).toBeTruthy();
 
 			// ボディの検証
 			expect(JSON.parse(options.body as string)).toEqual({ ref: "main" });

@@ -731,6 +731,17 @@ export class CommandService {
 		// See: docs/architecture/components/command.md §2.3 コマンド解析仕様
 		let parsed = parseCommand(input.rawCommand, this.registeredCommandNames);
 
+		// [BOT-DIAG] BOT書き込み時のパーサー結果を記録（問題解決後に除去する）
+		if (input.isBotGiver) {
+			console.error("[CommandService][BOT-DIAG] parseCommand result:", {
+				hasParsed: parsed !== null,
+				parsedName: parsed?.name ?? null,
+				parsedArgs: parsed?.args ?? null,
+				registeredCommands: this.registeredCommandNames,
+				rawCommandPreview: input.rawCommand.substring(0, 80),
+			});
+		}
+
 		if (!parsed) {
 			// コマンドが存在しない（通常の書き込み）
 			return null;

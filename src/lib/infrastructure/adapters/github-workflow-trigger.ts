@@ -64,6 +64,10 @@ export async function triggerWorkflow(workflowFile: string): Promise<void> {
 			Accept: "application/vnd.github+json",
 			"X-GitHub-Api-Version": GITHUB_API_VERSION,
 			"Content-Type": "application/json",
+			// GitHub API は User-Agent ヘッダを必須とする。
+			// Cloudflare Workers の fetch は自動付与しないため明示的に指定する。
+			// 未指定時は HTTP 403 "Request forbidden by administrative rules" が返る。
+			"User-Agent": "BattleBoard-Worker",
 		},
 		body: JSON.stringify({ ref: "main" }),
 	});
