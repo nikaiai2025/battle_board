@@ -458,17 +458,6 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// See: tmp/workers/bdd-architect_TASK-147/analysis.md §4.2 Step 3
 	const cmdService = getCommandService();
 	if (!isSystemMessage && cmdService) {
-		// [BOT-DIAG] BOT書き込み時の診断ログ（問題解決後に除去する）
-		if (input.isBotWrite) {
-			console.error("[PostService][BOT-DIAG] executeCommand input:", {
-				isBotWrite: input.isBotWrite,
-				isBotGiver: true,
-				botUserId: input.botUserId,
-				threadId: input.threadId,
-				bodyPreview: input.body.substring(0, 80),
-				cmdServiceExists: !!cmdService,
-			});
-		}
 		try {
 			commandResult = await cmdService.executeCommand({
 				rawCommand: input.body,
@@ -485,32 +474,11 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				// See: tmp/reports/debug_TASK-DEBUG-119.md
 				...(input.isBotWrite ? { isBotGiver: true } : {}),
 			});
-			// [BOT-DIAG] コマンド実行結果の診断ログ
-			if (input.isBotWrite) {
-				console.error("[PostService][BOT-DIAG] executeCommand result:", {
-					success: commandResult?.success,
-					systemMessage: commandResult?.systemMessage,
-					hasResult: commandResult !== null,
-				});
-			}
 		} catch (err) {
 			// コマンド実行失敗は書き込みを巻き戻さない
 			// See: docs/architecture/components/posting.md §1 分割方針
 			console.error("[PostService] CommandService.executeCommand failed:", err);
-			// [BOT-DIAG] エラー詳細の診断ログ
-			if (input.isBotWrite) {
-				console.error("[PostService][BOT-DIAG] executeCommand error:", {
-					errorType: err instanceof Error ? err.constructor.name : typeof err,
-					errorMessage: err instanceof Error ? err.message : String(err),
-				});
-			}
 		}
-	} else if (input.isBotWrite) {
-		// [BOT-DIAG] コマンドパイプラインがスキップされた理由を記録
-		console.error("[PostService][BOT-DIAG] executeCommand SKIPPED:", {
-			isSystemMessage,
-			cmdServiceExists: !!cmdService,
-		});
 	}
 
 	// Step 5.5: ステルス処理（本文除去 + フィールド上書き）

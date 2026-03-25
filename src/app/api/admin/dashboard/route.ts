@@ -33,12 +33,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 		// 管理者セッション検証
 		const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
 		if (!sessionToken) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+			return NextResponse.json(
+				{ error: "FORBIDDEN", message: "管理者権限が必要です" },
+				{ status: 403 },
+			);
 		}
 
 		const admin = await verifyAdminSession(sessionToken);
 		if (!admin) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+			return NextResponse.json(
+				{ error: "FORBIDDEN", message: "管理者権限が必要です" },
+				{ status: 403 },
+			);
 		}
 
 		const { searchParams } = new URL(request.url);

@@ -44,6 +44,14 @@ components:
       name: X-Bot-API-Key
       description: 運営ボット用サービスアカウントAPIキー
 
+    internalBearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Internal API 専用認証。GitHub Actions cron ジョブのみが呼び出す。
+        Authorization: Bearer {BOT_API_KEY} ヘッダで送信する。
+        BOT_API_KEY は環境変数で管理される（クライアントサイドに含めることを禁止）。
+
   # =============================================
   # スキーマ定義
   # =============================================
@@ -302,6 +310,534 @@ paths:
                 type: string
         "400":
           description: 認証失敗（Turnstile検証失敗）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # 認証: 本登録・ログイン
+  # -----------------------------------------
+  /api/auth/register:
+    post:
+      operationId: registerWithEmail
+      summary: メール本登録申請
+      description: |
+        仮ユーザー（edge-token認証済み）がメールアドレスとパスワードで本登録を申請する。
+        確認メールが送信される。本登録完了は /api/auth/confirm で処理される。
+      tags: [認証]
+      security:
+        - edgeTokenCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                redirectTo:
+                  type: string
+                  description: "メール確認後のリダイレクト先URL（省略時: /mypage）"
+              required: [email, password]
+      responses:
+        "200":
+          description: 確認メール送信済み
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: 確認メールを送信しました
+        "400":
+          description: バリデーションエラー（メール形式不正、パスワード8文字未満等）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+        "401":
+          description: 未認証（edge-tokenなし、または無効）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+        "409":
+          description: 重複（既に本登録済み、またはメールアドレス使用中）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                  reason:
+                    type: string
+                    enum: [already_registered, email_taken]
+
+  /api/auth/register/discord:
+    post:
+      operationId: registerWithDiscord
+      summary: Discord本登録開始
+      description: |
+        仮ユーザー（edge-token認証済み）がDiscordアカウントで本登録を開始する。
+        Discord認可URLを返す。クライアントはそのURLにリダイレクトする。
+        コールバックは /api/auth/callback?flow=register で処理される。
+      tags: [認証]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: Discord認可URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  redirectUrl:
+                    type: string
+                    description: Discord認可画面のURL
+        "401":
+          description: 未認証（edge-tokenなし、または無効）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+        "500":
+          description: サービスエラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+
+  /api/auth/login:
+    post:
+      operationId: loginWithEmail
+      summary: メールアドレス・パスワードでログイン
+      description: |
+        本登録ユーザーがメールアドレスとパスワードでログインする。
+        成功時に edge-token Cookie を設定する。
+        ログインは当該デバイスに新規 edge-token を追加発行するだけ。既存トークンは影響なし。
+      tags: [認証]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required: [email, password]
+      responses:
+        "200":
+          description: ログイン成功。edge-token Cookieを設定
+          headers:
+            Set-Cookie:
+              description: edge-token Cookie（HttpOnly, SameSite=Lax, 365日）
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: バリデーションエラー（メール未指定等）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+        "401":
+          description: 認証失敗（メールアドレスまたはパスワードが誤り、または本登録未完了）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+
+  /api/auth/login/discord:
+    post:
+      operationId: loginWithDiscord
+      summary: Discordアカウントでログイン開始
+      description: |
+        Discordアカウントでのログインを開始する。
+        Discord認可URLを返す。クライアントはそのURLにリダイレクトする。
+        コールバックは /api/auth/callback?flow=login で処理される。
+        認証不要（パスワードを忘れたユーザーはedge-tokenを持たない場合がある）。
+      tags: [認証]
+      responses:
+        "200":
+          description: Discord認可URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  redirectUrl:
+                    type: string
+                    description: Discord認可画面のURL
+        "500":
+          description: サービスエラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+
+  /api/auth/logout:
+    post:
+      operationId: logout
+      summary: ログアウト
+      description: |
+        当該デバイスのセッション（edge-token）を破棄する。
+        他デバイスの edge-token は影響を受けない。
+        edge-token がない場合（未ログイン状態）でも 200 を返す（冪等性）。
+      tags: [認証]
+      responses:
+        "200":
+          description: ログアウト完了（または既にログアウト済み）
+          headers:
+            Set-Cookie:
+              description: edge-token Cookie削除（maxAge=0）
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /api/auth/callback:
+    get:
+      operationId: authCallback
+      summary: OAuthコールバック（Discord本登録/ログイン）
+      description: |
+        Supabase Auth の OAuth フロー（Discord）完了後のリダイレクト先。
+        2つのフローを処理する:
+        1. Discord本登録フロー: flow=register かつ userId あり
+        2. Discordログインフロー: flow=login または flow なし
+
+        成功時は /mypage にリダイレクトし edge-token Cookie を設定する。
+        失敗時は /auth/error にリダイレクトする。
+
+        注: メール確認フロー（email_confirm）は /api/auth/confirm で処理。
+      tags: [認証]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Supabase Auth コールバックコード
+        - name: flow
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [register, login]
+          description: フロー種別（"register" | "login" | なし）
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Discord本登録フロー時の仮ユーザーID（flow=register 時のみ）
+      responses:
+        "302":
+          description: リダイレクト（成功時は /mypage、失敗時は /auth/error）
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              description: edge-token Cookie（成功時のみ。HttpOnly, SameSite=Lax, 365日）
+              schema:
+                type: string
+
+  /api/auth/confirm:
+    get:
+      operationId: authConfirm
+      summary: メール確認・パスワード再設定トークン検証
+      description: |
+        Supabase のカスタムメールテンプレートから直接リンクされるエンドポイント。
+        token_hash を受け取り verifyOtp() でサーバーサイド検証する。
+
+        type=email: メール本登録確認。完了後 edge-token 発行し next へリダイレクト。
+        type=recovery: パスワード再設定確認。edge-token 発行し next（デフォルト: /auth/reset-password）へリダイレクト。
+      tags: [認証]
+      parameters:
+        - name: token_hash
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Supabase メール確認トークンハッシュ
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [email, recovery]
+          description: OTP種別
+        - name: next
+          in: query
+          required: false
+          schema:
+            type: string
+          description: "確認後のリダイレクト先パス（省略時: type=recoveryは/auth/reset-password、それ以外は/mypage）"
+      responses:
+        "302":
+          description: リダイレクト（成功時はnextパラメータ先、失敗時は/auth/error）
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              description: edge-token Cookie（成功時のみ。HttpOnly, SameSite=Lax, 365日）
+              schema:
+                type: string
+
+  /api/auth/reset-password:
+    post:
+      operationId: requestPasswordReset
+      summary: パスワード再設定メール送信
+      description: |
+        メールアドレスを指定してパスワード再設定リンクを送信する。
+        セキュリティ上、未登録メールアドレスの場合でも常に 200 を返す（ユーザー列挙攻撃防止）。
+        edge-token 認証不要。
+      tags: [認証]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required: [email]
+      responses:
+        "200":
+          description: 送信完了（未登録メールでも同一レスポンスを返す）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+        "400":
+          description: バリデーションエラー（メール未指定、形式不正）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+
+  /api/auth/update-password:
+    post:
+      operationId: updatePassword
+      summary: パスワード更新
+      description: |
+        パスワード再設定フローの最終ステップ。
+        /api/auth/confirm?type=recovery で edge-token を取得した後、
+        パスワード変更フォームからこのエンドポイントに新パスワードを送信する。
+        本登録済みユーザーのみ実行可能。
+      tags: [認証]
+      security:
+        - edgeTokenCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+              required: [password]
+      responses:
+        "200":
+          description: パスワード更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: バリデーションエラー（パスワード8文字未満等）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+        "401":
+          description: 未認証または本登録未完了
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+
+  /api/auth/pat:
+    get:
+      operationId: getPat
+      summary: PAT取得
+      description: |
+        現在のPAT（パーソナルアクセストークン）と最終使用日時を返す。
+        本登録済みユーザーのみアクセス可能。仮ユーザーは 403 を返す。
+      tags: [認証]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: PAT情報
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  patToken:
+                    type: string
+                    description: PAT文字列
+                  patLastUsedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: 最終使用日時（未使用時はnull）
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 仮ユーザー（本登録未完了のためPAT未発行）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: regeneratePat
+      summary: PAT再発行
+      description: |
+        PATを再発行する。旧PATは即時無効化される。
+        本登録済みユーザーのみアクセス可能。仮ユーザーは 403 を返す。
+      tags: [認証]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: 新しいPAT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  patToken:
+                    type: string
+                    description: 再発行されたPAT文字列
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 仮ユーザー（本登録未完了のためPAT再発行不可）
           content:
             application/json:
               schema:
@@ -1359,6 +1895,378 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------
+  # Internal API（サーバー間通信専用）
+  # Bearer認証: Authorization: Bearer {BOT_API_KEY}
+  # 呼び出し元: GitHub Actions cronジョブのみ
+  # -----------------------------------------
+  /api/internal/bot/execute:
+    post:
+      operationId: internalBotExecute
+      summary: BOT投稿実行（Internal）
+      description: |
+        GitHub Actions の bot-scheduler cron ジョブから呼ばれる Internal API。
+        投稿対象のBOT（is_active=true かつ next_post_at <= NOW()）を取得し、
+        各BOTに executeBotPost() を実行する。
+        Vercel Hobbyタイムアウト（10秒）対策で1回の実行上限は5BOTまで。
+        加えてチュートリアルBOTのpending処理と煽りBOTのpending処理も実行する。
+      tags: [Internal]
+      security:
+        - internalBearerAuth: []
+      responses:
+        "200":
+          description: 実行結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalDue:
+                    type: integer
+                    description: 投稿対象BOT総数
+                  processed:
+                    type: integer
+                    description: 今回処理したBOT数（上限5）
+                  successCount:
+                    type: integer
+                  failureCount:
+                    type: integer
+                  skippedCount:
+                    type: integer
+                    description: next_post_at 未到達でスキップされたBOT数
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        botId:
+                          type: string
+                          format: uuid
+                        success:
+                          type: boolean
+                        postId:
+                          type: string
+                          format: uuid
+                          nullable: true
+                        postNumber:
+                          type: integer
+                          nullable: true
+                        skipped:
+                          type: boolean
+                          nullable: true
+                        error:
+                          type: string
+                          nullable: true
+                  tutorials:
+                    description: チュートリアルBOT pending処理結果（処理失敗時はnull）
+                    nullable: true
+                  aori:
+                    description: 煽りBOT pending処理結果（処理失敗時はnull）
+                    nullable: true
+        "401":
+          description: 認証失敗（BOT_API_KEY不一致）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        "500":
+          description: 内部エラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+
+  /api/internal/daily-reset:
+    post:
+      operationId: internalDailyReset
+      summary: 日次リセット（Internal）
+      description: |
+        GitHub Actions の daily-maintenance cron ジョブから呼ばれる Internal API。
+        BotService.performDailyReset() を実行する。
+        処理内容: 日次ID再生成、BOTマークリセット、生存日数加算、撃破BOTの復活。
+      tags: [Internal]
+      security:
+        - internalBearerAuth: []
+      responses:
+        "200":
+          description: 日次リセット完了
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  botsRevealed:
+                    type: integer
+                    description: 告発により公開されたBOT数
+                  botsRevived:
+                    type: integer
+                    description: 撃破から復活したBOT数
+                  idsRegenerated:
+                    type: integer
+                    description: 日次ID再生成されたユーザー数
+                required: [success, botsRevealed, botsRevived, idsRegenerated]
+        "401":
+          description: 認証失敗（BOT_API_KEY不一致）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        "500":
+          description: 内部エラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+
+  /api/internal/daily-stats:
+    post:
+      operationId: internalDailyStats
+      summary: 日次統計集計（Internal）
+      description: |
+        GitHub Actions の daily-maintenance cron ジョブから呼ばれる Internal API。
+        指定日（デフォルト: 昨日）の統計を集計し、daily_stats テーブルに UPSERT する。
+        集計対象: ユーザー数・書き込み数・スレッド数・通貨流通量・告発数・攻撃数。
+      tags: [Internal]
+      security:
+        - internalBearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  format: date
+                  description: "集計対象日（YYYY-MM-DD形式。省略時: 昨日）"
+      responses:
+        "200":
+          description: 集計完了
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  targetDate:
+                    type: string
+                    format: date
+                  stats:
+                    type: object
+                    description: 集計結果（DailyStat）
+                    properties:
+                      stat_date:
+                        type: string
+                        format: date
+                      total_users:
+                        type: integer
+                      new_users:
+                        type: integer
+                      active_users:
+                        type: integer
+                      total_posts:
+                        type: integer
+                      total_threads:
+                        type: integer
+                      active_threads:
+                        type: integer
+                      currency_in_circulation:
+                        type: integer
+                      currency_granted:
+                        type: integer
+                      currency_consumed:
+                        type: integer
+                      total_accusations:
+                        type: integer
+                      total_attacks:
+                        type: integer
+                required: [success, targetDate, stats]
+        "400":
+          description: バリデーションエラー（dateの形式不正）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_DATE
+                  message:
+                    type: string
+        "401":
+          description: 認証失敗（BOT_API_KEY不一致）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        "500":
+          description: 内部エラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+
+  /api/internal/newspaper/pending:
+    get:
+      operationId: internalNewspaperPending
+      summary: newspaper未処理キュー取得（Internal）
+      description: |
+        GitHub Actions の newspaper-worker から呼ばれる Internal API。
+        pending_async_commands テーブルから "newspaper" エントリを全件返す。
+      tags: [Internal]
+      security:
+        - internalBearerAuth: []
+      responses:
+        "200":
+          description: pending一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pendingList:
+                    type: array
+                    items:
+                      type: object
+                      description: PendingAsyncCommand エンティティ
+        "401":
+          description: 認証失敗（BOT_API_KEY不一致）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        "500":
+          description: 内部エラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+
+  /api/internal/newspaper/complete:
+    post:
+      operationId: internalNewspaperComplete
+      summary: newspaper処理結果書き込み（Internal）
+      description: |
+        GitHub Actions の newspaper-worker から呼ばれる Internal API。
+        AI生成結果（成功または失敗）を受け取り、DB書き込みを行う。
+        成功時: 生成テキストをレスとして投稿。失敗時: 通貨を返却し pending を削除。
+      tags: [Internal]
+      security:
+        - internalBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pendingId:
+                  type: string
+                  format: uuid
+                  description: 処理対象のpending_async_commands ID
+                threadId:
+                  type: string
+                  format: uuid
+                  description: 投稿先スレッドID
+                invokerUserId:
+                  type: string
+                  format: uuid
+                  description: コマンド発行ユーザーID
+                success:
+                  type: boolean
+                  description: AI生成が成功したか
+                generatedText:
+                  type: string
+                  description: AI生成テキスト（success=true 時のみ）
+                error:
+                  type: string
+                  description: エラーメッセージ（success=false 時のみ）
+              required: [pendingId, threadId, invokerUserId, success]
+      responses:
+        "200":
+          description: 処理完了
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    properties:
+                      pendingId:
+                        type: string
+                        format: uuid
+                      success:
+                        type: boolean
+                      postId:
+                        type: string
+                        format: uuid
+                        nullable: true
+                        description: 投稿されたレスのID（success=true 時のみ）
+        "401":
+          description: 認証失敗（BOT_API_KEY不一致）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        "500":
+          description: 内部エラー
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
 
   # -----------------------------------------
   # 5ch専ブラ互換 API
