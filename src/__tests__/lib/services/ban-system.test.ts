@@ -48,9 +48,8 @@ vi.mock("@/lib/infrastructure/repositories/ip-ban-repository", () => ({
 }));
 
 vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
-	create: vi.fn(),
+	createWithAtomicNumber: vi.fn(),
 	findByThreadId: vi.fn(),
-	getNextPostNumber: vi.fn().mockResolvedValue(1),
 	findById: vi.fn(),
 }));
 

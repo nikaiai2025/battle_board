@@ -966,9 +966,8 @@ Given(
 		// See: features/thread.feature @固定スレッドに案内情報が含まれる
 		const PostRepository =
 			require("../../src/lib/infrastructure/repositories/post-repository") as typeof import("../../src/lib/infrastructure/repositories/post-repository");
-		await PostRepository.create({
+		await PostRepository.createWithAtomicNumber({
 			threadId: thread.id,
-			postNumber: 1,
 			authorId: null,
 			displayName: "案内板",
 			dailyId: "system",
@@ -1413,9 +1412,8 @@ Given(
 		const PostRepository =
 			require("../../src/lib/infrastructure/repositories/post-repository") as typeof import("../../src/lib/infrastructure/repositories/post-repository");
 		for (let i = 1; i <= postCount; i++) {
-			await PostRepository.create({
+			await PostRepository.createWithAtomicNumber({
 				threadId: thread.id,
-				postNumber: i,
 				authorId: this.currentUserId ?? null,
 				displayName: "名無しさん",
 				dailyId: "test-daily-id",

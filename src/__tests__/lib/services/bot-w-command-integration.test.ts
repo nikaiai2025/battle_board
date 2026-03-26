@@ -384,8 +384,7 @@ vi.mock("../../../lib/infrastructure/supabase/client", () => ({
 
 vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 	findByThreadId: vi.fn(),
-	getNextPostNumber: vi.fn(),
-	create: vi.fn(),
+	createWithAtomicNumber: vi.fn(),
 	countByAuthorId: vi.fn().mockResolvedValue(1),
 	findByThreadIdAndPostNumber: vi.fn(),
 }));
@@ -463,7 +462,7 @@ function createTestThread(): Thread {
 	};
 }
 
-/** PostRepository.create の返り値（BOT書き込み結果） */
+/** PostRepository.createWithAtomicNumber の返り値（BOT書き込み結果） */
 function createCreatedPost(overrides: Partial<Post> = {}): Post {
 	return {
 		id: "post-new-bot-001",
@@ -487,10 +486,10 @@ describe("Level 3: PostService 経由 — BOT !w フルパス統合", () => {
 
 		// スレッド存在
 		vi.mocked(ThreadRepository.findById).mockResolvedValue(createTestThread());
-		// レス番号採番
-		vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(6);
 		// レス作成成功
-		vi.mocked(PostRepository.create).mockResolvedValue(createCreatedPost());
+		vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+			createCreatedPost(),
+		);
 		// スレッドアクティブ件数
 		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
 	});
@@ -533,9 +532,10 @@ describe("Level 3: PostService 経由 — BOT !w フルパス統合", () => {
 		// 書き込み自体は成功するはず
 		expect(result).toHaveProperty("success", true);
 
-		// PostRepository.create に渡された inlineSystemInfo を検証する
+		// PostRepository.createWithAtomicNumber に渡された inlineSystemInfo を検証する
 		// これが null のままだとコマンド効果が発揮されていない
-		const createCall = vi.mocked(PostRepository.create).mock.calls[0];
+		const createCall = vi.mocked(PostRepository.createWithAtomicNumber).mock
+			.calls[0];
 		expect(createCall).toBeDefined();
 
 		const createArg = createCall[0];
@@ -561,7 +561,8 @@ describe("Level 3: PostService 経由 — BOT !w フルパス統合", () => {
 
 		expect(result).toHaveProperty("success", true);
 
-		const createCall = vi.mocked(PostRepository.create).mock.calls[0];
+		const createCall = vi.mocked(PostRepository.createWithAtomicNumber).mock
+			.calls[0];
 		expect(createCall).toBeDefined();
 		expect(createCall[0].authorId).toBeNull();
 	});
@@ -595,7 +596,8 @@ describe("Level 3: PostService 経由 — BOT !w フルパス統合", () => {
 		expect(result).toHaveProperty("success", true);
 
 		// しかし inlineSystemInfo は null（コマンド未実行）
-		const createCall = vi.mocked(PostRepository.create).mock.calls[0];
+		const createCall = vi.mocked(PostRepository.createWithAtomicNumber).mock
+			.calls[0];
 		expect(createCall).toBeDefined();
 		expect(createCall[0].inlineSystemInfo).toBeNull();
 	});
@@ -623,7 +625,8 @@ describe("Level 3: PostService 経由 — BOT !w フルパス統合", () => {
 		expect(result).toHaveProperty("success", true);
 
 		// inlineSystemInfo は null（コマンド実行失敗）
-		const createCall = vi.mocked(PostRepository.create).mock.calls[0];
+		const createCall = vi.mocked(PostRepository.createWithAtomicNumber).mock
+			.calls[0];
 		expect(createCall).toBeDefined();
 		expect(createCall[0].inlineSystemInfo).toBeNull();
 	});
@@ -648,7 +651,8 @@ describe("Level 3: PostService 経由 — BOT !w フルパス統合", () => {
 
 		expect(result).toHaveProperty("success", true);
 
-		const createCall = vi.mocked(PostRepository.create).mock.calls[0];
+		const createCall = vi.mocked(PostRepository.createWithAtomicNumber).mock
+			.calls[0];
 		expect(createCall).toBeDefined();
 		expect(createCall[0].inlineSystemInfo).toBeNull();
 	});

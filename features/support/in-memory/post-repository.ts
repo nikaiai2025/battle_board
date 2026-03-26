@@ -222,16 +222,24 @@ export async function findByThreadIdAndPostNumber(
 }
 
 /**
- * 次のレス番号を取得する（アトミック採番）。
+ * レス番号の原子採番 + レス作成を一体的に実行する。
+ * 本番実装の insert_post_with_next_number RPC に対応するインメモリ版。
  *
  * 同一スレッドへの並行呼び出しでは Promise チェーンにより直列実行する。
  * これにより JS の単一スレッド内でのレース競合を防ぐ。
  *
- * See: src/lib/infrastructure/repositories/post-repository.ts
+ * See: src/lib/infrastructure/repositories/post-repository.ts > createWithAtomicNumber
  * See: features/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
+ *
+ * @param post - 作成するレスのデータ（postNumber は自動採番されるため不要）
+ * @returns 作成された Post（自動採番された postNumber を含む）
  */
-export async function getNextPostNumber(threadId: string): Promise<number> {
-	assertUUID(threadId, "PostRepository.getNextPostNumber.threadId");
+export async function createWithAtomicNumber(
+	post: Omit<Post, "id" | "createdAt" | "isDeleted" | "postNumber">,
+): Promise<Post> {
+	assertUUID(post.threadId, "PostRepository.createWithAtomicNumber.threadId");
+	const threadId = post.threadId;
+
 	// 並行採番を直列化する。
 	// 初回（prevQueue が undefined）: store から現在の最大レス番号を取得して +1 する。
 	// 2回目以降: 前回返した番号に +1 する（store への書き込み完了を待たずに連番を保証）。
@@ -240,34 +248,24 @@ export async function getNextPostNumber(threadId: string): Promise<number> {
 	// See: features/posting.feature @2人が同時に書き込みを行ってもデータ不整合が発生しない
 	const prevQueue = numberingQueues.get(threadId);
 
-	let nextQueue: Promise<number>;
-	if (prevQueue === undefined) {
-		// 初回: store から現在の最大番号を読み取って +1
-		nextQueue = Promise.resolve(null).then(() => {
-			const maxNumber = Array.from(store.values())
-				.filter((p) => p.threadId === threadId)
-				.reduce((max, p) => Math.max(max, p.postNumber), 0);
-			return maxNumber + 1;
-		});
-	} else {
-		// 2回目以降: 前回の番号に +1（store 更新完了を待たず連番を割り当てる）
-		nextQueue = prevQueue.then((prev) => prev + 1);
-	}
+	const nextQueue: Promise<number> =
+		prevQueue === undefined
+			? Promise.resolve(null).then(() => {
+					const maxNumber = Array.from(store.values())
+						.filter((p) => p.threadId === threadId)
+						.reduce((max, p) => Math.max(max, p.postNumber), 0);
+					return maxNumber + 1;
+				})
+			: prevQueue.then((prev) => prev + 1);
 
 	// キューを nextQueue で更新して次回呼び出しの起点とする
 	numberingQueues.set(threadId, nextQueue);
-	return nextQueue;
-}
+	const postNumber = await nextQueue;
 
-/**
- * 新しいレスを作成する。
- * See: src/lib/infrastructure/repositories/post-repository.ts
- */
-export async function create(
-	post: Omit<Post, "id" | "createdAt" | "isDeleted">,
-): Promise<Post> {
+	// レスを store に追加する
 	const newPost: Post = {
 		...post,
+		postNumber,
 		id: crypto.randomUUID(),
 		isDeleted: false,
 		createdAt: new Date(Date.now()),

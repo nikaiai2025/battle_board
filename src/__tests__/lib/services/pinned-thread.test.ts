@@ -39,7 +39,7 @@ vi.mock("../../../lib/infrastructure/repositories/thread-repository", () => ({
 
 // PostRepository モック（書き込みが実際に行われないよう）
 vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
-	create: vi.fn().mockResolvedValue({
+	createWithAtomicNumber: vi.fn().mockResolvedValue({
 		id: "mock-post-id",
 		threadId: "normal-thread-id",
 		postNumber: 1,
@@ -53,7 +53,6 @@ vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 		createdAt: new Date(),
 	}),
 	findByThreadId: vi.fn().mockResolvedValue([]),
-	getNextPostNumber: vi.fn().mockResolvedValue(1),
 	// Step 6.5: 初回書き込み検出（ウェルカムシーケンス）
 	countByAuthorId: vi.fn().mockResolvedValue(1), // 2回目以降として扱う
 }));
@@ -106,6 +105,19 @@ vi.mock(
 		create: vi.fn().mockResolvedValue(undefined),
 	}),
 );
+
+// IncentiveLogRepository モック（TASK-323: キリ番ボーナスの遅延評価に伴うモック追加）
+vi.mock(
+	"../../../lib/infrastructure/repositories/incentive-log-repository",
+	() => ({
+		create: vi.fn().mockResolvedValue(null),
+	}),
+);
+
+// calcMilestonePostBonus モック（TASK-323: キリ番ボーナスの遅延評価に伴うモック追加）
+vi.mock("../../../lib/domain/rules/incentive-rules", () => ({
+	calcMilestonePostBonus: vi.fn().mockReturnValue(0),
+}));
 
 import type { Thread } from "../../../lib/domain/models/thread";
 import * as ThreadRepository from "../../../lib/infrastructure/repositories/thread-repository";

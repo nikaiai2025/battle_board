@@ -359,64 +359,41 @@ export async function findByThreadIdAndPostNumber(
 }
 
 /**
- * 次のレス番号（現在の最大 post_number + 1）を取得する。
- * レス番号採番に使用する。UNIQUE 制約（thread_id, post_number）が最終防衛線。
+ * レス番号の原子採番 + INSERT を RPC 1回で実行する。
+ * DB 側の insert_post_with_next_number 関数で threads テーブルの行ロック (FOR UPDATE)
+ * を取得し、採番と INSERT を単一トランザクション内で原子的に実行する。
+ * これにより、従来の getNextPostNumber (SELECT MAX+1) → create (INSERT) 間の
+ * TOCTOU 競合を解消する。
+ *
+ * UNIQUE 制約 (thread_id, post_number) は最終防衛線として維持する。
  *
  * See: docs/architecture/architecture.md §7.2 同時実行制御（レス番号採番）
+ * See: supabase/migrations/00031_insert_post_with_next_number.sql
+ * See: tmp/workers/bdd-architect_ATK-POST-001/assessment.md §3 推奨案
  *
- * @param threadId - スレッドの UUID
- * @returns 次のレス番号（スレッドにレスがない場合は 1）
+ * @param post - 作成するレスのデータ（postNumber は DB 側で自動採番するため不要）
+ * @returns 作成された Post（DB デフォルト値 + 採番済み postNumber を含む）
  */
-export async function getNextPostNumber(threadId: string): Promise<number> {
-	const { data, error } = await supabaseAdmin
-		.from("posts")
-		.select("post_number")
-		.eq("thread_id", threadId)
-		.order("post_number", { ascending: false })
-		.limit(1)
-		.maybeSingle();
+export async function createWithAtomicNumber(
+	post: Omit<Post, "id" | "createdAt" | "isDeleted" | "postNumber">,
+): Promise<Post> {
+	const { data, error } = await supabaseAdmin.rpc(
+		"insert_post_with_next_number",
+		{
+			p_thread_id: post.threadId,
+			p_author_id: post.authorId,
+			p_display_name: post.displayName,
+			p_daily_id: post.dailyId,
+			p_body: post.body,
+			p_inline_system_info: post.inlineSystemInfo,
+			p_is_system_message: post.isSystemMessage,
+		},
+	);
 
 	if (error) {
 		throw new Error(
-			`PostRepository.getNextPostNumber failed: ${error.message}`,
+			`PostRepository.createWithAtomicNumber failed: ${error.message}`,
 		);
-	}
-
-	// レスがまだ存在しない場合は 1 から開始する
-	if (!data) return 1;
-	return (data as { post_number: number }).post_number + 1;
-}
-
-/**
- * 新しいレスを作成する。
- * id / createdAt / isDeleted は DB のデフォルト値を使用する。
- *
- * LOW-002: inline_system_info を INSERT オブジェクトに追加。
- * コマンド結果やインセンティブ情報がレスに正しく保存されるようにする。
- *
- * @param post - 作成するレスのデータ（自動設定フィールドを除く）
- * @returns 作成された Post（DB デフォルト値を含む）
- */
-export async function create(
-	post: Omit<Post, "id" | "createdAt" | "isDeleted">,
-): Promise<Post> {
-	const { data, error } = await supabaseAdmin
-		.from("posts")
-		.insert({
-			thread_id: post.threadId,
-			post_number: post.postNumber,
-			author_id: post.authorId,
-			display_name: post.displayName,
-			daily_id: post.dailyId,
-			body: post.body,
-			inline_system_info: post.inlineSystemInfo,
-			is_system_message: post.isSystemMessage,
-		})
-		.select()
-		.single();
-
-	if (error) {
-		throw new Error(`PostRepository.create failed: ${error.message}`);
 	}
 
 	return rowToPost(data as PostRow);

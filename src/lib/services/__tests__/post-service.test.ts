@@ -20,9 +20,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
-	create: vi.fn(),
+	createWithAtomicNumber: vi.fn(),
 	findByThreadId: vi.fn(),
-	getNextPostNumber: vi.fn(),
 	findById: vi.fn(),
 	findByAuthorId: vi.fn(),
 	softDelete: vi.fn(),
@@ -103,6 +102,16 @@ vi.mock(
 		create: vi.fn().mockResolvedValue(undefined),
 	}),
 );
+
+// IncentiveLogRepository モック（TASK-323: キリ番ボーナスの遅延評価に伴うモック追加）
+vi.mock("@/lib/infrastructure/repositories/incentive-log-repository", () => ({
+	create: vi.fn().mockResolvedValue(null),
+}));
+
+// calcMilestonePostBonus モック（TASK-323: キリ番ボーナスの遅延評価に伴うモック追加）
+vi.mock("@/lib/domain/rules/incentive-rules", () => ({
+	calcMilestonePostBonus: vi.fn().mockReturnValue(0),
+}));
 
 // ---------------------------------------------------------------------------
 // インポート（モック宣言後）
@@ -264,8 +273,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -299,8 +309,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -316,8 +327,8 @@ describe("PostService", () => {
 					isBotWrite: false,
 				});
 
-				// PostRepository.create が「名無しさん」で呼ばれることを検証
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				// PostRepository.createWithAtomicNumber が「名無しさん」で呼ばれることを検証
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({ displayName: "名無しさん" }),
 				);
 			});
@@ -330,8 +341,7 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2);
-				vi.mocked(PostRepository.create).mockResolvedValue({
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 					...mockPost,
 					postNumber: 2,
 				});
@@ -352,7 +362,7 @@ describe("PostService", () => {
 				});
 
 				expect(generateDailyId).toHaveBeenCalled();
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({ dailyId: "xyz99999" }),
 				);
 			});
@@ -364,8 +374,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -410,8 +421,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-xyz",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockPremiumUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(premiumPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					premiumPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -427,7 +439,7 @@ describe("PostService", () => {
 					isBotWrite: false,
 				});
 
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({ displayName: "バトラー太郎" }),
 				);
 			});
@@ -439,8 +451,7 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue({
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 					...mockPost,
 					displayName: "テストユーザー",
 				});
@@ -460,7 +471,7 @@ describe("PostService", () => {
 					isBotWrite: false,
 				});
 
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({ displayName: "テストユーザー" }),
 				);
 			});
@@ -473,8 +484,9 @@ describe("PostService", () => {
 		describe("正常系: isBotWrite=true の場合は認証をスキップする", () => {
 			it("edgeToken が null でも書き込みが成功する", async () => {
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -501,8 +513,9 @@ describe("PostService", () => {
 				// See: features/bot_system.feature
 				// See: tmp/reports/INCIDENT-CRON500.md
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -634,8 +647,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -722,7 +736,7 @@ describe("PostService", () => {
 				});
 
 				expect(AuthService.verifyEdgeToken).not.toHaveBeenCalled();
-				expect(PostRepository.create).not.toHaveBeenCalled();
+				expect(PostRepository.createWithAtomicNumber).not.toHaveBeenCalled();
 			});
 		});
 
@@ -741,8 +755,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -764,12 +779,13 @@ describe("PostService", () => {
 				// See: tmp/workers/bdd-architect_TASK-070/analysis.md §4 方針A: 二段階評価
 				expect(result).toMatchObject({ success: true });
 				expect(IncentiveService.evaluateOnPost).toHaveBeenCalledTimes(2);
-				// Phase 1: 同期ボーナス（INSERT前、仮postId）
+				// Phase 1: 同期ボーナス（INSERT前、仮postId・仮postNumber=0）
+				// postNumber は RPC 前のため仮値 0 を使用する（TASK-323: 原子採番化）
 				expect(IncentiveService.evaluateOnPost).toHaveBeenNthCalledWith(
 					1,
 					expect.objectContaining({
 						threadId: "thread-001",
-						postNumber: 1,
+						postNumber: 0,
 					}),
 					{ phase: "sync" },
 				);
@@ -793,8 +809,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -845,8 +862,7 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2);
-				vi.mocked(PostRepository.create).mockResolvedValue({
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 					...mockPost,
 					postNumber: 2,
 					id: "post-002",
@@ -888,8 +904,7 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2);
-				vi.mocked(PostRepository.create).mockResolvedValue({
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 					...mockPost,
 					postNumber: 2,
 				});
@@ -941,8 +956,7 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2);
-				vi.mocked(PostRepository.create).mockResolvedValue({
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 					...mockPost,
 					postNumber: 2,
 				});
@@ -982,8 +996,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1044,8 +1059,7 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(5);
-				vi.mocked(PostRepository.create).mockResolvedValue({
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 					...mockPost,
 					postNumber: 5,
 					id: "post-005",
@@ -1093,12 +1107,13 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
 				const unicodePost = {
 					...mockPost,
 					body: "🎮テスト\n改行あり<script>xss</script>",
 				};
-				vi.mocked(PostRepository.create).mockResolvedValue(unicodePost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					unicodePost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1123,16 +1138,15 @@ describe("PostService", () => {
 		// -----------------------------------------------------------------------
 
 		describe("異常系: DB 障害時は例外が伝播する", () => {
-			it("PostRepository.create が失敗した場合は例外をスローする", async () => {
+			it("PostRepository.createWithAtomicNumber が失敗した場合は例外をスローする", async () => {
 				vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockRejectedValue(
-					new Error("PostRepository.create failed: DB障害"),
+				vi.mocked(PostRepository.createWithAtomicNumber).mockRejectedValue(
+					new Error("PostRepository.createWithAtomicNumber failed: DB障害"),
 				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
@@ -1149,7 +1163,7 @@ describe("PostService", () => {
 						ipHash: "seed-abc",
 						isBotWrite: false,
 					}),
-				).rejects.toThrow("PostRepository.create failed");
+				).rejects.toThrow("PostRepository.createWithAtomicNumber failed");
 			});
 		});
 
@@ -1168,8 +1182,9 @@ describe("PostService", () => {
 					authorIdSeed: "seed-abc",
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1194,7 +1209,7 @@ describe("PostService", () => {
 					isBotWrite: false,
 				});
 
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({ inlineSystemInfo: null }),
 				);
 			});
@@ -1228,7 +1243,7 @@ describe("PostService", () => {
 						userId: "user-001",
 					}),
 				);
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({
 						inlineSystemInfo: "!tell >>5 を実行しました",
 					}),
@@ -1256,7 +1271,7 @@ describe("PostService", () => {
 					isBotWrite: false,
 				});
 
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({ inlineSystemInfo: null }),
 				);
 				setCommandService(null);
@@ -1283,8 +1298,8 @@ describe("PostService", () => {
 
 				// CommandService.executeCommand は呼ばれない
 				expect(mockCommandService.executeCommand).not.toHaveBeenCalled();
-				// isSystemMessage=true が PostRepository.create に渡される
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				// isSystemMessage=true が PostRepository.createWithAtomicNumber に渡される
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({ isSystemMessage: true }),
 				);
 				setCommandService(null);
@@ -1362,13 +1377,14 @@ describe("PostService", () => {
 				});
 
 				// inlineSystemInfo にコマンド結果と報酬の両方が含まれる
-				expect(PostRepository.create).toHaveBeenCalledWith(
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 					expect.objectContaining({
 						inlineSystemInfo: expect.stringContaining("コマンド実行結果"),
 					}),
 				);
 				// 報酬メッセージも含まれる
-				const createCall = vi.mocked(PostRepository.create).mock.calls[0][0];
+				const createCall = vi.mocked(PostRepository.createWithAtomicNumber).mock
+					.calls[0][0];
 				expect(createCall.inlineSystemInfo).toContain("daily_login +10");
 
 				setCommandService(null);
@@ -1396,8 +1412,9 @@ describe("PostService", () => {
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1419,7 +1436,7 @@ describe("PostService", () => {
 				expect(result.thread).toBeDefined();
 				expect(result.firstPost).toBeDefined();
 				expect(ThreadRepository.create).toHaveBeenCalled();
-				expect(PostRepository.create).toHaveBeenCalled();
+				expect(PostRepository.createWithAtomicNumber).toHaveBeenCalled();
 			});
 
 			it("1レス目は post_number=1 である", async () => {
@@ -1430,8 +1447,9 @@ describe("PostService", () => {
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1525,8 +1543,9 @@ describe("PostService", () => {
 					...mockThread,
 					title: maxTitle,
 				});
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1582,8 +1601,9 @@ describe("PostService", () => {
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1620,8 +1640,9 @@ describe("PostService", () => {
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
-				vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-				vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
 				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 					undefined,
 				);
@@ -1699,8 +1720,9 @@ describe("PostService", () => {
 				authorIdSeed: "seed-abc",
 			});
 			vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
-			vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(2);
-			vi.mocked(PostRepository.create).mockResolvedValue(mockPost);
+			vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+				mockPost,
+			);
 			vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
 				undefined,
 			);

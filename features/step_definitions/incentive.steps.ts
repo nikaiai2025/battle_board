@@ -13,7 +13,6 @@ import type { ITestStepHookParameter } from "@cucumber/cucumber";
 import { BeforeStep, Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
 import type { IncentiveLog } from "../../src/lib/domain/models/incentive";
-import type { Post } from "../../src/lib/domain/models/post";
 import * as AuthService from "../../src/lib/services/auth-service";
 import * as CurrencyService from "../../src/lib/services/currency-service";
 import * as IncentiveService from "../../src/lib/services/incentive-service";
@@ -1125,23 +1124,15 @@ When(
 			existingPosts[0]?.dailyId ?? "dummy-same-user-daily-id";
 		const existingAuthorId = existingPosts[0]?.authorId ?? "dummy-user-0";
 
-		const postNumber = await InMemoryPostRepo.getNextPostNumber(
-			this.currentThreadId,
-		);
-		const newPost: Post = {
-			id: crypto.randomUUID(),
+		const newPost = await InMemoryPostRepo.createWithAtomicNumber({
 			threadId: this.currentThreadId,
-			postNumber,
 			authorId: existingAuthorId,
 			displayName: "名無しさん",
 			dailyId: existingDailyId,
 			body: `${postCountTarget}件目のレスです（同一ユーザー）`,
 			inlineSystemInfo: null,
 			isSystemMessage: false,
-			isDeleted: false,
-			createdAt: new Date(Date.now()),
-		};
-		InMemoryPostRepo._insert(newPost);
+		});
 		await InMemoryThreadRepo.incrementPostCount(this.currentThreadId);
 
 		// IncentiveService を直接呼んでボーナス判定を実施する
@@ -1151,7 +1142,7 @@ When(
 				postId: newPost.id,
 				threadId: this.currentThreadId,
 				userId: existingAuthorId,
-				postNumber,
+				postNumber: newPost.postNumber,
 				createdAt: newPost.createdAt,
 			});
 		}
@@ -1161,7 +1152,7 @@ When(
 			data: {
 				success: true,
 				postId: newPost.id,
-				postNumber,
+				postNumber: newPost.postNumber,
 				systemMessages: [],
 			},
 		};

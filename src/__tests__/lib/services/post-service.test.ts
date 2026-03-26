@@ -45,8 +45,7 @@ vi.mock("../../../lib/infrastructure/supabase/client", () => ({
 // PostRepository をモック化
 vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 	findByThreadId: vi.fn(),
-	getNextPostNumber: vi.fn(),
-	create: vi.fn(),
+	createWithAtomicNumber: vi.fn(),
 	countByAuthorId: vi.fn().mockResolvedValue(1), // デフォルト: 初回書き込みではない
 }));
 
@@ -271,10 +270,10 @@ describe("PostService.createPost — BOT書き込み", () => {
 
 		// スレッドは通常スレッド（固定でない）
 		vi.mocked(ThreadRepository.findById).mockResolvedValue(createTestThread());
-		// レス番号採番
-		vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
-		// レス作成（authorId=nullで返す）
-		vi.mocked(PostRepository.create).mockResolvedValue(createTestCreatedPost());
+		// レス番号の原子採番 + INSERT（authorId=nullで返す）
+		vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+			createTestCreatedPost(),
+		);
 		// スレッドのアクティブ件数
 		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
 	});
@@ -298,7 +297,7 @@ describe("PostService.createPost — BOT書き込み", () => {
 			botUserId: botId,
 		});
 
-		expect(PostRepository.create).toHaveBeenCalledWith(
+		expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 			expect.objectContaining({
 				authorId: null, // botsテーブルのIDではなくNULL
 			}),
@@ -348,7 +347,7 @@ describe("PostService.createPost — BOT書き込み", () => {
 			// botUserId 未指定
 		});
 
-		expect(PostRepository.create).toHaveBeenCalledWith(
+		expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
 			expect.objectContaining({
 				authorId: null,
 			}),

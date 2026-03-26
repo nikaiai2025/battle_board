@@ -68,8 +68,7 @@ vi.mock("../../../lib/infrastructure/repositories/thread-repository", () => ({
 // PostRepository をモック化
 vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 	findByThreadId: vi.fn().mockResolvedValue([]),
-	getNextPostNumber: vi.fn().mockResolvedValue(1),
-	create: vi.fn(),
+	createWithAtomicNumber: vi.fn(),
 	countByAuthorId: vi.fn().mockResolvedValue(3), // 2回目以降（ウェルカムシーケンス無効）
 }));
 
@@ -172,7 +171,9 @@ describe("PostService.createPost — Step 4 dailyId 生成", () => {
 
 		// デフォルト設定: 通常のスレッドへの書き込み
 		vi.mocked(ThreadRepository.findById).mockResolvedValue(createMockThread());
-		vi.mocked(PostRepository.create).mockResolvedValue(createMockCreatedPost());
+		vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+			createMockCreatedPost(),
+		);
 	});
 
 	// =========================================================================
@@ -195,8 +196,9 @@ describe("PostService.createPost — Step 4 dailyId 生成", () => {
 				isSystemMessage: true,
 			});
 
-			expect(PostRepository.create).toHaveBeenCalledOnce();
-			const callArg = vi.mocked(PostRepository.create).mock.calls[0][0];
+			expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledOnce();
+			const callArg = vi.mocked(PostRepository.createWithAtomicNumber).mock
+				.calls[0][0];
 			expect(callArg.dailyId).toBe("SYSTEM");
 		});
 
@@ -213,8 +215,9 @@ describe("PostService.createPost — Step 4 dailyId 生成", () => {
 				isSystemMessage: true,
 			});
 
-			expect(PostRepository.create).toHaveBeenCalledOnce();
-			const callArg = vi.mocked(PostRepository.create).mock.calls[0][0];
+			expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledOnce();
+			const callArg = vi.mocked(PostRepository.createWithAtomicNumber).mock
+				.calls[0][0];
 			expect(callArg.dailyId).toBe("SYSTEM");
 		});
 
@@ -247,7 +250,7 @@ describe("PostService.createPost — Step 4 dailyId 生成", () => {
 		 */
 		it("isSystemMessage=false の場合、PostRepository.create に dailyId='SYSTEM' は渡されない", async () => {
 			// 通常レスの返り値: dailyId はハッシュ値
-			vi.mocked(PostRepository.create).mockResolvedValue(
+			vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
 				createMockCreatedPost({
 					authorId: null,
 					displayName: "名無しさん",
@@ -266,8 +269,9 @@ describe("PostService.createPost — Step 4 dailyId 生成", () => {
 				isSystemMessage: false,
 			});
 
-			expect(PostRepository.create).toHaveBeenCalledOnce();
-			const callArg = vi.mocked(PostRepository.create).mock.calls[0][0];
+			expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledOnce();
+			const callArg = vi.mocked(PostRepository.createWithAtomicNumber).mock
+				.calls[0][0];
 			// 通常レスでは "SYSTEM" は渡されない
 			expect(callArg.dailyId).not.toBe("SYSTEM");
 		});
@@ -276,7 +280,7 @@ describe("PostService.createPost — Step 4 dailyId 生成", () => {
 		 * isSystemMessage を省略した場合（デフォルト false）も通常レスとして扱われる
 		 */
 		it("isSystemMessage 未指定（デフォルト）の場合、dailyId は 'SYSTEM' でない", async () => {
-			vi.mocked(PostRepository.create).mockResolvedValue(
+			vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
 				createMockCreatedPost({
 					authorId: null,
 					displayName: "名無しさん",
@@ -295,8 +299,9 @@ describe("PostService.createPost — Step 4 dailyId 生成", () => {
 				// isSystemMessage は省略（デフォルト false）
 			});
 
-			expect(PostRepository.create).toHaveBeenCalledOnce();
-			const callArg = vi.mocked(PostRepository.create).mock.calls[0][0];
+			expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledOnce();
+			const callArg = vi.mocked(PostRepository.createWithAtomicNumber).mock
+				.calls[0][0];
 			expect(callArg.dailyId).not.toBe("SYSTEM");
 		});
 	});

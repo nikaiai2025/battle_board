@@ -33,12 +33,14 @@ import type { Thread, ThreadInput } from "../domain/models/thread";
 import { parseAnchors } from "../domain/rules/anchor-parser";
 import { parseCommand } from "../domain/rules/command-parser";
 import { generateDailyId } from "../domain/rules/daily-id";
+import { calcMilestonePostBonus } from "../domain/rules/incentive-rules";
 import {
 	validatePostBody,
 	validateThreadTitle,
 } from "../domain/rules/validation";
 import * as BotPostRepository from "../infrastructure/repositories/bot-post-repository";
 import * as BotRepository from "../infrastructure/repositories/bot-repository";
+import * as IncentiveLogRepository from "../infrastructure/repositories/incentive-log-repository";
 import * as PendingTutorialRepository from "../infrastructure/repositories/pending-tutorial-repository";
 import * as PostRepository from "../infrastructure/repositories/post-repository";
 import * as ThreadRepository from "../infrastructure/repositories/thread-repository";
@@ -301,14 +303,11 @@ async function resolveAuth(
  *   3. ユーザー情報取得（UserRepository.findById）
  *   4. 日次リセットID 生成（generateDailyId）
  *   5. コマンド解析 → CommandService.executeCommand
- *   6. レス番号採番（PostRepository.getNextPostNumber）
- *   6.5. 初回書き込み検出（ウェルカムシーケンス）
- *        - ① CurrencyService.credit +50（welcome_bonus）
- *        - ② welcomeMessagePending フラグセット
- *        - ③ PendingTutorialRepository.create
+ *   6.5. 初回書き込み検出（ウェルカムシーケンス: ボーナス付与 + pendingフラグ）
  *   7. IncentiveService 呼び出し（書き込み報酬計算）
  *   8. inlineSystemInfo 構築（コマンド結果 + 書き込み報酬 + ウェルカムボーナス）
- *   9. レス作成（PostRepository.create）
+ *   9. レス番号の原子採番 + INSERT（PostRepository.createWithAtomicNumber / RPC 1回）
+ *   9a. ウェルカムシーケンス後処理（pending_tutorials INSERT: 実際の postNumber を使用）
  *  10. スレッド更新（ThreadRepository.incrementPostCount + updateLastPostAt）
  *  11. IncentiveService 遅延評価ボーナス
  *  11.5. ウェルカムメッセージ投稿（welcomeMessagePending=true の場合）
@@ -510,15 +509,16 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	}
 	// else: 失敗時 or 非ステルスコマンド → resolvedBody / resolvedDisplayName / dailyId は変更しない
 
-	// Step 6: レス番号採番
-	// See: docs/architecture/architecture.md §7.2 同時実行制御（レス番号採番）
-	const postNumber = await PostRepository.getNextPostNumber(input.threadId);
-
 	// Step 6.5: 初回書き込み検出（ウェルカムシーケンス）
 	// 条件: ユーザー書き込み（!isSystemMessage && !isBotWrite）かつ認証済みユーザー（resolvedAuthorId != null）
 	// - ① 初回書き込みボーナス +50（CurrencyService.credit）→ inlineSystemInfo に追加
 	// - ② ウェルカムメッセージ pending フラグをセット（Step 11.5 で実際に投稿）
-	// - ③ pending_tutorials に INSERT（Cloudflare Cron によるチュートリアルBOTスポーン待ちキュー）
+	// - ③ pending_tutorials に INSERT（原子INSERT後にRPC戻り値の postNumber で更新）
+	//
+	// 従来は Step 6 で採番後に実行していたが、TOCTOU競合修正により採番+INSERTを
+	// RPC 1回で原子的に実行するよう変更した。ウェルカムシーケンスの判定（countByAuthorId）
+	// とボーナス付与（credit）は採番前に先行実行し、pending_tutorials の triggerPostNumber は
+	// RPC 戻り値から取得した実際の postNumber を使用する。
 	//
 	// isSystemMessage=true の場合は条件を満たさないため、Step 11.5 での createPost 再帰呼び出しで
 	// ウェルカムシーケンスは発動しない（無限ループ防止）。
@@ -526,9 +526,9 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// See: features/welcome.feature @仮ユーザーが初めて書き込むとウェルカムシーケンスが発動する
 	// See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
 	// See: tmp/workers/bdd-architect_TASK-236/design.md §2.1 初回書き込み検出ロジック
+	// See: tmp/workers/bdd-architect_ATK-POST-001/assessment.md §3 推奨案
 	let welcomeBonusText: string | null = null;
 	let welcomeMessagePending = false;
-	let welcomeTargetPostNumber: number | null = null;
 
 	if (!isSystemMessage && !input.isBotWrite && resolvedAuthorId != null) {
 		try {
@@ -540,14 +540,9 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 
 				// ② ウェルカムメッセージ（Step 11.5 で投稿）
 				welcomeMessagePending = true;
-				welcomeTargetPostNumber = postNumber;
 
-				// ③ pending_tutorials INSERT（Cloudflare Cron によるチュートリアルBOTスポーン待ち）
-				await PendingTutorialRepository.create({
-					userId: resolvedAuthorId,
-					threadId: input.threadId,
-					triggerPostNumber: postNumber,
-				});
+				// ③ pending_tutorials INSERT は Step 9 の RPC 後に実行する
+				// （triggerPostNumber に実際の postNumber が必要なため）
 			}
 		} catch (err) {
 			// ウェルカムシーケンス失敗は書き込みを巻き戻さない
@@ -560,13 +555,17 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// 結果を inlineSystemInfo に含める。
 	// 遅延評価ボーナス（hot_post, thread_revival, thread_growth）は INSERT + incrementPostCount 後に
 	// Phase 2 として別途実行する（方針A: 二段階評価）。
+	//
+	// postNumber は RPC 前のため仮値 0 を使用する。IncentiveService は postNumber を
+	// contextId の一部として使用するのみで、ボーナス計算自体には影響しない。
+	//
 	// See: features/command_system.feature @システムメッセージは書き込み報酬の対象にならない
 	// See: docs/architecture/components/incentive.md §5 設計上の判断
 	// See: features/incentive.feature @PostService経由の統合
 	// See: tmp/workers/bdd-architect_TASK-070/analysis.md §4 方針A: 二段階評価
 	let incentiveGranted: { eventType: string; amount: number }[] = [];
-	// INSERT 前のため仮 postId を生成する（IncentiveService 内で incentive_log の contextId に使用される）
-	const prePostId = `pre-${Date.now()}-${postNumber}`;
+	// INSERT 前のため仮 postId / postNumber を使用する
+	const prePostId = `pre-${Date.now()}`;
 	const preCreatedAt = new Date(Date.now());
 
 	// PostContext を構築（同期・遅延の両方で再利用する）
@@ -599,7 +598,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				postId: prePostId,
 				threadId: input.threadId,
 				userId: resolvedAuthorId ?? "",
-				postNumber,
+				postNumber: 0, // 仮値: RPC後に実際の postNumber で上書きする
 				createdAt: preCreatedAt,
 				isReplyTo,
 			};
@@ -651,12 +650,18 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	const inlineSystemInfo =
 		inlineSystemInfoParts.length > 0 ? inlineSystemInfoParts.join("\n") : null;
 
-	// Step 9: レス作成
-	// ステルス処理済みの resolvedBody / resolvedDisplayName / dailyId を使用する
+	// Step 9: レス番号の原子採番 + INSERT（RPC 1回で完結）
+	// 従来の Step 6 (getNextPostNumber) と Step 9 (create) を統合。
+	// DB 側の insert_post_with_next_number で threads 行ロック (FOR UPDATE) を取得し、
+	// 採番と INSERT を単一トランザクション内で原子的に実行する。
+	// これにより採番〜INSERT間の TOCTOU 競合を解消する。
+	// ステルス処理済みの resolvedBody / resolvedDisplayName / dailyId を使用する。
+	//
+	// See: docs/architecture/architecture.md §7.2 同時実行制御（レス番号採番）
+	// See: supabase/migrations/00031_insert_post_with_next_number.sql
 	// See: features/command_iamsystem.feature
-	const createdPost = await PostRepository.create({
+	const createdPost = await PostRepository.createWithAtomicNumber({
 		threadId: input.threadId,
-		postNumber,
 		authorId: resolvedAuthorId,
 		displayName: resolvedDisplayName,
 		dailyId,
@@ -664,6 +669,22 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		inlineSystemInfo,
 		isSystemMessage,
 	});
+
+	// Step 9a: ウェルカムシーケンスの後処理（pending_tutorials INSERT）
+	// RPC 戻り値の postNumber を使って triggerPostNumber を正確に設定する。
+	// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+	if (welcomeMessagePending && resolvedAuthorId != null) {
+		try {
+			await PendingTutorialRepository.create({
+				userId: resolvedAuthorId,
+				threadId: input.threadId,
+				triggerPostNumber: createdPost.postNumber,
+			});
+		} catch (err) {
+			// pending_tutorials INSERT 失敗は書き込みを巻き戻さない
+			console.error("[PostService] pending_tutorials INSERT 失敗:", err);
+		}
+	}
 
 	// Step 9b: 独立システムレス投稿（共通）
 	// eliminationNotice（撃破通知）または independentMessage（調査結果等）がある場合、
@@ -722,6 +743,44 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		}
 	}
 
+	// Step 9d: キリ番ボーナス（milestone_post）の遅延評価
+	// milestone_post は postNumber に依存するが、TOCTOU 修正により postNumber は
+	// RPC 戻り値でしか確定しない。Phase 1 (sync) では仮値 0 を渡すため発火しない。
+	// そのため RPC 後に postNumber 確定値を使って直接評価する。
+	// IncentiveService の sync フェーズから独立させることで、
+	// IncentiveService を変更せずに正しい postNumber でキリ番判定を実行する。
+	//
+	// See: features/incentive.feature Rule: スレッド内のレス番号が100の倍数のとき書き込んだユーザーにボーナス
+	// See: docs/architecture/architecture.md §7.2 同時実行制御（レス番号採番）
+	if (!isSystemMessage && !input.isBotWrite && resolvedAuthorId) {
+		try {
+			const milestoneAmount = calcMilestonePostBonus(createdPost.postNumber);
+			if (milestoneAmount > 0) {
+				const contextDate = getTodayJst();
+				const log = await IncentiveLogRepository.create({
+					userId: resolvedAuthorId,
+					eventType: "milestone_post",
+					amount: milestoneAmount,
+					contextId: createdPost.id,
+					contextDate,
+				});
+				if (log !== null) {
+					await CurrencyService.credit(
+						resolvedAuthorId,
+						milestoneAmount,
+						"incentive_milestone_post",
+					);
+				}
+			}
+		} catch (err) {
+			// キリ番ボーナス失敗は書き込みを巻き戻さない
+			console.error(
+				"[PostService] milestone_post ボーナス付与中にエラー:",
+				err,
+			);
+		}
+	}
+
 	// Step 10: スレッド更新
 	// See: docs/architecture/architecture.md §7.1 Step 2
 	await ThreadRepository.incrementPostCount(input.threadId);
@@ -768,9 +827,11 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 			// postContext の postId を実際の createdPost.id に更新する
 			// （遅延評価ボーナスでは INSERT 済みのレスが threadPosts に含まれるため、
 			//  実際の postId を使って正しく除外判定等ができるようにする）
+			// postContext の postId/postNumber を実際の値に更新する
 			const deferredContext: PostContext = {
 				...postContext,
 				postId: createdPost.id,
+				postNumber: createdPost.postNumber,
 			};
 			await IncentiveService.evaluateOnPost(deferredContext, {
 				phase: "deferred",
@@ -792,11 +853,11 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	//
 	// See: features/welcome.feature @初回書き込みの直後にウェルカムメッセージが独立システムレスで表示される
 	// See: tmp/workers/bdd-architect_TASK-236/design.md §2.1 Step 11.5
-	if (welcomeMessagePending && welcomeTargetPostNumber != null) {
+	if (welcomeMessagePending) {
 		try {
 			await createPost({
 				threadId: input.threadId,
-				body: `>>${welcomeTargetPostNumber} Welcome to Underground...\nここはBOTと人間が入り混じる対戦型掲示板です`,
+				body: `>>${createdPost.postNumber} Welcome to Underground...\nここはBOTと人間が入り混じる対戦型掲示板です`,
 				edgeToken: null,
 				ipHash: "system",
 				displayName: "★システム",

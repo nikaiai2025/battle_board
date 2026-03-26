@@ -13,7 +13,7 @@
 | 1 | admin.feature | 完了 | 36/19 | `20260325_admin_auth` |
 | 2 | authentication.feature | 完了 | (上と合算) | `20260325_admin_auth` |
 | 3 | posting.feature | **完了** | 9/3 (CRITICAL:1, HIGH:2) | `20260326_posting` |
-| 4 | thread.feature | 未着手 | | |
+| 4 | thread.feature | **完了** | 18/11 (CRITICAL:1, HIGH:10) | `20260326_thread` |
 | 5 | user_registration.feature | 未着手 | | |
 | 6 | reactions.feature | 未着手 | | |
 | 7 | currency.feature | 未着手 | | |

@@ -68,8 +68,7 @@ vi.mock("../../../lib/infrastructure/repositories/thread-repository", () => ({
 // PostRepository をモック化
 vi.mock("../../../lib/infrastructure/repositories/post-repository", () => ({
 	findByThreadId: vi.fn().mockResolvedValue([]),
-	getNextPostNumber: vi.fn().mockResolvedValue(1),
-	create: vi.fn(),
+	createWithAtomicNumber: vi.fn(),
 	countByAuthorId: vi.fn(),
 }));
 
@@ -174,8 +173,9 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 
 		// デフォルト設定: 通常のスレッドへの書き込み
 		vi.mocked(ThreadRepository.findById).mockResolvedValue(createMockThread());
-		vi.mocked(PostRepository.create).mockResolvedValue(createMockCreatedPost());
-		vi.mocked(PostRepository.getNextPostNumber).mockResolvedValue(1);
+		vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+			createMockCreatedPost(),
+		);
 		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([]);
 	});
 
@@ -214,9 +214,9 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 		 * 初回書き込み時にウェルカムメッセージが投稿される（PostRepository.create が2回呼ばれる）
 		 * See: features/welcome.feature @初回書き込みの直後にウェルカムメッセージが独立システムレスで表示される
 		 */
-		it("初回書き込み時に PostRepository.create が2回呼ばれる（元レス + ウェルカムメッセージ）", async () => {
+		it("初回書き込み時に PostRepository.createWithAtomicNumber が2回呼ばれる（元レス + ウェルカムメッセージ）", async () => {
 			// ウェルカムメッセージ（2回目の createPost）用の返り値
-			vi.mocked(PostRepository.create)
+			vi.mocked(PostRepository.createWithAtomicNumber)
 				.mockResolvedValueOnce(createMockCreatedPost()) // 元レス
 				.mockResolvedValueOnce(
 					createMockCreatedPost({ postNumber: 2, body: ">>1 Welcome..." }),
@@ -230,10 +230,11 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 				isBotWrite: false,
 			});
 
-			expect(PostRepository.create).toHaveBeenCalledTimes(2);
+			expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledTimes(2);
 
 			// 2回目の呼び出し（ウェルカムメッセージ）の body を確認
-			const secondCall = vi.mocked(PostRepository.create).mock.calls[1];
+			const secondCall = vi.mocked(PostRepository.createWithAtomicNumber).mock
+				.calls[1];
 			expect(secondCall[0].body).toContain("Welcome to Underground");
 			expect(secondCall[0].body).toContain(">>1"); // postNumber=1 へのアンカー
 			expect(secondCall[0].isSystemMessage).toBe(true);
@@ -314,7 +315,7 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 			expect(PendingTutorialRepository.create).not.toHaveBeenCalled();
 		});
 
-		it("2回目以降は PostRepository.create が1回のみ呼ばれる（元レスのみ）", async () => {
+		it("2回目以降は PostRepository.createWithAtomicNumber が1回のみ呼ばれる（元レスのみ）", async () => {
 			await createPost({
 				threadId: "thread-001",
 				body: "2回目の書き込み",
@@ -323,7 +324,7 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 				isBotWrite: false,
 			});
 
-			expect(PostRepository.create).toHaveBeenCalledTimes(1);
+			expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -409,7 +410,7 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 		// See: tmp/workers/bdd-architect_TASK-236/design.md §3.5 PostInput.botUserId 方式
 
 		it("isBotWrite=true かつ botUserId が指定された場合、書き込みが成功する", async () => {
-			vi.mocked(PostRepository.create).mockResolvedValue({
+			vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 				id: "post-bot-001",
 				threadId: "thread-001",
 				postNumber: 2,
@@ -436,7 +437,7 @@ describe("PostService.createPost — Step 6.5 ウェルカムシーケンス", (
 		});
 
 		it("isBotWrite=true かつ botUserId が指定されない場合も書き込みが成功する（後方互換）", async () => {
-			vi.mocked(PostRepository.create).mockResolvedValue({
+			vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
 				id: "post-bot-002",
 				threadId: "thread-001",
 				postNumber: 3,
