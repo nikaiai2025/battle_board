@@ -3,13 +3,15 @@
  *
  * !copipe コマンド（コピペAA再現）のBDDシナリオを実装する。
  *
- * カバーするシナリオ（6件）:
+ * カバーするシナリオ（8件）:
  *   1. 引数なしでランダムにAAが表示される
  *   2. 完全一致でAAが表示される
  *   3. 完全一致が存在する場合は部分一致より優先される
  *   4. 部分一致で1件に特定できる場合はAAが表示される
- *   5. 部分一致で複数件ヒットした場合はエラーになる
- *   6. 一致するAAがない場合はエラーになる
+ *   5. 名前の部分一致で複数件ヒットした場合はランダムに1件表示される（v2新規）
+ *   6. 名前に一致せず本文に一致する場合はAAが表示される（v2新規）
+ *   7. 本文検索で複数件ヒットした場合はランダムに1件表示される（v2新規）
+ *   8. 一致するAAがない場合はエラーになる
  *
  * 再利用する既存ステップ（新規定義不要）:
  *   - "コマンドレジストリに以下のコマンドが登録されている:" (command_system.steps.ts)
@@ -38,13 +40,12 @@ import type { BattleBoardWorld } from "../support/world";
 
 /**
  * 以下のコピペAAが登録されている。
- * Background ステップ。DataTable の各行（name 列）を InMemoryCopipeRepo に登録する。
- * content はテスト用ダミーコンテンツ（name + "のAA"）を使用する。
+ * Background ステップ。DataTable の各行（name + content 列）を InMemoryCopipeRepo に登録する。
  *
- * テーブル形式:
- *   | name             |
- *   | ドッキングにぼし  |
- *   | しょぼーん        |
+ * テーブル形式（v2: name + content の2列）:
+ *   | name             | content                      |
+ *   | ドッキングにぼし  | にぼしとドッキングするAA      |
+ *   | しょぼーん        | 顔文字ショボーンのAA         |
  *   ...
  *
  * See: features/command_copipe.feature Background
@@ -53,14 +54,14 @@ import type { BattleBoardWorld } from "../support/world";
 Given(
 	"以下のコピペAAが登録されている:",
 	function (this: BattleBoardWorld, dataTable: any) {
-		const rows: Array<{ name: string }> = dataTable.hashes();
+		const rows: Array<{ name: string; content?: string }> = dataTable.hashes();
 		for (const row of rows) {
-			// InMemoryCopipeRepo にエントリを追加する
-			// content はダミー（テスト用）— BDDシナリオは name のみで検索する
-			// See: features/command_copipe.feature @ランダム選択・名前検索シナリオ
+			// InMemoryCopipeRepo にエントリを追加する（content が指定されていれば使用、なければダミー）
+			// v2: feature の Background は name + content の2列テーブル
+			// See: features/command_copipe.feature Background
 			InMemoryCopipeRepo._insert({
 				name: row.name,
-				content: `${row.name}のAA本文（テスト用）`,
+				content: row.content,
 			});
 		}
 	},
@@ -132,7 +133,7 @@ Then(
  * See: features/command_copipe.feature @完全一致でAAが表示される
  * See: features/command_copipe.feature @完全一致が存在する場合は部分一致より優先される
  * See: features/command_copipe.feature @部分一致で1件に特定できる場合はAAが表示される
- * See: src/lib/services/handlers/copipe-handler.ts > _handleNameSearch
+ * See: src/lib/services/handlers/copipe-handler.ts > _handleSearch
  */
 Then(
 	/^「(.+)」のAAがレス末尾にマージ表示される$/,
@@ -152,10 +153,88 @@ Then(
 
 		// inlineSystemInfo に name が含まれることを確認する
 		// ハンドラは「【name】\ncontent」形式で systemMessage を生成する
-		// See: src/lib/services/handlers/copipe-handler.ts > _handleNameSearch
+		// See: src/lib/services/handlers/copipe-handler.ts > _handleSearch
 		assert(
 			lastPost.inlineSystemInfo.includes(expectedName),
 			`inlineSystemInfo に「${expectedName}」が含まれることを期待しましたが "${lastPost.inlineSystemInfo}" でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: 部分一致したAAからランダムに1件がレス末尾にマージ表示される
+// See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
+// See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+// ---------------------------------------------------------------------------
+
+/**
+ * 部分一致したAAからランダムに1件がレス末尾にマージ表示される。
+ * 複数ヒット時のランダム選択シナリオの検証。
+ * 最新レスの inlineSystemInfo に AA（【name】形式）が含まれることを確認する。
+ *
+ * See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
+ * See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+ * See: src/lib/services/handlers/copipe-handler.ts > _handleSearch
+ */
+Then(
+	"部分一致したAAからランダムに1件がレス末尾にマージ表示される",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+
+		// 最新レスを取得する
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+		assert(posts.length > 0, "スレッドに書き込みが存在しません");
+		const lastPost = posts[posts.length - 1];
+
+		// inlineSystemInfo が設定されていることを確認する
+		assert(
+			lastPost.inlineSystemInfo !== null,
+			`部分一致AAのランダム選択結果がレス末尾にマージ表示されるべきですが inlineSystemInfo が null でした`,
+		);
+
+		// inlineSystemInfo に【name】形式の AA が含まれることを確認する
+		// ハンドラは「【name】\ncontent\n曖昧です（N件ヒット）」形式で systemMessage を生成する
+		// See: src/lib/services/handlers/copipe-handler.ts > _handleSearch
+		assert(
+			lastPost.inlineSystemInfo.includes("【") &&
+				lastPost.inlineSystemInfo.includes("】"),
+			`inlineSystemInfo に AA名（【name】形式）が含まれるべきですが "${lastPost.inlineSystemInfo}" でした`,
+		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Then: マージ表示に {string} を含む通知が付与される
+// See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
+// See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+// ---------------------------------------------------------------------------
+
+/**
+ * マージ表示に {string} を含む通知が付与される。
+ * 複数ヒット時の「曖昧です」通知の検証。
+ * 最新レスの inlineSystemInfo に指定した文字列が含まれることを確認する。
+ *
+ * See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
+ * See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+ * See: src/lib/services/handlers/copipe-handler.ts > _handleSearch
+ */
+Then(
+	"マージ表示に {string} を含む通知が付与される",
+	async function (this: BattleBoardWorld, expectedText: string) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+
+		// 最新レスを取得する
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+		assert(posts.length > 0, "スレッドに書き込みが存在しません");
+		const lastPost = posts[posts.length - 1];
+
+		// inlineSystemInfo に期待する通知文字列が含まれることを確認する
+		// ハンドラは「【name】\ncontent\n曖昧です（N件ヒット）」形式で systemMessage を生成する
+		// See: src/lib/services/handlers/copipe-handler.ts > _handleSearch
+		assert(
+			lastPost.inlineSystemInfo !== null &&
+				lastPost.inlineSystemInfo.includes(expectedText),
+			`inlineSystemInfo に "${expectedText}" が含まれることを期待しましたが "${lastPost.inlineSystemInfo}" でした`,
 		);
 	},
 );

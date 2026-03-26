@@ -120,7 +120,7 @@ export const commandsConfig: CommandsYaml = {
 		// See: features/command_copipe.feature
 		copipe: {
 			description: "コピペAAを再現する",
-			cost: 0,
+			cost: 3,
 			targetFormat: null,
 			enabled: true,
 			stealth: false,

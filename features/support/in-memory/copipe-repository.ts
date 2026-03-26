@@ -5,9 +5,10 @@
  * copipe-repository.ts と同一シグネチャの関数を提供する。
  *
  * 検索ロジック（本番実装と同一）:
- *   findRandom()         → ストアからランダム1件を返す
- *   findByName(name)     → 完全一致（name === entry.name）
- *   findByNamePartial(name) → 部分一致（name を含む && 完全一致は除外）
+ *   findRandom()               → ストアからランダム1件を返す
+ *   findByName(name)           → 完全一致（name === entry.name）
+ *   findByNamePartial(name)    → 部分一致（name を含む && 完全一致は除外）
+ *   findByContentPartial(query) → content 部分一致（全文検索フォールバック）
  *
  * See: features/command_copipe.feature
  * See: src/lib/infrastructure/repositories/copipe-repository.ts
@@ -98,7 +99,7 @@ export async function findByName(name: string): Promise<CopipeEntry | null> {
  *
  * See: src/lib/infrastructure/repositories/copipe-repository.ts > findByNamePartial
  * See: features/command_copipe.feature @部分一致で1件に特定できる場合はAAが表示される
- * See: features/command_copipe.feature @部分一致で複数件ヒットした場合はエラーになる
+ * See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
  *
  * @param name - 検索するキーワード（部分一致）
  * @returns 部分一致したエントリの配列（完全一致は除外済み）
@@ -108,4 +109,23 @@ export async function findByNamePartial(name: string): Promise<CopipeEntry[]> {
 		// 部分一致（name を含む）かつ完全一致は除外
 		(entry) => entry.name.includes(name) && entry.name !== name,
 	);
+}
+
+/**
+ * content（AA本文）で部分一致検索する。
+ *
+ * query を content に含むエントリを返す。
+ * 本番実装の SQL: WHERE content LIKE '%query%'
+ *
+ * See: src/lib/infrastructure/repositories/copipe-repository.ts > findByContentPartial
+ * See: features/command_copipe.feature @名前に一致せず本文に一致する場合はAAが表示される
+ * See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+ *
+ * @param query - 検索するキーワード（content に対する部分一致）
+ * @returns 部分一致したエントリの配列
+ */
+export async function findByContentPartial(
+	query: string,
+): Promise<CopipeEntry[]> {
+	return store.filter((entry) => entry.content.includes(query));
 }

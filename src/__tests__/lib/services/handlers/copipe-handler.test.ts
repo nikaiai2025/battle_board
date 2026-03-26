@@ -3,16 +3,21 @@
  *
  * 検索ロジック（優先順）:
  *   1. 引数なし  → ランダム1件
- *   2. 引数あり  → 完全一致
- *   3. 完全一致なし → 部分一致
+ *   2. 引数あり  → name 完全一致
+ *   3. 完全一致なし → name 部分一致
  *       - 1件: 表示
- *       - 2件以上: 「曖昧です」エラー
+ *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット）」通知
+ *       - 0件: content 部分一致にフォールバック
+ *   4. name 一致なし → content 部分一致
+ *       - 1件: 表示
+ *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット）」通知
  *       - 0件: 「見つかりません」エラー
  *
  * エッジケース:
  *   - データが0件の場合のランダム取得（「コピペデータがありません」）
  *   - 空文字引数の扱い
  *   - 特殊文字を含む name の検索
+ *   - 曖昧ヒット時のランダム性（インデックスが範囲内であること）
  *
  * See: features/command_copipe.feature @copipe
  * See: src/lib/services/handlers/copipe-handler.ts
@@ -46,6 +51,7 @@ function createMockRepo(
 		findRandom: async () => null,
 		findByName: async () => null,
 		findByNamePartial: async () => [],
+		findByContentPartial: async () => [],
 		...overrides,
 	};
 }
@@ -187,9 +193,10 @@ describe("完全一致検索", () => {
 		expect(result.systemMessage).toContain("にぼし本文");
 	});
 
-	it("完全一致がある場合、部分一致検索は行わない（findByNamePartial が呼ばれない）", async () => {
+	it("完全一致がある場合、部分一致検索・content検索は行わない", async () => {
 		// See: features/command_copipe.feature @完全一致が存在する場合は部分一致より優先される
 		let partialCalled = false;
+		let contentCalled = false;
 		const entry = makeEntry(1, "ぬるぽ", "ガッ");
 		const repo = createMockRepo({
 			findByName: async () => entry,
@@ -197,20 +204,25 @@ describe("完全一致検索", () => {
 				partialCalled = true;
 				return [];
 			},
+			findByContentPartial: async () => {
+				contentCalled = true;
+				return [];
+			},
 		});
 		const handler = createHandler(repo);
 		await handler.execute(createCtx(["ぬるぽ"]));
 
 		expect(partialCalled).toBe(false);
+		expect(contentCalled).toBe(false);
 	});
 });
 
 // ---------------------------------------------------------------------------
-// 部分一致（1件）
+// name 部分一致（1件）
 // See: features/command_copipe.feature @部分一致で1件に特定できる場合はAAが表示される
 // ---------------------------------------------------------------------------
 
-describe("部分一致検索（1件）", () => {
+describe("name 部分一致検索（1件）", () => {
 	it("完全一致なし・部分一致1件の場合、そのエントリを返す", async () => {
 		// See: features/command_copipe.feature @部分一致で1件に特定できる場合はAAが表示される
 		const entry = makeEntry(1, "ドッキングにぼし", "にぼし本文");
@@ -225,7 +237,7 @@ describe("部分一致検索（1件）", () => {
 		expect(result.systemMessage).toContain("にぼし本文");
 	});
 
-	it("部分一致1件の場合も【name】\\ncontent 形式で返す", async () => {
+	it("name 部分一致1件の場合も【name】\\ncontent 形式で返す", async () => {
 		const entry = makeEntry(1, "ドッキングにぼし", "にぼし本文テスト");
 		const repo = createMockRepo({
 			findByName: async () => null,
@@ -236,16 +248,33 @@ describe("部分一致検索（1件）", () => {
 
 		expect(result.systemMessage).toBe("【ドッキングにぼし】\nにぼし本文テスト");
 	});
+
+	it("name 部分一致1件の場合、content 検索は行わない", async () => {
+		const entry = makeEntry(1, "ドッキングにぼし", "にぼし本文テスト");
+		let contentCalled = false;
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [entry],
+			findByContentPartial: async () => {
+				contentCalled = true;
+				return [];
+			},
+		});
+		const handler = createHandler(repo);
+		await handler.execute(createCtx(["ドッキング"]));
+
+		expect(contentCalled).toBe(false);
+	});
 });
 
 // ---------------------------------------------------------------------------
-// 部分一致（複数件）→ 「曖昧です」エラー
-// See: features/command_copipe.feature @部分一致で複数件ヒットした場合はエラーになる
+// name 部分一致（複数件）→ ランダム1件 +「曖昧です」通知
+// See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
 // ---------------------------------------------------------------------------
 
-describe("部分一致検索（複数件）", () => {
-	it("完全一致なし・部分一致2件以上の場合、「曖昧です」を返す", async () => {
-		// See: features/command_copipe.feature @部分一致で複数件ヒットした場合はエラーになる
+describe("name 部分一致検索（複数件）", () => {
+	it("完全一致なし・部分一致2件以上の場合、「曖昧です」通知が含まれる", async () => {
+		// See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
 		const entries = [
 			makeEntry(1, "しょぼーん", "(´・ω・`)"),
 			makeEntry(2, "しょぼんぬ", "(´・ω・`) <しょぼんぬ>"),
@@ -258,10 +287,26 @@ describe("部分一致検索（複数件）", () => {
 		const result = await handler.execute(createCtx(["しょぼ"]));
 
 		expect(result.success).toBe(true);
-		expect(result.systemMessage).toBe("曖昧です");
+		expect(result.systemMessage).toContain("曖昧です");
 	});
 
-	it("部分一致が3件以上の場合も「曖昧です」を返す", async () => {
+	it("部分一致2件の場合、「曖昧です（2件ヒット）」通知が付与される", async () => {
+		// See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
+		const entries = [
+			makeEntry(1, "しょぼーん", "(´・ω・`)"),
+			makeEntry(2, "しょぼんぬ", "(´・ω・`) <しょぼんぬ>"),
+		];
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["しょぼ"]));
+
+		expect(result.systemMessage).toContain("曖昧です（2件ヒット）");
+	});
+
+	it("部分一致複数件の場合、ヒット件数が systemMessage に含まれる（3件）", async () => {
 		const entries = [
 			makeEntry(1, "しょぼーん", "A"),
 			makeEntry(2, "しょぼんぬ", "B"),
@@ -274,7 +319,164 @@ describe("部分一致検索（複数件）", () => {
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["しょぼ"]));
 
-		expect(result.systemMessage).toBe("曖昧です");
+		expect(result.systemMessage).toContain("曖昧です（3件ヒット）");
+	});
+
+	it("部分一致複数件の場合、選ばれたエントリの name と content が systemMessage に含まれる", async () => {
+		// See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
+		const entries = [
+			makeEntry(1, "しょぼーん", "(´・ω・`)"),
+			makeEntry(2, "しょぼんぬ", "(´・ω・`) <しょぼんぬ>"),
+		];
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["しょぼ"]));
+
+		// ランダムで選ばれたエントリのいずれかが含まれること
+		const containsEntry1 =
+			result.systemMessage!.includes("しょぼーん") &&
+			result.systemMessage!.includes("(´・ω・`)");
+		const containsEntry2 =
+			result.systemMessage!.includes("しょぼんぬ") &&
+			result.systemMessage!.includes("(´・ω・`) <しょぼんぬ>");
+		expect(containsEntry1 || containsEntry2).toBe(true);
+	});
+
+	it("部分一致複数件の場合、content 検索は行わない", async () => {
+		const entries = [
+			makeEntry(1, "しょぼーん", "(´・ω・`)"),
+			makeEntry(2, "しょぼんぬ", "(´・ω・`) <しょぼんぬ>"),
+		];
+		let contentCalled = false;
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => entries,
+			findByContentPartial: async () => {
+				contentCalled = true;
+				return [];
+			},
+		});
+		const handler = createHandler(repo);
+		await handler.execute(createCtx(["しょぼ"]));
+
+		expect(contentCalled).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// content 部分一致フォールバック（1件）
+// See: features/command_copipe.feature @名前に一致せず本文に一致する場合はAAが表示される
+// ---------------------------------------------------------------------------
+
+describe("content 部分一致フォールバック（1件）", () => {
+	it("name 完全一致・部分一致なし、content 1件の場合、そのエントリを返す", async () => {
+		// See: features/command_copipe.feature @名前に一致せず本文に一致する場合はAAが表示される
+		const entry = makeEntry(1, "ぬるぽ", "JavaのNullPointerExceptionのAA");
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => [entry],
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["Java"]));
+
+		expect(result.systemMessage).toContain("ぬるぽ");
+		expect(result.systemMessage).toContain("JavaのNullPointerExceptionのAA");
+	});
+
+	it("content 部分一致1件の場合、【name】\\ncontent 形式で返す", async () => {
+		// See: features/command_copipe.feature @名前に一致せず本文に一致する場合はAAが表示される
+		const entry = makeEntry(1, "ぬるぽ", "Java例外のAA本文");
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => [entry],
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["Java"]));
+
+		expect(result.systemMessage).toBe("【ぬるぽ】\nJava例外のAA本文");
+	});
+
+	it("name 一致なし時に findByContentPartial を呼び出す", async () => {
+		let contentCalledWith: string | null = null;
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [],
+			findByContentPartial: async (query) => {
+				contentCalledWith = query;
+				return [];
+			},
+		});
+		const handler = createHandler(repo);
+		await handler.execute(createCtx(["Java"]));
+
+		expect(contentCalledWith).toBe("Java");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// content 部分一致フォールバック（複数件）→ ランダム1件 +「曖昧です」通知
+// See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+// ---------------------------------------------------------------------------
+
+describe("content 部分一致フォールバック（複数件）", () => {
+	it("content 部分一致2件以上の場合、「曖昧です」通知が含まれる", async () => {
+		// See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+		const entries = [
+			makeEntry(1, "しょぼーん", "顔文字ショボーンのAA"),
+			makeEntry(2, "しょぼんぬ", "顔文字ショボンヌのAA"),
+		];
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["顔文字"]));
+
+		expect(result.success).toBe(true);
+		expect(result.systemMessage).toContain("曖昧です");
+	});
+
+	it("content 部分一致2件の場合、「曖昧です（2件ヒット）」通知が付与される", async () => {
+		// See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+		const entries = [
+			makeEntry(1, "しょぼーん", "顔文字ショボーンのAA"),
+			makeEntry(2, "しょぼんぬ", "顔文字ショボンヌのAA"),
+		];
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["顔文字"]));
+
+		expect(result.systemMessage).toContain("曖昧です（2件ヒット）");
+	});
+
+	it("content 部分一致複数件の場合、選ばれたエントリの name が systemMessage に含まれる", async () => {
+		// See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
+		const entries = [
+			makeEntry(1, "しょぼーん", "顔文字ショボーンのAA"),
+			makeEntry(2, "しょぼんぬ", "顔文字ショボンヌのAA"),
+		];
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["顔文字"]));
+
+		// ランダムで選ばれたエントリのいずれかが含まれること
+		const containsEntry1 = result.systemMessage!.includes("しょぼーん");
+		const containsEntry2 = result.systemMessage!.includes("しょぼんぬ");
+		expect(containsEntry1 || containsEntry2).toBe(true);
 	});
 });
 
@@ -284,11 +486,12 @@ describe("部分一致検索（複数件）", () => {
 // ---------------------------------------------------------------------------
 
 describe("一致なし", () => {
-	it("完全一致なし・部分一致なしの場合、「見つかりません」を返す", async () => {
+	it("name 完全一致・部分一致・content 部分一致すべてなし → 「見つかりません」を返す", async () => {
 		// See: features/command_copipe.feature @一致するAAがない場合はエラーになる
 		const repo = createMockRepo({
 			findByName: async () => null,
 			findByNamePartial: async () => [],
+			findByContentPartial: async () => [],
 		});
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["存在しないAA"]));
@@ -374,6 +577,7 @@ describe("エッジケース", () => {
 		const repo = createMockRepo({
 			findByName: async () => null,
 			findByNamePartial: async () => [],
+			findByContentPartial: async () => [],
 		});
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx([longName]));
@@ -381,5 +585,37 @@ describe("エッジケース", () => {
 		// エラーなく「見つかりません」が返ること
 		expect(result.success).toBe(true);
 		expect(result.systemMessage).toBe("見つかりません");
+	});
+
+	it("曖昧ヒット時（name 部分一致）のランダムインデックスが配列範囲内である", async () => {
+		// ランダム選択の境界値テスト（インデックスが 0 〜 N-1 の範囲内）
+		const entries = Array.from({ length: 10 }, (_, i) =>
+			makeEntry(i + 1, `エントリ${i + 1}`, `内容${i + 1}`),
+		);
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["エントリ"]));
+
+		// 結果は entries のいずれかの name を含むこと
+		const matchedEntry = entries.find((e) =>
+			result.systemMessage!.includes(e.name),
+		);
+		expect(matchedEntry).toBeDefined();
+	});
+
+	it("content 部分一致にフォールバックする場合、Unicodeを含むクエリでも動作する", async () => {
+		const entry = makeEntry(1, "絵文字AA", "本文に😂が含まれる");
+		const repo = createMockRepo({
+			findByName: async () => null,
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => [entry],
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["😂"]));
+
+		expect(result.systemMessage).toContain("絵文字AA");
 	});
 });
