@@ -33,6 +33,26 @@
 | 21 | dev_board.feature | 未着手 | | |
 | 22 | theme.feature | 未着手 | | |
 
+**Sprint-126 完了 — !copipe コマンド実装**
+
+### Sprint-126の成果
+- TASK-328: !copipe メイン実装（Migration + Repository + Handler + Config + Tests + BDD Steps）
+  - copipe_entries テーブル作成（migration 00032）
+  - CopipeRepository（Supabase + InMemory）
+  - CopipeHandler: ランダム選択 + 完全一致優先検索 + 部分一致 + エラーハンドリング
+  - commands.yaml / commands.ts に copipe エントリ追加
+  - command-service.ts にハンドラ登録
+  - BDDステップ定義 + InMemoryモック登録
+  - 単体テスト21件追加
+- TASK-329: !copipe インフラ（Seed Script + GHA Workflow + ci-failure-notifier）
+  - seed-copipe.ts: copipe-seed.txt パース → DB UPSERT
+  - seed-copipe.yml: main push 時自動実行
+  - ci-failure-notifier.yml に通知追加
+- vitest: 1916テスト PASS / cucumber-js: 340 passed, 16 pending
+- GHA: migration success + seed success
+- コミット: f793c17
+- 本番スモーク: **29/34 PASS**（5件は設計上のスキップ）
+
 **Sprint-125 完了 — 削除済みレス非表示バグ修正**
 
 ### Sprint-125の成果
@@ -173,8 +193,8 @@
 
 ## テスト状況
 
-- vitest: **1896 PASS / 0 failed**（Sprint-121で5件追加）
-- cucumber-js: 355シナリオ / **334 passed / 0 failed** / 16 pending
+- vitest: **1916 PASS / 0 failed**（Sprint-126で21件追加。schema-consistency 1件はcopipe_entriesローカル未適用のため除外）
+- cucumber-js: 361シナリオ / **340 passed / 0 failed** / 16 pending（Sprint-126で+6）
   - pending 16件のうち11件はE2E層で検証済み（thread-ui 7 + polling 2 + bot-display 2）
   - 残りpending 5件: 専ブラインフラ3 + Discord OAuth 2
 - playwright E2E (ローカル): 16 passed, 0 fixme
@@ -253,6 +273,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-126 | !copipe コマンド実装 | completed | `tmp/orchestrator/sprint_126_plan.md` |
 | Sprint-125 | 削除済みレス非表示バグ修正 | completed | `tmp/orchestrator/sprint_125_plan.md` |
 | Sprint-124 | completeRegistrationアトミック化 + user_registration敵対的レビュー | completed | `tmp/orchestrator/sprint_124_plan.md` |
 | Sprint-123 | soft deleteフィルタ修正 + BDDシナリオ追加 | completed | `tmp/orchestrator/sprint_123_plan.md` |
