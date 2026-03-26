@@ -33,6 +33,21 @@
 | 21 | dev_board.feature | 未着手 | | |
 | 22 | theme.feature | 未着手 | | |
 
+**Sprint-127 完了 — !copipe v2 + seed 195件投入**
+
+### Sprint-127の成果
+- TASK-330: !copipe v2 改修
+  - 全文検索フォールバック: name 不一致時に content 部分一致へ
+  - 曖昧ヒット時: エラー終了 → ランダム1件表示 +「曖昧です（N件ヒット）」
+  - コスト変更: 0 → 3（連打防止）
+  - BDD 8シナリオ全PASS / 単体テスト33件PASS
+- seed データ 195件投入（AA コレクション一括登録）
+- trim バグ修正: AA先頭空白の消失を修正（.trim() → trimBlankLines()）
+- seed スクリプト: 追記専用 → 完全同期（UPSERT + DELETE）
+- vitest: 1928テスト PASS / cucumber-js: 342 passed, 16 pending
+- コミット: 37b62a4
+- 本番スモーク: **29/34 PASS**（5件は設計上のスキップ）
+
 **Sprint-126 完了 — !copipe コマンド実装**
 
 ### Sprint-126の成果
@@ -193,8 +208,8 @@
 
 ## テスト状況
 
-- vitest: **1916 PASS / 0 failed**（Sprint-126で21件追加。schema-consistency 1件はcopipe_entriesローカル未適用のため除外）
-- cucumber-js: 361シナリオ / **340 passed / 0 failed** / 16 pending（Sprint-126で+6）
+- vitest: **1928 PASS / 0 failed**（Sprint-127で+12。schema-consistency 1件はcopipe_entriesローカル未適用のため除外）
+- cucumber-js: 363シナリオ / **342 passed / 0 failed** / 16 pending（Sprint-127で+2）
   - pending 16件のうち11件はE2E層で検証済み（thread-ui 7 + polling 2 + bot-display 2）
   - 残りpending 5件: 専ブラインフラ3 + Discord OAuth 2
 - playwright E2E (ローカル): 16 passed, 0 fixme
@@ -273,6 +288,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-127 | !copipe v2 + seed 195件投入 | completed | — |
 | Sprint-126 | !copipe コマンド実装 | completed | `tmp/orchestrator/sprint_126_plan.md` |
 | Sprint-125 | 削除済みレス非表示バグ修正 | completed | `tmp/orchestrator/sprint_125_plan.md` |
 | Sprint-124 | completeRegistrationアトミック化 + user_registration敵対的レビュー | completed | `tmp/orchestrator/sprint_124_plan.md` |
