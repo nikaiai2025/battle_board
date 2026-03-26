@@ -27,6 +27,11 @@ try {
 const DELIMITER = /^====COPIPE:(.+?)====$/;
 const END_MARKER = "====END====";
 
+/** 前後の空行のみ除去。行内の先頭空白は保持する（AA の字下げ保護） */
+function trimBlankLines(text) {
+	return text.replace(/^(\s*\n)+/, "").replace(/(\n\s*)+$/, "");
+}
+
 const lines = raw.split("\n");
 const entries = [];
 const errors = [];
@@ -80,9 +85,9 @@ if (current) {
 // 各エントリの検証
 for (const entry of entries) {
 	const contentLines = lines.slice(entry.contentStart, entry.contentEnd);
-	const content = contentLines.join("\n").trim();
+	const content = trimBlankLines(contentLines.join("\n"));
 
-	if (content.length === 0) {
+	if (content.trim().length === 0) {
 		errors.push(`行${entry.lineNum}: "${entry.name}" の本文が空です`);
 	}
 

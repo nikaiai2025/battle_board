@@ -44,6 +44,15 @@ const DELIMITER = /^====COPIPE:(.+?)====$/;
 const END_MARKER = "====END====";
 
 // ---------------------------------------------------------------------------
+// ユーティリティ
+// ---------------------------------------------------------------------------
+
+/** 前後の空行のみ除去。行内の先頭空白は保持する（AA の字下げ保護） */
+function trimBlankLines(text: string): string {
+	return text.replace(/^(\s*\n)+/, "").replace(/(\n\s*)+$/, "");
+}
+
+// ---------------------------------------------------------------------------
 // パース処理
 // ---------------------------------------------------------------------------
 
@@ -74,7 +83,7 @@ function parseCopipeSeed(filePath: string): CopipeEntry[] {
 		if (line.trim() === END_MARKER) {
 			if (currentName !== null) {
 				const contentLines = lines.slice(currentContentStart, i);
-				const content = contentLines.join("\n").trim();
+				const content = trimBlankLines(contentLines.join("\n"));
 				entries.push({ name: currentName, content });
 				currentName = null;
 			}
@@ -87,7 +96,7 @@ function parseCopipeSeed(filePath: string): CopipeEntry[] {
 			// 前のエントリを閉じる
 			if (currentName !== null) {
 				const contentLines = lines.slice(currentContentStart, i);
-				const content = contentLines.join("\n").trim();
+				const content = trimBlankLines(contentLines.join("\n"));
 				entries.push({ name: currentName, content });
 			}
 
