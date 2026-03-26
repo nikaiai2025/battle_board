@@ -8,7 +8,7 @@
 | タイプ | smoke-test |
 | スプリント | Sprint-122/123 |
 | 担当エージェント | bdd-smoke |
-| ステータス | failed |
+| ステータス | passed（TASK-SMOKE-123b 再実行で解消） |
 
 ## 目的
 
@@ -65,3 +65,27 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 **スクリーンショット:** `ゴミ箱/test-results-prod/basic-flow-基本フロー検証（環境共通）-コ-4f350-nlineSystemInfo-がレス末尾に表示される-prod-flows/test-failed-1.png`
 
 **エラーコンテキスト:** `ゴミ箱/test-results-prod/basic-flow-基本フロー検証（環境共通）-コ-4f350-nlineSystemInfo-がレス末尾に表示される-prod-flows/error-context.md`
+
+---
+
+## 再実行結果（TASK-SMOKE-123b）
+
+### デプロイ確認
+
+| 項目 | 内容 |
+|---|---|
+| 確認日時 | 2026-03-26 |
+| 確認コマンド | `wrangler deployments list --name battle-board` |
+| 最新デプロイ日時 | 2026-03-26T01:15:58Z |
+| 最新バージョンID | 30f3a47c-c60f-4a45-957e-c7a7258df9a7 |
+| 確認結果 | 前回スモーク時デプロイ(2026-03-26T00:45:51Z)より新しい。TASK-325修正込みデプロイを確認OK |
+
+### テスト結果サマリー
+
+| 項目 | 内容 |
+|---|---|
+| 結果 | PASS |
+| PASS/TOTAL | 29/29（実行されたテスト中） |
+| スキップ | 5（設計上のスキップ: ローカル限定テスト） |
+| 所要時間 | 45.6s |
+| 失敗テスト | なし |

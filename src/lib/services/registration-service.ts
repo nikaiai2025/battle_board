@@ -181,17 +181,20 @@ export async function completeRegistration(
 	supabaseAuthId: string,
 	registrationType: "email" | "discord",
 ): Promise<void> {
-	// supabase_auth_id, registration_type, registered_at を更新
-	await UserRepository.updateSupabaseAuthId(
-		userId,
-		supabaseAuthId,
-		registrationType,
-	);
-
 	// PAT 自動生成（32文字 hex）
 	// See: docs/architecture/components/user-registration.md §8.1 自動発行
 	const patToken = randomBytes(16).toString("hex");
-	await UserRepository.updatePatToken(userId, patToken);
+
+	// supabase_auth_id, registration_type, registered_at, pat_token を単一UPDATEで原子的に書き込む。
+	// 旧来の updateSupabaseAuthId + updatePatToken の2段階呼び出しを廃止し、
+	// 中間状態（supabase_auth_id あり・pat_token なし）の固着問題を解消する。
+	// See: tmp/workers/bdd-architect_ATK-REG-001/assessment.md §事実1: 非アトミックな2段階UPDATE
+	await UserRepository.completeRegistrationUpdate(
+		userId,
+		supabaseAuthId,
+		registrationType,
+		patToken,
+	);
 }
 
 /**

@@ -14,7 +14,7 @@
 | 2 | authentication.feature | 完了 | (上と合算) | `20260325_admin_auth` |
 | 3 | posting.feature | **完了** | 9/3 (CRITICAL:1, HIGH:2) | `20260326_posting` |
 | 4 | thread.feature | **完了** | 18/11 (CRITICAL:1, HIGH:10) | `20260326_thread` |
-| 5 | user_registration.feature | 未着手 | | |
+| 5 | user_registration.feature | **完了** | 12/8 (CRITICAL:4, HIGH:2) | `20260326_user_registration` |
 | 6 | reactions.feature | 未着手 | | |
 | 7 | currency.feature | 未着手 | | |
 | 8 | incentive.feature | 未着手 | | |
@@ -38,6 +38,14 @@
 ### Sprint-123の成果
 - TASK-324: soft deleteフィルタ追加 + BDDシナリオ追加
   - `findById`/`findByThreadKey`に`.eq("is_deleted", false)`追加（thread-repository.ts）
+  - `findByThreadId`の両分岐に`.eq("is_deleted", false)`追加（post-repository.ts）
+  - InMemory thread-repository: `isDeleted`チェック追加 + `_findByIdIncludeDeleted`ヘルパー
+  - admin.feature: 削除済みスレッド/レスの非表示検証シナリオ3件追加
+  - エスカレーション: 0件
+- TASK-325: E2Eテスト FABメニュー対応（#fab-post-btn クリック追加 x4箇所）
+- vitest: 1896テスト 全PASS / cucumber-js: 334 passed, 16 pending
+- コミット: 286b02b, 88bbe3f
+- 本番スモーク: **29/29 PASS**
   - `findByThreadId`の両分岐に`.eq("is_deleted", false)`追加（post-repository.ts）
   - InMemory thread-repository: `isDeleted`チェック追加 + `_findByIdIncludeDeleted`ヘルパー
   - admin.feature: 削除済みスレッド/レスの非表示検証シナリオ3件追加
@@ -226,6 +234,11 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 | TD-ARCH-003 | React Compiler 有効化検討 | 中 | Phase 3 |
 | TD-ARCH-004 | Vitest Visual Regression でpendingシナリオ解消 | 低 | UI安定後 |
 | TD-ARCH-005 | BDDテストのESM移行検討 | 低 | 問題発生時 |
+| TD-REG-001 | メール重複検出の文字列依存（identities配列チェックに変更） | 中 | 人間判断待ち |
+| TD-REG-002 | パスワード更新のrecovery認可チェック欠如（purposeカラム追加） | 中 | 人間判断待ち |
+| TD-REG-003 | PAT平文がmypage APIに含まれる（専用API分離） | 中 | 人間判断待ち |
+| TD-REG-004 | MockBbsCgiResponseBuilder引数シグネチャ乖離 | 低 | 次のテスト整備 |
+| TD-REG-005 | NOT_REGISTERED単体テスト欠落 | 低 | 次のテスト整備 |
 
 ### ウォッチリスト（対応不要・監視のみ）
 - Cloudflare Vinext（実験的）、supabase-js v3、Playwright Agent CLI
@@ -243,6 +256,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-124 | completeRegistrationアトミック化 + user_registration敵対的レビュー | completed | `tmp/orchestrator/sprint_124_plan.md` |
 | Sprint-123 | soft deleteフィルタ修正 + BDDシナリオ追加 | completed | `tmp/orchestrator/sprint_123_plan.md` |
 | Sprint-122 | TOCTOU原子採番修正 | completed | `tmp/orchestrator/sprint_122_plan.md` |
 | Sprint-121 | HUMAN-004解消 + リファクタリング2件 + BOT-DIAGクリーンアップ | completed | `tmp/orchestrator/sprint_121_plan.md` |

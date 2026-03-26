@@ -267,8 +267,8 @@ export async function findBySupabaseAuthId(
 
 /**
  * ユーザーの Supabase Auth ID・本登録種別・本登録日時を更新する。
- * 本登録完了コールバック（completeRegistration）から呼び出される。
  *
+ * @deprecated completeRegistration() からは completeRegistrationUpdate() を使用する。
  * See: src/lib/infrastructure/repositories/user-repository.ts > updateSupabaseAuthId
  * See: features/user_registration.feature @メール確認リンクをクリックして本登録が完了する
  */
@@ -285,6 +285,35 @@ export async function updateSupabaseAuthId(
 			supabaseAuthId,
 			registrationType,
 			registeredAt: new Date(Date.now()),
+		});
+	}
+}
+
+/**
+ * 本登録完了に必要な全フィールドを単一操作で原子的に書き込む。
+ * completeRegistration() から呼び出される統合メソッド。
+ * 本番実装（user-repository.ts）の completeRegistrationUpdate と対称実装。
+ *
+ * See: src/lib/infrastructure/repositories/user-repository.ts > completeRegistrationUpdate
+ * See: features/user_registration.feature @メール確認リンクをクリックして本登録が完了する
+ * See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+ */
+export async function completeRegistrationUpdate(
+	userId: string,
+	supabaseAuthId: string,
+	registrationType: "email" | "discord",
+	patToken: string,
+): Promise<void> {
+	assertUUID(userId, "UserRepository.completeRegistrationUpdate.userId");
+	const user = store.get(userId);
+	if (user) {
+		store.set(userId, {
+			...user,
+			supabaseAuthId,
+			registrationType,
+			registeredAt: new Date(Date.now()),
+			patToken,
+			patLastUsedAt: null,
 		});
 	}
 }

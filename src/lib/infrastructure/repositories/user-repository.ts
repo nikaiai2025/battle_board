@@ -378,7 +378,10 @@ export async function findBySupabaseAuthId(
 
 /**
  * ユーザーの Supabase Auth ID・本登録種別・本登録日時を更新する。
- * 本登録完了コールバック（completeRegistration）から呼び出される。
+ *
+ * @deprecated completeRegistration() からは completeRegistrationUpdate() を使用する。
+ * 本メソッドは現在、本番コードから直接呼ばれていない。
+ * 削除前には他の呼び出し箇所がないことを確認すること。
  *
  * See: docs/architecture/components/user-registration.md §5.1 本登録 > completeRegistration
  *
@@ -403,6 +406,45 @@ export async function updateSupabaseAuthId(
 	if (error) {
 		throw new Error(
 			`UserRepository.updateSupabaseAuthId failed: ${error.message}`,
+		);
+	}
+}
+
+/**
+ * 本登録完了に必要な全フィールドを単一UPDATEで原子的に書き込む。
+ * completeRegistration() から呼び出される統合メソッド。
+ *
+ * 非アトミックな2段階UPDATE（updateSupabaseAuthId + updatePatToken）による
+ * 中間状態固着問題を解消する。
+ * See: tmp/workers/bdd-architect_ATK-REG-001/assessment.md §対応必須
+ * See: features/user_registration.feature @メール確認リンクをクリックして本登録が完了する
+ * See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
+ *
+ * @param userId - 対象ユーザーの UUID
+ * @param supabaseAuthId - Supabase Auth の user.id
+ * @param registrationType - 本登録方法: 'email' | 'discord'
+ * @param patToken - 新しい PAT（32文字の hex 文字列）
+ */
+export async function completeRegistrationUpdate(
+	userId: string,
+	supabaseAuthId: string,
+	registrationType: "email" | "discord",
+	patToken: string,
+): Promise<void> {
+	const { error } = await supabaseAdmin
+		.from("users")
+		.update({
+			supabase_auth_id: supabaseAuthId,
+			registration_type: registrationType,
+			registered_at: new Date(Date.now()).toISOString(),
+			pat_token: patToken,
+			pat_last_used_at: null,
+		})
+		.eq("id", userId);
+
+	if (error) {
+		throw new Error(
+			`UserRepository.completeRegistrationUpdate failed: ${error.message}`,
 		);
 	}
 }

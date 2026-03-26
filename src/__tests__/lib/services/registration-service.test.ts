@@ -54,6 +54,7 @@ const { mockSupabaseAuth, mockUserRepository, mockEdgeTokenRepository } =
 			findById: vi.fn(),
 			findBySupabaseAuthId: vi.fn(),
 			findByPatToken: vi.fn(),
+			completeRegistrationUpdate: vi.fn(),
 			updateSupabaseAuthId: vi.fn(),
 			updatePatToken: vi.fn(),
 			updatePatLastUsedAt: vi.fn(),
@@ -86,6 +87,8 @@ vi.mock("../../../lib/infrastructure/repositories/user-repository", () => ({
 		mockUserRepository.findBySupabaseAuthId(...args),
 	findByPatToken: (...args: unknown[]) =>
 		mockUserRepository.findByPatToken(...args),
+	completeRegistrationUpdate: (...args: unknown[]) =>
+		mockUserRepository.completeRegistrationUpdate(...args),
 	updateSupabaseAuthId: (...args: unknown[]) =>
 		mockUserRepository.updateSupabaseAuthId(...args),
 	updatePatToken: (...args: unknown[]) =>
@@ -336,10 +339,12 @@ describe("RegistrationService", () => {
 	// =========================================================================
 
 	describe("completeRegistration", () => {
-		it("正常: supabase_auth_id の更新と PAT 自動生成が呼ばれる", async () => {
+		it("正常: completeRegistrationUpdate が1回の呼び出しで全フィールドを更新する（アトミック化）", async () => {
 			// See: features/user_registration.feature @メール確認リンクをクリックして本登録が完了する
-			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
-			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
+			// See: tmp/workers/bdd-architect_ATK-REG-001/assessment.md §修正方針
+			mockUserRepository.completeRegistrationUpdate.mockResolvedValue(
+				undefined,
+			);
 
 			await RegistrationService.completeRegistration(
 				USER_ID,
@@ -347,22 +352,28 @@ describe("RegistrationService", () => {
 				"email",
 			);
 
-			expect(mockUserRepository.updateSupabaseAuthId).toHaveBeenCalledWith(
+			// 統合メソッドが1回だけ呼ばれることを確認（非アトミック2段階呼び出しではなくなった）
+			expect(
+				mockUserRepository.completeRegistrationUpdate,
+			).toHaveBeenCalledTimes(1);
+			expect(
+				mockUserRepository.completeRegistrationUpdate,
+			).toHaveBeenCalledWith(
 				USER_ID,
 				SUPABASE_AUTH_ID,
 				"email",
-			);
-			// PAT が 32文字 hex で updatePatToken が呼ばれることを確認
-			expect(mockUserRepository.updatePatToken).toHaveBeenCalledWith(
-				USER_ID,
 				expect.stringMatching(/^[0-9a-f]{32}$/),
 			);
+			// 旧来の2段階呼び出しが行われないことを確認
+			expect(mockUserRepository.updateSupabaseAuthId).not.toHaveBeenCalled();
+			expect(mockUserRepository.updatePatToken).not.toHaveBeenCalled();
 		});
 
-		it("正常: Discord 本登録の場合も PAT が自動生成される", async () => {
+		it("正常: Discord 本登録の場合も completeRegistrationUpdate が呼ばれる", async () => {
 			// See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
-			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
-			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
+			mockUserRepository.completeRegistrationUpdate.mockResolvedValue(
+				undefined,
+			);
 
 			await RegistrationService.completeRegistration(
 				USER_ID,
@@ -370,24 +381,26 @@ describe("RegistrationService", () => {
 				"discord",
 			);
 
-			expect(mockUserRepository.updateSupabaseAuthId).toHaveBeenCalledWith(
+			expect(
+				mockUserRepository.completeRegistrationUpdate,
+			).toHaveBeenCalledWith(
 				USER_ID,
 				SUPABASE_AUTH_ID,
 				"discord",
-			);
-			expect(mockUserRepository.updatePatToken).toHaveBeenCalledWith(
-				USER_ID,
 				expect.stringMatching(/^[0-9a-f]{32}$/),
 			);
 		});
 
 		it("正常: 連続して呼ばれた場合、PAT は毎回異なる値が生成される", async () => {
 			// See: docs/architecture/components/user-registration.md §8.1 自動発行
-			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
-
 			const capturedPats: string[] = [];
-			mockUserRepository.updatePatToken.mockImplementation(
-				(_userId: string, patToken: string) => {
+			mockUserRepository.completeRegistrationUpdate.mockImplementation(
+				(
+					_userId: string,
+					_supabaseAuthId: string,
+					_registrationType: string,
+					patToken: string,
+				) => {
 					capturedPats.push(patToken);
 					return Promise.resolve();
 				},
@@ -553,9 +566,10 @@ describe("RegistrationService", () => {
 			});
 			// 最初は supabase_auth_id で見つからない（未本登録）
 			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(null);
-			// completeRegistration の内部呼び出し
-			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
-			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
+			// completeRegistration の内部呼び出し（統合メソッド）
+			mockUserRepository.completeRegistrationUpdate.mockResolvedValue(
+				undefined,
+			);
 			// 本登録完了後に findById で取得
 			mockUserRepository.findById.mockResolvedValue(createRegisteredUser());
 			mockEdgeTokenRepository.create.mockResolvedValue({});
@@ -566,10 +580,14 @@ describe("RegistrationService", () => {
 			);
 
 			expect(result.success).toBe(true);
-			expect(mockUserRepository.updateSupabaseAuthId).toHaveBeenCalledWith(
+			// completeRegistration が completeRegistrationUpdate を呼び出すことを確認
+			expect(
+				mockUserRepository.completeRegistrationUpdate,
+			).toHaveBeenCalledWith(
 				USER_ID,
 				SUPABASE_AUTH_ID,
 				"discord",
+				expect.stringMatching(/^[0-9a-f]{32}$/),
 			);
 		});
 
@@ -608,9 +626,10 @@ describe("RegistrationService", () => {
 		it("正常(新規本登録): 仮ユーザーを本登録し edgeToken を返す", async () => {
 			// supabase_auth_id で既存ユーザーは見つからない（新規）
 			mockUserRepository.findBySupabaseAuthId.mockResolvedValue(null);
-			// completeRegistration の内部呼び出し
-			mockUserRepository.updateSupabaseAuthId.mockResolvedValue(undefined);
-			mockUserRepository.updatePatToken.mockResolvedValue(undefined);
+			// completeRegistration の内部呼び出し（統合メソッド）
+			mockUserRepository.completeRegistrationUpdate.mockResolvedValue(
+				undefined,
+			);
 			// 本登録完了後に findById で取得
 			mockUserRepository.findById.mockResolvedValue(createRegisteredUser());
 			mockEdgeTokenRepository.create.mockResolvedValue({});
@@ -625,11 +644,14 @@ describe("RegistrationService", () => {
 				expect(result.userId).toBe(USER_ID);
 				expect(result.edgeToken).toBeDefined();
 			}
-			// completeRegistration が "email" タイプで呼ばれること
-			expect(mockUserRepository.updateSupabaseAuthId).toHaveBeenCalledWith(
+			// completeRegistration が "email" タイプで completeRegistrationUpdate を呼び出すこと
+			expect(
+				mockUserRepository.completeRegistrationUpdate,
+			).toHaveBeenCalledWith(
 				USER_ID,
 				SUPABASE_AUTH_ID,
 				"email",
+				expect.stringMatching(/^[0-9a-f]{32}$/),
 			);
 		});
 
