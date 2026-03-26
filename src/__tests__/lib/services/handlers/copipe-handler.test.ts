@@ -6,11 +6,11 @@
  *   2. 引数あり  → name 完全一致
  *   3. 完全一致なし → name 部分一致
  *       - 1件: 表示
- *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット）」通知
+ *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット。うち１件をランダム表示）」通知
  *       - 0件: content 部分一致にフォールバック
  *   4. name 一致なし → content 部分一致
  *       - 1件: 表示
- *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット）」通知
+ *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット。うち１件をランダム表示）」通知
  *       - 0件: 「見つかりません」エラー
  *
  * エッジケース:
@@ -290,7 +290,7 @@ describe("name 部分一致検索（複数件）", () => {
 		expect(result.systemMessage).toContain("曖昧です");
 	});
 
-	it("部分一致2件の場合、「曖昧です（2件ヒット）」通知が付与される", async () => {
+	it("部分一致2件の場合、「曖昧です（2件ヒット。うち１件をランダム表示）」通知が付与される", async () => {
 		// See: features/command_copipe.feature @名前の部分一致で複数件ヒットした場合はランダムに1件表示される
 		const entries = [
 			makeEntry(1, "しょぼーん", "(´・ω・`)"),
@@ -303,7 +303,9 @@ describe("name 部分一致検索（複数件）", () => {
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["しょぼ"]));
 
-		expect(result.systemMessage).toContain("曖昧です（2件ヒット）");
+		expect(result.systemMessage).toContain(
+			"曖昧です（2件ヒット。うち１件をランダム表示）",
+		);
 	});
 
 	it("部分一致複数件の場合、ヒット件数が systemMessage に含まれる（3件）", async () => {
@@ -319,7 +321,9 @@ describe("name 部分一致検索（複数件）", () => {
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["しょぼ"]));
 
-		expect(result.systemMessage).toContain("曖昧です（3件ヒット）");
+		expect(result.systemMessage).toContain(
+			"曖昧です（3件ヒット。うち１件をランダム表示）",
+		);
 	});
 
 	it("部分一致複数件の場合、選ばれたエントリの name と content が systemMessage に含まれる", async () => {
@@ -442,7 +446,7 @@ describe("content 部分一致フォールバック（複数件）", () => {
 		expect(result.systemMessage).toContain("曖昧です");
 	});
 
-	it("content 部分一致2件の場合、「曖昧です（2件ヒット）」通知が付与される", async () => {
+	it("content 部分一致2件の場合、「曖昧です（2件ヒット。うち１件をランダム表示）」通知が付与される", async () => {
 		// See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
 		const entries = [
 			makeEntry(1, "しょぼーん", "顔文字ショボーンのAA"),
@@ -456,7 +460,9 @@ describe("content 部分一致フォールバック（複数件）", () => {
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["顔文字"]));
 
-		expect(result.systemMessage).toContain("曖昧です（2件ヒット）");
+		expect(result.systemMessage).toContain(
+			"曖昧です（2件ヒット。うち１件をランダム表示）",
+		);
 	});
 
 	it("content 部分一致複数件の場合、選ばれたエントリの name が systemMessage に含まれる", async () => {

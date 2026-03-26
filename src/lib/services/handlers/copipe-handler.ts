@@ -166,7 +166,7 @@ export class CopipeHandler implements CommandHandler {
 			const entry = partialMatches[randomIndex];
 			return {
 				success: true,
-				systemMessage: `【${entry.name}】\n${entry.content}\n曖昧です（${partialMatches.length}件ヒット）`,
+				systemMessage: `曖昧です（${partialMatches.length}件ヒット。うち１件をランダム表示）\n【${entry.name}】\n${entry.content}`,
 			};
 		}
 
@@ -215,7 +215,7 @@ export class CopipeHandler implements CommandHandler {
 		const entry = contentMatches[randomIndex];
 		return {
 			success: true,
-			systemMessage: `【${entry.name}】\n${entry.content}\n曖昧です（${contentMatches.length}件ヒット）`,
+			systemMessage: `曖昧です（${contentMatches.length}件ヒット。うち１件をランダム表示）\n【${entry.name}】\n${entry.content}`,
 		};
 	}
 }
