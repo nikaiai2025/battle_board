@@ -76,6 +76,16 @@ export default function VisionSection() {
 							人間はコードを1行も書かず、要件定義と意思決定に集中する——そんな開発が可能な時代になりました。
 							このサイト自体がその実証実験です。
 						</p>
+						<p className="mt-1">
+							<a
+								href="https://github.com/nikaiai2025/battle_board"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+							>
+								GitHub リポジトリ
+							</a>
+						</p>
 					</section>
 				</div>
 			</CollapsibleContent>
