@@ -501,14 +501,19 @@ Then(
 		);
 
 		// スレッド内の全レスも is_deleted = true であるか確認する
-		// findByThreadId は isDeleted=true を除外するため、返却数が 0 であることで検証する
-		const activePosts = await InMemoryPostRepo.findByThreadId(
+		// findByThreadId は削除済みレスも含めて返すため、全件の isDeleted フラグを検証する
+		const allPosts = await InMemoryPostRepo.findByThreadId(
 			this.lastDeletedThreadId,
 		);
+		assert(
+			allPosts.length > 0,
+			`スレッド内にレスが 1 件以上存在することを期待しましたが 0 件でした`,
+		);
+		const nonDeletedPosts = allPosts.filter((p) => !p.isDeleted);
 		assert.strictEqual(
-			activePosts.length,
+			nonDeletedPosts.length,
 			0,
-			`スレッド内のアクティブなレスが 0 件であることを期待しましたが ${activePosts.length} 件でした`,
+			`スレッド内の全レスが isDeleted=true であることを期待しましたが、isDeleted=false のレスが ${nonDeletedPosts.length} 件あります`,
 		);
 	},
 );
@@ -2323,7 +2328,7 @@ Then(
 // 削除済みコンテンツの非表示シナリオ ステップ定義
 // ATK-004-2 / ATK-003-1: soft delete フィルタの対称化
 // See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
-// See: features/admin.feature @管理者が削除したレスはスレッド閲覧時に表示されない
+// See: features/admin.feature @管理者が削除したレスはスレッド閲覧時に「削除されました」と表示される
 // See: features/admin.feature @削除済みスレッドの再削除は冪等にnot_foundを返す
 // ---------------------------------------------------------------------------
 
@@ -2388,39 +2393,35 @@ Then(
 );
 
 /**
- * スレッドのレス一覧に削除済みレスが含まれないことを検証する。
- * findByThreadId は is_deleted=false フィルタを適用するため、
- * 削除済みレスは結果に含まれない。
+ * 削除済みレスがスレッドのレス一覧に含まれ、isDeleted フラグが true であることを検証する。
+ * findByThreadId は削除済みレスも含めて返すため、プレゼンテーション層で
+ * 「このレスは削除されました」プレースホルダーを表示する設計。
+ * BDD レベルでは isDeleted フラグの検証で受け入れ基準を満たす。
  *
- * See: features/admin.feature @管理者が削除したレスはスレッド閲覧時に表示されない
+ * See: features/admin.feature @管理者が削除したレスはスレッド閲覧時に「削除されました」と表示される
  * See: src/lib/infrastructure/repositories/post-repository.ts > findByThreadId
  */
 Then(
-	"スレッドのレス一覧に削除済みレスが含まれない",
+	"スレッドのレス一覧で削除済みレスが「このレスは削除されました」と表示される",
 	async function (this: BattleBoardWorld) {
 		assert(this.currentThreadId, "currentThreadId が設定されていません");
 		assert(this.lastDeletedPostId, "削除されたレス ID が設定されていません");
 
-		// findByThreadId は is_deleted=false のレスのみ返す
+		// findByThreadId は削除済みレスも含めて返す
 		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
 
-		// 削除されたレスが含まれていないことを確認する
-		const deletedPostInList = posts.find(
-			(p) => p.id === this.lastDeletedPostId,
-		);
-		assert.strictEqual(
-			deletedPostInList,
-			undefined,
-			`削除済みレスが findByThreadId の結果に含まれています（soft delete フィルタが機能していません）`,
+		// 削除されたレスがレス一覧に含まれていることを確認する
+		const deletedPost = posts.find((p) => p.id === this.lastDeletedPostId);
+		assert(
+			deletedPost !== undefined,
+			`削除済みレスが findByThreadId の結果に含まれていません（レス番号保持の設計意図に反します）`,
 		);
 
-		// システムレス（削除通知）のみが残っていることも確認する
-		// 削除前のレス（>>5）は除外され、通知システムレスのみ残る
-		const userPosts = posts.filter((p) => !p.isSystemMessage);
+		// 削除済みレスの isDeleted フラグが true であることを確認する
 		assert.strictEqual(
-			userPosts.length,
-			0,
-			`非システムレスが ${userPosts.length} 件残っています（削除済みレスが除外されていない可能性）`,
+			deletedPost.isDeleted,
+			true,
+			`削除済みレスの isDeleted が true であることを期待しましたが false でした`,
 		);
 	},
 );

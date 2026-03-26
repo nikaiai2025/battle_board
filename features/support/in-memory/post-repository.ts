@@ -80,7 +80,7 @@ export async function findByThreadId(
 ): Promise<Post[]> {
 	assertUUID(threadId, "PostRepository.findByThreadId.threadId");
 	const posts = Array.from(store.values())
-		.filter((p) => p.threadId === threadId && !p.isDeleted)
+		.filter((p) => p.threadId === threadId)
 		.sort((a, b) => a.postNumber - b.postNumber);
 
 	// latestCount 指定時: 末尾 latestCount 件を返す
