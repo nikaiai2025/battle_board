@@ -61,7 +61,8 @@ copipe:
 
 ### 5. 運用: GitHub Actions 自動デプロイ
 
-`config/copipe-seed.txt` を main に push → GHA が自動で本番DBに反映。
+`config/copipe-seed.txt` を main に push → GHA が自動で本番DBに完全同期。
+seed.txt が正本: 追加・編集・削除すべてが DB に反映される。
 既存の `seed-pinned-thread.yml` と同一パターン。追加の GitHub Secrets は不要。
 
 ## 実装タスク一覧

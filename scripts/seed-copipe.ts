@@ -1,11 +1,15 @@
 /**
- * copipe_entries テーブルへの seed データ投入スクリプト
+ * copipe_entries テーブルへの seed データ完全同期スクリプト
  *
  * 処理フロー:
  *   1. config/copipe-seed.txt を読み込む
  *   2. ====COPIPE:タイトル==== 区切りでパースし name + content のペアを抽出
- *   3. copipe_entries テーブルに INSERT ... ON CONFLICT (name) DO NOTHING で UPSERT
- *      （冪等: 既存 name はスキップ、新規のみ INSERT）
+ *   3. copipe_entries テーブルを seed.txt の内容に完全同期:
+ *      - 新規 name → INSERT
+ *      - 既存 name → content を UPDATE
+ *      - seed.txt にない name → DELETE
+ *
+ * seed.txt が唯一の正本。DB は毎回この内容に一致させる。
  *
  * 実行方法:
  *   npx tsx scripts/seed-copipe.ts
@@ -100,13 +104,10 @@ function parseCopipeSeed(filePath: string): CopipeEntry[] {
 // ---------------------------------------------------------------------------
 
 /**
- * copipe_entries テーブルに seed データを投入する。
- * INSERT ... ON CONFLICT (name) DO NOTHING で冪等性を保証。
- * スクリプトのメインエントリーポイント。
+ * copipe_entries テーブルを seed.txt の内容に完全同期する。
+ * seed.txt が正本: 追加・更新・削除すべてを反映する。
  */
 async function main(): Promise<void> {
-	// Supabase クライアントを動的インポート（スクリプト実行時のみ必要）
-	// NOTE: このスクリプトは Node.js 環境で直接実行されるため dynamic import を使用する
 	const { createClient } = await import("@supabase/supabase-js");
 
 	const supabaseUrl = process.env.SUPABASE_URL;
@@ -127,38 +128,65 @@ async function main(): Promise<void> {
 	console.log(`[seed-copipe] パース完了: ${entries.length} 件のエントリ`);
 
 	if (entries.length === 0) {
-		console.log("[seed-copipe] 投入するエントリがありません。終了します");
+		console.log("[seed-copipe] seed が空です。全エントリを削除します");
+		const { error } = await supabase
+			.from("copipe_entries")
+			.delete()
+			.neq("id", 0); // 全行削除（neq で WHERE TRUE 相当）
+		if (error) throw new Error(`全削除エラー: ${error.message}`);
+		console.log("[seed-copipe] 全エントリ削除完了");
 		return;
 	}
 
-	// copipe_entries テーブルに INSERT ... ON CONFLICT (name) DO NOTHING で投入
-	// ON CONFLICT DO NOTHING: 既存 name はスキップ、新規のみ INSERT（冪等）
-	console.log("[seed-copipe] copipe_entries に投入中...");
-	const { data, error } = await supabase
-		.from("copipe_entries")
-		.upsert(
-			entries.map((e) => ({ name: e.name, content: e.content })),
-			{ onConflict: "name", ignoreDuplicates: true },
-		)
-		.select("name");
+	// Step 1: UPSERT — 新規は INSERT、既存は content を UPDATE
+	console.log("[seed-copipe] UPSERT 中...");
+	const { error: upsertError } = await supabase.from("copipe_entries").upsert(
+		entries.map((e) => ({ name: e.name, content: e.content })),
+		{ onConflict: "name" },
+	);
 
-	if (error) {
-		throw new Error(`copipe_entries 投入エラー: ${error.message}`);
+	if (upsertError) {
+		throw new Error(`UPSERT エラー: ${upsertError.message}`);
 	}
 
-	const insertedCount = data?.length ?? 0;
-	const skippedCount = entries.length - insertedCount;
+	// Step 2: DELETE — seed.txt にない name を削除
+	const seedNames = entries.map((e) => e.name);
 
-	console.log("[seed-copipe] 投入完了");
-	console.log(`  新規 INSERT: ${insertedCount} 件`);
-	console.log(`  スキップ（既存）: ${skippedCount} 件`);
+	// DB 上の全 name を取得
+	const { data: dbEntries, error: selectError } = await supabase
+		.from("copipe_entries")
+		.select("name");
 
-	// 投入したエントリ名を表示
+	if (selectError) {
+		throw new Error(`SELECT エラー: ${selectError.message}`);
+	}
+
+	const toDelete = (dbEntries ?? [])
+		.map((row: { name: string }) => row.name)
+		.filter((name: string) => !seedNames.includes(name));
+
+	if (toDelete.length > 0) {
+		const { error: deleteError } = await supabase
+			.from("copipe_entries")
+			.delete()
+			.in("name", toDelete);
+
+		if (deleteError) {
+			throw new Error(`DELETE エラー: ${deleteError.message}`);
+		}
+	}
+
+	// 結果表示
+	console.log("[seed-copipe] 同期完了");
+	console.log(`  seed エントリ数: ${entries.length}`);
+	console.log(`  削除: ${toDelete.length} 件`);
+	if (toDelete.length > 0) {
+		for (const name of toDelete) {
+			console.log(`    [DELETE] ${name}`);
+		}
+	}
 	for (const entry of entries) {
-		const status = data?.some((d: { name: string }) => d.name === entry.name)
-			? "INSERT"
-			: "SKIP";
-		console.log(`  [${status}] ${entry.name}`);
+		console.log(`  [SYNC] ${entry.name}`);
 	}
 }
 
