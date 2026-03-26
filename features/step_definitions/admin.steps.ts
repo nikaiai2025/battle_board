@@ -488,7 +488,11 @@ Then(
 		);
 
 		// スレッドが is_deleted = true になっているか確認する
-		const thread = await InMemoryThreadRepo.findById(this.lastDeletedThreadId);
+		// findById は削除済みを除外するため、テスト用ヘルパーで直接参照する
+		// See: features/support/in-memory/thread-repository.ts > _findByIdIncludeDeleted
+		const thread = InMemoryThreadRepo._findByIdIncludeDeleted(
+			this.lastDeletedThreadId,
+		);
 		assert(thread !== null, "削除されたスレッドが存在しません");
 		assert.strictEqual(
 			thread.isDeleted,
@@ -2314,3 +2318,169 @@ Then(
 		);
 	},
 );
+
+// ---------------------------------------------------------------------------
+// 削除済みコンテンツの非表示シナリオ ステップ定義
+// ATK-004-2 / ATK-003-1: soft delete フィルタの対称化
+// See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
+// See: features/admin.feature @管理者が削除したレスはスレッド閲覧時に表示されない
+// See: features/admin.feature @削除済みスレッドの再削除は冪等にnot_foundを返す
+// ---------------------------------------------------------------------------
+
+/**
+ * 削除されたスレッドが findById で取得できないことを検証する。
+ * findById は is_deleted=false フィルタを適用するため、
+ * 削除済みスレッドに対して null を返すことを確認する。
+ *
+ * See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
+ * See: src/lib/infrastructure/repositories/thread-repository.ts > findById
+ */
+Then(
+	"スレッド {string} をIDで取得しても見つからない",
+	async function (this: BattleBoardWorld, _threadTitle: string) {
+		assert(
+			this.lastDeletedThreadId,
+			"削除されたスレッド ID が設定されていません",
+		);
+
+		// findById は削除済みスレッドを除外するため null が返る
+		const thread = await InMemoryThreadRepo.findById(this.lastDeletedThreadId);
+		assert.strictEqual(
+			thread,
+			null,
+			`削除済みスレッドが findById で取得できてしまいました（soft delete フィルタが機能していません）`,
+		);
+	},
+);
+
+/**
+ * 削除されたスレッドが findByThreadKey で取得できないことを検証する。
+ * findByThreadKey は is_deleted=false フィルタを適用するため、
+ * 削除済みスレッドに対して null を返すことを確認する。
+ *
+ * See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
+ * See: src/lib/infrastructure/repositories/thread-repository.ts > findByThreadKey
+ */
+Then(
+	"スレッド {string} をスレッドキーで取得しても見つからない",
+	async function (this: BattleBoardWorld, _threadTitle: string) {
+		assert(
+			this.lastDeletedThreadId,
+			"削除されたスレッド ID が設定されていません",
+		);
+
+		// 削除されたスレッドの threadKey を _findByIdIncludeDeleted で取得する
+		const deletedThread = InMemoryThreadRepo._findByIdIncludeDeleted(
+			this.lastDeletedThreadId,
+		);
+		assert(deletedThread !== null, "削除されたスレッドが存在しません");
+
+		// findByThreadKey は削除済みスレッドを除外するため null が返る
+		const thread = await InMemoryThreadRepo.findByThreadKey(
+			deletedThread.threadKey,
+		);
+		assert.strictEqual(
+			thread,
+			null,
+			`削除済みスレッドが findByThreadKey で取得できてしまいました（soft delete フィルタが機能していません）`,
+		);
+	},
+);
+
+/**
+ * スレッドのレス一覧に削除済みレスが含まれないことを検証する。
+ * findByThreadId は is_deleted=false フィルタを適用するため、
+ * 削除済みレスは結果に含まれない。
+ *
+ * See: features/admin.feature @管理者が削除したレスはスレッド閲覧時に表示されない
+ * See: src/lib/infrastructure/repositories/post-repository.ts > findByThreadId
+ */
+Then(
+	"スレッドのレス一覧に削除済みレスが含まれない",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentThreadId, "currentThreadId が設定されていません");
+		assert(this.lastDeletedPostId, "削除されたレス ID が設定されていません");
+
+		// findByThreadId は is_deleted=false のレスのみ返す
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+
+		// 削除されたレスが含まれていないことを確認する
+		const deletedPostInList = posts.find(
+			(p) => p.id === this.lastDeletedPostId,
+		);
+		assert.strictEqual(
+			deletedPostInList,
+			undefined,
+			`削除済みレスが findByThreadId の結果に含まれています（soft delete フィルタが機能していません）`,
+		);
+
+		// システムレス（削除通知）のみが残っていることも確認する
+		// 削除前のレス（>>5）は除外され、通知システムレスのみ残る
+		const userPosts = posts.filter((p) => !p.isSystemMessage);
+		assert.strictEqual(
+			userPosts.length,
+			0,
+			`非システムレスが ${userPosts.length} 件残っています（削除済みレスが除外されていない可能性）`,
+		);
+	},
+);
+
+/**
+ * 削除済みスレッドの再削除を実行する。
+ * deleteThread は findById で削除済みスレッドを取得できないため not_found を返す。
+ *
+ * See: features/admin.feature @削除済みスレッドの再削除は冪等にnot_foundを返す
+ * See: src/lib/services/admin-service.ts > deleteThread
+ */
+When(
+	"スレッド {string} の再削除を実行する",
+	async function (this: BattleBoardWorld, _threadTitle: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+		assert(
+			this.lastDeletedThreadId,
+			"削除されたスレッド ID が設定されていません",
+		);
+
+		const AdminService = getAdminService();
+		const result = await AdminService.deleteThread(
+			this.lastDeletedThreadId,
+			this.currentAdminId,
+		);
+
+		// 再削除の結果を lastResult に記録する（Then ステップで検証する）
+		if (result.success) {
+			this.lastResult = { type: "success", data: result };
+		} else {
+			this.lastResult = {
+				type: "error",
+				message: "スレッドが見つかりません",
+				code: result.reason,
+			};
+		}
+	},
+);
+
+/**
+ * 再削除の結果が not_found エラーであることを検証する。
+ * 削除済みスレッドに対する再削除は冪等に not_found を返す。
+ *
+ * See: features/admin.feature @削除済みスレッドの再削除は冪等にnot_foundを返す
+ */
+Then("再削除の結果はnot_foundエラーである", function (this: BattleBoardWorld) {
+	assert(this.lastResult, "操作結果が存在しません");
+	assert.strictEqual(
+		this.lastResult.type,
+		"error",
+		`not_found エラーを期待しましたが "${this.lastResult.type}" でした`,
+	);
+	const errorResult = this.lastResult as {
+		type: "error";
+		message: string;
+		code?: string;
+	};
+	assert.strictEqual(
+		errorResult.code,
+		"not_found",
+		`エラーコード "not_found" を期待しましたが "${errorResult.code}" でした`,
+	);
+});

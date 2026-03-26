@@ -113,6 +113,7 @@ export async function findById(id: string): Promise<Post | null> {
  * @param options.latestCount - 最新N件を取得。@pagination のl表示用
  * @returns Post 配列（post_number ASC ソート済み）
  */
+// See: features/admin.feature @管理者が削除したレスはスレッド閲覧時に表示されない
 export async function findByThreadId(
 	threadId: string,
 	options: {
@@ -128,6 +129,7 @@ export async function findByThreadId(
 			.from("posts")
 			.select("*")
 			.eq("thread_id", threadId)
+			.eq("is_deleted", false)
 			.order("post_number", { ascending: false })
 			.limit(options.latestCount);
 
@@ -143,6 +145,7 @@ export async function findByThreadId(
 		.from("posts")
 		.select("*")
 		.eq("thread_id", threadId)
+		.eq("is_deleted", false)
 		.order("post_number", { ascending: true });
 
 	// fromPostNumber が指定された場合は、その番号以降のレスだけを取得する

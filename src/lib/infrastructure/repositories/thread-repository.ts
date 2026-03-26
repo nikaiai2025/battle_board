@@ -73,11 +73,13 @@ function rowToThread(row: ThreadRow): Thread {
  * @param id - スレッドの UUID
  * @returns 見つかった Thread、存在しない場合は null
  */
+// See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
 export async function findById(id: string): Promise<Thread | null> {
 	const { data, error } = await supabaseAdmin
 		.from("threads")
 		.select("*")
 		.eq("id", id)
+		.eq("is_deleted", false)
 		.single();
 
 	if (error) {
@@ -94,6 +96,7 @@ export async function findById(id: string): Promise<Thread | null> {
  * @param threadKey - 専ブラ互換キー
  * @returns 見つかった Thread、存在しない場合は null
  */
+// See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
 export async function findByThreadKey(
 	threadKey: string,
 ): Promise<Thread | null> {
@@ -101,6 +104,7 @@ export async function findByThreadKey(
 		.from("threads")
 		.select("*")
 		.eq("thread_key", threadKey)
+		.eq("is_deleted", false)
 		.single();
 
 	if (error) {

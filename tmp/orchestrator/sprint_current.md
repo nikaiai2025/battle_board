@@ -33,6 +33,27 @@
 | 21 | dev_board.feature | 未着手 | | |
 | 22 | theme.feature | 未着手 | | |
 
+**Sprint-122/123 完了 — TOCTOU原子採番 + soft deleteフィルタ修正**
+
+### Sprint-123の成果
+- TASK-324: soft deleteフィルタ追加 + BDDシナリオ追加
+  - `findById`/`findByThreadKey`に`.eq("is_deleted", false)`追加（thread-repository.ts）
+  - `findByThreadId`の両分岐に`.eq("is_deleted", false)`追加（post-repository.ts）
+  - InMemory thread-repository: `isDeleted`チェック追加 + `_findByIdIncludeDeleted`ヘルパー
+  - admin.feature: 削除済みスレッド/レスの非表示検証シナリオ3件追加
+  - エスカレーション: 0件
+- vitest: 1896テスト 全PASS / cucumber-js: 334 passed, 16 pending
+
+### Sprint-122の成果
+- TASK-323: レス番号TOCTOU競合修正（原子採番RPC）
+  - 新規RPC `insert_post_with_next_number` で threads FOR UPDATE ロック + 採番 + INSERT原子実行
+  - `getNextPostNumber` 廃止、`createWithAtomicNumber` に統合
+  - Step 6.5/7/8 を先行実行し、Step 9 でRPC一発に変更
+  - Step 9d: milestone_postボーナスをRPC戻り値の実postNumberで遅延評価
+  - ESC-TASK-323-1/2 解決: locked_files外のテスト・ステップ定義の機械的置換
+- vitest: 1896テスト 全PASS / cucumber-js: 331 passed, 16 pending
+- コミット: 21de5a6
+
 **Sprint-121 完了 — HUMAN-004解消 + リファクタリング2件 + BOT-DIAGクリーンアップ**
 
 ### Sprint-121の成果
@@ -148,7 +169,7 @@
 ## テスト状況
 
 - vitest: **1896 PASS / 0 failed**（Sprint-121で5件追加）
-- cucumber-js: 347シナリオ / **331 passed / 0 failed** / 16 pending
+- cucumber-js: 355シナリオ / **334 passed / 0 failed** / 16 pending
   - pending 16件のうち11件はE2E層で検証済み（thread-ui 7 + polling 2 + bot-display 2）
   - 残りpending 5件: 専ブラインフラ3 + Discord OAuth 2
 - playwright E2E (ローカル): 16 passed, 0 fixme
@@ -222,6 +243,8 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-123 | soft deleteフィルタ修正 + BDDシナリオ追加 | completed | `tmp/orchestrator/sprint_123_plan.md` |
+| Sprint-122 | TOCTOU原子採番修正 | completed | `tmp/orchestrator/sprint_122_plan.md` |
 | Sprint-121 | HUMAN-004解消 + リファクタリング2件 + BOT-DIAGクリーンアップ | completed | `tmp/orchestrator/sprint_121_plan.md` |
 | Sprint-120 | !newspaper 403修正 + BOT !w 本番復旧 | completed | `tmp/orchestrator/sprint_120_plan.md` |
 | Sprint-119 | BOT !wコマンド FK制約違反修正 | completed | `tmp/orchestrator/sprint_119_plan.md` |

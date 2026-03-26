@@ -37,25 +37,38 @@ export function _insert(thread: Thread): void {
 // ---------------------------------------------------------------------------
 
 /**
- * スレッドを ID で取得する。
+ * スレッドを ID で取得する。削除済みスレッドは除外する。
  * See: src/lib/infrastructure/repositories/thread-repository.ts
+ * See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
  */
 export async function findById(id: string): Promise<Thread | null> {
 	assertUUID(id, "ThreadRepository.findById.id");
-	return store.get(id) ?? null;
+	const thread = store.get(id) ?? null;
+	if (thread && thread.isDeleted) return null;
+	return thread;
 }
 
 /**
- * スレッドを thread_key で取得する。
+ * スレッドを thread_key で取得する。削除済みスレッドは除外する。
  * See: src/lib/infrastructure/repositories/thread-repository.ts
+ * See: features/admin.feature @管理者が削除したスレッドはURL直接アクセスでも表示されない
  */
 export async function findByThreadKey(
 	threadKey: string,
 ): Promise<Thread | null> {
 	for (const thread of store.values()) {
-		if (thread.threadKey === threadKey) return thread;
+		if (thread.threadKey === threadKey && !thread.isDeleted) return thread;
 	}
 	return null;
+}
+
+/**
+ * テスト用ヘルパー: 削除済みを含む全スレッドを ID で取得する。
+ * Then ステップで isDeleted フラグを直接検証するために使用する。
+ * See: features/admin.feature @管理者が指定したスレッドを削除する
+ */
+export function _findByIdIncludeDeleted(id: string): Thread | null {
+	return store.get(id) ?? null;
 }
 
 /**
