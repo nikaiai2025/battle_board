@@ -35,6 +35,8 @@ import { usePostFormRegister } from "./PostFormContext";
 interface PostFormProps {
 	/** 書き込み先スレッドID */
 	threadId: string;
+	/** insertText が実行された時のコールバック（FABパネル自動展開用） */
+	onTextInserted?: () => void;
 }
 
 /**
@@ -47,7 +49,7 @@ interface PostFormProps {
  * See: docs/specs/screens/thread-view.yaml > post-form
  * See: features/thread.feature @post_number_display
  */
-export default function PostForm({ threadId }: PostFormProps) {
+export default function PostForm({ threadId, onTextInserted }: PostFormProps) {
 	const router = useRouter();
 	const [body, setBody] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -176,12 +178,16 @@ export default function PostForm({ threadId }: PostFormProps) {
 	 * See: features/thread.feature @post_number_display
 	 * See: tmp/workers/bdd-architect_TASK-162/design.md §4.3
 	 */
-	const insertText = useCallback((text: string) => {
-		setBody((prev) => {
-			if (prev.trim() === "") return text;
-			return `${prev}\n${text}`;
-		});
-	}, []);
+	const insertText = useCallback(
+		(text: string) => {
+			setBody((prev) => {
+				if (prev.trim() === "") return text;
+				return `${prev}\n${text}`;
+			});
+			onTextInserted?.();
+		},
+		[onTextInserted],
+	);
 
 	// PostFormContextProvider（親）に insertText を登録する
 	// PostItem のレス番号クリック時に、この関数が PostFormContext 経由で呼ばれる
@@ -198,7 +204,7 @@ export default function PostForm({ threadId }: PostFormProps) {
 			<form
 				id="post-form"
 				onSubmit={handleSubmit}
-				className="border border-border rounded p-3 mb-4 bg-muted"
+				className="border border-border rounded p-3 bg-muted"
 			>
 				<div className="mb-2">
 					{/* post-body-input: 本文入力エリア

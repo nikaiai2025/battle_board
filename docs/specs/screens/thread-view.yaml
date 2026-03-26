@@ -136,3 +136,27 @@ elements:
       - !w >>N — 指定レスに草を生やす
       - !hissi >>N — 指定レスの投稿者の直近書き込み調査
       - !kinou >>N — 指定レスの投稿者の昨日の書き込み調査
+
+  - id: fab-menu
+    type: component
+    description: フローティングアクションメニュー（画面右下固定）
+    children:
+      - id: fab-post-btn
+        type: button
+        icon: pencil
+        action: ボトムシートで書き込みフォームを開く
+      - id: fab-search-btn
+        type: button
+        icon: search
+        action: ボトムシートでスレッド内検索を開く
+        status: wip
+      - id: fab-image-btn
+        type: button
+        icon: image
+        action: ボトムシートで画像アップロードを開く
+        status: wip
+      - id: fab-settings-btn
+        type: button
+        icon: settings
+        action: ボトムシートで設定パネルを開く
+        status: wip

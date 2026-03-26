@@ -4,6 +4,35 @@
 
 ## 現在のフェーズ
 
+**敵対的コードレビュー実施中（Feature単位・全件順次実施）**
+
+### 敵対的コードレビュー進捗
+
+| # | Feature | ステータス | 指摘/採用 | セッション |
+|---|---------|-----------|----------|-----------|
+| 1 | admin.feature | 完了 | 36/19 | `20260325_admin_auth` |
+| 2 | authentication.feature | 完了 | (上と合算) | `20260325_admin_auth` |
+| 3 | posting.feature | **完了** | 9/3 (CRITICAL:1, HIGH:2) | `20260326_posting` |
+| 4 | thread.feature | 未着手 | | |
+| 5 | user_registration.feature | 未着手 | | |
+| 6 | reactions.feature | 未着手 | | |
+| 7 | currency.feature | 未着手 | | |
+| 8 | incentive.feature | 未着手 | | |
+| 9 | welcome.feature | 未着手 | | |
+| 10 | bot_system.feature | 未着手 | | |
+| 11 | command_system.feature | 未着手 | | |
+| 12 | command_aori.feature | 未着手 | | |
+| 13 | command_newspaper.feature | 未着手 | | |
+| 14 | command_omikuji.feature | 未着手 | | |
+| 15 | command_iamsystem.feature | 未着手 | | |
+| 16 | command_livingbot.feature | 未着手 | | |
+| 17 | ai_accusation.feature | 未着手 | | |
+| 18 | investigation.feature | 未着手 | | |
+| 19 | mypage.feature | 未着手 | | |
+| 20 | specialist_browser_compat.feature | 未着手 | | |
+| 21 | dev_board.feature | 未着手 | | |
+| 22 | theme.feature | 未着手 | | |
+
 **Sprint-121 完了 — HUMAN-004解消 + リファクタリング2件 + BOT-DIAGクリーンアップ**
 
 ### Sprint-121の成果

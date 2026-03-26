@@ -28,8 +28,8 @@ import AnchorPopup from "../../../_components/AnchorPopup";
 import { AnchorPopupProvider } from "../../../_components/AnchorPopupContext";
 import EliminatedBotToggle from "../../../_components/EliminatedBotToggle";
 import { EliminatedBotToggleProvider } from "../../../_components/EliminatedBotToggleContext";
+import FloatingActionMenu from "../../../_components/FloatingActionMenu";
 import PaginationNav from "../../../_components/PaginationNav";
-import PostForm from "../../../_components/PostForm";
 import { PostFormContextProvider } from "../../../_components/PostFormContext";
 import type { Post } from "../../../_components/PostItem";
 import PostList from "../../../_components/PostList";
@@ -322,11 +322,6 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 					    See: tmp/workers/bdd-architect_TASK-162/design.md §6.2 スレッドページ
 					    See: features/thread.feature @post_number_display */}
 					<PostFormContextProvider>
-						{/* post-form: 書き込みフォーム（Client Component）
-						    未認証時に401レスポンスを受けると AuthModal が表示される。
-						    See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点） */}
-						<PostForm threadId={thread.id} />
-
 						{/* post-list: レス一覧（初期表示はSSR）
 						    See: docs/specs/screens/thread-view.yaml > post-list
 						    See: docs/architecture/components/web-ui.md §3.2 スレッドページ */}
@@ -342,6 +337,13 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 							initialLastPostNumber={lastPostNumber}
 							pollingEnabled={pollingEnabled}
 						/>
+
+						{/* FloatingActionMenu: FAB + ボトムシート（書き込み・検索・画像・設定）
+						    PostFormContextProvider 内に配置し、PostItem のレス番号クリック →
+						    PostForm へのテキスト挿入連携を維持する。
+						    See: features/thread.feature @fab
+						    See: docs/specs/screens/thread-view.yaml > fab-menu */}
+						<FloatingActionMenu threadId={thread.id} />
 					</PostFormContextProvider>
 
 					{/* AnchorPopup: アンカーポップアップ表示コンポーネント
