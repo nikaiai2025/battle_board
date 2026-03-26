@@ -33,24 +33,21 @@
 | 21 | dev_board.feature | 未着手 | | |
 | 22 | theme.feature | 未着手 | | |
 
-**Sprint-122/123 完了 — TOCTOU原子採番 + soft deleteフィルタ修正**
+**Sprint-125 完了 — 削除済みレス非表示バグ修正**
 
-### Sprint-123の成果
-- TASK-324: soft deleteフィルタ追加 + BDDシナリオ追加
-  - `findById`/`findByThreadKey`に`.eq("is_deleted", false)`追加（thread-repository.ts）
-  - `findByThreadId`の両分岐に`.eq("is_deleted", false)`追加（post-repository.ts）
-  - InMemory thread-repository: `isDeleted`チェック追加 + `_findByIdIncludeDeleted`ヘルパー
-  - admin.feature: 削除済みスレッド/レスの非表示検証シナリオ3件追加
-  - エスカレーション: 0件
-- TASK-325: E2Eテスト FABメニュー対応（#fab-post-btn クリック追加 x4箇所）
+### Sprint-125の成果
+- TASK-327: findByThreadId is_deletedフィルタ除去 + admin.featureシナリオ修正
+  - Sprint-123で追加した過剰なis_deletedフィルタにより削除済みレスが完全非表示になっていたバグを修正
+  - `findByThreadId`の2分岐から`.eq("is_deleted", false)`を除去（post-repository.ts）
+  - InMemory post-repository: `findByThreadId`から`!p.isDeleted`除去
+  - admin.feature L69-73: 設計意図と矛盾するシナリオを修正（人間承認済み）
+  - admin.steps.ts: スレッド削除検証を全レス`isDeleted===true`チェックに変更
+  - ESC-TASK-327-1: BDDテストFAIL → 人間承認でfeature修正 → 解決
 - vitest: 1896テスト 全PASS / cucumber-js: 334 passed, 16 pending
-- コミット: 286b02b, 88bbe3f
+- コミット: 5f080e7
 - 本番スモーク: **29/29 PASS**
-  - `findByThreadId`の両分岐に`.eq("is_deleted", false)`追加（post-repository.ts）
-  - InMemory thread-repository: `isDeleted`チェック追加 + `_findByIdIncludeDeleted`ヘルパー
-  - admin.feature: 削除済みスレッド/レスの非表示検証シナリオ3件追加
-  - エスカレーション: 0件
-- vitest: 1896テスト 全PASS / cucumber-js: 334 passed, 16 pending
+
+**Sprint-122〜124 完了 — TOCTOU原子採番 + soft deleteフィルタ + completeRegistrationアトミック化**
 
 ### Sprint-122の成果
 - TASK-323: レス番号TOCTOU競合修正（原子採番RPC）
@@ -256,6 +253,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-125 | 削除済みレス非表示バグ修正 | completed | `tmp/orchestrator/sprint_125_plan.md` |
 | Sprint-124 | completeRegistrationアトミック化 + user_registration敵対的レビュー | completed | `tmp/orchestrator/sprint_124_plan.md` |
 | Sprint-123 | soft deleteフィルタ修正 + BDDシナリオ追加 | completed | `tmp/orchestrator/sprint_123_plan.md` |
 | Sprint-122 | TOCTOU原子採番修正 | completed | `tmp/orchestrator/sprint_122_plan.md` |

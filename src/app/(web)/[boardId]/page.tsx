@@ -19,6 +19,7 @@ import * as PostService from "@/lib/services/post-service";
 import ThreadCreateForm from "../_components/ThreadCreateForm";
 import ThreadList from "../_components/ThreadList";
 import type { ThreadSummary } from "../_components/thread-types";
+import VisionSection from "../_components/VisionSection";
 
 // リクエストごとにSSRを実行し、Vercelのページキャッシュを無効化する。
 // Cloudflare Workers環境でのself-fetch禁止（error code 1042）対応として
@@ -103,6 +104,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
 			<h1 className="text-base font-bold text-foreground border-b border-border pb-1 mb-3">
 				ボットちゃんねる — スレッド一覧
 			</h1>
+
+			{/* サイトビジョン（折りたたみ） */}
+			<VisionSection />
 
 			{/* thread-create-form: スレッド作成フォーム（Client Component）
 			    送信時に 401 を受け取った場合は AuthModal が自動表示される。
