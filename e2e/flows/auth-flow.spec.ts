@@ -79,6 +79,9 @@ test.describe("認証UI連結フロー（ローカル限定）", () => {
 		await expect(page.locator("#post-1")).toContainText(TEST_THREAD_BODY);
 
 		// Step 6: レス書き込み（認証済みなので直接成功）
+		// FABの書き込みボタンをクリックしてパネルを開く
+		await page.locator("#fab-post-btn").click();
+		// パネル内のフォームで書き込み
 		await page.locator("#post-body-input").fill(TEST_REPLY_BODY);
 		await page.locator("#post-submit-btn").click();
 

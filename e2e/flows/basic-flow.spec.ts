@@ -147,6 +147,9 @@ test.describe
 			const lastPost = await getLastPostNumber(page);
 
 			// !w >>1 コマンドを書き込み（authenticate フィクスチャで認証済み）
+			// FABの書き込みボタンをクリックしてパネルを開く
+			await page.locator("#fab-post-btn").click();
+			// パネル内のフォームで書き込み
 			await page.locator("#post-body-input").fill(TEST_GRASS_COMMAND);
 			await page.locator("#post-submit-btn").click();
 
@@ -200,6 +203,9 @@ test.describe
 			const lastPost = await getLastPostNumber(page);
 
 			// !abeshinzo コマンドを書き込み
+			// FABの書き込みボタンをクリックしてパネルを開く
+			await page.locator("#fab-post-btn").click();
+			// パネル内のフォームで書き込み
 			await page.locator("#post-body-input").fill(TEST_ABESHINZO_COMMAND);
 			await page.locator("#post-submit-btn").click();
 
@@ -239,6 +245,9 @@ test.describe
 			const lastPost = await getLastPostNumber(page);
 
 			// !omikuji コマンドを書き込み
+			// FABの書き込みボタンをクリックしてパネルを開く
+			await page.locator("#fab-post-btn").click();
+			// パネル内のフォームで書き込み
 			await page.locator("#post-body-input").fill("!omikuji");
 			await page.locator("#post-submit-btn").click();
 
