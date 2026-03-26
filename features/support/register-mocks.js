@@ -203,6 +203,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/daily-event-repository.ts",
 		"./in-memory/daily-event-repository.ts",
 	],
+	// copipe リポジトリ（TASK-328 で追加）
+	// See: features/command_copipe.feature
+	[
+		"src/lib/infrastructure/repositories/copipe-repository.ts",
+		"./in-memory/copipe-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

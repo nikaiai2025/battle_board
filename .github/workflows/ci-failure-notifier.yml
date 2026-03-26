@@ -15,6 +15,7 @@ on:
       - "Daily Maintenance"
       - "Apply DB Migrations"
       - "Seed Pinned Thread"
+      - "Seed Copipe Entries"
       - "Newspaper Scheduler"
     types: [completed]
 

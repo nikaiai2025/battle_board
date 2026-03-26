@@ -20,6 +20,7 @@
 import { commandsConfig as defaultCommandsConfig } from "../../../config/commands";
 import type { DeductReason } from "../domain/models/currency";
 import { parseCommand } from "../domain/rules/command-parser";
+import type { ICopipeRepository } from "../infrastructure/repositories/copipe-repository";
 import {
 	type AccusationBonusConfig,
 	type AccusationService,
@@ -34,6 +35,9 @@ import {
 	type IAoriPendingRepository,
 } from "./handlers/aori-handler";
 import { AttackHandler } from "./handlers/attack-handler";
+// TASK-328: !copipe コマンド（コピペAA再現）
+// See: features/command_copipe.feature
+import { CopipeHandler } from "./handlers/copipe-handler";
 import {
 	GrassHandler,
 	type IGrassBotPostRepository,
@@ -402,6 +406,7 @@ export class CommandService {
 	 * @param livingBotHandler - LivingBotHandler（DI。テスト時はモックを注入する）
 	 * @param hissiBotPostRepository - !hissi BOT 判定用 BotPostRepository（DI。省略時は本番用を動的 require）
 	 * @param kinouBotPostRepository - !kinou BOT 判定用 BotPostRepository（DI。省略時は本番用を動的 require）
+	 * @param copipeRepository - CopipeRepository（DI。テスト時はモックを注入する。省略時は本番用を動的 require）
 	 *
 	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
 	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
@@ -423,6 +428,7 @@ export class CommandService {
 		livingBotHandler?: LivingBotHandler | null,
 		hissiBotPostRepository?: IHissiBotPostRepository | null,
 		kinouBotPostRepository?: IKinouBotPostRepository | null,
+		copipeRepository?: ICopipeRepository | null,
 	) {
 		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
 		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
@@ -642,6 +648,23 @@ export class CommandService {
 			resolvedLivingBotHandler = new LivingBotHandler(botRepository);
 		}
 
+		// CopipeHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に copipe コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// See: features/command_copipe.feature
+		let resolvedCopipeHandler: CopipeHandler | null = null;
+		if (copipeRepository !== undefined) {
+			// 明示的に DI された場合（null を含む）
+			if (copipeRepository) {
+				resolvedCopipeHandler = new CopipeHandler(copipeRepository);
+			}
+		} else if (parsed.commands.copipe?.enabled) {
+			// YAML で copipe が有効化されており、DI がない場合のみ本番用生成
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			const resolvedCopipeRepo: ICopipeRepository = require("../infrastructure/repositories/copipe-repository");
+			resolvedCopipeHandler = new CopipeHandler(resolvedCopipeRepo);
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
@@ -667,6 +690,9 @@ export class CommandService {
 			// !livingbot: 生存BOT数表示（BotRepository の DI が必要）
 			// See: features/command_livingbot.feature
 			...(resolvedLivingBotHandler ? [resolvedLivingBotHandler] : []),
+			// !copipe: コピペAA再現（CopipeRepository の DI が必要）
+			// See: features/command_copipe.feature
+			...(resolvedCopipeHandler ? [resolvedCopipeHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();

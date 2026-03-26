@@ -37,6 +37,9 @@ import * as InMemoryBotPostRepo from "./in-memory/bot-post-repository";
 // ボットリポジトリ（TASK-096 で追加）
 // See: features/bot_system.feature
 import * as InMemoryBotRepo from "./in-memory/bot-repository";
+// copipe リポジトリ（TASK-328 で追加）
+// See: features/command_copipe.feature
+import * as InMemoryCopipeRepo from "./in-memory/copipe-repository";
 import * as InMemoryCurrencyRepo from "./in-memory/currency-repository";
 // daily-event リポジトリ（TASK-278 で追加）
 // See: features/command_livingbot.feature
@@ -130,6 +133,9 @@ export function resetAllStores(): void {
 	// daily-event リポジトリのリセット（TASK-278 で追加）
 	// See: features/command_livingbot.feature
 	InMemoryDailyEventRepo.reset();
+	// copipe リポジトリのリセット（TASK-328 で追加）
+	// See: features/command_copipe.feature
+	InMemoryCopipeRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +153,8 @@ export {
 	InMemoryBotPostRepo,
 	// ボットリポジトリ（TASK-096 で追加）
 	InMemoryBotRepo,
+	// copipe リポジトリ（TASK-328 で追加）
+	InMemoryCopipeRepo,
 	InMemoryCurrencyRepo,
 	// daily-event リポジトリ（TASK-278 で追加）
 	InMemoryDailyEventRepo,

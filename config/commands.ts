@@ -116,5 +116,14 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: false,
 		},
+		// TASK-328: !copipe コマンド追加（コピペAA再現）
+		// See: features/command_copipe.feature
+		copipe: {
+			description: "コピペAAを再現する",
+			cost: 0,
+			targetFormat: null,
+			enabled: true,
+			stealth: false,
+		},
 	},
 };

@@ -89,6 +89,9 @@ module.exports = {
 			// TASK-285: テーマ機能 BDD シナリオ追加
 			// See: features/theme.feature
 			"features/theme.feature",
+			// TASK-328: !copipe コマンド（コピペAA再現） BDD シナリオ追加
+			// See: features/command_copipe.feature
+			"features/command_copipe.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -150,6 +153,9 @@ module.exports = {
 			// TASK-285: テーマ機能 BDD ステップ定義
 			// See: features/theme.feature
 			"features/step_definitions/theme.steps.ts",
+			// TASK-328: !copipe コマンド（コピペAA再現） BDD ステップ定義
+			// See: features/command_copipe.feature
+			"features/step_definitions/command_copipe.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録
