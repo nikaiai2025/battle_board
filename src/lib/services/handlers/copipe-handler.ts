@@ -70,10 +70,16 @@ export class CopipeHandler implements CommandHandler {
 	 * @returns コマンド実行結果（systemMessage にレス末尾マージ内容）
 	 */
 	async execute(ctx: CommandContext): Promise<CommandHandlerResult> {
-		const nameArg = ctx.args[0];
+		// 複数 args をスペース区切りで結合して1つのキーワードにする。
+		// - "ドッキング" "にぼし" → "ドッキング にぼし"
+		// - `!copipeドッキング にぼし` のように、スペースなし引数＋スペースあり引数を両方受け付ける
+		// - trim() により `!copipe ` のように末尾スペースだけの場合も "" になる
+		// See: features/command_copipe.feature @copipe
+		// See: tmp/tasks/task_TASK-331.md
+		const nameArg = ctx.args.join(" ").trim() || undefined;
 
 		if (!nameArg) {
-			// ケース1: 引数なし → ランダム1件を取得する
+			// ケース1: 引数なし（空配列・空文字・スペースのみ）→ ランダム1件を取得する
 			// See: features/command_copipe.feature @引数なしでランダムにAAが表示される
 			return await this._handleRandom();
 		}

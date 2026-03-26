@@ -478,4 +478,57 @@ describe("parseCommand", () => {
 		// 仕様ルール7（>>N と !cmd の間の条件のみ規定）に対応するBDDシナリオが存在しないため、
 		// テスト対象外とする。仕様追加時に対応する。
 	});
+
+	// ===========================================
+	// 新ルール: コマンド名直後スペースなし引数（!copipeドッキング 形式）
+	// See: features/command_copipe.feature @copipe
+	// See: tmp/orchestrator/memo_copipe_command.md
+	// ===========================================
+
+	describe("新ルール: コマンド名直後スペースなし引数", () => {
+		/**
+		 * !copipeドッキング 形式（コマンド名と引数の間にスペースなし）の解析
+		 * See: features/command_copipe.feature @copipe
+		 */
+		it("コマンド名直後にスペースなしで続くテキストを引数として解析できる (!copipeドッキング)", () => {
+			const result = parseCommand("!copipeドッキング", ["copipe"]);
+			expect(result).not.toBeNull();
+			expect(result?.name).toBe("copipe");
+			expect(result?.args).toEqual(["ドッキング"]);
+		});
+
+		it("スペースなし引数は既存スペースあり形式 (!copipe ドッキング) と同じ結果になる", () => {
+			const withSpace = parseCommand("!copipe ドッキング", ["copipe"]);
+			const withoutSpace = parseCommand("!copipeドッキング", ["copipe"]);
+			expect(withoutSpace?.args).toEqual(withSpace?.args);
+		});
+
+		it("コマンド名直後の引数 + スペース区切り引数を両方解析できる (!copipeドッキング にぼし)", () => {
+			const result = parseCommand("!copipeドッキング にぼし", ["copipe"]);
+			expect(result?.name).toBe("copipe");
+			expect(result?.args).toEqual(["ドッキング", "にぼし"]);
+		});
+
+		it("テキスト中でもコマンド名直後スペースなし引数を検出できる (これ !copipeドッキング ね)", () => {
+			const result = parseCommand("これ !copipeドッキング ね", ["copipe"]);
+			expect(result?.name).toBe("copipe");
+			expect(result?.args).toContain("ドッキング");
+		});
+
+		it("アンカー引数はスペースなしでも認識される (!tell>>5 は既存動作に影響しない)", () => {
+			const result = parseCommand("!tell>>5", REGISTERED_COMMANDS);
+			expect(result?.name).toBe("tell");
+			expect(result?.args).toContain(">>5");
+		});
+
+		it("引数なしのコマンド (!w) は既存動作と同一 (args: [])", () => {
+			const result = parseCommand("!w", REGISTERED_COMMANDS);
+			expect(result?.args).toEqual([]);
+		});
+
+		it("未登録コマンドはスペースなし引数があっても null を返す (!unknownドッキング)", () => {
+			const result = parseCommand("!unknownドッキング", REGISTERED_COMMANDS);
+			expect(result).toBeNull();
+		});
+	});
 });

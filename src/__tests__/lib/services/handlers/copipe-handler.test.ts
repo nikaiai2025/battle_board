@@ -619,3 +619,72 @@ describe("エッジケース", () => {
 		expect(result.systemMessage).toContain("絵文字AA");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// 引数結合: 複数 args を結合して1つの検索キーワードにする
+// See: features/command_copipe.feature @copipe
+// See: tmp/tasks/task_TASK-331.md
+// ---------------------------------------------------------------------------
+
+describe("引数結合（複数 args を結合して検索）", () => {
+	it("複数 args が渡された場合、スペース区切りで結合してキーワード検索する", async () => {
+		// !copipe ドッキング にぼし → "ドッキング にぼし" として完全一致検索
+		let calledWith: string | null = null;
+		const repo = createMockRepo({
+			findByName: async (name) => {
+				calledWith = name;
+				return null;
+			},
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => [],
+		});
+		const handler = createHandler(repo);
+		await handler.execute(createCtx(["ドッキング", "にぼし"]));
+
+		expect(calledWith).toBe("ドッキング にぼし");
+	});
+
+	it("複数 args の結合キーワードで完全一致した場合、そのエントリを返す", async () => {
+		// See: features/command_copipe.feature @完全一致でAAが表示される
+		const entry = makeEntry(1, "ドッキング にぼし", "にぼし本文");
+		const repo = createMockRepo({
+			findByName: async (name) => (name === "ドッキング にぼし" ? entry : null),
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["ドッキング", "にぼし"]));
+
+		expect(result.systemMessage).toContain("ドッキング にぼし");
+		expect(result.systemMessage).toContain("にぼし本文");
+	});
+
+	it("3つ以上の args も結合してキーワード検索する", async () => {
+		let calledWith: string | null = null;
+		const repo = createMockRepo({
+			findByName: async (name) => {
+				calledWith = name;
+				return null;
+			},
+			findByNamePartial: async () => [],
+			findByContentPartial: async () => [],
+		});
+		const handler = createHandler(repo);
+		await handler.execute(createCtx(["あ", "い", "う"]));
+
+		expect(calledWith).toBe("あ い う");
+	});
+
+	it("スペースのみの args（trim後に空文字）はランダム選択にフォールバックする", async () => {
+		// args.join(" ").trim() === "" → ランダムモード
+		let randomCalled = false;
+		const repo = createMockRepo({
+			findRandom: async () => {
+				randomCalled = true;
+				return makeEntry(1, "test", "content");
+			},
+		});
+		const handler = createHandler(repo);
+		await handler.execute(createCtx(["  "]));
+
+		expect(randomCalled).toBe(true);
+	});
+});

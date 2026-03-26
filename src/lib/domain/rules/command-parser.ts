@@ -39,11 +39,15 @@ const WHITESPACE = "[ \\t\\u3000]";
  * - 末尾の空白+残余テキストは引数として取得する
  * - 区切り文字は半角・全角スペース両方を許容する（ルール8）
  * - `>>N` 形式のアンカー引数はスペースなしでも認識する（ルール9）
+ * - コマンド名直後のスペースなしテキストも引数としてキャプチャする（`\S*`）
+ *   例: `!copipeドッキング` → args: ["ドッキング"]（ルール10）
+ *   `\S*` は0文字以上のため、スペースありの場合も既存動作に影響しない
  *
  * See: docs/architecture/components/command.md §2.3
+ * See: features/command_copipe.feature @copipe
  */
 const COMMAND_PATTERN = new RegExp(
-	`(?:^|(?<=[\\s\\u3000])|(?<=>>\\d+))!([a-zA-Z][a-zA-Z0-9_]*)((?:${WHITESPACE}+\\S+|>>\\d+)*)`,
+	`(?:^|(?<=[\\s\\u3000])|(?<=>>\\d+))!([a-zA-Z][a-zA-Z0-9_]*)(\\S*(?:${WHITESPACE}+\\S+|>>\\d+)*)`,
 	"g",
 );
 
