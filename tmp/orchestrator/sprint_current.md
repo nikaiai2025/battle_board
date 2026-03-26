@@ -1,6 +1,6 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-26
+> 最終更新: 2026-03-27
 
 ## 現在のフェーズ
 
@@ -32,6 +32,17 @@
 | 20 | specialist_browser_compat.feature | 未着手 | | |
 | 21 | dev_board.feature | 未着手 | | |
 | 22 | theme.feature | 未着手 | | |
+
+**Sprint-128 完了 — !copipe 曖昧ヒット通知フォーマット変更**
+
+### Sprint-128の成果
+- TASK-332: copipe-handler「曖昧です」通知の位置・文言変更
+  - 通知をAA末尾→最上部に移動
+  - 文言: 「曖昧です（N件ヒット）」→「曖昧です（N件ヒット。うち１件をランダム表示）」
+  - テストアサーション3箇所 + テスト名2箇所修正
+- vitest: 1939テスト PASS / cucumber-js: 334 passed, 16 pending
+- コミット: 3f95560
+- 本番スモーク: **29/34 PASS**（5件は設計上のスキップ）
 
 **Sprint-127 完了 — !copipe v2 + seed 195件投入**
 
@@ -288,6 +299,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-128 | !copipe 曖昧ヒット通知フォーマット変更 | completed | `tmp/orchestrator/sprint_128_plan.md` |
 | Sprint-127 | !copipe v2 + seed 195件投入 | completed | — |
 | Sprint-126 | !copipe コマンド実装 | completed | `tmp/orchestrator/sprint_126_plan.md` |
 | Sprint-125 | 削除済みレス非表示バグ修正 | completed | `tmp/orchestrator/sprint_125_plan.md` |

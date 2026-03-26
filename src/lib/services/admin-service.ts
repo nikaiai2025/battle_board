@@ -22,6 +22,7 @@
  * See: docs/architecture/components/admin.md §5 設計上の判断
  */
 
+import * as BotRepository from "../infrastructure/repositories/bot-repository";
 import * as CurrencyRepository from "../infrastructure/repositories/currency-repository";
 import type { DailyStat } from "../infrastructure/repositories/daily-stats-repository";
 import * as DailyStatsRepository from "../infrastructure/repositories/daily-stats-repository";
@@ -643,13 +644,21 @@ export async function setPremiumStatus(
  * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
  */
 export interface DashboardSummary {
-	/** 総ユーザー数（仮+本登録） */
-	totalUsers: number;
-	/** 本日の書き込み数（非システムメッセージ） */
-	todayPosts: number;
+	/** 人間ユーザー数（users テーブル件数） */
+	humanUsers: number;
+	/** BOT数（bots テーブル件数） */
+	botCount: number;
+	/** 本日の人間書き込み数（is_system_message=false, author_id IS NOT NULL） */
+	humanPosts: number;
+	/** 本日の人間ユニーク書き込みID数 */
+	humanUniquePosters: number;
+	/** 本日のBOT書き込み数（is_system_message=false, author_id IS NULL） */
+	botPosts: number;
+	/** 本日のBOTユニーク書き込みID数 */
+	botUniquePosters: number;
 	/** アクティブスレッド数（本日書き込みがあったスレッド） */
 	activeThreads: number;
-	/** 通貨流通量（全ユーザー残高合計） */
+	/** 通貨流通量（BANユーザー除外） */
 	currencyInCirculation: number;
 }
 
@@ -667,25 +676,41 @@ export interface DashboardSummary {
 export async function getDashboard(
 	options: { today?: string } = {},
 ): Promise<DashboardSummary> {
-	// ユーザー総数（リアルタイム）
+	// 人間ユーザー総数（リアルタイム）
 	// UserRepository.findAll({ limit: 1 }) で total を取得する
-	const { total: totalUsers } = await UserRepository.findAll({ limit: 1 });
+	// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+	const { total: humanUsers } = await UserRepository.findAll({ limit: 1 });
 
-	// 本日の書き込み数・アクティブスレッド数（リアルタイム）
+	// BOT総数（リアルタイム）
+	// BotRepository.countAll() で bots テーブルの件数を取得する
+	const botCount = await BotRepository.countAll();
+
+	// 本日の書き込み数（人間/BOT分離）・アクティブスレッド数（リアルタイム）
 	// PostRepository 経由で集計するため、BDDテストでも InMemoryPostRepo が使われる
 	// See: tmp/feature_plan_admin_expansion.md §5-e リアルタイム値 vs スナップショット値
 	const today =
 		options.today ?? new Date(Date.now()).toISOString().slice(0, 10);
-	const todayPosts = await PostRepository.countByDate(today);
+
+	// 人間書き込み: is_system_message=false, author_id IS NOT NULL
+	const humanPostStats = await PostRepository.countHumanPostsByDate(today);
+
+	// BOT書き込み: is_system_message=false, author_id IS NULL（bot_postsとJOIN）
+	const botPostStats = await PostRepository.countBotPostsByDate(today);
+
+	// アクティブスレッド数（変更なし）
 	const activeThreads = await PostRepository.countActiveThreadsByDate(today);
 
-	// 通貨流通量（リアルタイム）
-	// CurrencyRepository 経由で集計するため、BDDテストでも InMemoryCurrencyRepo が使われる
-	const currencyInCirculation = await CurrencyRepository.sumAllBalances();
+	// 通貨流通量（リアルタイム、BANユーザー除外）
+	// CurrencyRepository.sumActiveBalances() で is_banned=false のユーザーのみ集計
+	const currencyInCirculation = await CurrencyRepository.sumActiveBalances();
 
 	return {
-		totalUsers,
-		todayPosts,
+		humanUsers,
+		botCount,
+		humanPosts: humanPostStats.count,
+		humanUniquePosters: humanPostStats.uniqueAuthors,
+		botPosts: botPostStats.count,
+		botUniquePosters: botPostStats.uniqueBots,
 		activeThreads,
 		currencyInCirculation,
 	};

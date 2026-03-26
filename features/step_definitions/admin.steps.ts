@@ -1941,13 +1941,19 @@ When("ダッシュボードを表示する", async function (this: BattleBoardWo
  */
 Then("総ユーザー数が表示される", function (this: BattleBoardWorld) {
 	assert(dashboardResult, "ダッシュボード取得結果が存在しません");
+	// 人間/BOT分離後: humanUsers + botCount で総数を検証する
 	assert(
-		typeof dashboardResult.totalUsers === "number",
-		"総ユーザー数（totalUsers）が数値でありません",
+		typeof dashboardResult.humanUsers === "number",
+		"人間ユーザー数（humanUsers）が数値でありません",
 	);
 	assert(
-		dashboardResult.totalUsers >= 0,
-		`総ユーザー数が0以上であることを期待しましたが ${dashboardResult.totalUsers} でした`,
+		typeof dashboardResult.botCount === "number",
+		"BOT数（botCount）が数値でありません",
+	);
+	const totalUsers = dashboardResult.humanUsers + dashboardResult.botCount;
+	assert(
+		totalUsers >= 0,
+		`総ユーザー数が0以上であることを期待しましたが ${totalUsers} でした`,
 	);
 });
 
@@ -1963,13 +1969,19 @@ Then("総ユーザー数が表示される", function (this: BattleBoardWorld) {
  */
 Then("本日の書き込み数が表示される", function (this: BattleBoardWorld) {
 	assert(dashboardResult, "ダッシュボード取得結果が存在しません");
+	// 人間/BOT分離後: humanPosts + botPosts で総書き込み数を検証する
 	assert(
-		typeof dashboardResult.todayPosts === "number",
-		"本日の書き込み数（todayPosts）が数値でありません",
+		typeof dashboardResult.humanPosts === "number",
+		"人間書き込み数（humanPosts）が数値でありません",
 	);
 	assert(
-		dashboardResult.todayPosts >= 0,
-		`本日の書き込み数が0以上であることを期待しましたが ${dashboardResult.todayPosts} でした`,
+		typeof dashboardResult.botPosts === "number",
+		"BOT書き込み数（botPosts）が数値でありません",
+	);
+	const todayPosts = dashboardResult.humanPosts + dashboardResult.botPosts;
+	assert(
+		todayPosts >= 0,
+		`本日の書き込み数が0以上であることを期待しましたが ${todayPosts} でした`,
 	);
 });
 

@@ -270,3 +270,38 @@ export async function sumAllBalances(): Promise<number> {
 		0,
 	);
 }
+
+/**
+ * BANされていないユーザーの通貨残高合計を集計する。
+ * ダッシュボードの通貨流通量表示に使用する（BANユーザー除外）。
+ *
+ * currencies テーブルと users テーブルを結合し、
+ * users.is_banned = false のユーザーの balance のみ合算する。
+ *
+ * Supabase PostgREST の集計構文は使えないため、
+ * currencies → users の FK 結合で is_banned をフィルタし、JS側で合算する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ *
+ * @returns BANされていないユーザーの残高合計
+ */
+export async function sumActiveBalances(): Promise<number> {
+	// currencies テーブルと users テーブルを FK 結合し、is_banned でフィルタする。
+	// currencies.user_id → users.id の FK を利用する。
+	const { data, error } = await supabaseAdmin
+		.from("currencies")
+		.select("balance, users!inner(is_banned)")
+		.eq("users.is_banned", false);
+
+	if (error) {
+		throw new Error(
+			`CurrencyRepository.sumActiveBalances failed: ${error.message}`,
+		);
+	}
+
+	// レコードが0件の場合は 0 を返す。
+	return (data as { balance: number }[]).reduce(
+		(sum, row) => sum + row.balance,
+		0,
+	);
+}

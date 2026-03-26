@@ -77,6 +77,33 @@ vi.mock("@/lib/infrastructure/repositories/currency-repository", () => ({
 	sumAllBalances: vi.fn().mockResolvedValue(0),
 }));
 
+// BotRepository をモック化する（AdminService.getDashboard が countAll を呼ぶため）
+// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+vi.mock("@/lib/infrastructure/repositories/bot-repository", () => ({
+	findById: vi.fn(),
+	findActive: vi.fn(),
+	findAll: vi.fn(),
+	countAll: vi.fn().mockResolvedValue(0),
+	create: vi.fn(),
+	updateHp: vi.fn(),
+	updateDailyId: vi.fn(),
+	reveal: vi.fn(),
+	unreveal: vi.fn(),
+	eliminate: vi.fn(),
+	incrementTotalPosts: vi.fn(),
+	incrementAccusedCount: vi.fn(),
+	incrementSurvivalDays: vi.fn(),
+	incrementTimesAttacked: vi.fn(),
+	updateNextPostAt: vi.fn(),
+	findDueForPost: vi.fn(),
+	bulkResetRevealed: vi.fn(),
+	bulkReviveEliminated: vi.fn(),
+	countLivingBots: vi.fn(),
+	countLivingBotsInThread: vi.fn(),
+	deleteEliminatedTutorialBots: vi.fn(),
+	findByIds: vi.fn(),
+}));
+
 // DailyStatsRepository をモック化する（AdminService.getDashboardHistory が findLatest を呼ぶため）
 // See: features/admin.feature @管理者が統計情報の日次推移を確認できる
 vi.mock("@/lib/infrastructure/repositories/daily-stats-repository", () => ({

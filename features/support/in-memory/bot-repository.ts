@@ -117,6 +117,17 @@ export async function findAll(): Promise<Bot[]> {
 }
 
 /**
+ * 全ボットの件数を取得する（is_active フラグ問わず）。
+ * ダッシュボードのBOT総数表示に使用する。
+ *
+ * See: src/lib/infrastructure/repositories/bot-repository.ts > countAll
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+export async function countAll(): Promise<number> {
+	return store.length;
+}
+
+/**
  * 活動中ボットのみ取得する。
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */

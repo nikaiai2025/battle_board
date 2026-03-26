@@ -8,8 +8,9 @@
  * See: tmp/feature_plan_admin_expansion.md §5 ダッシュボード
  *
  * テスト方針:
- *   - UserRepository, PostRepository, CurrencyRepository, DailyStatsRepository はモック化する
+ *   - UserRepository, PostRepository, CurrencyRepository, BotRepository, DailyStatsRepository はモック化する
  *   - リアルタイムサマリー（getDashboard）とスナップショット取得（getDashboardHistory）を分けて検証
+ *   - 人間/BOT分離表示、通貨のBAN除外を重点検証する
  *   - エッジケース（データなし、今日日付指定、範囲外など）を網羅する
  */
 
@@ -34,6 +35,8 @@ vi.mock("@/lib/infrastructure/repositories/post-repository", () => ({
 	softDeleteByThreadId: vi.fn(),
 	countByDate: vi.fn(),
 	countActiveThreadsByDate: vi.fn(),
+	countHumanPostsByDate: vi.fn(),
+	countBotPostsByDate: vi.fn(),
 }));
 
 vi.mock("@/lib/infrastructure/repositories/currency-repository", () => ({
@@ -43,6 +46,32 @@ vi.mock("@/lib/infrastructure/repositories/currency-repository", () => ({
 	deduct: vi.fn(),
 	getBalance: vi.fn().mockResolvedValue(0),
 	sumAllBalances: vi.fn(),
+	sumActiveBalances: vi.fn(),
+}));
+
+vi.mock("@/lib/infrastructure/repositories/bot-repository", () => ({
+	findById: vi.fn(),
+	findActive: vi.fn(),
+	findAll: vi.fn(),
+	countAll: vi.fn(),
+	create: vi.fn(),
+	updateHp: vi.fn(),
+	updateDailyId: vi.fn(),
+	reveal: vi.fn(),
+	unreveal: vi.fn(),
+	eliminate: vi.fn(),
+	incrementTotalPosts: vi.fn(),
+	incrementAccusedCount: vi.fn(),
+	incrementSurvivalDays: vi.fn(),
+	incrementTimesAttacked: vi.fn(),
+	updateNextPostAt: vi.fn(),
+	findDueForPost: vi.fn(),
+	bulkResetRevealed: vi.fn(),
+	bulkReviveEliminated: vi.fn(),
+	countLivingBots: vi.fn(),
+	countLivingBotsInThread: vi.fn(),
+	deleteEliminatedTutorialBots: vi.fn(),
+	findByIds: vi.fn(),
 }));
 
 vi.mock("@/lib/infrastructure/repositories/daily-stats-repository", () => ({
@@ -80,6 +109,7 @@ vi.mock("@/lib/services/post-service", () => ({
 // インポート（モック宣言後）
 // ---------------------------------------------------------------------------
 
+import * as BotRepository from "@/lib/infrastructure/repositories/bot-repository";
 import * as CurrencyRepository from "@/lib/infrastructure/repositories/currency-repository";
 import type { DailyStat } from "@/lib/infrastructure/repositories/daily-stats-repository";
 import * as DailyStatsRepository from "@/lib/infrastructure/repositories/daily-stats-repository";
@@ -114,6 +144,37 @@ function makeDailyStat(overrides: Partial<DailyStat> = {}): DailyStat {
 	};
 }
 
+/**
+ * getDashboard テストで必要な全モックをセットアップするヘルパー。
+ * 個別のテストでは必要なモックのみ上書きする。
+ */
+function setupDefaultDashboardMocks(overrides?: {
+	humanUsers?: number;
+	botCount?: number;
+	humanPosts?: { count: number; uniqueAuthors: number };
+	botPosts?: { count: number; uniqueBots: number };
+	activeThreads?: number;
+	currencyInCirculation?: number;
+}) {
+	vi.mocked(UserRepository.findAll).mockResolvedValue({
+		users: [],
+		total: overrides?.humanUsers ?? 0,
+	});
+	vi.mocked(BotRepository.countAll).mockResolvedValue(overrides?.botCount ?? 0);
+	vi.mocked(PostRepository.countHumanPostsByDate).mockResolvedValue(
+		overrides?.humanPosts ?? { count: 0, uniqueAuthors: 0 },
+	);
+	vi.mocked(PostRepository.countBotPostsByDate).mockResolvedValue(
+		overrides?.botPosts ?? { count: 0, uniqueBots: 0 },
+	);
+	vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(
+		overrides?.activeThreads ?? 0,
+	);
+	vi.mocked(CurrencyRepository.sumActiveBalances).mockResolvedValue(
+		overrides?.currencyInCirculation ?? 0,
+	);
+}
+
 // ---------------------------------------------------------------------------
 // テストスイート
 // ---------------------------------------------------------------------------
@@ -124,7 +185,7 @@ describe("AdminService ダッシュボード", () => {
 	});
 
 	// =========================================================================
-	// getDashboard: リアルタイムサマリー
+	// getDashboard: リアルタイムサマリー（人間/BOT分離）
 	// =========================================================================
 
 	describe("getDashboard", () => {
@@ -133,37 +194,41 @@ describe("AdminService ダッシュボード", () => {
 		// -----------------------------------------------------------------------
 
 		describe("正常系", () => {
-			it("ユーザー数・書き込み数・アクティブスレッド数・通貨流通量を返す", async () => {
+			it("人間ユーザー数・BOT数・人間書き込み・BOT書き込み・アクティブスレッド数・通貨流通量を返す", async () => {
 				// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
-				vi.mocked(UserRepository.findAll).mockResolvedValue({
-					users: [],
-					total: 42,
+				setupDefaultDashboardMocks({
+					humanUsers: 42,
+					botCount: 5,
+					humanPosts: { count: 18, uniqueAuthors: 10 },
+					botPosts: { count: 7, uniqueBots: 3 },
+					activeThreads: 7,
+					currencyInCirculation: 3500,
 				});
-				vi.mocked(PostRepository.countByDate).mockResolvedValue(18);
-				vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(7);
-				vi.mocked(CurrencyRepository.sumAllBalances).mockResolvedValue(3500);
 
 				const result = await getDashboard({ today: "2026-03-17" });
 
-				expect(result.totalUsers).toBe(42);
-				expect(result.todayPosts).toBe(18);
+				expect(result.humanUsers).toBe(42);
+				expect(result.botCount).toBe(5);
+				expect(result.humanPosts).toBe(18);
+				expect(result.humanUniquePosters).toBe(10);
+				expect(result.botPosts).toBe(7);
+				expect(result.botUniquePosters).toBe(3);
 				expect(result.activeThreads).toBe(7);
 				expect(result.currencyInCirculation).toBe(3500);
 			});
 
-			it("today オプションを PostRepository.countByDate に渡す", async () => {
+			it("today オプションを PostRepository の集計メソッドに渡す", async () => {
 				// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
-				vi.mocked(UserRepository.findAll).mockResolvedValue({
-					users: [],
-					total: 0,
-				});
-				vi.mocked(PostRepository.countByDate).mockResolvedValue(0);
-				vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(0);
-				vi.mocked(CurrencyRepository.sumAllBalances).mockResolvedValue(0);
+				setupDefaultDashboardMocks();
 
 				await getDashboard({ today: "2026-01-15" });
 
-				expect(PostRepository.countByDate).toHaveBeenCalledWith("2026-01-15");
+				expect(PostRepository.countHumanPostsByDate).toHaveBeenCalledWith(
+					"2026-01-15",
+				);
+				expect(PostRepository.countBotPostsByDate).toHaveBeenCalledWith(
+					"2026-01-15",
+				);
 				expect(PostRepository.countActiveThreadsByDate).toHaveBeenCalledWith(
 					"2026-01-15",
 				);
@@ -171,19 +236,36 @@ describe("AdminService ダッシュボード", () => {
 
 			it("today 省略時は現在日付を使用する", async () => {
 				// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
-				vi.mocked(UserRepository.findAll).mockResolvedValue({
-					users: [],
-					total: 0,
-				});
-				vi.mocked(PostRepository.countByDate).mockResolvedValue(0);
-				vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(0);
-				vi.mocked(CurrencyRepository.sumAllBalances).mockResolvedValue(0);
+				setupDefaultDashboardMocks();
 
 				const today = new Date().toISOString().slice(0, 10);
 
 				await getDashboard();
 
-				expect(PostRepository.countByDate).toHaveBeenCalledWith(today);
+				expect(PostRepository.countHumanPostsByDate).toHaveBeenCalledWith(
+					today,
+				);
+			});
+
+			it("BotRepository.countAll でBOT総数を取得する", async () => {
+				// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+				setupDefaultDashboardMocks({ botCount: 12 });
+
+				const result = await getDashboard({ today: "2026-03-17" });
+
+				expect(BotRepository.countAll).toHaveBeenCalledTimes(1);
+				expect(result.botCount).toBe(12);
+			});
+
+			it("CurrencyRepository.sumActiveBalances でBANユーザー除外の通貨流通量を取得する", async () => {
+				// See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+				// BAN除外: sumActiveBalances を呼ぶ（sumAllBalances ではなく）
+				setupDefaultDashboardMocks({ currencyInCirculation: 8000 });
+
+				const result = await getDashboard({ today: "2026-03-17" });
+
+				expect(CurrencyRepository.sumActiveBalances).toHaveBeenCalledTimes(1);
+				expect(result.currencyInCirculation).toBe(8000);
 			});
 		});
 
@@ -192,33 +274,45 @@ describe("AdminService ダッシュボード", () => {
 		// -----------------------------------------------------------------------
 
 		describe("エッジケース: ゼロ値", () => {
-			it("ユーザーが0人の場合は totalUsers=0 を返す", async () => {
+			it("全値が0の場合はすべて0を返す", async () => {
 				// See: エッジケース: 空の配列
-				vi.mocked(UserRepository.findAll).mockResolvedValue({
-					users: [],
-					total: 0,
-				});
-				vi.mocked(PostRepository.countByDate).mockResolvedValue(0);
-				vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(0);
-				vi.mocked(CurrencyRepository.sumAllBalances).mockResolvedValue(0);
+				setupDefaultDashboardMocks();
 
 				const result = await getDashboard({ today: "2026-03-17" });
 
-				expect(result.totalUsers).toBe(0);
-				expect(result.todayPosts).toBe(0);
+				expect(result.humanUsers).toBe(0);
+				expect(result.botCount).toBe(0);
+				expect(result.humanPosts).toBe(0);
+				expect(result.humanUniquePosters).toBe(0);
+				expect(result.botPosts).toBe(0);
+				expect(result.botUniquePosters).toBe(0);
 				expect(result.activeThreads).toBe(0);
 				expect(result.currencyInCirculation).toBe(0);
 			});
 
+			it("人間ユーザーのみでBOTがいない場合", async () => {
+				// See: エッジケース: 境界値（最小値）
+				setupDefaultDashboardMocks({
+					humanUsers: 50,
+					botCount: 0,
+					humanPosts: { count: 10, uniqueAuthors: 5 },
+					botPosts: { count: 0, uniqueBots: 0 },
+				});
+
+				const result = await getDashboard({ today: "2026-03-17" });
+
+				expect(result.humanUsers).toBe(50);
+				expect(result.botCount).toBe(0);
+				expect(result.botPosts).toBe(0);
+				expect(result.botUniquePosters).toBe(0);
+			});
+
 			it("通貨流通量が0の場合は currencyInCirculation=0 を返す", async () => {
 				// See: エッジケース: 境界値（最小値）
-				vi.mocked(UserRepository.findAll).mockResolvedValue({
-					users: [],
-					total: 100,
+				setupDefaultDashboardMocks({
+					humanUsers: 100,
+					currencyInCirculation: 0,
 				});
-				vi.mocked(PostRepository.countByDate).mockResolvedValue(5);
-				vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(2);
-				vi.mocked(CurrencyRepository.sumAllBalances).mockResolvedValue(0);
 
 				const result = await getDashboard({ today: "2026-03-17" });
 
@@ -233,22 +327,23 @@ describe("AdminService ダッシュボード", () => {
 		describe("エッジケース: 大量データ", () => {
 			it("ユーザー数10万人・書き込み1万件でも正常に集計する", async () => {
 				// See: エッジケース: 大量データ（1万件以上）
-				vi.mocked(UserRepository.findAll).mockResolvedValue({
-					users: [],
-					total: 100_000,
+				setupDefaultDashboardMocks({
+					humanUsers: 100_000,
+					botCount: 50,
+					humanPosts: { count: 9_000, uniqueAuthors: 3_000 },
+					botPosts: { count: 1_000, uniqueBots: 50 },
+					activeThreads: 500,
+					currencyInCirculation: 5_000_000,
 				});
-				vi.mocked(PostRepository.countByDate).mockResolvedValue(10_000);
-				vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(
-					500,
-				);
-				vi.mocked(CurrencyRepository.sumAllBalances).mockResolvedValue(
-					5_000_000,
-				);
 
 				const result = await getDashboard({ today: "2026-03-17" });
 
-				expect(result.totalUsers).toBe(100_000);
-				expect(result.todayPosts).toBe(10_000);
+				expect(result.humanUsers).toBe(100_000);
+				expect(result.botCount).toBe(50);
+				expect(result.humanPosts).toBe(9_000);
+				expect(result.humanUniquePosters).toBe(3_000);
+				expect(result.botPosts).toBe(1_000);
+				expect(result.botUniquePosters).toBe(50);
 				expect(result.activeThreads).toBe(500);
 				expect(result.currencyInCirculation).toBe(5_000_000);
 			});
@@ -270,19 +365,54 @@ describe("AdminService ダッシュボード", () => {
 				);
 			});
 
-			it("CurrencyRepository.sumAllBalances がエラーをスローした場合は伝播する", async () => {
+			it("BotRepository.countAll がエラーをスローした場合は伝播する", async () => {
+				// See: エッジケース: 異常系パス
 				vi.mocked(UserRepository.findAll).mockResolvedValue({
 					users: [],
 					total: 0,
 				});
-				vi.mocked(PostRepository.countByDate).mockResolvedValue(0);
-				vi.mocked(PostRepository.countActiveThreadsByDate).mockResolvedValue(0);
-				vi.mocked(CurrencyRepository.sumAllBalances).mockRejectedValue(
-					new Error("集計エラー"),
+				vi.mocked(BotRepository.countAll).mockRejectedValue(
+					new Error("BOTカウントエラー"),
 				);
 
 				await expect(getDashboard({ today: "2026-03-17" })).rejects.toThrow(
-					"集計エラー",
+					"BOTカウントエラー",
+				);
+			});
+
+			it("PostRepository.countHumanPostsByDate がエラーをスローした場合は伝播する", async () => {
+				// See: エッジケース: 異常系パス
+				setupDefaultDashboardMocks();
+				vi.mocked(PostRepository.countHumanPostsByDate).mockRejectedValue(
+					new Error("人間投稿集計エラー"),
+				);
+
+				await expect(getDashboard({ today: "2026-03-17" })).rejects.toThrow(
+					"人間投稿集計エラー",
+				);
+			});
+
+			it("PostRepository.countBotPostsByDate がエラーをスローした場合は伝播する", async () => {
+				// See: エッジケース: 異常系パス
+				setupDefaultDashboardMocks();
+				vi.mocked(PostRepository.countBotPostsByDate).mockRejectedValue(
+					new Error("BOT投稿集計エラー"),
+				);
+
+				await expect(getDashboard({ today: "2026-03-17" })).rejects.toThrow(
+					"BOT投稿集計エラー",
+				);
+			});
+
+			it("CurrencyRepository.sumActiveBalances がエラーをスローした場合は伝播する", async () => {
+				// See: エッジケース: 異常系パス
+				setupDefaultDashboardMocks();
+				vi.mocked(CurrencyRepository.sumActiveBalances).mockRejectedValue(
+					new Error("通貨集計エラー"),
+				);
+
+				await expect(getDashboard({ today: "2026-03-17" })).rejects.toThrow(
+					"通貨集計エラー",
 				);
 			});
 		});

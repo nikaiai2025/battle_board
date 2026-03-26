@@ -226,6 +226,25 @@ export async function findAll(): Promise<Bot[]> {
 }
 
 /**
+ * 全ボットの件数を取得する（is_active フラグ問わず）。
+ * ダッシュボードのBOT総数表示に使用する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ *
+ * @returns 全ボットの件数
+ */
+export async function countAll(): Promise<number> {
+	const { count, error } = await supabaseAdmin
+		.from("bots")
+		.select("*", { count: "exact", head: true });
+
+	if (error) {
+		throw new Error(`BotRepository.countAll failed: ${error.message}`);
+	}
+	return count ?? 0;
+}
+
+/**
  * 新規ボットを作成する。
  * id, createdAt, survivalDays, totalPosts, accusedCount, timesAttacked,
  * eliminatedAt, eliminatedBy は DB デフォルト値で生成されるため、入力から除外する。

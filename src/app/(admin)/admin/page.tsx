@@ -8,7 +8,7 @@
  * See: tmp/feature_plan_admin_expansion.md §6-c ダッシュボード表示要素
  *
  * 提供機能:
- *   - 統計カード4枚（総ユーザー数 / 本日書き込み数 / アクティブスレッド数 / 通貨流通量）
+ *   - 統計カード4枚（ユーザー数[人間/BOT内訳] / 本日書き込み数[人間/BOT内訳] / アクティブスレッド数 / 通貨流通量[BAN除外]）
  *   - 日次推移テーブル（7日 / 30日 切替）
  *
  * 設計方針:
@@ -33,16 +33,25 @@ type HistoryDays = 7 | 30;
 
 /**
  * 統計情報を1枚のカードで表示するコンポーネント。
+ * breakdown プロパティが指定された場合、メイン値の下に内訳行を表示する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
  * See: tmp/feature_plan_admin_expansion.md §6-c ダッシュボード表示要素
  */
 function StatCard({
 	label,
 	value,
 	unit = "",
+	breakdown,
+	note,
 }: {
 	label: string;
 	value: number | null;
 	unit?: string;
+	/** 内訳行の配列。各行は「ラベル: 値 単位」で表示される */
+	breakdown?: Array<{ label: string; value: number | null; unit?: string }>;
+	/** カード下部の注記テキスト */
+	note?: string;
 }) {
 	return (
 		<div className="bg-card border border-border rounded p-4 shadow-sm">
@@ -61,6 +70,22 @@ function StatCard({
 					</>
 				)}
 			</p>
+			{breakdown && value !== null && (
+				<div className="mt-2 space-y-0.5">
+					{breakdown.map((row) => (
+						<p key={row.label} className="text-xs text-muted-foreground">
+							{row.label}:{" "}
+							<span className="font-medium text-foreground">
+								{row.value !== null ? row.value.toLocaleString("ja-JP") : "-"}
+							</span>
+							{row.unit && <span className="ml-0.5">{row.unit}</span>}
+						</p>
+					))}
+				</div>
+			)}
+			{note && value !== null && (
+				<p className="mt-1 text-[10px] text-muted-foreground">{note}</p>
+			)}
 		</div>
 	);
 }
@@ -162,35 +187,75 @@ export default function AdminDashboardPage() {
 				<p className="text-red-600 text-sm">{summaryError}</p>
 			) : (
 				<div id="stats-cards" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-					{/* 総ユーザー数
-              See: features/admin.feature @総ユーザー数が表示される */}
+					{/* ユーザー数（人間/BOT内訳付き）
+              See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる */}
 					<StatCard
-						label="総ユーザー数"
-						value={isLoadingSummary ? null : (summary?.totalUsers ?? 0)}
-						unit="人"
+						label="ユーザー数"
+						value={
+							isLoadingSummary
+								? null
+								: (summary?.humanUsers ?? 0) + (summary?.botCount ?? 0)
+						}
+						breakdown={
+							isLoadingSummary
+								? undefined
+								: [
+										{
+											label: "人間",
+											value: summary?.humanUsers ?? 0,
+											unit: "人",
+										},
+										{
+											label: "BOT",
+											value: summary?.botCount ?? 0,
+											unit: "体",
+										},
+									]
+						}
 					/>
-					{/* 本日の書き込み数
-              See: features/admin.feature @本日の書き込み数が表示される */}
+					{/* 本日の書き込み数（人間/BOT内訳付き）
+              See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる */}
 					<StatCard
 						label="本日の書き込み数"
-						value={isLoadingSummary ? null : (summary?.todayPosts ?? 0)}
+						value={
+							isLoadingSummary
+								? null
+								: (summary?.humanPosts ?? 0) + (summary?.botPosts ?? 0)
+						}
 						unit="件"
+						breakdown={
+							isLoadingSummary
+								? undefined
+								: [
+										{
+											label: `人間 (${summary?.humanUniquePosters ?? 0}人)`,
+											value: summary?.humanPosts ?? 0,
+											unit: "件",
+										},
+										{
+											label: `BOT (${summary?.botUniquePosters ?? 0}体)`,
+											value: summary?.botPosts ?? 0,
+											unit: "件",
+										},
+									]
+						}
 					/>
 					{/* アクティブスレッド数
-              See: features/admin.feature @アクティブスレッド数が表示される */}
+              See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる */}
 					<StatCard
 						label="アクティブスレッド数"
 						value={isLoadingSummary ? null : (summary?.activeThreads ?? 0)}
 						unit="件"
 					/>
-					{/* 通貨流通量
-              See: features/admin.feature @通貨流通量が表示される */}
+					{/* 通貨流通量（BANユーザー除外）
+              See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる */}
 					<StatCard
 						label="通貨流通量"
 						value={
 							isLoadingSummary ? null : (summary?.currencyInCirculation ?? 0)
 						}
 						unit="BT"
+						note="BAN除外"
 					/>
 				</div>
 			)}

@@ -47,6 +47,18 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * AA（アスキーアート）表示用フォント。
+ * 2ch/5chのAAは「MS Pゴシック 16px」を前提にデザインされている。
+ * Web版でも同じフォント特性（全角1文字 = 半角2文字の幅）を持つフォントを指定し、
+ * 専ブラとの表示互換性を保証する。
+ * See: config/copipe-seed.txt ヘッダー「AA表示の前提フォントとスペース方針」
+ * See: docs/specs/screens/thread-view.yaml > inline-system-content
+ */
+:root {
+  --font-aa: "MS PGothic", "IPAMonaPGothic", "Monapo", "Mona", monospace;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

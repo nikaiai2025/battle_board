@@ -376,6 +376,49 @@ export async function countByDate(date: string): Promise<number> {
 }
 
 /**
+ * 指定日の人間書き込み数とユニーク書き込みユーザー数を集計する。
+ * 条件: is_system_message = false AND author_id IS NOT NULL（人間の書き込み）。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > countHumanPostsByDate
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+export async function countHumanPostsByDate(
+	date: string,
+): Promise<{ count: number; uniqueAuthors: number }> {
+	const humanPosts = Array.from(store.values()).filter((p) => {
+		if (p.isSystemMessage) return false;
+		if (p.authorId === null) return false;
+		const postDate = p.createdAt.toISOString().slice(0, 10);
+		return postDate === date;
+	});
+	const uniqueAuthors = new Set(humanPosts.map((p) => p.authorId)).size;
+	return { count: humanPosts.length, uniqueAuthors };
+}
+
+/**
+ * 指定日のBOT書き込み数とユニークBOT数を集計する。
+ * 条件: is_system_message = false AND author_id IS NULL（BOTの書き込み）。
+ *
+ * InMemory版ではbot_postsテーブルの代わりにBotRepositoryのストアを参照しないため、
+ * uniqueBots は常に 0 を返す（InMemory環境ではbot_posts JOINを省略）。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > countBotPostsByDate
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+export async function countBotPostsByDate(
+	date: string,
+): Promise<{ count: number; uniqueBots: number }> {
+	const botPosts = Array.from(store.values()).filter((p) => {
+		if (p.isSystemMessage) return false;
+		if (p.authorId !== null) return false;
+		const postDate = p.createdAt.toISOString().slice(0, 10);
+		return postDate === date;
+	});
+	// InMemory版ではbot_postsテーブルがないため、uniqueBots はcount相当で近似する
+	return { count: botPosts.length, uniqueBots: 0 };
+}
+
+/**
  * 著者 ID（author_id）に紐づくレス総数を返す。
  * 初回書き込み検出（ウェルカムシーケンス発動判定）に使用する。
  * システムメッセージ・削除済みレスを含む全件をカウントする

@@ -91,7 +91,12 @@ elements:
             type: text
             source: post.inlineSystemInfo
             style: muted, smaller-font
+            font: "MS PGothic, Monapo, monospace"
+            font-size: 16px
+            line-height: 18px
             description: >
+              AA（アスキーアート）を含むため、MS Pゴシック互換フォントで表示する。
+              詳細: config/copipe-seed.txt ヘッダー「AA表示の前提フォントとスペース方針」参照。
               例: "🤖 >>5 はAIでした！ 通貨 +30"
               例: "📝 書き込み報酬 +10"
               例: "⚠️ 通貨が不足しています"

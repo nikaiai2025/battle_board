@@ -182,3 +182,27 @@ export async function sumAllBalances(): Promise<number> {
 		0,
 	);
 }
+
+/**
+ * BANされていないユーザーの通貨残高合計を集計する。
+ * ダッシュボードの通貨流通量表示に使用する（BANユーザー除外）。
+ *
+ * InMemory版では UserRepository.findById を使ってBAN状態を確認する。
+ *
+ * See: src/lib/infrastructure/repositories/currency-repository.ts > sumActiveBalances
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ */
+export async function sumActiveBalances(): Promise<number> {
+	// InMemory UserRepository を動的 require で取得（循環参照回避）
+	const UserRepo =
+		require("./user-repository") as typeof import("./user-repository");
+	let total = 0;
+	for (const [userId, currency] of store.entries()) {
+		const user = await UserRepo.findById(userId);
+		// ユーザーが見つからない or BANされていない場合のみ加算
+		if (!user || !user.isBanned) {
+			total += currency.balance ?? 0;
+		}
+	}
+	return total;
+}

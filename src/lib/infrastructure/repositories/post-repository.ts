@@ -449,6 +449,91 @@ export async function countByDate(date: string): Promise<number> {
 }
 
 /**
+ * 指定日の人間書き込み数とユニーク書き込みユーザー数を集計する。
+ * 条件: is_system_message = false AND author_id IS NOT NULL（人間の書き込み）。
+ * ダッシュボードの人間/BOT分離表示に使用する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ *
+ * @param date - 対象日付（YYYY-MM-DD 形式）
+ * @returns { count: 書き込み数, uniqueAuthors: ユニーク著者数 }
+ */
+export async function countHumanPostsByDate(
+	date: string,
+): Promise<{ count: number; uniqueAuthors: number }> {
+	// author_id が NOT NULL の書き込みを取得（author_id のみ。head:true では author_id が取れないため）
+	const { data, error } = await supabaseAdmin
+		.from("posts")
+		.select("author_id")
+		.gte("created_at", `${date}T00:00:00.000Z`)
+		.lt("created_at", `${date}T23:59:59.999Z`)
+		.eq("is_system_message", false)
+		.not("author_id", "is", null);
+
+	if (error) {
+		throw new Error(
+			`PostRepository.countHumanPostsByDate failed: ${error.message}`,
+		);
+	}
+
+	const rows = (data ?? []) as { author_id: string }[];
+	const uniqueAuthors = new Set(rows.map((r) => r.author_id)).size;
+	return { count: rows.length, uniqueAuthors };
+}
+
+/**
+ * 指定日のBOT書き込み数とユニークBOT数を集計する。
+ * 条件: is_system_message = false AND author_id IS NULL（BOTの書き込み）。
+ * bot_posts テーブルとJOINして bot_id を取得しユニークBOT数を算出する。
+ * ダッシュボードの人間/BOT分離表示に使用する。
+ *
+ * See: features/admin.feature @管理者がダッシュボードで統計情報を確認できる
+ *
+ * @param date - 対象日付（YYYY-MM-DD 形式）
+ * @returns { count: 書き込み数, uniqueBots: ユニークBOT数 }
+ */
+export async function countBotPostsByDate(
+	date: string,
+): Promise<{ count: number; uniqueBots: number }> {
+	// Step 1: author_id IS NULL かつ非システムメッセージの当日書き込みの post_id を取得
+	const { data: posts, error: postsError } = await supabaseAdmin
+		.from("posts")
+		.select("id")
+		.gte("created_at", `${date}T00:00:00.000Z`)
+		.lt("created_at", `${date}T23:59:59.999Z`)
+		.eq("is_system_message", false)
+		.is("author_id", null);
+
+	if (postsError) {
+		throw new Error(
+			`PostRepository.countBotPostsByDate (posts) failed: ${postsError.message}`,
+		);
+	}
+
+	const postIds = (posts ?? []).map((p: { id: string }) => p.id);
+	if (postIds.length === 0) {
+		return { count: 0, uniqueBots: 0 };
+	}
+
+	// Step 2: bot_posts テーブルから該当 post_id の bot_id を取得
+	const { data: botPosts, error: bpError } = await supabaseAdmin
+		.from("bot_posts")
+		.select("bot_id")
+		.in("post_id", postIds);
+
+	if (bpError) {
+		throw new Error(
+			`PostRepository.countBotPostsByDate (bot_posts) failed: ${bpError.message}`,
+		);
+	}
+
+	const uniqueBots = new Set(
+		(botPosts ?? []).map((bp: { bot_id: string }) => bp.bot_id),
+	).size;
+	return { count: postIds.length, uniqueBots };
+}
+
+/**
  * 指定日に書き込みがあったアクティブスレッド数を集計する。
  * ダッシュボードのリアルタイムサマリーに使用する。
  *
