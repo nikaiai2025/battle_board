@@ -705,7 +705,24 @@ export class CommandService {
 			// resolvedPendingRepo を共用する（pending_async_commands テーブルを共用）
 			if (resolvedPendingRepo) {
 				// eslint-disable-next-line @typescript-eslint/no-require-imports
-				const postRepository: IHiroyukiPostRepository = require("../infrastructure/repositories/post-repository");
+				const PostRepo = require("../infrastructure/repositories/post-repository");
+				// post-repository の findByThreadIdAndPostNumber を IHiroyukiPostRepository の
+				// findPostByNumber に適合させるアダプター。
+				// require() は any を返すため型チェックが効かず、メソッド名不一致がランタイムエラーになる。
+				// See: features/command_hiroyuki.feature @削除済みレスを対象に指定するとエラーになる
+				const postRepository: IHiroyukiPostRepository = {
+					findPostByNumber: async (threadId: string, postNumber: number) => {
+						const post = await PostRepo.findByThreadIdAndPostNumber(
+							threadId,
+							postNumber,
+						);
+						if (!post) return null;
+						return {
+							isDeleted: post.isDeleted ?? false,
+							isSystemMessage: post.isSystemMessage ?? false,
+						};
+					},
+				};
 				resolvedHiroyukiHandler = new HiroyukiHandler(
 					resolvedPendingRepo as IHiroyukiPendingRepository,
 					postRepository,

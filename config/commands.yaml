@@ -11,7 +11,7 @@
 
 commands:
   tell:
-    description: "指定レスがBOTかどうか判定する。使用例: !tell >>10"
+    description: "指定レスがBOTかどうか判定する。>>N 指定必須。"
     cost: 10
     targetFormat: ">>postNumber"
     enabled: true
@@ -19,7 +19,7 @@ commands:
     hitBonus: 20
     falseAccusationBonus: 10
   attack:
-    description: "指定レスに攻撃する(BOT駆除用)。使用例: !attack >>10"
+    description: "指定レスに攻撃する(BOT駆除用)。>>N 指定必須。"
     cost: 5
     damage: 10
     compensation_multiplier: 3
@@ -27,7 +27,7 @@ commands:
     enabled: true
     stealth: false
   w:
-    description: "指定レスに草を生やす。使用例: !w >>10"
+    description: "指定レスに草を生やす。>>N 指定必須。"
     cost: 0
     targetFormat: ">>postNumber"
     enabled: true
@@ -40,21 +40,21 @@ commands:
     stealth: false
     hidden: true
   hissi:
-    description: "対象ユーザーの本日の書き込みを表示。使用例: !hissi >>10"
+    description: "対象ユーザーの本日の書き込みを表示。>>N 指定必須。"
     cost: 20
     targetFormat: ">>postNumber"
     responseType: independent
     enabled: true
     stealth: false
   kinou:
-    description: "対象ユーザーの昨日のIDを表示。使用例: !kinou >>10"
+    description: "対象ユーザーの昨日のIDを表示。>>N 指定必須。"
     cost: 20
     targetFormat: ">>postNumber"
     responseType: independent
     enabled: true
     stealth: false
   omikuji:
-    description: "おみくじで運勢を占う（>>N 指定で対象ユーザーの運勢を占う）"
+    description: "おみくじで運勢を占う。>>N 指定可能。"
     cost: 0
     targetFormat: null
     responseType: independent
@@ -69,7 +69,7 @@ commands:
   # TASK-270: !aori コマンド追加（煽りBOT召喚・ステルス）
   # See: features/command_aori.feature
   aori:
-    description: "(ステルス)BOTを召喚し、指定レスを煽る。使用例: !aori >>10"
+    description: "(ステルス)BOTを召喚し、対象レスを煽る。>>N 指定必須。"
     cost: 10
     targetFormat: ">>postNumber"
     enabled: true
@@ -94,7 +94,7 @@ commands:
   # !hiroyuki コマンド追加（ひろゆき風AI BOT召喚・非ステルス）
   # See: features/command_hiroyuki.feature
   hiroyuki:
-    description: "ひろゆき風BOTを召喚する。例: !hiroyuki / !hiroyuki >>5"
+    description: "ひろゆき風BOTを召喚する。>>N 指定可能。"
     cost: 10
     targetFormat: null
     enabled: true
@@ -102,7 +102,7 @@ commands:
   # TASK-328: !copipe コマンド追加（コピペAA再現）
   # See: features/command_copipe.feature
   copipe:
-    description: "コピペ・AAを再現。ランダムor検索。例: !copipe ドッキングにぼし"
+    description: "コピペ・AAを再現。検索可能（!copipe以降の「文末までの文字列」で検索します）"
     cost: 3
     targetFormat: null
     enabled: true
