@@ -23,6 +23,7 @@ import * as UserRepository from "../infrastructure/repositories/user-repository"
 // createClient の直接 import を削除（レイヤー規約準拠）
 import {
 	createAuthOnlyClient,
+	createPkceOAuthClient,
 	supabaseAdmin,
 } from "../infrastructure/supabase/client";
 
@@ -131,21 +132,27 @@ export async function registerWithEmail(
 /**
  * Discord アカウントで本登録するための OAuth URL を返す。
  * Supabase Auth signInWithOAuth({ provider: 'discord' }) の認可 URL を返す。
+ * PKCE フローを使用し、code_verifier をストレージに保存する。
+ * 呼び出し元は pkceStorage を Cookie に保存すること。
  *
  * See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
  * See: docs/architecture/components/user-registration.md §7.2 Discord連携
+ * See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
  *
  * @param redirectTo - Discord認可後のコールバックURL
- * @returns redirectUrl: Discord認可画面のURL
+ * @returns redirectUrl: Discord認可画面のURL, pkceStorage: Cookieに保存するPKCEストレージ
  */
 export async function registerWithDiscord(
 	redirectTo: string,
-): Promise<{ redirectUrl: string }> {
-	const { data, error } = await supabaseAdmin.auth.signInWithOAuth({
+): Promise<{ redirectUrl: string; pkceStorage: Record<string, string> }> {
+	const { client, getStorage } = createPkceOAuthClient();
+
+	const { data, error } = await client.auth.signInWithOAuth({
 		provider: "discord",
 		options: {
 			redirectTo,
 			scopes: "identify",
+			skipBrowserRedirect: true,
 		},
 	});
 
@@ -155,7 +162,7 @@ export async function registerWithDiscord(
 		);
 	}
 
-	return { redirectUrl: data.url };
+	return { redirectUrl: data.url, pkceStorage: getStorage() };
 }
 
 /**
@@ -291,21 +298,27 @@ export async function loginWithEmail(
 
 /**
  * Discord アカウントでのログイン開始。Discord OAuth フロー開始 URL を返す。
+ * PKCE フローを使用し、code_verifier をストレージに保存する。
+ * 呼び出し元は pkceStorage を Cookie に保存すること。
  *
  * See: features/user_registration.feature @本登録ユーザーがDiscordアカウントでログインする
  * See: docs/architecture/components/user-registration.md §5.2 ログイン > loginWithDiscord
+ * See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
  *
  * @param redirectTo - Discord認可後のコールバックURL
- * @returns redirectUrl: Discord認可画面のURL
+ * @returns redirectUrl: Discord認可画面のURL, pkceStorage: Cookieに保存するPKCEストレージ
  */
 export async function loginWithDiscord(
 	redirectTo: string,
-): Promise<{ redirectUrl: string }> {
-	const { data, error } = await supabaseAdmin.auth.signInWithOAuth({
+): Promise<{ redirectUrl: string; pkceStorage: Record<string, string> }> {
+	const { client, getStorage } = createPkceOAuthClient();
+
+	const { data, error } = await client.auth.signInWithOAuth({
 		provider: "discord",
 		options: {
 			redirectTo,
 			scopes: "identify",
+			skipBrowserRedirect: true,
 		},
 	});
 
@@ -315,7 +328,7 @@ export async function loginWithDiscord(
 		);
 	}
 
-	return { redirectUrl: data.url };
+	return { redirectUrl: data.url, pkceStorage: getStorage() };
 }
 
 /**
@@ -323,26 +336,35 @@ export async function loginWithDiscord(
  * Supabase Auth exchangeCodeForSession() でセッション取得後、ログイン処理を行う。
  *
  * 処理手順:
- *   1. Supabase Auth exchangeCodeForSession() でセッション取得
+ *   1. Supabase Auth exchangeCodeForSession() でセッション取得（PKCE verifier使用）
  *   2. supabase_auth_id で users レコードを検索
  *   3. 見つかった場合: 新 edge-token を発行してログイン完了（ログインフロー）
  *   4. 見つからない場合: completeRegistration() で本登録完了（本登録フロー）
  *
  * See: docs/architecture/components/user-registration.md §5.2 ログイン > handleOAuthCallback
+ * See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
  *
  * @param code - Supabase Auth コールバックの code パラメータ
  * @param pendingUserId - 本登録フローの場合、紐付け先の仮ユーザーID（ログインフローの場合は不要）
  * @param registrationType - 本登録方法: 'email' | 'discord'（本登録フローの場合に使用）
+ * @param pkceStorage - OAuth開始時にCookieに保存したPKCEストレージ（code_verifierを含む）
  * @returns LoginResult（ログイン成功時は userId と edgeToken を含む）
  */
 export async function handleOAuthCallback(
 	code: string,
 	pendingUserId?: string,
 	registrationType: "email" | "discord" = "discord",
+	pkceStorage?: Record<string, string>,
 ): Promise<LoginResult> {
 	// Step 1: コードをセッションに交換
+	// PKCE フロー: pkceStorage に保存された code_verifier を使用する
+	// See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
+	const authClient = pkceStorage
+		? createPkceOAuthClient(pkceStorage).client
+		: supabaseAdmin;
+
 	const { data: sessionData, error: sessionError } =
-		await supabaseAdmin.auth.exchangeCodeForSession(code);
+		await authClient.auth.exchangeCodeForSession(code);
 
 	if (sessionError || !sessionData.user) {
 		return { success: false, reason: "invalid_credentials" };

@@ -4,12 +4,14 @@
  * See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
  * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象がボットだった場合
  * See: features/bot_system.feature @BOTマークなしのレスに攻撃して対象が人間だった場合は賠償金が発生する
+ * See: features/bot_system.feature @複数ターゲット攻撃
  * See: docs/architecture/components/attack.md §3 処理フロー
  * See: docs/architecture/components/attack.md §6 設計上の判断
  *
  * !attack コマンドの仕様:
- *   - 引数: ">>postNumber" 形式でレスを指定する（例: "!attack >>5"）
- *   - 通貨コスト: 5（config/commands.yaml の attack.cost）
+ *   - 単体: ">>postNumber" 形式でレスを指定する（例: "!attack >>5"）
+ *   - 範囲: ">>N-M" 形式でレスN〜Mを順に攻撃する（例: "!attack >>10-13"）
+ *   - 通貨コスト: 5/ターゲット（config/commands.yaml の attack.cost）
  *   - ダメージ: 10（config/commands.yaml の attack.damage）
  *   - 対象がBOT → BOTマーク付与（未付与なら）+ HP減少 + 攻撃記録
  *   - 対象が人間 → コスト消費 + 賠償金（cost * multiplier = 15）
@@ -26,6 +28,10 @@ import type {
 	DeductResult,
 } from "../../domain/models/currency";
 import type { Post } from "../../domain/models/post";
+import {
+	isRangeFormat,
+	parseAttackRange,
+} from "../../domain/rules/attack-range-parser";
 import type { BotInfo, DamageResult } from "../bot-service";
 import type {
 	CommandContext,
@@ -85,6 +91,49 @@ export interface IAttackCurrencyService {
  */
 export interface IAttackPostRepository {
 	findById(id: string): Promise<Post | null>;
+	/**
+	 * スレッドIDとレス番号からレスを取得する。
+	 * 複数ターゲット攻撃（>>N-M 形式）でレス番号→Post の解決に使用する。
+	 * See: features/bot_system.feature @複数ターゲット攻撃
+	 */
+	findByThreadIdAndPostNumber(
+		threadId: string,
+		postNumber: number,
+	): Promise<Post | null>;
+}
+
+// ---------------------------------------------------------------------------
+// 複数ターゲット攻撃の内部型
+// See: features/bot_system.feature @複数ターゲット攻撃
+// ---------------------------------------------------------------------------
+
+/** 事前検証で有効と判定されたターゲット */
+type ValidTarget =
+	| {
+			postNumber: number;
+			postId: string;
+			type: "bot";
+			botInfo: BotInfo;
+	  }
+	| {
+			postNumber: number;
+			postId: string;
+			type: "human";
+			targetUserId: string;
+	  };
+
+/** 事前検証でスキップされたターゲット */
+interface SkippedTarget {
+	postNumber: number;
+	reason: string;
+}
+
+/** 個別ターゲットの攻撃結果（表示用） */
+interface TargetResult {
+	postNumber: number;
+	message: string;
+	eliminationNotice?: string;
+	lastBotBonusNotice?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +147,7 @@ export interface IAttackPostRepository {
  *   - 共通前処理: 対象レス存在チェック・自己攻撃拒否・システムメッセージ拒否
  *   - フローB: 対象がBOTの場合（BOTマーク付与 + HP減少 + 撃破報酬）
  *   - フローC: 対象が人間の場合（賠償金支払い）
+ *   - 複数ターゲット: >>N-M 形式で範囲内のレスを順番に攻撃する
  *
  * See: features/bot_system.feature
  * See: docs/architecture/components/attack.md §2.1 AttackHandler
@@ -127,12 +177,11 @@ export class AttackHandler implements CommandHandler {
 	/**
 	 * !attack コマンドを実行する。
 	 *
-	 * D-08 attack.md §3 の処理フローに忠実に実装する。
-	 * CommandService は通貨残高チェック（>=cost）のみ行い、
-	 * 実際のdebitはこのメソッド内で行う（エラーケースでのコスト不消費を保証）。
+	 * 引数が >>N-M 形式の場合は複数ターゲット攻撃に分岐する。
+	 * それ以外は既存の単体攻撃フロー（D-08 attack.md §3 準拠）。
 	 *
 	 * See: features/bot_system.feature @暴露済みボットに攻撃してHPを減少させる
-	 * See: docs/architecture/components/attack.md §3 処理フロー
+	 * See: features/bot_system.feature @複数ターゲット攻撃
 	 *
 	 * @param ctx - コマンド実行コンテキスト
 	 * @returns コマンド実行結果（systemMessage に表示内容）
@@ -147,6 +196,29 @@ export class AttackHandler implements CommandHandler {
 			};
 		}
 
+		// >>N-M 形式の範囲指定を検出 → 複数ターゲット攻撃
+		// CommandService の PostNumberResolver は >>N のみ解決するため、
+		// >>N-M はそのまま文字列として渡される。
+		if (isRangeFormat(targetArg)) {
+			return await this.executeMultiTarget(ctx, targetArg);
+		}
+
+		// 以下: 既存の単体攻撃フロー
+		return await this.executeSingleTarget(ctx, targetArg);
+	}
+
+	// ---------------------------------------------------------------------------
+	// 単体攻撃フロー（既存）
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * 単体ターゲットの攻撃フロー。
+	 * D-08 attack.md §3 の処理フローに忠実に実装する。
+	 */
+	private async executeSingleTarget(
+		ctx: CommandContext,
+		targetArg: string,
+	): Promise<CommandHandlerResult> {
 		// 共通前処理: 対象レスの存在チェック
 		// See: docs/architecture/components/attack.md §3.1 共通前処理 step 4
 		const targetPost = await this.postRepository.findById(targetArg);
@@ -196,7 +268,343 @@ export class AttackHandler implements CommandHandler {
 	}
 
 	// ---------------------------------------------------------------------------
-	// フローB: 対象がBOTの場合
+	// 複数ターゲット攻撃フロー
+	// See: features/bot_system.feature @複数ターゲット攻撃
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * 複数ターゲット攻撃の処理。
+	 *
+	 * 1. 範囲パース → レス番号配列
+	 * 2. 各ターゲットの事前検証（有効/スキップの判定）
+	 * 3. 有効ターゲット数 × コストの残高チェック
+	 * 4. 有効ターゲットを順に攻撃（途中で残高不足なら中断）
+	 * 5. 全結果を集約した表示文を生成
+	 */
+	private async executeMultiTarget(
+		ctx: CommandContext,
+		rangeArg: string,
+	): Promise<CommandHandlerResult> {
+		// 1. 範囲パース
+		const rangeResult = parseAttackRange(rangeArg);
+		if (!rangeResult.success) {
+			return { success: false, systemMessage: rangeResult.error };
+		}
+
+		const { postNumbers } = rangeResult;
+
+		// 2. 各ターゲットの事前検証
+		const validTargets: ValidTarget[] = [];
+		const skippedTargets: SkippedTarget[] = [];
+		const attackedBotIds = new Set<string>(); // 範囲内の同一ボット重複検出
+
+		for (const pn of postNumbers) {
+			const skipReason = await this.preValidateTarget(
+				ctx,
+				pn,
+				attackedBotIds,
+				validTargets,
+			);
+			if (skipReason) {
+				skippedTargets.push({ postNumber: pn, reason: skipReason });
+			}
+		}
+
+		// 3. 有効ターゲットが0件ならエラー
+		if (validTargets.length === 0) {
+			return {
+				success: false,
+				systemMessage: "攻撃対象がありません",
+			};
+		}
+
+		// 4. 残高チェック（有効ターゲット数 × コスト）
+		const totalCost = validTargets.length * this.cost;
+		const balance = await this.currencyService.getBalance(ctx.userId);
+		if (balance < totalCost) {
+			return {
+				success: false,
+				systemMessage: `通貨が不足しています（必要: ${totalCost}、残高: ${balance}）`,
+			};
+		}
+
+		// 5. 有効ターゲットを順に攻撃
+		const results: TargetResult[] = [];
+		const eliminationNotices: string[] = [];
+		let lastBotBonusNotice: string | null = null;
+
+		for (const target of validTargets) {
+			// 賠償金等で残高が次のコスト分を下回った場合は中断
+			const currentBalance = await this.currencyService.getBalance(ctx.userId);
+			if (currentBalance < this.cost) {
+				results.push({
+					postNumber: target.postNumber,
+					message: "残高不足で中断",
+				});
+				// 残りの未処理ターゲットも中断として追加
+				const currentIdx = validTargets.indexOf(target);
+				for (let i = currentIdx + 1; i < validTargets.length; i++) {
+					results.push({
+						postNumber: validTargets[i].postNumber,
+						message: "残高不足で中断",
+					});
+				}
+				break;
+			}
+
+			if (target.type === "bot") {
+				const r = await this.executeSingleBotAttack(ctx, target);
+				results.push(r);
+				if (r.eliminationNotice) {
+					eliminationNotices.push(r.eliminationNotice);
+				}
+				if (r.lastBotBonusNotice) {
+					lastBotBonusNotice = r.lastBotBonusNotice;
+				}
+			} else {
+				const r = await this.executeSingleHumanAttack(ctx, target);
+				results.push(r);
+			}
+		}
+
+		// 6. 集約表示文を生成
+		const systemMessage = this.buildMultiTargetMessage(
+			ctx.dailyId,
+			postNumbers,
+			results,
+			skippedTargets,
+		);
+
+		return {
+			success: true,
+			systemMessage,
+			eliminationNotice:
+				eliminationNotices.length > 0 ? eliminationNotices.join("\n\n") : null,
+			lastBotBonusNotice,
+		};
+	}
+
+	/**
+	 * 個別ターゲットの事前検証。
+	 * 有効な場合は validTargets に追加し null を返す。
+	 * 無効な場合はスキップ理由文字列を返す。
+	 */
+	private async preValidateTarget(
+		ctx: CommandContext,
+		postNumber: number,
+		attackedBotIds: Set<string>,
+		validTargets: ValidTarget[],
+	): Promise<string | null> {
+		const post = await this.postRepository.findByThreadIdAndPostNumber(
+			ctx.threadId,
+			postNumber,
+		);
+
+		if (!post) return "存在しないレス";
+		if (post.authorId === ctx.userId) return "自分の書き込み";
+		if (post.isSystemMessage) return "システムメッセージ";
+
+		const isBot = await this.botService.isBot(post.id);
+
+		if (isBot) {
+			const botInfo = await this.botService.getBotByPostId(post.id);
+			if (!botInfo) return "ボット情報取得失敗";
+			if (!botInfo.isActive) return "撃破済み";
+
+			// 範囲内の同一ボット重複チェック
+			if (attackedBotIds.has(botInfo.botId)) {
+				return "同じボットには1日1回のみ";
+			}
+
+			// 同日攻撃済みチェック
+			const canAttack = await this.botService.canAttackToday(
+				ctx.userId,
+				botInfo.botId,
+			);
+			if (!canAttack) return "同日攻撃済み";
+
+			validTargets.push({
+				postNumber,
+				postId: post.id,
+				type: "bot",
+				botInfo,
+			});
+			attackedBotIds.add(botInfo.botId);
+		} else {
+			// authorId=null かつ非システムメッセージのレスは攻撃不可
+			if (post.authorId === null) return "攻撃不可能なレス";
+
+			validTargets.push({
+				postNumber,
+				postId: post.id,
+				type: "human",
+				targetUserId: post.authorId,
+			});
+		}
+
+		return null; // 有効
+	}
+
+	/**
+	 * 複数ターゲット攻撃: BOTへの単体攻撃実行。
+	 * executeFlowB のコアロジックを使用するが、結果を TargetResult で返す。
+	 */
+	private async executeSingleBotAttack(
+		ctx: CommandContext,
+		target: ValidTarget & { type: "bot" },
+	): Promise<TargetResult> {
+		const { botInfo, postNumber } = target;
+
+		// コスト消費
+		const deductResult = await this.currencyService.debit(
+			ctx.userId,
+			this.cost,
+			"command_attack",
+		);
+		if (!deductResult.success) {
+			return { postNumber, message: "残高不足で中断" };
+		}
+
+		// 不意打ち（lurking） → revealBot
+		if (!botInfo.isRevealed) {
+			await this.botService.revealBot(botInfo.botId);
+		}
+
+		// HP減少
+		const damageResult = await this.botService.applyDamage(
+			botInfo.botId,
+			this.damage,
+			ctx.userId,
+		);
+
+		// 攻撃記録
+		await this.botService.recordAttack(
+			ctx.userId,
+			botInfo.botId,
+			ctx.postId || null,
+			this.damage,
+		);
+
+		// 撃破判定
+		let eliminationNotice: string | undefined;
+		let lastBotBonusNotice: string | undefined;
+		let eliminatedTag = "";
+
+		if (damageResult.eliminated && damageResult.reward !== null) {
+			await this.currencyService.credit(
+				ctx.userId,
+				damageResult.reward,
+				"bot_elimination",
+			);
+
+			eliminationNotice = [
+				`⚔️ ボット「${botInfo.name}」が撃破されました！`,
+				`生存日数：${botInfo.survivalDays}日 / 総書き込み：${botInfo.totalPosts}件 / 被告発：${botInfo.accusedCount}回`,
+				`撃破者：名無しさん(ID:${ctx.dailyId}) に撃破報酬 +${damageResult.reward}`,
+			].join("\n");
+
+			eliminatedTag = " 【撃破】";
+
+			// ラストボットボーナス
+			const lastBotCheck = await this.botService.checkLastBotBonus(ctx.userId);
+			if (lastBotCheck.triggered) {
+				await this.currencyService.credit(ctx.userId, 100, "last_bot_bonus");
+				lastBotBonusNotice = [
+					"🎉 本日のBOTが全滅しました！",
+					`最終撃破者：名無しさん(ID:${ctx.dailyId}) にラストボットボーナス +100`,
+				].join("\n");
+			}
+		}
+
+		return {
+			postNumber,
+			message: `🤖${botInfo.name} に攻撃！ HP:${damageResult.previousHp}→${damageResult.remainingHp}${eliminatedTag}`,
+			eliminationNotice,
+			lastBotBonusNotice,
+		};
+	}
+
+	/**
+	 * 複数ターゲット攻撃: 人間への単体攻撃実行。
+	 * executeFlowC のコアロジックを使用するが、結果を TargetResult で返す。
+	 */
+	private async executeSingleHumanAttack(
+		ctx: CommandContext,
+		target: ValidTarget & { type: "human" },
+	): Promise<TargetResult> {
+		const { postNumber, targetUserId } = target;
+
+		// コスト消費
+		const deductResult = await this.currencyService.debit(
+			ctx.userId,
+			this.cost,
+			"command_attack",
+		);
+		if (!deductResult.success) {
+			return { postNumber, message: "残高不足で中断" };
+		}
+
+		// 賠償金計算・支払い
+		const compensationAmount = this.cost * this.compensationMultiplier;
+		const attackerBalance = await this.currencyService.getBalance(ctx.userId);
+		const actualCompensation = Math.min(compensationAmount, attackerBalance);
+
+		if (actualCompensation > 0) {
+			await this.currencyService.debit(
+				ctx.userId,
+				actualCompensation,
+				"command_attack",
+			);
+		}
+
+		await this.currencyService.credit(
+			targetUserId,
+			actualCompensation,
+			"compensation",
+		);
+
+		return {
+			postNumber,
+			message: `人間だった！ 賠償金 ${actualCompensation}`,
+		};
+	}
+
+	/**
+	 * 複数ターゲット攻撃の集約表示文を生成する。
+	 * レス番号昇順で、攻撃結果とスキップ理由を列挙する。
+	 *
+	 * 表示例:
+	 *   ⚔ 名無しさん(ID:Ax8kP2) の連続攻撃！
+	 *     >>10: 🤖荒らし役A に攻撃！ HP:10→0 【撃破】
+	 *     >>11: 人間だった！ 賠償金 15
+	 *     >>12: （存在しないレス — スキップ）
+	 *     >>13: 🤖コピペ に攻撃！ HP:100→90
+	 */
+	private buildMultiTargetMessage(
+		dailyId: string,
+		allPostNumbers: number[],
+		results: TargetResult[],
+		skipped: SkippedTarget[],
+	): string {
+		const resultMap = new Map<number, string>();
+		for (const r of results) {
+			resultMap.set(r.postNumber, r.message);
+		}
+		for (const s of skipped) {
+			resultMap.set(s.postNumber, `（${s.reason} — スキップ）`);
+		}
+
+		const lines = [`⚔ 名無しさん(ID:${dailyId}) の連続攻撃！`];
+		for (const pn of allPostNumbers) {
+			const msg = resultMap.get(pn) ?? "（不明）";
+			lines.push(`  >>${pn}: ${msg}`);
+		}
+
+		return lines.join("\n");
+	}
+
+	// ---------------------------------------------------------------------------
+	// フローB: 対象がBOTの場合（単体攻撃）
 	// See: docs/architecture/components/attack.md §3.3 フローB
 	// ---------------------------------------------------------------------------
 
@@ -353,7 +761,7 @@ export class AttackHandler implements CommandHandler {
 	}
 
 	// ---------------------------------------------------------------------------
-	// フローC: 対象が人間の場合
+	// フローC: 対象が人間の場合（単体攻撃）
 	// See: docs/architecture/components/attack.md §3.4 フローC
 	// ---------------------------------------------------------------------------
 

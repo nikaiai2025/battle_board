@@ -22,7 +22,10 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { EDGE_TOKEN_COOKIE } from "@/lib/constants/cookie-names";
+import {
+	EDGE_TOKEN_COOKIE,
+	PKCE_STATE_COOKIE,
+} from "@/lib/constants/cookie-names";
 import * as RegistrationService from "@/lib/services/registration-service";
 
 // ---------------------------------------------------------------------------
@@ -60,6 +63,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 		return NextResponse.redirect(new URL("/auth/error", req.nextUrl.origin));
 	}
 
+	// --- PKCE ストレージを Cookie から復元する ---
+	// OAuth開始時（/api/auth/login/discord または /api/auth/register/discord）に
+	// 設定した bb-pkce-state Cookie から code_verifier を復元する。
+	// See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
+	const pkceStateCookie = req.cookies.get(PKCE_STATE_COOKIE)?.value;
+	let pkceStorage: Record<string, string> | undefined;
+	if (pkceStateCookie) {
+		try {
+			pkceStorage = JSON.parse(pkceStateCookie) as Record<string, string>;
+		} catch {
+			// 不正なCookie値は無視（フォールバック: pkceStorageなしで進む）
+		}
+	}
+
 	let result: Awaited<
 		ReturnType<typeof RegistrationService.handleOAuthCallback>
 	>;
@@ -68,11 +85,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 	if (flow === "register" && userId) {
 		// フロー1: Discord本登録フロー（flow=register + userId あり）
 		// See: docs/architecture/components/user-registration.md §7.2 Discord連携
-		result = await RegistrationService.handleOAuthCallback(code, userId);
+		result = await RegistrationService.handleOAuthCallback(
+			code,
+			userId,
+			"discord",
+			pkceStorage,
+		);
 	} else {
 		// フロー2: Discordログインフロー（flow=login または flow なし）
 		// See: docs/architecture/components/user-registration.md §7.3 ログイン（新デバイス）
-		result = await RegistrationService.handleOAuthCallback(code);
+		result = await RegistrationService.handleOAuthCallback(
+			code,
+			undefined,
+			"discord",
+			pkceStorage,
+		);
 	}
 
 	// --- 結果処理 ---
@@ -96,6 +123,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 		maxAge: 60 * 60 * 24 * 365,
 		path: "/",
 	});
+
+	// PKCE ストレージ Cookie を削除（使い捨て；セキュリティ上の後片付け）
+	response.cookies.delete(PKCE_STATE_COOKIE);
 
 	return response;
 }

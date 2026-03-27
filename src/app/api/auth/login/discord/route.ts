@@ -16,6 +16,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+import { PKCE_STATE_COOKIE } from "@/lib/constants/cookie-names";
 import * as RegistrationService from "@/lib/services/registration-service";
 
 // ---------------------------------------------------------------------------
@@ -45,10 +46,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 		const result = await RegistrationService.loginWithDiscord(redirectTo);
 
-		return NextResponse.json(
+		// PKCE ストレージを Cookie に保存する（コールバック時に code_verifier を復元するため）
+		// See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
+		const response = NextResponse.json(
 			{ success: true, redirectUrl: result.redirectUrl },
 			{ status: 200 },
 		);
+		response.cookies.set(
+			PKCE_STATE_COOKIE,
+			JSON.stringify(result.pkceStorage),
+			{
+				httpOnly: true,
+				secure: process.env.NODE_ENV === "production",
+				sameSite: "lax",
+				maxAge: 60 * 10, // 10分間有効（OAuth フロー完了までの猶予）
+				path: "/",
+			},
+		);
+		return response;
 	} catch (err) {
 		console.error("[POST /api/auth/login/discord] Error:", err);
 		return NextResponse.json(

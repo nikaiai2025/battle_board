@@ -1,6 +1,6 @@
 # D-08 コンポーネント境界設計書: Attack（攻撃システム）
 
-> ステータス: ドラフト v1 / 2026-03-16
+> ステータス: ドラフト v2 / 2026-03-28
 > 関連D-07: SS 3.2 CommandService
 > 関連D-05: bot_state_transitions.yaml v5
 > 関連D-08: bot.md v5, command.md, accusation.md
@@ -116,6 +116,32 @@ C5. インライン・システム情報を生成:
 | 同一ボットに同日2回目 | なし | "同じボットには1日1回しか攻撃できません" |
 
 全エラーケースでコストは消費されない（攻撃自体が実行されないため）。
+
+### 3.6 フローD: 複数ターゲット攻撃（>>N-M 形式）
+
+See: features/bot_system.feature @複数ターゲット攻撃
+See: src/lib/domain/rules/attack-range-parser.ts
+
+```
+D1. 引数が >>N-M 形式かを判定（isRangeFormat）
+    -> 非該当: 単体攻撃（§3.2 へ）
+D2. parseAttackRange(arg) で範囲パース
+    -> エラー（不正形式・上限10超過）: エラー応答
+D3. 各レス番号を事前検証（preValidateTarget）
+    スキップ条件: 存在しない / 自分 / システムメッセージ /
+    撃破済み / 同日攻撃済み / 範囲内で同一ボット重複
+D4. 有効ターゲット数 == 0: エラー応答
+D5. 残高チェック: balance >= 有効ターゲット数 × cost
+    -> 不足: エラー応答、コスト消費なし
+D6. 有効ターゲットを昇順に順次攻撃:
+    各ターゲットで残高 < cost なら中断
+    - BOT → executeSingleBotAttack（フローB の B4〜B9 相当）
+    - 人間 → executeSingleHumanAttack（フローC の C1〜C5 相当）
+D7. 全結果を集約した表示文を生成:
+    "⚔ 名無しさん(ID:{dailyId}) の連続攻撃！"
+    "  >>N: {結果}"
+    スキップ対象は "（{理由} — スキップ）" 表記
+```
 
 ---
 

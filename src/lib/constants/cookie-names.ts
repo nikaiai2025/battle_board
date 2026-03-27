@@ -33,3 +33,11 @@ export const THEME_COOKIE = "bb-theme";
  * See: features/theme.feature
  */
 export const FONT_COOKIE = "bb-font";
+
+/**
+ * Discord OAuth PKCE ストレージ Cookie。
+ * OAuth フロー開始時に code_verifier を保存し、コールバック時に読み取る。
+ * HttpOnly; 10分間有効。
+ * See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
+ */
+export const PKCE_STATE_COOKIE = "bb-pkce-state";

@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import type { DeductResult } from "../../../../lib/domain/models/currency";
 import type { Post } from "../../../../lib/domain/models/post";
 import type {
 	BotInfo,
@@ -169,6 +170,7 @@ function createMockPostRepository(
 ): IAttackPostRepository {
 	return {
 		findById: vi.fn().mockResolvedValue(post),
+		findByThreadIdAndPostNumber: vi.fn().mockResolvedValue(post),
 	};
 }
 
@@ -669,6 +671,518 @@ describe("AttackHandler", () => {
 			);
 			await handler.execute(createCtx());
 			expect(currencyService.debit).not.toHaveBeenCalled();
+		});
+	});
+
+	// =========================================================================
+	// 複数ターゲット攻撃（>>N-M 形式）
+	// See: features/bot_system.feature @複数ターゲット攻撃
+	// =========================================================================
+
+	describe("複数ターゲット攻撃", () => {
+		/**
+		 * マルチターゲット用の AttackHandler を生成する。
+		 * findByThreadIdAndPostNumber のモックを柔軟に設定可能。
+		 */
+		function createMultiTargetHandler(options: {
+			postsByNumber: Map<number, Post | null>;
+			isBotByPostId: Map<string, boolean>;
+			botInfoByPostId?: Map<string, BotInfo>;
+			canAttackByBotId?: Map<string, boolean>;
+			damageResultByBotId?: Map<string, DamageResult>;
+			balance?: number;
+		}) {
+			const balance = options.balance ?? 100;
+			let currentBalance = balance;
+
+			const botService: IAttackBotService = {
+				isBot: vi.fn().mockImplementation((postId: string) => {
+					return Promise.resolve(options.isBotByPostId.get(postId) ?? false);
+				}),
+				getBotByPostId: vi.fn().mockImplementation((postId: string) => {
+					return Promise.resolve(options.botInfoByPostId?.get(postId) ?? null);
+				}),
+				revealBot: vi.fn().mockResolvedValue(undefined),
+				applyDamage: vi.fn().mockImplementation((botId: string) => {
+					const result =
+						options.damageResultByBotId?.get(botId) ??
+						createDamageResultEliminated();
+					return Promise.resolve(result);
+				}),
+				canAttackToday: vi
+					.fn()
+					.mockImplementation((_attackerId: string, botId: string) => {
+						return Promise.resolve(
+							options.canAttackByBotId?.get(botId) ?? true,
+						);
+					}),
+				recordAttack: vi.fn().mockResolvedValue(undefined),
+				checkLastBotBonus: vi.fn().mockResolvedValue({ triggered: false }),
+			};
+
+			const currencyService: IAttackCurrencyService = {
+				getBalance: vi.fn().mockImplementation(() => {
+					return Promise.resolve(currentBalance);
+				}),
+				debit: vi
+					.fn()
+					.mockImplementation(
+						(_userId: string, amount: number): Promise<DeductResult> => {
+							if (currentBalance < amount) {
+								return Promise.resolve({
+									success: false as const,
+									reason: "insufficient_balance" as const,
+								});
+							}
+							currentBalance -= amount;
+							return Promise.resolve({
+								success: true,
+								newBalance: currentBalance,
+							});
+						},
+					),
+				credit: vi.fn().mockResolvedValue(undefined),
+			};
+
+			const postRepository: IAttackPostRepository = {
+				findById: vi.fn().mockResolvedValue(null),
+				findByThreadIdAndPostNumber: vi
+					.fn()
+					.mockImplementation((_threadId: string, postNumber: number) => {
+						return Promise.resolve(
+							options.postsByNumber.get(postNumber) ?? null,
+						);
+					}),
+			};
+
+			const handler = new AttackHandler(
+				botService,
+				currencyService,
+				postRepository,
+				DEFAULT_COST,
+				DEFAULT_DAMAGE,
+				COMPENSATION_MULTIPLIER,
+			);
+
+			return {
+				handler,
+				botService,
+				currencyService,
+				postRepository,
+				getBalance: () => currentBalance,
+			};
+		}
+
+		it("範囲指定で複数のボットを順番に攻撃する", async () => {
+			// See: features/bot_system.feature @範囲指定で複数のボットを順番に攻撃する
+			const botPostA = createHumanPost({
+				id: "post-a",
+				postNumber: 10,
+				authorId: "bot-author-a",
+			});
+			const botPostB = createHumanPost({
+				id: "post-b",
+				postNumber: 11,
+				authorId: "bot-author-b",
+			});
+
+			const { handler, botService, getBalance } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[10, botPostA],
+					[11, botPostB],
+				]),
+				isBotByPostId: new Map([
+					["post-a", true],
+					["post-b", true],
+				]),
+				botInfoByPostId: new Map([
+					[
+						"post-a",
+						createBotInfo({
+							botId: "bot-a",
+							name: "荒らし役A",
+							hp: 10,
+							isActive: true,
+						}),
+					],
+					[
+						"post-b",
+						createBotInfo({
+							botId: "bot-b",
+							name: "荒らし役B",
+							hp: 10,
+							isActive: true,
+						}),
+					],
+				]),
+				damageResultByBotId: new Map([
+					[
+						"bot-a",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+					[
+						"bot-b",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+				]),
+				balance: 100,
+			});
+
+			const result = await handler.execute(createCtx({ args: [">>10-11"] }));
+
+			expect(result.success).toBe(true);
+			expect(result.systemMessage).toContain("連続攻撃");
+			expect(result.systemMessage).toContain(">>10:");
+			expect(result.systemMessage).toContain(">>11:");
+			expect(result.systemMessage).toContain("荒らし役A");
+			expect(result.systemMessage).toContain("荒らし役B");
+			// コスト: 2 × 5 = 10
+			expect(getBalance()).toBe(100 - 10);
+			expect(botService.applyDamage).toHaveBeenCalledTimes(2);
+		});
+
+		it("コイン不足のため全体が失敗する", async () => {
+			// See: features/bot_system.feature @範囲指定でコイン不足のため全体が失敗する
+			const botPost = createHumanPost({
+				id: "post-a",
+				postNumber: 10,
+				authorId: "bot-author-a",
+			});
+
+			const { handler, getBalance } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[10, botPost],
+					[11, botPost],
+					[12, botPost],
+					[13, botPost],
+				]),
+				isBotByPostId: new Map([["post-a", true]]),
+				botInfoByPostId: new Map([
+					[
+						"post-a",
+						createBotInfo({
+							botId: "bot-a",
+							isActive: true,
+						}),
+					],
+				]),
+				balance: 15, // 必要: 4 × 5 = 20（※同一ボット重複で有効1件→5で足りるはずだが...）
+			});
+
+			// 同一ボットの重複で有効1件のみ → コスト5は足りる
+			// 別ボットで4件とも有効にするテストに修正
+			const botPostA = createHumanPost({
+				id: "post-a",
+				postNumber: 10,
+			});
+			const botPostB = createHumanPost({
+				id: "post-b",
+				postNumber: 11,
+			});
+			const botPostC = createHumanPost({
+				id: "post-c",
+				postNumber: 12,
+			});
+			const botPostD = createHumanPost({
+				id: "post-d",
+				postNumber: 13,
+			});
+
+			const { handler: h2, getBalance: gb2 } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[10, botPostA],
+					[11, botPostB],
+					[12, botPostC],
+					[13, botPostD],
+				]),
+				isBotByPostId: new Map([
+					["post-a", true],
+					["post-b", true],
+					["post-c", true],
+					["post-d", true],
+				]),
+				botInfoByPostId: new Map([
+					[
+						"post-a",
+						createBotInfo({
+							botId: "bot-a",
+							isActive: true,
+						}),
+					],
+					[
+						"post-b",
+						createBotInfo({
+							botId: "bot-b",
+							isActive: true,
+						}),
+					],
+					[
+						"post-c",
+						createBotInfo({
+							botId: "bot-c",
+							isActive: true,
+						}),
+					],
+					[
+						"post-d",
+						createBotInfo({
+							botId: "bot-d",
+							isActive: true,
+						}),
+					],
+				]),
+				balance: 15, // 必要: 4 × 5 = 20
+			});
+
+			const result = await h2.execute(createCtx({ args: [">>10-13"] }));
+
+			expect(result.success).toBe(false);
+			expect(result.systemMessage).toContain("通貨が不足しています");
+			expect(gb2()).toBe(15); // 消費なし
+		});
+
+		it("範囲内に無効なターゲットがある場合はスキップして続行する", async () => {
+			// See: features/bot_system.feature @範囲内に無効なターゲットがある場合はスキップして続行する
+			const botPost10 = createHumanPost({
+				id: "post-10",
+				postNumber: 10,
+			});
+			const systemPost = createHumanPost({
+				id: "post-12",
+				postNumber: 12,
+				isSystemMessage: true,
+				authorId: null,
+			});
+			const botPost13 = createHumanPost({
+				id: "post-13",
+				postNumber: 13,
+			});
+
+			const { handler, getBalance } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[10, botPost10],
+					[11, null], // 存在しない
+					[12, systemPost], // システムメッセージ
+					[13, botPost13],
+				]),
+				isBotByPostId: new Map([
+					["post-10", true],
+					["post-13", true],
+				]),
+				botInfoByPostId: new Map([
+					[
+						"post-10",
+						createBotInfo({
+							botId: "bot-10",
+							isActive: true,
+						}),
+					],
+					[
+						"post-13",
+						createBotInfo({
+							botId: "bot-13",
+							isActive: true,
+						}),
+					],
+				]),
+				damageResultByBotId: new Map([
+					[
+						"bot-10",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+					[
+						"bot-13",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+				]),
+				balance: 100,
+			});
+
+			const result = await handler.execute(createCtx({ args: [">>10-13"] }));
+
+			expect(result.success).toBe(true);
+			expect(result.systemMessage).toContain(">>11:");
+			expect(result.systemMessage).toContain("スキップ");
+			expect(result.systemMessage).toContain(">>12:");
+			expect(result.systemMessage).toContain("スキップ");
+			// 有効2件 × 5 = 10
+			expect(getBalance()).toBe(100 - 10);
+		});
+
+		it("範囲内の全ターゲットが無効の場合はエラーになる", async () => {
+			// See: features/bot_system.feature @範囲内の全ターゲットが無効の場合はエラーになる
+			const { handler } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[10, null],
+					[11, null],
+					[12, null],
+				]),
+				isBotByPostId: new Map(),
+				balance: 100,
+			});
+
+			const result = await handler.execute(createCtx({ args: [">>10-12"] }));
+
+			expect(result.success).toBe(false);
+			expect(result.systemMessage).toContain("攻撃対象がありません");
+		});
+
+		it("賠償金で途中で残高不足になると残りの攻撃が中断される", async () => {
+			// See: features/bot_system.feature @賠償金で途中で残高不足になると残りの攻撃が中断される
+			const botPost10 = createHumanPost({
+				id: "post-10",
+				postNumber: 10,
+			});
+			const humanPost11 = createHumanPost({
+				id: "post-11",
+				postNumber: 11,
+				authorId: "human-target",
+			});
+			const botPost12 = createHumanPost({
+				id: "post-12",
+				postNumber: 12,
+			});
+
+			const { handler, getBalance } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[10, botPost10],
+					[11, humanPost11],
+					[12, botPost12],
+				]),
+				isBotByPostId: new Map([
+					["post-10", true],
+					["post-11", false],
+					["post-12", true],
+				]),
+				botInfoByPostId: new Map([
+					[
+						"post-10",
+						createBotInfo({
+							botId: "bot-10",
+							isActive: true,
+						}),
+					],
+					[
+						"post-12",
+						createBotInfo({
+							botId: "bot-12",
+							isActive: true,
+						}),
+					],
+				]),
+				damageResultByBotId: new Map([
+					[
+						"bot-10",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+				]),
+				balance: 25, // >>10: -5, >>11: -5-15(compensation)=0, >>12: 中断
+			});
+
+			const result = await handler.execute(createCtx({ args: [">>10-12"] }));
+
+			expect(result.success).toBe(true);
+			expect(result.systemMessage).toContain(">>10:");
+			expect(result.systemMessage).toContain(">>11:");
+			expect(result.systemMessage).toContain(">>12:");
+			expect(result.systemMessage).toContain("中断");
+			expect(getBalance()).toBe(0);
+		});
+
+		it("範囲内で同一ボットの複数レスがある場合は2回目以降がスキップされる", async () => {
+			// See: features/bot_system.feature @範囲内で同一ボットの複数レスがある場合は2回目以降がスキップされる
+			const botPost10 = createHumanPost({
+				id: "post-10",
+				postNumber: 10,
+			});
+			const humanPost11 = createHumanPost({
+				id: "post-11",
+				postNumber: 11,
+				authorId: "human-target",
+			});
+			const botPost12 = createHumanPost({
+				id: "post-12",
+				postNumber: 12,
+			}); // 同じボット
+
+			const { handler, getBalance } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[10, botPost10],
+					[11, humanPost11],
+					[12, botPost12],
+				]),
+				isBotByPostId: new Map([
+					["post-10", true],
+					["post-11", false],
+					["post-12", true],
+				]),
+				botInfoByPostId: new Map([
+					[
+						"post-10",
+						createBotInfo({
+							botId: "same-bot",
+							name: "荒らし役",
+							isActive: true,
+						}),
+					],
+					[
+						"post-12",
+						createBotInfo({
+							botId: "same-bot",
+							name: "荒らし役",
+							isActive: true,
+						}),
+					],
+				]),
+				damageResultByBotId: new Map([
+					[
+						"same-bot",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+				]),
+				balance: 100,
+			});
+
+			const result = await handler.execute(createCtx({ args: [">>10-12"] }));
+
+			expect(result.success).toBe(true);
+			expect(result.systemMessage).toContain(">>12:");
+			expect(result.systemMessage).toContain("スキップ");
+			// 有効2件（BOT1 + 人間1）: コスト 10 + 賠償金 15 = 25
+			expect(getBalance()).toBe(100 - 25);
+		});
+
+		it("範囲上限（10ターゲット）を超えるとエラーになる", async () => {
+			// See: features/bot_system.feature @範囲上限（10ターゲット）を超えるとエラーになる
+			const handler = createHandler();
+			const result = await handler.execute(createCtx({ args: [">>1-20"] }));
+
+			expect(result.success).toBe(false);
+			expect(result.systemMessage).toContain("最大10");
 		});
 	});
 });
