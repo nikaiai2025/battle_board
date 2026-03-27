@@ -542,28 +542,31 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: 「★システム」名義の独立レスでエラーが通知される
+//
+// 汎用ステップ: InMemoryPostRepo から「★システム」名義の投稿の存在を検証する。
+// lastNewspaperResult 等の特定コマンド結果変数に依存しない。
+// newspaper, hiroyuki 等の複数コマンドから再利用可能。
+// メッセージ内容のコマンド固有検証は各コマンドのステップ定義に委譲する。
+//
 // See: features/command_newspaper.feature @AI API呼び出しが失敗した場合は通貨返却・システム通知
+// See: features/command_hiroyuki.feature @AI API呼び出しが失敗した場合はBOT未生成・通貨返却
 // ---------------------------------------------------------------------------
 
 Then(
 	"「★システム」名義の独立レスでエラーが通知される",
 	async function (this: BattleBoardWorld) {
-		assert(lastNewspaperResult, "processNewspaperCommands の結果がありません");
-		assert(lastNewspaperResult.results.length > 0, "処理結果が存在しません");
-
-		// エラー時も処理済みになる（通貨返却・エラー通知・pending削除が行われた）
-		const failedResult = lastNewspaperResult.results.find((r) => !r.success);
-		assert(failedResult, "失敗した処理が存在するべきです");
-
-		// エラー通知投稿が★システム名義で行われていることを確認
+		// InMemoryPostRepo から「★システム」名義のエラー通知投稿を検索する。
+		// 特定コマンドの結果変数（lastNewspaperResult 等）に依存せず、
+		// リポジトリの状態から汎用的に検証する。
 		assert(this.currentThreadId, "スレッドIDが設定されていません");
 		const { InMemoryPostRepo } = require("../support/mock-installer");
 		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
-		const errorPost = posts.find(
-			(p: any) =>
-				p.displayName === "★システム" &&
-				p.body.includes("ニュースの取得に失敗しました"),
+		const systemErrorPost = posts.find(
+			(p: any) => p.displayName === "★システム" && p.isSystemMessage === true,
 		);
-		assert(errorPost, "「★システム」名義のエラー通知投稿が見つかりません");
+		assert(
+			systemErrorPost,
+			"「★システム」名義のエラー通知投稿が見つかりません",
+		);
 	},
 );

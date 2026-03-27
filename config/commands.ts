@@ -107,6 +107,15 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: false,
 		},
+		// TASK-334: !hiroyuki コマンド追加（ひろゆき風AI BOT召喚・非ステルス）
+		// See: features/command_hiroyuki.feature
+		hiroyuki: {
+			description: "ひろゆき風BOTを召喚する",
+			cost: 10,
+			targetFormat: null,
+			enabled: true,
+			stealth: false,
+		},
 		// TASK-278: !livingbot コマンド追加（生存BOT数表示）
 		// See: features/command_livingbot.feature
 		livingbot: {

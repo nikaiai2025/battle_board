@@ -8,8 +8,9 @@
  *   1. コマンド書き込み + inlineSystemInfo 表示
  *   2. 隠しコマンド !abeshinzo + 独立レス表示
  *   3. !omikuji コマンド + 独立レス表示
- *   4. 専ブラAPI整合（書き込みデータが subject.txt / DAT に反映）
- *   5. 管理者テストデータ削除（削除完了 + 公開API消失確認 = クリーンアップ兼用）
+ *   4. !hiroyuki コマンド（非同期BOT召喚・非ステルス）
+ *   5. 専ブラAPI整合（書き込みデータが subject.txt / DAT に反映）
+ *   6. 管理者テストデータ削除（削除完了 + 公開API消失確認 = クリーンアップ兼用）
  *
  * ライフサイクル:
  *   - beforeAll: 共有スレッドを1回だけ作成
@@ -267,7 +268,49 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 4. 専ブラAPI整合
+		// 4. !hiroyuki コマンド（非同期BOT召喚・非ステルス）
+		// -----------------------------------------------------------------------
+
+		/**
+		 * !hiroyuki コマンドが非ステルスで投稿され、コマンド文字列が本文に残る。
+		 * BOT応答は非同期（GH Actions）のためE2Eでは検証しない。
+		 * コマンド投稿が受理されinlineSystemInfoに通貨消費が表示されることを確認する。
+		 *
+		 * See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
+		 * See: src/lib/services/handlers/hiroyuki-handler.ts
+		 */
+		test("!hiroyuki コマンドが非ステルスで投稿されコマンド文字列が本文に残る", async ({
+			page,
+			authenticate,
+		}) => {
+			await page.goto(`/livebot/${sharedThreadKey}/`);
+			await expect(page.locator("#thread-title")).toBeVisible({
+				timeout: 15_000,
+			});
+			await expect(page.locator("#post-1")).toBeVisible();
+
+			const lastPost = await getLastPostNumber(page);
+
+			// !hiroyuki コマンドを書き込み
+			await page.locator("#fab-post-btn").click();
+			await page.locator("#post-body-input").fill("!hiroyuki");
+			await page.locator("#post-submit-btn").click();
+
+			// ユーザーの書き込みが表示される（非ステルスのためコマンド文字列が残る）
+			const myPostNum = lastPost + 1;
+			await expect(page.locator(`#post-${myPostNum}`)).toBeVisible({
+				timeout: 15_000,
+			});
+			await expect(page.locator(`#post-${myPostNum}`)).toContainText(
+				"!hiroyuki",
+			);
+
+			// inlineSystemInfo に通貨消費が表示される（コスト10）
+			await expect(page.locator(`#post-${myPostNum}`)).toContainText("-10");
+		});
+
+		// -----------------------------------------------------------------------
+		// 5. 専ブラAPI整合
 		// -----------------------------------------------------------------------
 
 		/**
@@ -307,7 +350,7 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 5. 管理者削除（最後 = クリーンアップ兼用）
+		// 6. 管理者削除（最後 = クリーンアップ兼用）
 		// -----------------------------------------------------------------------
 
 		/**

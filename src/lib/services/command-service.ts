@@ -44,6 +44,13 @@ import {
 	type IGrassPostRepository,
 	type IGrassRepository,
 } from "./handlers/grass-handler";
+// TASK-334: !hiroyuki コマンド（ひろゆき風AI BOT召喚・非ステルス）
+// See: features/command_hiroyuki.feature
+import {
+	HiroyukiHandler,
+	type IHiroyukiPendingRepository,
+	type IHiroyukiPostRepository,
+} from "./handlers/hiroyuki-handler";
 // eslint-disable-next-line no-restricted-imports
 import {
 	HissiHandler,
@@ -407,6 +414,8 @@ export class CommandService {
 	 * @param hissiBotPostRepository - !hissi BOT 判定用 BotPostRepository（DI。省略時は本番用を動的 require）
 	 * @param kinouBotPostRepository - !kinou BOT 判定用 BotPostRepository（DI。省略時は本番用を動的 require）
 	 * @param copipeRepository - CopipeRepository（DI。テスト時はモックを注入する。省略時は本番用を動的 require）
+	 * @param hiroyukiPendingRepository - HiroyukiHandler 用 PendingAsyncCommandRepository（DI。省略時は本番用を動的 require）
+	 * @param hiroyukiPostRepository - HiroyukiHandler 用 PostRepository（DI。ターゲットバリデーション用）
 	 *
 	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
 	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
@@ -429,6 +438,8 @@ export class CommandService {
 		hissiBotPostRepository?: IHissiBotPostRepository | null,
 		kinouBotPostRepository?: IKinouBotPostRepository | null,
 		copipeRepository?: ICopipeRepository | null,
+		hiroyukiPendingRepository?: IHiroyukiPendingRepository | null,
+		hiroyukiPostRepository?: IHiroyukiPostRepository | null,
 	) {
 		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
 		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
@@ -612,6 +623,8 @@ export class CommandService {
 		// 非同期コマンドの即時トリガー（TDR-017）
 		// 対象 commandType の pending INSERT 時に GH Actions を workflow_dispatch で即時起動する。
 		// GITHUB_PAT 未設定時（開発・テスト環境）は triggerWorkflow 内でスキップされるため安全。
+		// withWorkflowTrigger を commandType ごとに積み重ねることで、
+		// 複数ワークフローへのトリガーを実現する。
 		// See: docs/architecture/architecture.md TDR-017
 		if (resolvedPendingRepo) {
 			// eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -619,10 +632,18 @@ export class CommandService {
 				withWorkflowTrigger,
 				triggerWorkflow,
 			} = require("../infrastructure/adapters/github-workflow-trigger");
+			// newspaper コマンドのトリガー
 			resolvedPendingRepo = withWorkflowTrigger(
 				resolvedPendingRepo,
 				new Set(["newspaper"]),
 				() => triggerWorkflow("newspaper-scheduler.yml"),
+			);
+			// hiroyuki コマンドのトリガー
+			// See: features/command_hiroyuki.feature
+			resolvedPendingRepo = withWorkflowTrigger(
+				resolvedPendingRepo,
+				new Set(["hiroyuki"]),
+				() => triggerWorkflow("hiroyuki-scheduler.yml"),
 			);
 		}
 
@@ -665,6 +686,33 @@ export class CommandService {
 			resolvedCopipeHandler = new CopipeHandler(resolvedCopipeRepo);
 		}
 
+		// HiroyukiHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に hiroyuki コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// AoriHandler/NewspaperHandler と同一リポジトリを共用する（command_type カラムで区別）。
+		// See: features/command_hiroyuki.feature
+		let resolvedHiroyukiHandler: HiroyukiHandler | null = null;
+		if (hiroyukiPendingRepository !== undefined) {
+			// 明示的に DI された場合（null を含む）
+			if (hiroyukiPendingRepository) {
+				resolvedHiroyukiHandler = new HiroyukiHandler(
+					hiroyukiPendingRepository,
+					hiroyukiPostRepository ?? null,
+				);
+			}
+		} else if (parsed.commands.hiroyuki?.enabled) {
+			// YAML で hiroyuki が有効化されており、DI がない場合のみ本番用生成
+			// resolvedPendingRepo を共用する（pending_async_commands テーブルを共用）
+			if (resolvedPendingRepo) {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const postRepository: IHiroyukiPostRepository = require("../infrastructure/repositories/post-repository");
+				resolvedHiroyukiHandler = new HiroyukiHandler(
+					resolvedPendingRepo as IHiroyukiPendingRepository,
+					postRepository,
+				);
+			}
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
@@ -693,6 +741,9 @@ export class CommandService {
 			// !copipe: コピペAA再現（CopipeRepository の DI が必要）
 			// See: features/command_copipe.feature
 			...(resolvedCopipeHandler ? [resolvedCopipeHandler] : []),
+			// !hiroyuki: ひろゆき風AI BOT召喚（PendingAsyncCommandRepository の DI が必要）
+			// See: features/command_hiroyuki.feature
+			...(resolvedHiroyukiHandler ? [resolvedHiroyukiHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();

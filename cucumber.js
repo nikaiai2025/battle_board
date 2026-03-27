@@ -92,6 +92,9 @@ module.exports = {
 			// TASK-328: !copipe コマンド（コピペAA再現） BDD シナリオ追加
 			// See: features/command_copipe.feature
 			"features/command_copipe.feature",
+			// TASK-335: !hiroyuki コマンド（ひろゆき風AI BOT召喚） BDD シナリオ追加
+			// See: features/command_hiroyuki.feature
+			"features/command_hiroyuki.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -156,6 +159,9 @@ module.exports = {
 			// TASK-328: !copipe コマンド（コピペAA再現） BDD ステップ定義
 			// See: features/command_copipe.feature
 			"features/step_definitions/command_copipe.steps.ts",
+			// TASK-335: !hiroyuki コマンド（ひろゆき風AI BOT召喚） BDD ステップ定義
+			// See: features/command_hiroyuki.feature
+			"features/step_definitions/command_hiroyuki.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

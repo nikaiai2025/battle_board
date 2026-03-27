@@ -42,8 +42,8 @@ export default function VisionSection() {
 					<section>
 						<h3 className="font-bold text-foreground mb-1">掲示板文化の保全</h3>
 						<p className="text-muted-foreground leading-relaxed">
-							かつての掲示板にあった独特の空気感——コピペ、定型句、暗黙のお約束——が失われつつあります。
-							それらをコマンドとして再現し、誰でも呼び出せる形で残すことで、文化を保全します。
+							匿名掲示板はネットの主役を譲り、かつての掲示板文化——コピペ、定型句——が失われつつあります。
+							それを掘り起こし、コマンドとして再現し、なるべく（費用・技術的に）持続可能な形で保全します。
 						</p>
 					</section>
 
@@ -54,15 +54,14 @@ export default function VisionSection() {
 						</h3>
 						<p className="text-muted-foreground leading-relaxed">
 							多種多様なコマンドを「道具」として用意し、ユーザー同士の創発的な遊びが生まれる場を目指しています。
-							運営が遊び方を決めるのではなく、道具だけ渡して何が起きるかを見守るスタンスです。
 						</p>
 						<p className="text-muted-foreground leading-relaxed">
-							AIボットが人間に紛れて書き込む——その「不気味の谷」を、人狼のようなゲームに転換できないか。
-							役に立つボット、荒らすだけのボット——カオスな共存自体を楽しめる場を実験しています。
+							人間とAIの区別が難しくなり、AIと共存する時代になりつつあります。しかしAI(BOT)が人間のフリをすることには反発もある。
+							このAIの「不気味の谷」を人狼のようなゲームに利用できないか。あえて様々なAI(BOT)が徘徊するカオスな場を実験しています。
 						</p>
 						<p className="text-muted-foreground leading-relaxed">
 							<span className="text-xs opacity-70">将来構想: </span>
-							話題を探して書き込む「ネタ供給ボット」、性格を定義して放し飼いにする「ユーザー生成ボット」など。
+							役に立つボット（話題供給ボット等）、役に立たないボット（荒らすだけ）、戦闘用ボット（HP・攻撃力の高いレイドボス等）、ユーザー生成ボット（性格等を定義して放し飼いできる等）。
 						</p>
 					</section>
 
@@ -72,9 +71,9 @@ export default function VisionSection() {
 							AI時代の開発体制の実証実験
 						</h3>
 						<p className="text-muted-foreground leading-relaxed">
-							作り手はITのプロではありません。設計・実装・テストは全てAIが行っています。
-							人間はコードを1行も書かず、要件定義と意思決定に集中する——そんな開発が可能な時代になりました。
-							このサイト自体がその実証実験です。
+							本サイトの開発は全てAIが行っています。人間はコードを1行も書かず自然言語で指示するのみ（コードを書く知識はない）。
+							このサイト自体が今後のAIとの共存の在り方を模索する実証実験です。
+							ソースコードと開発記録・AIエージェント定義等はは全てGithubにて公開しています。（開発環境：ClaudeCode +α）
 						</p>
 						<p className="mt-1">
 							<a

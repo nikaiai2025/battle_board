@@ -17,6 +17,7 @@ on:
       - "Seed Pinned Thread"
       - "Seed Copipe Entries"
       - "Newspaper Scheduler"
+      - "Hiroyuki Scheduler"
     types: [completed]
 
 jobs:

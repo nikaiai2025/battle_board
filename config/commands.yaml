@@ -91,10 +91,18 @@ commands:
     responseType: independent
     enabled: true
     stealth: false
+  # !hiroyuki コマンド追加（ひろゆき風AI BOT召喚・非ステルス）
+  # See: features/command_hiroyuki.feature
+  hiroyuki:
+    description: "ひろゆき風BOTを召喚する。例: !hiroyuki / !hiroyuki >>5"
+    cost: 10
+    targetFormat: null
+    enabled: true
+    stealth: false
   # TASK-328: !copipe コマンド追加（コピペAA再現）
   # See: features/command_copipe.feature
   copipe:
-    description: "コピペ・AAを再現。引数指定で検索。例: !copipe ドッキングにぼし"
+    description: "コピペ・AAを再現。ランダムor検索。例: !copipe ドッキングにぼし"
     cost: 3
     targetFormat: null
     enabled: true

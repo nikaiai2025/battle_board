@@ -34,6 +34,7 @@ export interface GoogleAiResult {
  * BDD テストではモック実装に差し替える。
  *
  * See: features/command_newspaper.feature @AI APIに新聞配達員の人格プロンプトとカテゴリ指示が渡される
+ * See: features/command_hiroyuki.feature @スレッド本文がシステムプロンプトと構造的に分離されている
  */
 export interface IGoogleAiAdapter {
 	generateWithSearch(params: {
@@ -41,6 +42,19 @@ export interface IGoogleAiAdapter {
 		userPrompt: string;
 		modelId: string;
 	}): Promise<GoogleAiResult>;
+
+	/**
+	 * Google Search Grounding なしで Gemini API を呼び出す。
+	 * !hiroyuki など、Web検索不要のコマンド向け。
+	 * リトライ戦略は generateWithSearch と同一（最大3回、指数バックオフ）。
+	 *
+	 * See: features/command_hiroyuki.feature @スレッド本文がシステムプロンプトと構造的に分離されている
+	 */
+	generate(params: {
+		systemPrompt: string;
+		userPrompt: string;
+		modelId: string;
+	}): Promise<{ text: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +116,69 @@ export class GoogleAiAdapter implements IGoogleAiAdapter {
 		}
 
 		throw lastError!; // TypeScript 用（到達しない）
+	}
+
+	/**
+	 * Google Search Grounding なしで Gemini API を呼び出す。
+	 * !hiroyuki など、Web検索不要のコマンド向け。
+	 * 失敗時は指数バックオフでリトライする（最大 3 回）。
+	 *
+	 * generateWithSearch との差分: tools: [{ googleSearch: {} }] を渡さない。
+	 *
+	 * See: features/command_hiroyuki.feature @スレッド本文がシステムプロンプトと構造的に分離されている
+	 * See: tmp/orchestrator/memo_hiroyuki_command.md §6
+	 */
+	async generate(params: {
+		systemPrompt: string;
+		userPrompt: string;
+		modelId: string;
+	}): Promise<{ text: string }> {
+		let lastError: Error | null = null;
+
+		for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+			try {
+				return await this._callGeminiApiWithoutSearch(params);
+			} catch (err) {
+				lastError = err instanceof Error ? err : new Error(String(err));
+
+				if (!this._isRetryable(err) || attempt === MAX_RETRIES - 1) {
+					throw lastError;
+				}
+
+				// 指数バックオフ: 1s, 2s, 4s
+				await this._sleep(INITIAL_DELAY_MS * 2 ** attempt);
+			}
+		}
+
+		throw lastError!; // TypeScript 用（到達しない）
+	}
+
+	/**
+	 * Gemini API を 1 回呼び出す内部メソッド（検索なし版）。
+	 * tools を渡さず、純粋なテキスト生成のみを行う。
+	 * プロンプトインジェクション防止のため、systemInstruction と contents を分離する。
+	 *
+	 * See: features/command_hiroyuki.feature @スレッド本文がシステムプロンプトと構造的に分離されている
+	 * See: CLAUDE.md 横断的制約「ユーザー入力をそのままLLMに渡すことを禁止する」
+	 */
+	private async _callGeminiApiWithoutSearch(params: {
+		systemPrompt: string;
+		userPrompt: string;
+		modelId: string;
+	}): Promise<{ text: string }> {
+		const ai = new GoogleGenAI({ apiKey: this._pickApiKey() });
+		const response = await ai.models.generateContent({
+			model: params.modelId,
+			contents: params.userPrompt,
+			config: {
+				systemInstruction: params.systemPrompt,
+				// tools は渡さない（Search Grounding 無効）
+			},
+		});
+
+		return {
+			text: response.text ?? "",
+		};
 	}
 
 	/**

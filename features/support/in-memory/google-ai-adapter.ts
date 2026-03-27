@@ -6,6 +6,7 @@
  * `shouldFail=true` に設定すると例外をスローする（エラーシナリオ検証用）。
  *
  * See: features/command_newspaper.feature
+ * See: features/command_hiroyuki.feature
  * See: tmp/workers/bdd-architect_271/newspaper_design.md §5.1
  */
 
@@ -56,6 +57,27 @@ export class InMemoryGoogleAiAdapter implements IGoogleAiAdapter {
 		}
 
 		return this.nextResult;
+	}
+
+	/**
+	 * 検索なし AI API の呼び出しをシミュレートする。
+	 * !hiroyuki など Web 検索不要のコマンド向け。
+	 * shouldFail=true の場合は例外をスロー。
+	 *
+	 * See: features/command_hiroyuki.feature @スレッド本文がシステムプロンプトと構造的に分離されている
+	 */
+	async generate(params: {
+		systemPrompt: string;
+		userPrompt: string;
+		modelId: string;
+	}): Promise<{ text: string }> {
+		this.calls.push(params);
+
+		if (this.shouldFail) {
+			throw new Error("AI API is unavailable (mock)");
+		}
+
+		return { text: this.nextResult.text };
 	}
 
 	/** テストのリセット用（各シナリオの Before フックから呼び出す） */

@@ -86,7 +86,10 @@ function createDeps(overrides: Partial<INewspaperServiceDeps> = {}): {
 			findByCommandType,
 			deletePendingAsyncCommand,
 		},
-		googleAiAdapter: { generateWithSearch } as IGoogleAiAdapter,
+		googleAiAdapter: {
+			generateWithSearch,
+			generate: vi.fn(),
+		} as IGoogleAiAdapter,
 		createPostFn,
 		creditFn,
 		...overrides,
@@ -261,6 +264,7 @@ describe("processNewspaperCommands", () => {
 				},
 				googleAiAdapter: {
 					generateWithSearch: vi.fn().mockRejectedValue(new Error("API Error")),
+					generate: vi.fn(),
 				},
 			});
 			await processNewspaperCommands(deps);
@@ -283,6 +287,7 @@ describe("processNewspaperCommands", () => {
 				},
 				googleAiAdapter: {
 					generateWithSearch: vi.fn().mockRejectedValue(new Error("API Error")),
+					generate: vi.fn(),
 				},
 				createPostFn,
 			});
@@ -306,6 +311,7 @@ describe("processNewspaperCommands", () => {
 				},
 				googleAiAdapter: {
 					generateWithSearch: vi.fn().mockRejectedValue(new Error("API Error")),
+					generate: vi.fn(),
 				},
 			});
 			await processNewspaperCommands(deps);
@@ -323,6 +329,7 @@ describe("processNewspaperCommands", () => {
 					generateWithSearch: vi
 						.fn()
 						.mockRejectedValue(new Error("Network timeout")),
+					generate: vi.fn(),
 				},
 			});
 			const result = await processNewspaperCommands(deps);

@@ -219,25 +219,33 @@ Then(
 
 // ---------------------------------------------------------------------------
 // Then: BOTに偽装IDと「名無しさん」表示名が割り当てられる
+//
+// 汎用ステップ: InMemoryBotRepo から直近生成されたBOTを検索して検証する。
+// lastAoriResult 等の特定コマンド結果変数に依存しない。
+// aori, hiroyuki 等の複数コマンドから再利用可能。
+//
 // See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
+// See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
 // ---------------------------------------------------------------------------
 
 Then(
 	"BOTに偽装IDと「名無しさん」表示名が割り当てられる",
 	async function (this: BattleBoardWorld) {
-		assert(lastAoriResult, "processAoriCommands の結果がありません");
-		const successResult = lastAoriResult.results.find((r) => r.success);
-		assert(successResult?.botId, "成功した処理のbotIdがありません");
+		// InMemoryBotRepo から全BOTを取得し、直近生成されたBOTを検証する。
+		// 特定コマンドの結果変数（lastAoriResult 等）に依存せず、
+		// リポジトリの状態から汎用的に検証する。
+		const allBots = await InMemoryBotRepo.findAll();
+		assert(allBots.length > 0, "BOTが1体も生成されていません");
 
-		const bot = await InMemoryBotRepo.findById(successResult.botId);
-		assert(bot, "煽りBOTが見つかりません");
+		// 直近生成されたBOT（配列末尾）を検証対象とする
+		const latestBot = allBots[allBots.length - 1];
 		assert.strictEqual(
-			bot.name,
+			latestBot.name,
 			"名無しさん",
 			"表示名が '名無しさん' であるべきです",
 		);
 		assert(
-			bot.dailyId && bot.dailyId.length > 0,
+			latestBot.dailyId && latestBot.dailyId.length > 0,
 			"偽装IDが割り当てられているべきです",
 		);
 	},

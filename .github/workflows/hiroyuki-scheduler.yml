@@ -1,0 +1,33 @@
+# Hiroyuki Scheduler -- !hiroyuki コマンドの非同期処理
+#
+# Vercel 側で !hiroyuki コマンド受理時に workflow_dispatch で即時起動される。
+# GH Actions 内で AI API を呼び出し、結果を Vercel の /api/internal/hiroyuki/complete に送信する。
+#
+# 認証: BOT_API_KEY（既存の bot-scheduler と共用）
+# See: features/command_hiroyuki.feature
+# See: tmp/orchestrator/memo_hiroyuki_command.md §4
+
+name: Hiroyuki Scheduler
+
+on:
+  workflow_dispatch: {}      # Vercel からの即時トリガー + 手動実行
+
+jobs:
+  process-hiroyuki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Process hiroyuki commands
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          BOT_API_KEY: ${{ secrets.BOT_API_KEY }}
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+        run: npx tsx scripts/hiroyuki-worker.ts
