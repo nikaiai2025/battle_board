@@ -87,7 +87,7 @@ function createMockBotRepository(
 		reveal: vi.fn().mockResolvedValue(undefined),
 		incrementTimesAttacked: vi.fn().mockResolvedValue(undefined),
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
-		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
+		bulkReviveEliminated: vi.fn().mockResolvedValue([]),
 		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
 		deleteEliminatedTutorialBots: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
@@ -999,6 +999,8 @@ describe("BotService", () => {
 				createRevealedBot({ id: "bot-002" }),
 				createEliminatedBot({ id: "bot-003" }),
 			];
+			// インカーネーションモデル: 復活後は新 UUID を持つ新世代 Bot を返す
+			const revivedBot = createLurkingBot({ id: "bot-003-new" });
 			const botRepo = createMockBotRepository();
 			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(allBots);
 			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -1006,7 +1008,7 @@ describe("BotService", () => {
 			);
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(1);
+			).mockResolvedValue([revivedBot]);
 			const attackRepo = createMockAttackRepository();
 			const service = new BotService(
 				botRepo,
@@ -1030,7 +1032,7 @@ describe("BotService", () => {
 			);
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(0);
+			).mockResolvedValue([]);
 			const attackRepo = createMockAttackRepository();
 			const service = new BotService(
 				botRepo,
@@ -1056,7 +1058,7 @@ describe("BotService", () => {
 			);
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(0);
+			).mockResolvedValue([]);
 			const service = new BotService(
 				botRepo,
 				createMockBotPostRepository(),
@@ -1071,6 +1073,7 @@ describe("BotService", () => {
 
 		it("eliminated 状態のボットの survival_days は +1 されない", async () => {
 			const bots = [createEliminatedBot({ id: "bot-003" })];
+			const revivedBot = createLurkingBot({ id: "bot-003-new" });
 			const botRepo = createMockBotRepository();
 			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(bots);
 			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -1078,7 +1081,7 @@ describe("BotService", () => {
 			);
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(1);
+			).mockResolvedValue([revivedBot]);
 			const service = new BotService(
 				botRepo,
 				createMockBotPostRepository(),
@@ -1100,7 +1103,7 @@ describe("BotService", () => {
 			);
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(0);
+			).mockResolvedValue([]);
 			const attackRepo = createMockAttackRepository();
 			const service = new BotService(
 				botRepo,

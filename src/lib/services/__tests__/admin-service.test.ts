@@ -97,7 +97,7 @@ vi.mock("@/lib/infrastructure/repositories/bot-repository", () => ({
 	updateNextPostAt: vi.fn(),
 	findDueForPost: vi.fn(),
 	bulkResetRevealed: vi.fn(),
-	bulkReviveEliminated: vi.fn(),
+	bulkReviveEliminated: vi.fn().mockResolvedValue([]),
 	countLivingBots: vi.fn(),
 	countLivingBotsInThread: vi.fn(),
 	deleteEliminatedTutorialBots: vi.fn(),

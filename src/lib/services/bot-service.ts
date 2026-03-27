@@ -129,7 +129,14 @@ export interface IBotRepository {
 		dailyIdDate: string,
 	): Promise<void>;
 	bulkResetRevealed(): Promise<number>;
-	bulkReviveEliminated(): Promise<number>;
+	/**
+	 * 撃破済みボットを復活させる（インカーネーションモデル）。
+	 * 旧レコードは is_active=false のまま凍結保持し、新レコードを INSERT して返す。
+	 * チュートリアルBOT・煽りBOTは復活対象外。
+	 * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+	 * See: docs/specs/bot_state_transitions.yaml #transitions > eliminated -> lurking
+	 */
+	bulkReviveEliminated(): Promise<Bot[]>;
 	/**
 	 * 撃破済みチュートリアルBOT および7日経過の未撃破チュートリアルBOTを削除する。
 	 * performDailyReset() の末尾で呼び出す。
@@ -749,31 +756,21 @@ export class BotService {
 			}
 		}
 
-		// Step 4: eliminated -> lurking（HP 復帰・survival_days=0・times_attacked=0）
+		// Step 4: eliminated -> 新レコード INSERT（インカーネーションモデル）
+		// 旧レコードは is_active=false のまま凍結保持し、新レコードを INSERT して返す。
 		// See: docs/specs/bot_state_transitions.yaml #transitions > eliminated -> lurking
-		const botsRevived = await this.botRepository.bulkReviveEliminated();
+		// See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+		const revivedBots = await this.botRepository.bulkReviveEliminated();
+		const botsRevived = revivedBots.length;
 
-		// Step 4.5: 復活したBOTの next_post_at を再設定（TDR-010）
-		// 復活したBOTは next_post_at を再設定して投稿サイクルを再開する。
-		// bulkReviveEliminated は内部でBOTを復活させるが、next_post_at は更新しないため
-		// ここで改めて設定する。
+		// Step 4.5: 復活した新世代BOTの next_post_at を再設定（TDR-010）
+		// bulkReviveEliminated() が返す Bot[] をそのまま使用する（再取得不要）。
 		// See: docs/architecture/architecture.md §13 TDR-010 > 撃破との整合性
 		// See: docs/architecture/components/bot.md §2.10 日次リセット処理
-		if (botsRevived > 0) {
-			// 復活したBOTを再取得して next_post_at を設定する
-			const allBotsAfterRevive = await this.botRepository.findAll();
-			for (const bot of allBotsAfterRevive) {
-				// 復活したBOT = is_active=true かつ survival_days=0 かつ
-				// 元のallBots取得時にis_active=falseだったBOT
-				const wasEliminated = allBots.some(
-					(original) => original.id === bot.id && !original.isActive,
-				);
-				if (wasEliminated && bot.isActive) {
-					const delayMinutes = this.getNextPostDelay(bot.id, bot.botProfileKey);
-					const nextPostAt = new Date(Date.now() + delayMinutes * 60 * 1000);
-					await this.botRepository.updateNextPostAt(bot.id, nextPostAt);
-				}
-			}
+		for (const bot of revivedBots) {
+			const delayMinutes = this.getNextPostDelay(bot.id, bot.botProfileKey);
+			const nextPostAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+			await this.botRepository.updateNextPostAt(bot.id, nextPostAt);
 		}
 
 		// Step 5: attacks テーブルの前日分レコードをクリーンアップ

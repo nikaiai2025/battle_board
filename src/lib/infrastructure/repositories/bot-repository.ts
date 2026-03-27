@@ -499,29 +499,29 @@ export async function bulkResetRevealed(): Promise<number> {
 }
 
 /**
- * eliminated 状態の全ボットを lurking に復活させる。
- * HP を max_hp に戻し、survival_days・times_attacked を 0 にリセットする。
- * 日次リセット処理で使用する。
+ * 撃破済みボットをインカーネーションモデルで復活させる。
  *
- * チュートリアルBOT（bot_profile_key = 'tutorial'）は復活対象から除外する。
- * チュートリアルBOTは1回限りの消耗品であり、日次リセットで復活しない設計。
+ * 旧レコードは is_active=false のまま凍結保持し（bot_posts 紐付けを維持）、
+ * 同一 name/persona/bot_profile_key/max_hp で新レコードを INSERT する。
+ * 新世代ボットは新しい UUID・偽装ID を持ち、旧日の書き込みとは無関係になる。
  *
- * See: docs/specs/bot_state_transitions.yaml #daily_reset > eliminated -> lurking
+ * チュートリアルBOT（bot_profile_key = 'tutorial'）・煽りBOT（'aori'）は
+ * 復活対象から除外する。
+ *
+ * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+ * See: docs/specs/bot_state_transitions.yaml #transitions > eliminated -> lurking
  * See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
  * See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
- * See: tmp/workers/bdd-architect_TASK-236/design.md §3.7 日次リセットでの復活除外
+ * See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
  *
- * @returns 復活させたボット数
+ * @returns 新規作成された Bot レコードの配列
  */
-export async function bulkReviveEliminated(): Promise<number> {
-	// eliminated 状態 = is_active = false のボットを取得して max_hp を参照する必要がある。
-	// Supabase は UPDATE ... SET hp = max_hp のような自己参照 UPDATE をサポートしないため、
-	// 一度全件取得してから個別に更新する。
+export async function bulkReviveEliminated(): Promise<Bot[]> {
+	// eliminated 状態（is_active=false）かつ復活対象のボットを取得する。
 	// チュートリアルBOT・煽りBOT（使い切りBOT）は復活させない。
-	// See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
 	const { data: eliminated, error: fetchError } = await supabaseAdmin
 		.from("bots")
-		.select("id, max_hp")
+		.select("*")
 		.eq("is_active", false)
 		.or("bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)");
 
@@ -531,33 +531,65 @@ export async function bulkReviveEliminated(): Promise<number> {
 		);
 	}
 
-	const rows = eliminated as { id: string; max_hp: number }[];
-	if (rows.length === 0) return 0;
+	const rows = eliminated as BotRow[];
+	if (rows.length === 0) return [];
 
-	// 各ボットを復活させる（max_hp は bot ごとに異なりうるため個別 UPDATE）
-	for (const row of rows) {
-		const { error: updateError } = await supabaseAdmin
-			.from("bots")
-			.update({
-				is_active: true,
-				is_revealed: false,
-				hp: row.max_hp,
-				revealed_at: null,
-				eliminated_at: null,
-				eliminated_by: null,
-				survival_days: 0,
-				times_attacked: 0,
-			})
-			.eq("id", row.id);
+	// 当日 JST 日付を取得する（daily_id_date に使用）
+	const jstOffset = 9 * 60 * 60 * 1000;
+	const jstDate = new Date(Date.now() + jstOffset);
+	const today = jstDate.toISOString().slice(0, 10);
 
-		if (updateError) {
-			throw new Error(
-				`BotRepository.bulkReviveEliminated update failed for bot ${row.id}: ${updateError.message}`,
-			);
+	// ランダム偽装IDを生成する（人間の daily_id と同形式: 英数字8文字）
+	// See: docs/specs/bot_state_transitions.yaml #fake_daily_id > generation
+	const fakeDailyIdChars =
+		"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+	function generateFakeDailyId(): string {
+		let result = "";
+		for (let i = 0; i < 8; i++) {
+			result +=
+				fakeDailyIdChars[Math.floor(Math.random() * fakeDailyIdChars.length)];
 		}
+		return result;
 	}
 
-	return rows.length;
+	// 旧レコードは UPDATE せず凍結保持。新レコードを INSERT して新世代ボットを作成する。
+	const revivedBots: Bot[] = [];
+	for (const row of rows) {
+		const { data: newRow, error: insertError } = await supabaseAdmin
+			.from("bots")
+			.insert({
+				name: row.name,
+				persona: row.persona,
+				bot_profile_key: row.bot_profile_key,
+				hp: row.max_hp,
+				max_hp: row.max_hp,
+				is_active: true,
+				is_revealed: false,
+				revealed_at: null,
+				daily_id: generateFakeDailyId(),
+				daily_id_date: today,
+				survival_days: 0,
+				total_posts: 0,
+				accused_count: 0,
+				times_attacked: 0,
+				grass_count: 0,
+				eliminated_at: null,
+				eliminated_by: null,
+				next_post_at: null,
+			})
+			.select()
+			.single();
+
+		if (insertError) {
+			throw new Error(
+				`BotRepository.bulkReviveEliminated insert failed for bot "${row.name}": ${insertError.message}`,
+			);
+		}
+
+		revivedBots.push(rowToBot(newRow as BotRow));
+	}
+
+	return revivedBots;
 }
 
 /**

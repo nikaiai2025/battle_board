@@ -637,6 +637,22 @@ When("日付が変更される（JST 0:00）", async function (this: BattleBoard
 	// BotService の日次リセット処理を実行する
 	const botService = createBotService();
 	await botService.performDailyReset();
+
+	// インカーネーションモデルでは旧ボットが凍結され、新世代ボットが別 UUID で作成される。
+	// 撃破済みボットが復活した場合は this.currentBot を新世代ボットに更新する。
+	// See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+	if (this.currentBot) {
+		const allBots = await InMemoryBotRepo.findAll();
+		const newIncarnation = allBots.find(
+			(b) =>
+				b.isActive &&
+				b.name === this.currentBot!.name &&
+				b.id !== this.currentBot!.id,
+		);
+		if (newIncarnation) {
+			this.currentBot = newIncarnation;
+		}
+	}
 });
 
 When(
@@ -2192,6 +2208,22 @@ When("翌日に復活する", async function (this: BattleBoardWorld) {
 	this.setCurrentTime(tomorrow);
 	const botService = createBotService();
 	await botService.performDailyReset();
+
+	// インカーネーションモデルでは旧ボットが凍結され、新世代ボットが別 UUID で作成される。
+	// this.currentBot を新世代ボットに更新しないと、後続ステップが旧（凍結済み）レコードを参照してしまう。
+	// See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+	if (this.currentBot) {
+		const allBots = await InMemoryBotRepo.findAll();
+		const newIncarnation = allBots.find(
+			(b) =>
+				b.isActive &&
+				b.name === this.currentBot!.name &&
+				b.id !== this.currentBot!.id,
+		);
+		if (newIncarnation) {
+			this.currentBot = newIncarnation;
+		}
+	}
 });
 
 Then(

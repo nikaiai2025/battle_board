@@ -80,7 +80,7 @@ function createMockBotRepository(
 		reveal: vi.fn().mockResolvedValue(undefined),
 		incrementTimesAttacked: vi.fn().mockResolvedValue(undefined),
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
-		bulkReviveEliminated: vi.fn().mockResolvedValue(0),
+		bulkReviveEliminated: vi.fn().mockResolvedValue([]),
 		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
 		deleteEliminatedTutorialBots: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
@@ -448,22 +448,23 @@ describe("BotService next_post_at スケジューリング", () => {
 		it("eliminated BOTが復活した場合、next_post_at が再設定される", async () => {
 			// See: docs/architecture/components/bot.md §2.10 日次リセット処理
 			// See: docs/architecture/architecture.md §13 TDR-010 > 撃破との整合性
+			// See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
 			const eliminatedBot = createEliminatedBot({ id: "bot-dead-001" });
+			// インカーネーション: 新世代ボットは旧ボットとは異なる新 UUID を持つ
 			const revivedBot = createLurkingBot({
-				id: "bot-dead-001",
+				id: "bot-dead-001-new",
 				survivalDays: 0,
 			});
 
 			const botRepo = createMockBotRepository();
-			// 最初の findAll: eliminated BOTを含むリスト
-			(botRepo.findAll as ReturnType<typeof vi.fn>)
-				.mockResolvedValueOnce([eliminatedBot])
-				// 2回目の findAll: 復活後のBOTリスト
-				.mockResolvedValueOnce([revivedBot]);
-
+			// findAll は Step1 の偽装ID再生成とStep3の survival_days +1 のために呼ばれる
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([
+				eliminatedBot,
+			]);
+			// bulkReviveEliminated は新世代 Bot[] を返す（再取得不要）
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(1);
+			).mockResolvedValue([revivedBot]);
 
 			const service = new BotService(
 				botRepo,
@@ -473,9 +474,9 @@ describe("BotService next_post_at スケジューリング", () => {
 
 			await service.performDailyReset();
 
-			// 復活したBOTの next_post_at が設定されていること
+			// 復活した新世代BOTの next_post_at が設定されていること（新 UUID で呼ばれる）
 			expect(botRepo.updateNextPostAt).toHaveBeenCalledWith(
-				"bot-dead-001",
+				"bot-dead-001-new",
 				expect.any(Date),
 			);
 		});
@@ -489,7 +490,7 @@ describe("BotService next_post_at スケジューリング", () => {
 			]);
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(0);
+			).mockResolvedValue([]);
 
 			const service = new BotService(
 				botRepo,
@@ -505,18 +506,19 @@ describe("BotService next_post_at スケジューリング", () => {
 
 		it("復活した next_post_at は NOW() + delay 分後の値である", async () => {
 			const eliminatedBot = createEliminatedBot({ id: "bot-dead-001" });
+			// インカーネーション: 新世代ボットは旧ボットとは異なる新 UUID を持つ
 			const revivedBot = createLurkingBot({
-				id: "bot-dead-001",
+				id: "bot-dead-001-new",
 				survivalDays: 0,
 			});
 
 			const botRepo = createMockBotRepository();
-			(botRepo.findAll as ReturnType<typeof vi.fn>)
-				.mockResolvedValueOnce([eliminatedBot])
-				.mockResolvedValueOnce([revivedBot]);
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([
+				eliminatedBot,
+			]);
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(1);
+			).mockResolvedValue([revivedBot]);
 
 			const service = new BotService(
 				botRepo,
@@ -540,22 +542,25 @@ describe("BotService next_post_at スケジューリング", () => {
 		it("複数の eliminated BOTが復活した場合、全てに next_post_at が設定される", async () => {
 			const eliminated1 = createEliminatedBot({ id: "bot-dead-001" });
 			const eliminated2 = createEliminatedBot({ id: "bot-dead-002" });
+			// インカーネーション: 新世代ボットはそれぞれ旧ボットとは異なる新 UUID を持つ
 			const revived1 = createLurkingBot({
-				id: "bot-dead-001",
+				id: "bot-dead-001-new",
 				survivalDays: 0,
 			});
 			const revived2 = createLurkingBot({
-				id: "bot-dead-002",
+				id: "bot-dead-002-new",
 				survivalDays: 0,
 			});
 
 			const botRepo = createMockBotRepository();
-			(botRepo.findAll as ReturnType<typeof vi.fn>)
-				.mockResolvedValueOnce([eliminated1, eliminated2])
-				.mockResolvedValueOnce([revived1, revived2]);
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([
+				eliminated1,
+				eliminated2,
+			]);
+			// bulkReviveEliminated は新世代 Bot[] を返す（再取得不要）
 			(
 				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
-			).mockResolvedValue(2);
+			).mockResolvedValue([revived1, revived2]);
 
 			const service = new BotService(
 				botRepo,
@@ -565,14 +570,14 @@ describe("BotService next_post_at スケジューリング", () => {
 
 			await service.performDailyReset();
 
-			// 2体分の updateNextPostAt が呼ばれていること
+			// 2体分の updateNextPostAt が呼ばれていること（新 UUID で呼ばれる）
 			expect(botRepo.updateNextPostAt).toHaveBeenCalledTimes(2);
 			expect(botRepo.updateNextPostAt).toHaveBeenCalledWith(
-				"bot-dead-001",
+				"bot-dead-001-new",
 				expect.any(Date),
 			);
 			expect(botRepo.updateNextPostAt).toHaveBeenCalledWith(
-				"bot-dead-002",
+				"bot-dead-002-new",
 				expect.any(Date),
 			);
 		});

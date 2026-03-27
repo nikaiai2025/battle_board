@@ -661,42 +661,65 @@ describe("BotRepository", () => {
 	describe("bulkReviveEliminated", () => {
 		// See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
 		// See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
+		// See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+		//
+		// 実装変更: UPDATE → INSERT（インカーネーションモデル）
+		// 旧レコードは凍結保持し、新レコードを INSERT して新世代 Bot[] を返す。
 
-		it("正常: eliminated ボットを復活させ復活数を返す", async () => {
-			// Supabase のチェーン: .from().select().eq().or() → 復活対象取得（tutorial 除外）
+		it("正常: eliminated ボットを復活させ新世代 Bot[] を返す", async () => {
+			// SELECT *: eliminated かつ復活対象のボットを全フィールド取得
+			const eliminatedRow = createBotRow({
+				id: "bot-id-001",
+				is_active: false,
+				hp: 0,
+				max_hp: 10,
+				bot_profile_key: "荒らし役",
+			});
 			const mockOrInner = vi.fn().mockResolvedValue({
-				data: [
-					{ id: "bot-id-001", max_hp: 10 },
-					{ id: "bot-id-002", max_hp: 20 },
-				],
+				data: [eliminatedRow],
 				error: null,
 			});
 			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
-			// .from().update().eq() → 個別更新（2回呼ばれる）
-			mockUpdate.mockReturnValue({ eq: mockEq });
-			mockEq.mockResolvedValue({ error: null });
+			// INSERT ... select().single(): 新世代ボットの行を返す
+			const newBotRow = createBotRow({
+				id: "bot-id-001-new",
+				is_active: true,
+				hp: 10,
+				survival_days: 0,
+				times_attacked: 0,
+				eliminated_at: null,
+				eliminated_by: null,
+			});
+			setupInsertSelectSingleChain({ data: newBotRow, error: null });
 
-			const count = await BotRepository.bulkReviveEliminated();
+			const result = await BotRepository.bulkReviveEliminated();
 
-			expect(count).toBe(2);
+			// Bot[] が返ること
+			expect(result).toHaveLength(1);
+			expect(result[0].id).toBe("bot-id-001-new");
+			expect(result[0].isActive).toBe(true);
+			expect(result[0].hp).toBe(10);
 			// tutorial・aori 除外フィルタが正しく渡されていることを確認
 			expect(mockOrInner).toHaveBeenCalledWith(
 				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)",
 			);
+			// UPDATE は呼ばれない（INSERT のみ）
+			expect(mockUpdate).not.toHaveBeenCalled();
 		});
 
-		it("正常: eliminated ボットが 0 件の場合は 0 を返す（DB更新なし）", async () => {
+		it("正常: eliminated ボットが 0 件の場合は空配列を返す（INSERT なし）", async () => {
 			const mockOrInner = vi.fn().mockResolvedValue({ data: [], error: null });
 			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
-			const count = await BotRepository.bulkReviveEliminated();
+			const result = await BotRepository.bulkReviveEliminated();
 
-			// 更新は呼ばれない
+			// INSERT・UPDATE ともに呼ばれない
+			expect(mockInsert).not.toHaveBeenCalled();
 			expect(mockUpdate).not.toHaveBeenCalled();
-			expect(count).toBe(0);
+			expect(result).toEqual([]);
 		});
 
 		it("正常: tutorial プロファイルの eliminated ボットは復活対象から除外される", async () => {
@@ -708,9 +731,9 @@ describe("BotRepository", () => {
 			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
-			const count = await BotRepository.bulkReviveEliminated();
+			const result = await BotRepository.bulkReviveEliminated();
 
-			expect(count).toBe(0);
+			expect(result).toEqual([]);
 			// tutorial・aori 除外フィルタが渡されていることを確認
 			expect(mockEqInner).toHaveBeenCalledWith("is_active", false);
 			expect(mockOrInner).toHaveBeenCalledWith(
@@ -730,19 +753,30 @@ describe("BotRepository", () => {
 			);
 		});
 
-		it("異常系: 更新時 DB エラーが発生した場合はエラーをスローする", async () => {
+		it("異常系: INSERT 時 DB エラーが発生した場合はエラーをスローする", async () => {
+			const eliminatedRow = createBotRow({
+				id: "bot-id-001",
+				is_active: false,
+				hp: 0,
+				max_hp: 10,
+				name: "荒らし役",
+				bot_profile_key: "荒らし役",
+			});
 			const mockOrInner = vi.fn().mockResolvedValue({
-				data: [{ id: "bot-id-001", max_hp: 10 }],
+				data: [eliminatedRow],
 				error: null,
 			});
 			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			mockSelect.mockReturnValue({ eq: mockEqInner });
 
-			mockUpdate.mockReturnValue({ eq: mockEq });
-			mockEq.mockResolvedValue({ error: { message: "update error" } });
+			// INSERT エラーをシミュレート
+			setupInsertSelectSingleChain({
+				data: null,
+				error: { message: "insert error" },
+			});
 
 			await expect(BotRepository.bulkReviveEliminated()).rejects.toThrow(
-				"BotRepository.bulkReviveEliminated update failed for bot bot-id-001: update error",
+				'BotRepository.bulkReviveEliminated insert failed for bot "荒らし役": insert error',
 			);
 		});
 	});

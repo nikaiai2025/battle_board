@@ -424,36 +424,78 @@ export async function countLivingBotsInThread(
 }
 
 /**
- * eliminated 状態の全ボットを lurking に復活させる。
- * HP を maxHp に戻し、survivalDays・timesAttacked を 0 にリセットする。
- * 日次リセット処理で使用する。
+ * 撃破済みボットをインカーネーションモデルで復活させる（日次リセット処理）。
  *
- * チュートリアルBOT（botProfileKey = 'tutorial'）は復活対象から除外する。
- * チュートリアルBOTは1回限りの消耗品であり、日次リセットで復活しない設計。
+ * 旧レコードは store 内にそのまま残す（is_active=false 凍結）。
+ * 新 UUID を生成し、同一 name/persona/bot_profile_key/max_hp で新レコードを push する。
+ * 本番実装（BotRepository.bulkReviveEliminated）と同一の振る舞いを持つ。
+ *
+ * チュートリアルBOT（botProfileKey = 'tutorial'）・煽りBOT（'aori'）は復活対象外。
  *
  * See: src/lib/infrastructure/repositories/bot-repository.ts
+ * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+ * See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
  * See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
+ * See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
  */
-export async function bulkReviveEliminated(): Promise<number> {
-	let count = 0;
-	for (const bot of store) {
-		// チュートリアルBOT・煽りBOT（使い切りBOT）は復活させない（本番実装と一致）
-		// See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
-		const NON_REVIVABLE_PROFILE_KEYS = ["tutorial", "aori"];
-		if (
-			!bot.isActive &&
-			!NON_REVIVABLE_PROFILE_KEYS.includes(bot.botProfileKey ?? "")
-		) {
-			bot.isActive = true;
-			bot.isRevealed = false;
-			bot.revealedAt = null;
-			bot.hp = bot.maxHp;
-			bot.eliminatedAt = null;
-			bot.eliminatedBy = null;
-			bot.survivalDays = 0;
-			bot.timesAttacked = 0;
-			count++;
+export async function bulkReviveEliminated(): Promise<Bot[]> {
+	// チュートリアルBOT・煽りBOT（使い切りBOT）は復活させない
+	const NON_REVIVABLE_PROFILE_KEYS = ["tutorial", "aori"];
+
+	// 当日 JST 日付を取得する（daily_id_date に使用）
+	const jstOffset = 9 * 60 * 60 * 1000;
+	const jstDate = new Date(Date.now() + jstOffset);
+	const today = jstDate.toISOString().slice(0, 10);
+
+	// ランダム偽装IDを生成する（人間の daily_id と同形式: 英数字8文字）
+	// See: docs/specs/bot_state_transitions.yaml #fake_daily_id > generation
+	const fakeDailyIdChars =
+		"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+	function generateFakeDailyId(): string {
+		let result = "";
+		for (let i = 0; i < 8; i++) {
+			result +=
+				fakeDailyIdChars[Math.floor(Math.random() * fakeDailyIdChars.length)];
 		}
+		return result;
 	}
-	return count;
+
+	// store のスナップショットを取る（ループ中に push しても対象外になるよう先に絞り込む）
+	const eliminated = store.filter(
+		(bot) =>
+			!bot.isActive &&
+			!NON_REVIVABLE_PROFILE_KEYS.includes(bot.botProfileKey ?? ""),
+	);
+
+	const revivedBots: Bot[] = [];
+	for (const oldBot of eliminated) {
+		// 旧レコードは store 内に変更せず残す（凍結保持）
+		// 新世代ボットを別 UUID で作成して push する
+		const newBot: Bot = {
+			id: crypto.randomUUID(),
+			name: oldBot.name,
+			persona: oldBot.persona,
+			botProfileKey: oldBot.botProfileKey,
+			hp: oldBot.maxHp,
+			maxHp: oldBot.maxHp,
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			dailyId: generateFakeDailyId(),
+			dailyIdDate: today,
+			survivalDays: 0,
+			totalPosts: 0,
+			accusedCount: 0,
+			timesAttacked: 0,
+			grassCount: 0,
+			eliminatedAt: null,
+			eliminatedBy: null,
+			nextPostAt: null,
+			createdAt: new Date(Date.now()),
+		};
+		store.push(newBot);
+		revivedBots.push({ ...newBot });
+	}
+
+	return revivedBots;
 }
