@@ -25,6 +25,7 @@ import {
 	InMemoryAttackRepo,
 	InMemoryBotPostRepo,
 	InMemoryBotRepo,
+	InMemoryCopipeRepo,
 	InMemoryCurrencyRepo,
 	InMemoryDailyEventRepo,
 	InMemoryPostRepo,
@@ -790,6 +791,32 @@ Given(
 When("ボットが書き込みを行う", async function (this: BattleBoardWorld) {
 	assert(this.currentBot, "ボットが設定されていません");
 	assert(this.currentThreadId, "スレッドIDが設定されていません");
+
+	// コピペボット（botProfileKey="コピペ"）の場合は PostService.createPost 経由でコマンドパイプラインを通す。
+	// FixedMessageContentStrategy の結果として "!copipe" が選ばれ、CopipeHandler が実行される。
+	// See: features/bot_system.feature @コピペボットは !copipe コマンドで書き込む
+	if (this.currentBot.botProfileKey === "コピペ") {
+		const PostService = getPostService();
+		const result = await PostService.createPost({
+			threadId: this.currentThreadId,
+			body: "!copipe",
+			edgeToken: null,
+			ipHash: "bot",
+			displayName: "名無しさん",
+			isBotWrite: true,
+			botUserId: this.currentBot.id,
+		});
+		// PostResult は success プロパティで判定する（type プロパティは存在しない）
+		// See: src/lib/services/post-service.ts > PostResult
+		if ("success" in result && result.success) {
+			this.lastResult = { type: "success", data: result };
+		} else {
+			this.lastResult = { type: "error", message: "書き込みに失敗しました" };
+		}
+		return;
+	}
+
+	// 荒らし役ボット: 固定文リストからランダムに選択してInMemoryPostRepo に直接挿入する
 	const selectedMessage =
 		TROLL_FIXED_MESSAGES[
 			Math.floor(Math.random() * TROLL_FIXED_MESSAGES.length)
@@ -2245,3 +2272,316 @@ Then(
 		);
 	},
 );
+
+// ---------------------------------------------------------------------------
+// 運営ボットのコマンドコスト免除 / コピペボット
+// See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
+// See: features/bot_system.feature @コピペボットは !copipe コマンドで書き込む
+// See: features/bot_system.feature @コピペボットはHP 100で配置され一撃では撃破されない
+// ---------------------------------------------------------------------------
+
+/** コピペボットの初期HP（bot_profiles.yaml 準拠） */
+const COPIPE_INITIAL_HP = 100;
+
+/**
+ * テスト用コピペボットを作成して InMemoryBotRepo に追加するヘルパー。
+ * bot_profiles.yaml の "コピペ" プロファイルに対応する。
+ *
+ * See: config/bot_profiles.yaml > コピペ
+ * See: features/bot_system.feature @コピペボットはHP 100で配置され一撃では撃破されない
+ */
+function createCopipeBot(options = {}) {
+	const today = getTodayJst();
+	const bot = {
+		id: crypto.randomUUID(),
+		name: "コピペ",
+		persona: "コピペボットペルソナ",
+		hp: options.hp ?? COPIPE_INITIAL_HP,
+		maxHp: COPIPE_INITIAL_HP,
+		dailyId: "CppieDly",
+		dailyIdDate: today,
+		isActive: options.isActive !== undefined ? options.isActive : true,
+		isRevealed: options.isRevealed ?? false,
+		revealedAt: options.isRevealed ? new Date(Date.now()) : null,
+		survivalDays: 0,
+		totalPosts: 0,
+		accusedCount: 0,
+		timesAttacked: 0,
+		botProfileKey: "コピペ",
+		nextPostAt: null,
+		eliminatedAt: options.isActive === false ? new Date(Date.now()) : null,
+		eliminatedBy: null,
+		createdAt: new Date(Date.now()),
+	};
+	InMemoryBotRepo._insert(bot);
+	return bot;
+}
+
+/**
+ * PostService に CommandService（InMemoryCopipeRepo を注入済み）を DI するヘルパー。
+ * コピペボットが isBotWrite=true で書き込む際のコマンドパイプラインを有効化する。
+ *
+ * コスト免除は CommandService.executeCommand の isBotGiver=true 条件で実現される。
+ * PostService が isBotWrite=true 時に自動的に isBotGiver=true を設定する。
+ *
+ * See: src/lib/services/command-service.ts > executeCommand（isBotGiver 条件）
+ * See: src/lib/services/post-service.ts > createPost（isBotGiver 自動設定）
+ * See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
+ */
+function setupCommandServiceWithCopipeRepo() {
+	const PostService = getPostService();
+	const CurrencyService = getCurrencyService();
+	const { CommandService } = require("../../src/lib/services/command-service");
+	const {
+		createAccusationService,
+	} = require("../../src/lib/services/accusation-service");
+	const accusationService = createAccusationService();
+	// CommandService constructor 引数順（第13引数が copipeRepository）:
+	// currencyService, accusationService, commandsYamlOverride, attackHandler, grassHandler,
+	// postNumberResolver, hissiHandler, kinouHandler, pendingAsyncCommandRepository,
+	// livingBotHandler, hissiBotPostRepository, kinouBotPostRepository, copipeRepository
+	// See: src/lib/services/command-service.ts > constructor
+	const commandService = new CommandService(
+		CurrencyService,
+		accusationService,
+		undefined, // commandsYamlOverride
+		undefined, // attackHandler
+		undefined, // grassHandler
+		InMemoryPostRepo, // postNumberResolver（>>N → UUID 解決用）
+		undefined, // hissiHandler
+		undefined, // kinouHandler
+		undefined, // pendingAsyncCommandRepository
+		undefined, // livingBotHandler
+		undefined, // hissiBotPostRepository
+		undefined, // kinouBotPostRepository
+		InMemoryCopipeRepo, // copipeRepository
+	);
+	PostService.setCommandService(commandService);
+}
+
+/**
+ * 運営ボット「コピペ」がスレッドで潜伏中の状態をセットアップする。
+ *
+ * - InMemoryBotRepo にコピペボット（HP:100）を配置する
+ * - InMemoryCopipeRepo にテスト用AAを投入する
+ * - PostService に CommandService（InMemoryCopipeRepo 注入済み）を DI する
+ *
+ * See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
+ * See: features/bot_system.feature @コピペボットは !copipe コマンドで書き込む
+ */
+Given("運営ボット「コピペ」がスレッドで潜伏中である", async function (this) {
+	// ユーザーとスレッドをセットアップする
+	await ensureUserAndThread(this);
+
+	// コピペボットを配置する（HP:100, isRevealed:false）
+	const bot = createCopipeBot({ isRevealed: false });
+	this.currentBot = bot;
+
+	// InMemoryCopipeRepo にテスト用AAデータを投入する
+	// CopipeHandler がランダム選択する際にデータが必要
+	InMemoryCopipeRepo._insert({
+		name: "テストAA",
+		content: "（テスト用AA本文）",
+	});
+
+	// PostService に CommandService（InMemoryCopipeRepo 注入済み）を DI する
+	// コスト免除は CommandService 側で isBotGiver=true 時にスキップされる
+	setupCommandServiceWithCopipeRepo();
+});
+
+/**
+ * "!copipe" は通常コスト N のコマンドである。
+ * commands.yaml の copipe コマンド設定値を宣言的に確認する。
+ *
+ * See: config/commands.yaml > copipe.cost
+ * See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
+ */
+Given(
+	/^"!copipe" は通常コスト (\d+) のコマンドである$/,
+	function (this, costStr) {
+		const expectedCost = parseInt(costStr, 10);
+		// config/commands.ts のエクスポート名は commandsConfig
+		// See: config/commands.ts > export const commandsConfig
+		const { commandsConfig } = require("../../config/commands");
+		const copipeCost = commandsConfig?.commands?.copipe?.cost ?? 0;
+		assert.strictEqual(
+			copipeCost,
+			expectedCost,
+			`!copipe のコストが ${expectedCost} であることを確認（実際: ${copipeCost}）`,
+		);
+	},
+);
+
+/**
+ * ボットが指定した本文を含む書き込みを投稿する。
+ * isBotWrite=true で PostService.createPost を呼び出す。
+ * PostService 側で isBotGiver=true が自動設定され、通貨チェック・消費がスキップされる。
+ *
+ * See: src/lib/services/post-service.ts > createPost（isBotGiver 自動設定）
+ * See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
+ */
+When(
+	/^ボットが "([^"]+)" を含む書き込みを投稿する$/,
+	async function (this, body) {
+		assert(this.currentBot, "ボットが設定されていません");
+		assert(this.currentThreadId, "スレッドIDが設定されていません");
+		const PostService = getPostService();
+		const result = await PostService.createPost({
+			threadId: this.currentThreadId,
+			body,
+			edgeToken: null,
+			ipHash: "bot",
+			displayName: "名無しさん",
+			isBotWrite: true,
+			botUserId: this.currentBot.id,
+		});
+		// lastResult に保存する（"コマンドが正常に実行される" ステップが参照する）
+		// PostResult は success プロパティで判定する（type プロパティは存在しない）
+		// See: src/lib/services/post-service.ts > PostResult
+		// See: features/step_definitions/command_system.steps.ts > "コマンドが正常に実行される"
+		if ("success" in result && result.success) {
+			this.lastResult = { type: "success", data: result };
+		} else if ("error" in result) {
+			this.lastResult = {
+				type: "error",
+				message: (result as any).error ?? "書き込みに失敗しました",
+			};
+		} else {
+			this.lastResult = {
+				type: "error",
+				message: "書き込みに失敗しました",
+			};
+		}
+	},
+);
+
+/**
+ * コピペAAがレス末尾にマージ表示される。
+ * 最新レスの inlineSystemInfo に「【」が含まれることを確認する。
+ * CopipeHandler の出力フォーマット: 「【name】\ncontent」
+ *
+ * See: src/lib/services/handlers/copipe-handler.ts
+ * See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
+ * See: features/bot_system.feature @コピペボットは !copipe コマンドで書き込む
+ */
+Then("コピペAAがレス末尾にマージ表示される", async function (this) {
+	assert(this.currentThreadId, "スレッドIDが設定されていません");
+	const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+	assert(posts.length > 0, "スレッドに書き込みが存在しません");
+	const lastPost = posts[posts.length - 1];
+	assert(
+		lastPost.inlineSystemInfo !== null,
+		`コピペAAがレス末尾にマージ表示されるべきですが inlineSystemInfo が null でした`,
+	);
+	assert(
+		lastPost.inlineSystemInfo.includes("【"),
+		`コピペAAのフォーマット「【name】\ncontent」が inlineSystemInfo に含まれることを期待しましたが "${lastPost.inlineSystemInfo}" でした`,
+	);
+});
+
+/**
+ * 書き込み本文が期待値と一致する。
+ * ボット書き込み（authorId が null）の最新レスの body を確認する。
+ *
+ * See: features/bot_system.feature @コピペボットは !copipe コマンドで書き込む
+ */
+Then(/^書き込み本文は "([^"]+)" である$/, async function (this, expectedBody) {
+	assert(this.currentThreadId, "スレッドIDが設定されていません");
+	const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+	assert(posts.length > 0, "スレッドに書き込みが存在しません");
+	// ボット書き込みを取得する（authorId が null のレス）
+	const botPosts = posts.filter((p) => p.authorId === null);
+	assert(botPosts.length > 0, "ボットの書き込みが存在しません");
+	const lastBotPost = botPosts[botPosts.length - 1];
+	assert.strictEqual(
+		lastBotPost.body,
+		expectedBody,
+		`書き込み本文が "${expectedBody}" であることを期待しましたが "${lastBotPost.body}" でした`,
+	);
+});
+
+/**
+ * 運営ボット「コピペ」（HP:N）が「暴露済み」状態で配置される。
+ * HP:100 のコピペボットを isRevealed=true で InMemoryBotRepo に配置する。
+ *
+ * See: features/bot_system.feature @コピペボットはHP 100で配置され一撃では撃破されない
+ */
+Given(
+	/^運営ボット「コピペ」（HP:(\d+)）の状態が「暴露済み」である$/,
+	async function (this, hpStr) {
+		await ensureUserAndThread(this);
+		const hp = parseInt(hpStr, 10);
+		const bot = createCopipeBot({ hp, isRevealed: true });
+		this.currentBot = bot;
+	},
+);
+
+/**
+ * レス >>N はBOTマーク付きのコピペボットの書き込みである。
+ * InMemoryPostRepo と InMemoryBotPostRepo にボット書き込みレコードを追加する。
+ *
+ * See: features/bot_system.feature @コピペボットはHP 100で配置され一撃では撃破されない
+ */
+Given(
+	/^レス >>(\d+) はBOTマーク付きボット「コピペ」の書き込みである$/,
+	async function (this, postNumberStr) {
+		const postNumber = parseInt(postNumberStr, 10);
+		if (this.botPostNumberToId.has(postNumber)) return;
+		await ensureUserAndThread(this);
+		assert(this.currentBot, "ボットが設定されていません");
+		const postId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: postId,
+			threadId: this.currentThreadId,
+			postNumber,
+			authorId: null,
+			displayName: "名無しさん",
+			dailyId: this.currentBot.dailyId,
+			body: "!copipe",
+			inlineSystemInfo: null,
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(Date.now()),
+		});
+		InMemoryBotPostRepo._insert(postId, this.currentBot.id);
+		this.botPostNumberToId.set(postNumber, postId);
+	},
+);
+
+/**
+ * ボット「コピペ」のHPが N から M に減少する。
+ * InMemoryBotRepo から最新のボット情報を取得してHP値を検証する。
+ *
+ * See: features/bot_system.feature @コピペボットはHP 100で配置され一撃では撃破されない
+ */
+Then(
+	/^ボット「コピペ」のHPが (\d+) から (\d+) に減少する$/,
+	async function (this, _prevHpStr, expectedHpStr) {
+		const expectedHp = parseInt(expectedHpStr, 10);
+		assert(this.currentBot, "ボットが設定されていません");
+		const bot = await InMemoryBotRepo.findById(this.currentBot.id);
+		assert(bot, "ボットが見つかりません");
+		assert.strictEqual(
+			bot.hp,
+			expectedHp,
+			`ボット「コピペ」のHPが ${expectedHp} であることを期待しましたが ${bot.hp} でした`,
+		);
+	},
+);
+
+/**
+ * ボットの状態が「撃破済み」にならない。
+ * isActive が true（活動中）であることを確認する。
+ *
+ * See: features/bot_system.feature @コピペボットはHP 100で配置され一撃では撃破されない
+ */
+Then("ボットの状態は「撃破済み」にならない", async function (this) {
+	assert(this.currentBot, "ボットが設定されていません");
+	const bot = await InMemoryBotRepo.findById(this.currentBot.id);
+	assert(bot, "ボットが見つかりません");
+	assert.strictEqual(
+		bot.isActive,
+		true,
+		`ボットが活動中（isActive=true）であり「撃破済み」にならないことを期待しましたが isActive=${bot.isActive} でした`,
+	);
+});

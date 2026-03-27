@@ -905,8 +905,10 @@ export class CommandService {
 		const shouldSkipDebit = this.skipDebitCommands.has(parsed.name);
 
 		// Step 3: 通貨残高チェック（cost > 0 のコマンドのみ）
+		// 運営ボット（isBotGiver=true）は currencies レコードを持たないため通貨チェック・消費をスキップする。
+		// See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
 		// See: features/command_system.feature @通貨不足でコマンドが実行できない場合はエラーになる
-		if (cost > 0) {
+		if (cost > 0 && !input.isBotGiver) {
 			const balance = await this.currencyService.getBalance(input.userId);
 			if (balance < cost) {
 				return {
@@ -954,6 +956,7 @@ export class CommandService {
 
 		// 通貨引き落とし済みの場合は、ハンドラの成否にかかわらず currencyCost に実際の消費額を返す。
 		// skipDebit コマンドはハンドラ内で消費が決まるため、成功時のみ cost を返す。
+		// 運営ボット（isBotGiver）は通貨免除のため常に 0。
 		// See: docs/architecture/components/command.md §5 通貨引き落としの順序
 		// 「コマンド失敗時に通貨を戻す補償処理は行わない」
 		// eliminationNotice: ハンドラが設定した場合は PostService に伝播する。
@@ -963,7 +966,13 @@ export class CommandService {
 		return {
 			success: result.success,
 			systemMessage: result.systemMessage,
-			currencyCost: shouldSkipDebit ? (result.success ? cost : 0) : cost,
+			currencyCost: input.isBotGiver
+				? 0
+				: shouldSkipDebit
+					? result.success
+						? cost
+						: 0
+					: cost,
 			eliminationNotice: result.eliminationNotice ?? null,
 			independentMessage: result.independentMessage ?? null,
 			// ステルス関連フィールドの伝播

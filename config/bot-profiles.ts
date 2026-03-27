@@ -77,4 +77,17 @@ export const botProfilesConfig: BotProfilesYaml = {
 		},
 		fixed_messages: [], // 煽り文句は aori-taunts.ts で管理（BOT プロファイルと分離）
 	},
+	// コピペボット: !copipe コマンドを実行するHP:100の運営ボット
+	// See: features/bot_system.feature @コピペボット
+	// See: config/bot_profiles.yaml (正本)
+	コピペ: {
+		hp: 100,
+		max_hp: 100,
+		reward: {
+			base_reward: 50,
+			daily_bonus: 20,
+			attack_bonus: 3,
+		},
+		fixed_messages: ["!copipe"],
+	},
 };

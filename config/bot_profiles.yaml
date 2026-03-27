@@ -75,3 +75,21 @@ hiroyuki:
     daily_bonus: 0
     attack_bonus: 0
   fixed_messages: []    # ひろゆき風テキストは Gemini API で動的生成（固定文なし）
+
+# コピペボット（!copipe コマンドを実行するHP:100の運営ボット）
+# 一撃では撃破できない初の運営ボット。
+# 撃破には10回の攻撃（damage:10 × 10回）が必要。
+# 報酬計算例:
+#   即日撃破（10人協力）: 50 + (0 × 20) + (10 × 3) = 80
+#   5日後撃破:           50 + (5 × 20) + (10 × 3) = 180
+#   30日後撃破:          50 + (30 × 20) + (10 × 3) = 680
+# See: features/bot_system.feature @コピペボット
+コピペ:
+  hp: 100
+  max_hp: 100
+  reward:
+    base_reward: 50
+    daily_bonus: 20
+    attack_bonus: 3
+  fixed_messages:
+    - "!copipe"

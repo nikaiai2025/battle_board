@@ -96,7 +96,8 @@ color: green
 
 ### ステップ8: Gitコミット・プッシュ
 - スプリントが問題なく完了した場合、スプリントで変更したファイル全てをGitにコミット・プッシュする。
-- プッシュした後、Vercel,Cloudflareそれぞれで自動デプロイが実施される。デプロイ見込み時間として3分間待機した後、CLIでデプロイ状況を確認する。
+- Githubにプッシュした後、Vercelに自動デプロイが実行される。続いてCloudflareにも自動デプロイが実施される（少し時間差がある）。
+- デプロイ見込み時間として3分間待機した後、CLIで両環境のデプロイ状況を確認する。
   - Vercel: `npx vercel ls`
   - Cloudflare: `wrangler deployments status`
     (使用禁止コマンド: `npx wrangler deployments list`)
