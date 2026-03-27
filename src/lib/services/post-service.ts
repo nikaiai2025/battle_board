@@ -302,8 +302,8 @@ async function resolveAuth(
  *      - 未認証/not_found: issueEdgeToken → issueAuthCode → authRequired 応答
  *   3. ユーザー情報取得（UserRepository.findById）
  *   4. 日次リセットID 生成（generateDailyId）
+ *   4.5. 初回書き込み検出（ウェルカムシーケンス: ボーナス付与 + pendingフラグ）
  *   5. コマンド解析 → CommandService.executeCommand
- *   6.5. 初回書き込み検出（ウェルカムシーケンス: ボーナス付与 + pendingフラグ）
  *   7. IncentiveService 呼び出し（書き込み報酬計算）
  *   8. inlineSystemInfo 構築（コマンド結果 + 書き込み報酬 + ウェルカムボーナス）
  *   9. レス番号の原子採番 + INSERT（PostRepository.createWithAtomicNumber / RPC 1回）
@@ -447,6 +447,45 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		? "SYSTEM"
 		: generateDailyId(authorIdSeed, boardId, dateJst);
 
+	// Step 4.5: 初回書き込み検出（ウェルカムシーケンス）
+	// 条件: ユーザー書き込み（!isSystemMessage && !isBotWrite）かつ認証済みユーザー（resolvedAuthorId != null）
+	// - ① 初回書き込みボーナス +50（CurrencyService.credit）→ inlineSystemInfo に追加
+	// - ② ウェルカムメッセージ pending フラグをセット（Step 11.5 で実際に投稿）
+	// - ③ pending_tutorials に INSERT（原子INSERT後にRPC戻り値の postNumber で更新）
+	//
+	// ★ Step 5（コマンド実行）より前に実行する。
+	// 初回書き込みにコマンドを含む場合、ボーナス付与前にコマンドの通貨チェックが走ると
+	// 残高0で通貨不足エラーになるため、先にボーナスを付与してからコマンドを実行する。
+	//
+	// isSystemMessage=true の場合は条件を満たさないため、Step 11.5 での createPost 再帰呼び出しで
+	// ウェルカムシーケンスは発動しない（無限ループ防止）。
+	//
+	// See: features/welcome.feature @仮ユーザーが初めて書き込むとウェルカムシーケンスが発動する
+	// See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
+	// See: features/welcome.feature @初回書き込みにコマンドを含む場合もボーナスが先に付与されコマンドが成功する
+	let welcomeBonusText: string | null = null;
+	let welcomeMessagePending = false;
+
+	if (!isSystemMessage && !input.isBotWrite && resolvedAuthorId != null) {
+		try {
+			const postCount = await PostRepository.countByAuthorId(resolvedAuthorId);
+			if (postCount === 0) {
+				// ① 初回書き込みボーナス +50
+				await CurrencyService.credit(resolvedAuthorId, 50, "welcome_bonus");
+				welcomeBonusText = "🎉 初回書き込みボーナス！ +50";
+
+				// ② ウェルカムメッセージ（Step 11.5 で投稿）
+				welcomeMessagePending = true;
+
+				// ③ pending_tutorials INSERT は Step 9 の RPC 後に実行する
+				// （triggerPostNumber に実際の postNumber が必要なため）
+			}
+		} catch (err) {
+			// ウェルカムシーケンス失敗は書き込みを巻き戻さない
+			console.error("[PostService] ウェルカムシーケンス処理失敗:", err);
+		}
+	}
+
 	// Step 5: コマンド解析 → コマンド実行（方式A: レス内マージ）
 	// システムメッセージにはコマンド解析をスキップする
 	// See: features/command_system.feature @システムメッセージ内のコマンド文字列は実行されない
@@ -508,47 +547,6 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		}
 	}
 	// else: 失敗時 or 非ステルスコマンド → resolvedBody / resolvedDisplayName / dailyId は変更しない
-
-	// Step 6.5: 初回書き込み検出（ウェルカムシーケンス）
-	// 条件: ユーザー書き込み（!isSystemMessage && !isBotWrite）かつ認証済みユーザー（resolvedAuthorId != null）
-	// - ① 初回書き込みボーナス +50（CurrencyService.credit）→ inlineSystemInfo に追加
-	// - ② ウェルカムメッセージ pending フラグをセット（Step 11.5 で実際に投稿）
-	// - ③ pending_tutorials に INSERT（原子INSERT後にRPC戻り値の postNumber で更新）
-	//
-	// 従来は Step 6 で採番後に実行していたが、TOCTOU競合修正により採番+INSERTを
-	// RPC 1回で原子的に実行するよう変更した。ウェルカムシーケンスの判定（countByAuthorId）
-	// とボーナス付与（credit）は採番前に先行実行し、pending_tutorials の triggerPostNumber は
-	// RPC 戻り値から取得した実際の postNumber を使用する。
-	//
-	// isSystemMessage=true の場合は条件を満たさないため、Step 11.5 での createPost 再帰呼び出しで
-	// ウェルカムシーケンスは発動しない（無限ループ防止）。
-	//
-	// See: features/welcome.feature @仮ユーザーが初めて書き込むとウェルカムシーケンスが発動する
-	// See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
-	// See: tmp/workers/bdd-architect_TASK-236/design.md §2.1 初回書き込み検出ロジック
-	// See: tmp/workers/bdd-architect_ATK-POST-001/assessment.md §3 推奨案
-	let welcomeBonusText: string | null = null;
-	let welcomeMessagePending = false;
-
-	if (!isSystemMessage && !input.isBotWrite && resolvedAuthorId != null) {
-		try {
-			const postCount = await PostRepository.countByAuthorId(resolvedAuthorId);
-			if (postCount === 0) {
-				// ① 初回書き込みボーナス +50
-				await CurrencyService.credit(resolvedAuthorId, 50, "welcome_bonus");
-				welcomeBonusText = "🎉 初回書き込みボーナス！ +50";
-
-				// ② ウェルカムメッセージ（Step 11.5 で投稿）
-				welcomeMessagePending = true;
-
-				// ③ pending_tutorials INSERT は Step 9 の RPC 後に実行する
-				// （triggerPostNumber に実際の postNumber が必要なため）
-			}
-		} catch (err) {
-			// ウェルカムシーケンス失敗は書き込みを巻き戻さない
-			console.error("[PostService] ウェルカムシーケンス処理失敗:", err);
-		}
-	}
 
 	// Step 7: IncentiveService 同期ボーナス（Phase 1: INSERT前）
 	// 同期ボーナス（daily_login, reply, new_thread_join, streak, milestone_post）のみ計算し、
@@ -639,7 +637,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		inlineSystemInfoParts.push(...rewardMessages);
 	}
 
-	// ウェルカムボーナスメッセージを追加（Step 6.5 で設定された場合）
+	// ウェルカムボーナスメッセージを追加（Step 4.5 で設定された場合）
 	// See: features/welcome.feature @初回書き込みボーナスとして+50が付与されレス末尾にマージ表示される
 	// See: tmp/workers/bdd-architect_TASK-236/design.md §2.5 inlineSystemInfo へのボーナス表示統合
 	if (welcomeBonusText != null) {
@@ -846,9 +844,9 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	}
 
 	// Step 11.5: ウェルカムメッセージ投稿（初回書き込み時のみ）
-	// Step 6.5 で welcomeMessagePending=true になった場合、「★システム」名義の独立システムレスを投稿する。
+	// Step 4.5 で welcomeMessagePending=true になった場合、「★システム」名義の独立システムレスを投稿する。
 	// isBotWrite=true は「認証スキップ」の意味で使用している（設計上の判断は design.md §2.1 参照）。
-	// isSystemMessage=true により Step 6.5 の条件（!isSystemMessage）を満たさず、無限ループにならない。
+	// isSystemMessage=true により Step 4.5 の条件（!isSystemMessage）を満たさず、無限ループにならない。
 	// 投稿失敗は元レスの成功を巻き戻さない（try-catch で保護）。
 	//
 	// See: features/welcome.feature @初回書き込みの直後にウェルカムメッセージが独立システムレスで表示される

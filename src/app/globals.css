@@ -48,15 +48,23 @@
 }
 
 /*
- * AA（アスキーアート）表示用フォント。
+ * AA（アスキーアート）表示用Webフォント。
  * 2ch/5chのAAは「MS Pゴシック 16px」を前提にデザインされている。
- * Web版でも同じフォント特性（全角1文字 = 半角2文字の幅）を持つフォントを指定し、
- * 専ブラとの表示互換性を保証する。
+ * PCではOS搭載のMS PGothicを優先し、スマホ等の未搭載環境では
+ * Monapo（IPA Font License、Debian fonts-monapo由来）をWebフォントとして配信する。
  * See: config/copipe-seed.txt ヘッダー「AA表示の前提フォントとスペース方針」
  * See: docs/specs/screens/thread-view.yaml > inline-system-content
  */
+@font-face {
+  font-family: "Monapo";
+  src: url("/fonts/monapo.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --font-aa: "MS PGothic", "IPAMonaPGothic", "Monapo", "Mona", monospace;
+  --font-aa: "MS PGothic", "IPAMonaPGothic", "Monapo", monospace;
 }
 
 :root {

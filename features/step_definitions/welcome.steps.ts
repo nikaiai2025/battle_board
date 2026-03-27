@@ -2,11 +2,12 @@
  * welcome.feature ステップ定義
  *
  * 初回書き込み時のウェルカムシーケンス（初回書き込みボーナス・ウェルカムメッセージ・
- * チュートリアルBOT）に関する全11シナリオを実装する。
+ * チュートリアルBOT）に関する全12シナリオを実装する。
  *
  * カバーするシナリオ:
  *   - 初回書き込み判定（仮ユーザー・本登録ユーザー・仮ユーザー時代書き込み済み・2回目以降）
  *   - 初回書き込みボーナス +50（レス内マージ表示）
+ *   - 初回書き込みにコマンドを含む場合のボーナス先行付与
  *   - ウェルカムメッセージ（★システム名義の独立システムレス）
  *   - チュートリアルBOTスポーン（!w 反応・1回撃破・毎回新規・日次リセット非復活・cron非書き込み）
  *
@@ -1241,5 +1242,130 @@ Then(
 			!tutorialBotInDue,
 			"findDueForPost の対象にチュートリアルBOTが含まれていないこと（next_post_at=null のため）",
 		);
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Given/Then: 初回書き込み + コマンドの複合シナリオ
+// See: features/welcome.feature @初回書き込みにコマンドを含む場合もボーナスが先に付与されコマンドが成功する
+// ---------------------------------------------------------------------------
+
+/**
+ * コマンドターゲットのレス >>N がスレッドに存在する。
+ * CommandService（tell コマンド含む）をセットアップし、スレッドにダミーレスを挿入する。
+ * ウェルカムボーナス先行付与シナリオで、コマンドのターゲットとして使用する。
+ *
+ * See: features/welcome.feature @初回書き込みにコマンドを含む場合もボーナスが先に付与されコマンドが成功する
+ */
+Given(
+	"コマンドターゲットのレス >>{int} がスレッドに存在する",
+	async function (this: BattleBoardWorld, postNumber: number) {
+		// スレッドが未作成の場合は作成する
+		await ensureUserAndThread(this);
+
+		// CommandService をセットアップ（tell コマンドを含む）
+		const PostService = getPostService();
+		const CurrencyService = getCurrencyService();
+		try {
+			const { CommandService } =
+				require("../../src/lib/services/command-service") as typeof import("../../src/lib/services/command-service");
+			const { createAccusationService } =
+				require("../../src/lib/services/accusation-service") as typeof import("../../src/lib/services/accusation-service");
+			const accusationService = createAccusationService();
+			const commandService = new CommandService(
+				CurrencyService,
+				accusationService,
+				undefined,
+				undefined,
+				undefined,
+				InMemoryPostRepo,
+			);
+			PostService.setCommandService(commandService);
+		} catch (err) {
+			console.warn("[BDD] CommandService のインスタンス化に失敗:", err);
+			PostService.setCommandService(null);
+		}
+
+		// ダミーレスを指定レス番号で挿入する
+		InMemoryPostRepo._insert({
+			id: crypto.randomUUID(),
+			threadId: this.currentThreadId!,
+			postNumber,
+			authorId: crypto.randomUUID(),
+			displayName: "名無しさん",
+			dailyId: "TrgDly00",
+			body: `ターゲット用ダミーレス >>${postNumber}`,
+			inlineSystemInfo: null,
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(Date.now()),
+		});
+	},
+);
+
+/**
+ * 初回書き込みボーナス +50 が先に付与される。
+ * inlineSystemInfo にウェルカムボーナスメッセージが含まれることを確認する。
+ *
+ * See: features/welcome.feature @初回書き込みにコマンドを含む場合もボーナスが先に付与されコマンドが成功する
+ */
+Then(
+	"初回書き込みボーナス +{int} が先に付与される",
+	async function (this: BattleBoardWorld, amount: number) {
+		assert.ok(this.lastResult, "操作結果が存在しません");
+		assert.strictEqual(
+			this.lastResult.type,
+			"success",
+			`書き込みが成功することを期待しましたが "${this.lastResult.type}" でした`,
+		);
+
+		// inlineSystemInfo にウェルカムボーナスメッセージが含まれることを確認する
+		const postResult = this.lastResult.data as { postNumber?: number };
+		assert.ok(postResult?.postNumber, "postNumber が存在すること");
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId!);
+		const targetPost = posts.find(
+			(p) => p.postNumber === postResult.postNumber,
+		);
+		assert.ok(targetPost, "投稿したレスが存在すること");
+		assert.ok(
+			targetPost.inlineSystemInfo,
+			"inlineSystemInfo が null でないこと",
+		);
+		const expectedText = `初回書き込みボーナス！ +${amount}`;
+		assert.ok(
+			targetPost.inlineSystemInfo.includes(expectedText),
+			`inlineSystemInfo に "${expectedText}" が含まれること（実際: ${targetPost.inlineSystemInfo}）`,
+		);
+	},
+);
+
+/**
+ * コマンドが通貨不足にならず実行される。
+ * inlineSystemInfo に「通貨が不足しています」が含まれないことを確認する。
+ *
+ * See: features/welcome.feature @初回書き込みにコマンドを含む場合もボーナスが先に付与されコマンドが成功する
+ */
+Then(
+	"コマンドが通貨不足にならず実行される",
+	async function (this: BattleBoardWorld) {
+		assert.ok(this.lastResult, "操作結果が存在しません");
+		assert.strictEqual(
+			this.lastResult.type,
+			"success",
+			`書き込みが成功することを期待しましたが "${this.lastResult.type}" でした`,
+		);
+
+		// inlineSystemInfo に「通貨が不足しています」が含まれないことを確認する
+		const postResult = this.lastResult.data as { postNumber?: number };
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId!);
+		const targetPost = posts.find(
+			(p) => p.postNumber === postResult?.postNumber,
+		);
+		if (targetPost?.inlineSystemInfo) {
+			assert.ok(
+				!targetPost.inlineSystemInfo.includes("通貨が不足しています"),
+				`コマンドが通貨不足にならないこと（実際の inlineSystemInfo: ${targetPost.inlineSystemInfo}）`,
+			);
+		}
 	},
 );

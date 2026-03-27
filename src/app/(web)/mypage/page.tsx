@@ -585,7 +585,7 @@ export default function MypagePage() {
 					data-testid="registration-section"
 					className="bg-blue-50 border border-blue-200 rounded p-4 space-y-3"
 				>
-					<h2 className="text-base font-bold text-blue-800">本登録</h2>
+					<h2 className="text-base font-bold text-blue-800">本登録（無料です）</h2>
 					<p className="text-sm text-blue-700">
 						メールアドレスまたは Discord アカウントで本登録すると、Cookie
 						喪失・端末変更時でも同一ユーザーとして復帰できます。
@@ -778,9 +778,9 @@ export default function MypagePage() {
 				id="upgrade-section"
 				className="bg-card border border-border rounded p-4 space-y-2"
 			>
-				<h2 className="text-base font-bold text-foreground">有料プラン</h2>
+				<h2 className="text-base font-bold text-foreground">有料プラン※未実装。今は全員有料プラン扱い</h2>
 				<p className="text-sm text-muted-foreground">
-					有料プランに加入するとユーザーネームが設定できます。
+					有料プランに加入するとユーザーネームが設定できます。配色・文字フォントも変更できます。
 				</p>
 
 				{/* 仮ユーザーへの本登録必要メッセージ

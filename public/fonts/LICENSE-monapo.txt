@@ -1,0 +1,104 @@
+Monapo Font
+===========
+
+Source: Debian fonts-monapo package (fonts-monapo_20170722-3_all.deb)
+URL: https://packages.debian.org/stable/fonts-monapo
+
+Monapo is a Japanese proportional Gothic font derived from IPA Font,
+with glyph width adjustments for 2ch/5ch ASCII Art (AA) compatibility.
+
+Licensed under the IPA Font License Agreement v1.0.
+Full license text: https://opensource.org/licenses/IPA
+
+---
+
+IPA Font License Agreement v1.0
+
+The Licensor provides the Licensed Program (as defined in Article 1 below)
+under the terms of this license agreement ("Agreement").
+
+Any use, reproduction or distribution of the Licensed Program, or any exercise
+of rights under this Agreement by a Recipient (as defined in Article 1 below)
+constitutes the Recipient's acceptance of this Agreement.
+
+Article 1 (Definitions)
+
+1. "Digital Font Program" shall mean a computer program containing, or used
+   to render or display fonts.
+2. "Licensed Program" shall mean a Digital Font Program licensed by the
+   Licensor under this Agreement.
+3. "Derived Program" shall mean a Digital Font Program created as a result
+   of a modification, addition, deletion, replacement or any other adaptation
+   to or of a part or all of the Licensed Program, and includes a case where
+   a Digital Font Program newly created by retrieving font information from
+   a part or all of the Licensed Program to describe the font information
+   in the newly created Digital Font Program.
+4. "Digital Content" shall mean products provided to end users in the form
+   of digital data, including video content, motion and/or still pictures,
+   TV programs or other broadcasting content and contents of network-based
+   broadcasting, all contents of network-based services, and contents
+   included in CD-ROM, DVD, Blu-ray Disc and other similar recording
+   media, etc.
+5. "Recipient" shall mean anyone who receives the Licensed Program under
+   this Agreement, including one who receives the Licensed Program from
+   a Recipient.
+
+Article 2 (Grant of License)
+
+The Licensor grants to the Recipient a license to use the Licensed Program
+in any and all countries in accordance with each of the provisions set forth
+in this Agreement. However, any and all rights underlying in the Licensed
+Program shall be held by the Licensor. In no sense is this Agreement intended
+to transfer any right relating to the Licensed Program held by the Licensor
+except as specifically set forth herein or any right relating to any trademark,
+trade name, or service mark to the Recipient.
+
+1. The Recipient may install the Licensed Program on any number of computers
+   and use the same in accordance with the provisions set forth in this
+   Agreement.
+2. The Recipient may use the Licensed Program, with or without modification
+   in printed materials or Digital Content as an expression of character texts
+   or arrow marks, or the like, in a way which the font information of the
+   Licensed Program is not used by or extracted from a computer by the
+   Recipient or any third party while using such contents.
+3. The Recipient may conduct the following acts concerning the Licensed
+   Program without any restriction:
+   a) reproduce the Licensed Program as is, and distribute such copies;
+   b) create and distribute a Derived Program;
+   provided that the Recipient shall comply with the provisions set forth
+   in Article 3 when distributing.
+
+Article 3 (Restriction)
+
+When the Recipient distributes the Licensed Program or Derived Program, the
+Recipient shall comply with the following:
+
+1. The Recipient shall attach a copy of this Agreement to the Licensed
+   Program or the Derived Program.
+2. When distributing a Derived Program, the Recipient shall provide in
+   a conspicuous manner the information listed below in a file:
+   a) the fact that it is a Derived Program;
+   b) the name of the Licensed Program;
+   c) information to identify the Licensor of the Licensed Program.
+3. The Recipient shall not change the name of the Licensed Program to the
+   name which is the same as the name of another Digital Font Program.
+4. When distributing the Licensed Program or a Derived Program, the
+   Recipient shall not use or include the name of the Licensor of the
+   Licensed Program as a program name, nor use or include the name of
+   the Licensor of the Licensed Program in any manner that would imply
+   or suggest endorsement or promotion.
+
+Article 4 (Termination)
+
+1. The term of this Agreement shall begin from the time of receipt of the
+   Licensed Program by the Recipient and shall continue as long as the
+   Recipient retains any such Licensed Program in any way.
+2. Notwithstanding the provision set forth in the preceding Paragraph,
+   in the event of the breach of any of the provisions set forth in this
+   Agreement by the Recipient, this Agreement shall automatically terminate
+   without any notice. In the case of such termination, the Recipient may
+   not use or conduct any other act with respect to the Licensed Program.
+
+Article 5 (Governing Law)
+
+IPA Font License Agreement shall be construed under the laws of Japan.
