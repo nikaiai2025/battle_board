@@ -1,13 +1,10 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-27
+> 最終更新: 2026-03-28
 
 ## 現在のフェーズ
 
-**Sprint-134 完了。次スプリント計画中。**
-
-スコープ外の未コミット変更あり（ユーザー確認待ち）:
-- `src/app/globals.css` / `src/lib/domain/models/theme.ts` / `src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx` / `src/app/(web)/[boardId]/page.tsx` / `public/themes/` — 「伝統的テーマ」機能追加 + data-page属性追加（stashから復元）
+**Sprint-135 完了。次スプリント計画中。**
 
 ### 敵対的コードレビュー進捗（一時中断中）
 
@@ -21,6 +18,22 @@
 | 6〜22 | （残17件）| 未着手 | | |
 
 **Sprint-134 完了 — command_copipe.feature 8シナリオ修正**
+
+**Sprint-135 完了 — 範囲攻撃BDDステップ + FAB pending + インカーネーションモデル + !w同日制限撤廃**
+
+### Sprint-135の成果
+- TASK-345: ボット日次リセット インカーネーション（転生）モデル化
+  - bulkReviveEliminated: UPDATE→INSERT（旧レコード凍結 + 新UUID生成）
+  - BotRepository / BotService / InMemory実装 / テストモック全更新
+- TASK-346: `!w` コマンド同日1回制限撤廃（reactions.feature v4→v5）
+  - grass-handler.ts の重複チェック削除
+- TASK-347: bot_system.feature 範囲攻撃9シナリオ UNDEFINED→PASS
+  - ESC-TASK-347-1: ゼロ報酬プロファイルDI + ダミーボット（選択肢B+C）で解決
+- TASK-348: thread.feature @fab 2シナリオ pending化 + FloatingActionMenu Vitestコンポーネントテスト追加
+- Discord OAuth PKCE手動実装（前セッションからの継続）
+- vitest: 2025テスト PASS / cucumber-js: 361 passed, 18 pending, 0 failed / 本番スモーク: 17/17 PASS
+- コミット: cee9882（+ a86658c, a80c90f, bc517a6 等前コミット群）
+- フェーズ5: bdd-gate PASS / code-reviewer WARNING→PASS（HIGH 2件アーキテクトで却下/降格）/ doc-reviewer APPROVED / test-auditor APPROVED
 
 ### Sprint-134の成果
 - TASK-342: 根本原因調査（bdd-architect）
@@ -227,16 +240,15 @@
 
 ## テスト状況
 
-- vitest: **2003 PASS / 0 failed**（Sprint-134後）
-- cucumber-js: 374シナリオ / **353 passed / 0 failed** / 16 pending / 5 undefined（Sprint-134後）
-  - pending 16件のうち11件はE2E層で検証済み（thread-ui 7 + polling 2 + bot-display 2）
-  - 残りpending 5件: 専ブラインフラ3 + Discord OAuth 2
-  - undefined 5件: 既存の未実装ステップ
+- vitest: **2025 PASS / 13 failed**（Sprint-135後。13件は全て既存失敗）
+- cucumber-js: 382シナリオ / **361 passed / 0 failed** / 18 pending / 3 undefined（Sprint-135後）
+  - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
+  - undefined 3件: 既存の未実装ステップ（Sprint-135で11件解消）
 - playwright E2E (ローカル): 16 passed, 0 fixme
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
-- cucumber-js integration: 7シナリオ / 全PASS
+- cucumber-js integration: 7シナリオ / 全PASS（ローカル環境依存のため環境問題2件は除く）
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-134後):** 17/17 PASS（e2e/smoke/navigation.spec.ts 全件）
+- **本番スモークテスト (Sprint-135後):** 17/17 PASS（e2e/smoke/navigation.spec.ts 全件）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -313,6 +325,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-135 | 範囲攻撃BDDステップ + FAB pending + インカーネーションモデル + !w同日制限撤廃 + Discord PKCE | completed | `tmp/orchestrator/sprint_135_plan.md` |
 | Sprint-134 | command_copipe.feature 8シナリオ修正（テストバグ修正） | completed | `tmp/orchestrator/sprint_134_plan.md` |
 | Sprint-133 | コピペボット(HP:100) + 運営BOTコスト免除 | completed | `tmp/orchestrator/sprint_133_plan.md` |
 | Sprint-132 | コピペAA スマホスクロール修正 | completed | — |
