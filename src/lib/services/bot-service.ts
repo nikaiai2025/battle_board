@@ -885,7 +885,7 @@ export class BotService {
 
 			if (action.type === "create_thread") {
 				// Phase 3 以降: スレッド作成処理（現時点では未実装）
-				// See: docs/architecture/components/bot.md §2.12.5 ネタ師の行動フロー
+				// See: docs/architecture/components/bot.md §2.12.5 キュレーションBOTの行動フロー
 				throw new Error(
 					"BotService.executeBotPost: create_thread アクションは Phase 3 以降に対応予定です",
 				);

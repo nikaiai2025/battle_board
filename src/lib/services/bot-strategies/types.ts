@@ -15,9 +15,9 @@
 // ---------------------------------------------------------------------------
 
 /**
- * ネタ師用の収集済みネタ情報。
+ * キュレーションBOT用の収集済みネタ情報。
  * Phase 3 実装時に詳細を追加する。
- * See: docs/architecture/components/bot.md §2.12.5 ネタ師の行動フロー
+ * See: docs/architecture/components/bot.md §2.12.5 キュレーションBOTの行動フロー
  */
 export interface CollectedTopic {
 	id: string;
@@ -82,7 +82,7 @@ export interface ContentGenerationContext {
 	botId: string;
 	botProfileKey: string | null;
 	threadId: string;
-	/** ネタ師用: 収集済みのネタ情報（Phase 3）*/
+	/** キュレーションBOT用: 収集済みのネタ情報（Phase 3）*/
 	collectedTopic?: CollectedTopic;
 	/** AI対話用: スレッドの直近レス（Phase 4）*/
 	recentPosts?: RecentPostSummary[];

@@ -279,3 +279,198 @@ export async function findByCommandType(
 | LOW | 1 | note |
 
 **判定: APPROVED** -- CRITICAL/HIGH の問題はありません。MEDIUM 2件は将来のリファクタリング候補として記録しますが、マージをブロックする理由にはなりません。
+
+---
+---
+
+# Code Review Report: Sprint-135
+
+> Reviewer: bdd-code-reviewer
+> Task: REVIEW-135
+> Date: 2026-03-28
+> Scope: Sprint-135 -- PKCE手動実装、インカーネーションモデル、草v5重複制限撤廃、範囲攻撃BDDステップ、FABテスト
+
+---
+
+## 対象
+
+| 項目 | 値 |
+|---|---|
+| Sprint | Sprint-135 |
+| 計画書 | `tmp/orchestrator/sprint_135_plan.md` |
+| 変更ファイル数 | 20 |
+| 重点チェック | PKCE セキュリティ、インカーネーション整合性、草重複チェック削除影響 |
+
+## 指摘事項
+
+### [HIGH-1] OAuth state パラメータによる CSRF 保護が欠如している
+
+ファイル: `src/lib/services/registration-service.ts` (L211-228, L376-393)
+ファイル: `src/app/api/auth/callback/route.ts` (L55-95)
+
+**問題点:**
+Discord OAuth フローにおいて、`state` パラメータの生成・検証が行われていない。PKCE の `code_verifier` を `bb-pkce-state` Cookie に保存しているが、PKCE（RFC 7636）は「認可コードの横取り（authorization code interception）」を防ぐ仕組みであり、「CSRF（第三者が被害者のブラウザでOAuthフローを完了させ、攻撃者のSNSアカウントを紐付ける攻撃）」は防がない。RFC 6749 Section 10.12 では `state` パラメータによる CSRF 対策が RECOMMENDED とされている。
+
+ただし、Supabase Auth の `/auth/v1/authorize` エンドポイントはサーバー側で独自に state 管理を行っている可能性がある。この場合、アプリケーション側での二重の state 検証は不要となる。Supabase Auth の PKCE フロー仕様を確認した上で、結果を設計書（D-07 または user-registration.md）に明記すべきである。
+
+**修正案:**
+Supabase Auth 側が state を内部管理している場合はその旨をドキュメント化する。していない場合は、OAuth 開始時にランダム state 値を生成して Cookie に保存し、コールバック時に照合するロジックを追加する。
+
+---
+
+### [HIGH-2] bulkReviveEliminated で撃破済みボット1体ごとに個別 INSERT（N+1 問題）
+
+ファイル: `src/lib/infrastructure/repositories/bot-repository.ts` (L519-593)
+
+**問題点:**
+撃破済みボットの復活処理が `for` ループで1体ずつ個別の `INSERT` + `SELECT` クエリを実行している（L557-590）。ボット数 N に対して N 回の DB ラウンドトリップが発生する。
+
+現時点のボット規模（10体前後）では実害は小さいが、アーキテクチャ上 `bots` テーブルのレコード数に上限制約がなく、Supabase の `insert()` は配列による一括挿入をサポートしているため、改善が容易である。
+
+```typescript
+// 現状: N回の個別 INSERT
+for (const row of rows) {
+    const { data: newRow } = await supabaseAdmin
+        .from("bots").insert({ ... }).select().single();
+}
+
+// 改善案: 1回の一括 INSERT
+const inserts = rows.map(row => ({ ... }));
+const { data } = await supabaseAdmin.from("bots").insert(inserts).select();
+```
+
+---
+
+### [MEDIUM-1] exchangeCodeForSupabaseUser の fetch にタイムアウト未設定
+
+ファイル: `src/lib/services/registration-service.ts` (L72-82)
+
+**問題点:**
+Supabase Auth REST API への直接 `fetch` 呼び出しに `AbortController` / `signal` によるタイムアウトが設定されていない。ネットワーク障害やサーバー遅延時にリクエストが無期限にハングする可能性がある。
+
+CF Workers の 30 秒ハードタイムアウトにより最悪でも打ち切られるが、明示的なタイムアウトによりエラーハンドリングの精度が向上する。
+
+**修正案:**
+```typescript
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 10_000);
+const response = await fetch(url, { ..., signal: controller.signal });
+clearTimeout(timeoutId);
+```
+
+---
+
+### [MEDIUM-2] IGrassRepository に未使用メソッド existsForToday が残存
+
+ファイル: `src/lib/services/handlers/grass-handler.ts` (L54-59)
+
+**問題点:**
+v5 仕様で同日重複制限が廃止され、`existsForToday` の呼び出しはハンドラ本体から削除されたが、`IGrassRepository` インターフェース定義には残っている。インターフェースの実装者に不要なメソッド実装を強制し、将来の開発者に廃止済み機能が現役であるかのような誤解を与える。
+
+**修正案:**
+`IGrassRepository` から `existsForToday` を削除し、本番・インメモリ両リポジトリの対応実装も合わせて除去する。
+
+---
+
+### [MEDIUM-3] registerWithDiscord / loginWithDiscord で SUPABASE_URL 未設定時のサイレント不正 URL 生成
+
+ファイル: `src/lib/services/registration-service.ts` (L217, L382)
+
+**問題点:**
+`process.env.SUPABASE_URL ?? ""` で環境変数が未設定の場合に空文字列にフォールバックしており、`/auth/v1/authorize?...` という不正な URL が返却される。ユーザーはリダイレクト先で不明瞭なエラーとなる。
+
+同ファイル内の `exchangeCodeForSupabaseUser`（L64-69）では環境変数の存在チェックが行われており、防御の粒度に不整合がある。
+
+**修正案:**
+`SUPABASE_URL` が未設定の場合は例外をスローし、呼び出し元ルートハンドラの catch で 500 エラーを返す。
+
+---
+
+### [MEDIUM-4] Supabase Auth エラーレスポンス本文のログ出力
+
+ファイル: `src/lib/services/registration-service.ts` (L84-87)
+
+**問題点:**
+`exchangeCodeForSupabaseUser` のエラーハンドリングで Supabase Auth API のレスポンスボディ全体を `console.error` に出力している。クライアントには返却されないが、ログ基盤のセキュリティレベルによっては内部情報（エンドポイント構成、バージョン情報等）が漏洩しうる。
+
+```typescript
+const body = await response.text();
+console.error(`exchangeCodeForSupabaseUser: ${response.status} ${body}`);
+```
+
+**修正案:**
+ステータスコードのみを INFO レベルで出力し、レスポンスボディの詳細は DEBUG レベルに限定する。
+
+---
+
+### [LOW-1] PKCE_STATE_COOKIE の JSDoc に古い参照先が残存
+
+ファイル: `src/lib/constants/cookie-names.ts` (L38-42)
+
+**問題点:**
+JSDoc の `See:` 参照が `src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()` を指しているが、Sprint-135 で PKCE 実装は `registration-service.ts` の手動実装（`generatePkce()`）に移行しており、参照先が実態と乖離している。
+
+**修正案:**
+`See:` を `src/lib/services/registration-service.ts generatePkce()` に更新する。
+
+---
+
+### [LOW-2] createNamedBotWithPost ヘルパーで grassCount フィールド未指定
+
+ファイル: `features/step_definitions/bot_system.steps.ts` (L2668-2694)
+
+**問題点:**
+範囲攻撃ステップ定義の `createNamedBotWithPost` で `InMemoryBotRepo._insert()` を呼び出す際、Bot 型の `grassCount` フィールドが明示的に設定されていない。TypeScript の型チェックで検出されていないため `_insert` 内部で処理されている可能性があるが、明示的に `grassCount: 0` を設定するほうが意図が明確になる。
+
+**修正案:**
+Bot オブジェクト生成時に `grassCount: 0` を追加する。
+
+---
+
+## 確認済み・問題なし
+
+### セキュリティ
+
+- **PKCE 実装品質**: `generatePkce()` は RFC 7636 準拠。`code_verifier` は `crypto.randomBytes(32).toString("base64url")`（43文字）、`code_challenge` は `SHA-256(verifier).digest("base64url")`。十分なエントロピーを持つ。
+- **Cookie 属性**: `PKCE_STATE_COOKIE` は `httpOnly: true`, `secure: process.env.NODE_ENV === "production"`, `sameSite: "lax"`, `maxAge: 600`（10分）, `path: "/"` で適切に設定。コールバック後に `response.cookies.delete(PKCE_STATE_COOKIE)` で後片付け実施。
+- **codeVerifier フォールバック**: `handleOAuthCallback` で `codeVerifier` が undefined の場合は SDK 経由のフォールバック（旧互換）が機能しており、PKCE Cookie が消失した場合でもフローが破綻しない設計。
+- **エラーメッセージ**: クライアント返却のエラーメッセージは「Discord認証の開始に失敗しました」等の一般的文言であり、内部情報の漏洩なし。
+
+### インカーネーションモデル
+
+- **旧レコード凍結**: 本番 `bulkReviveEliminated` は旧レコードに UPDATE を行わず、新レコードを INSERT するのみ。`bot_posts` テーブルの FK 参照が破壊されない。
+- **チュートリアル/煽りBOT除外**: 本番側は `.or("bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)")`、インメモリ側は `NON_REVIVABLE_PROFILE_KEYS = ["tutorial", "aori"]` で同一条件。
+- **新世代ボットの属性リセット**: `survival_days: 0`, `total_posts: 0`, `accused_count: 0`, `times_attacked: 0`, `grass_count: 0`, `eliminated_at: null`, `eliminated_by: null` -- 全て初期化されている。
+- **BDD ステップ整合**: `日付が変更される（JST 0:00）` ステップ内で `performDailyReset()` 実行後に `findAll()` から新世代ボットを特定して `this.currentBot` を更新しており、インカーネーション前提のテストフローが正しく構築されている。
+
+### 草コマンド v5 仕様
+
+- **重複チェック削除の影響**: `GrassHandler.execute()` 内の `existsForToday` 呼び出しが削除され、毎回 `grassRepository.create()` が実行される。`features/reactions.feature` の `@同日中に同一ユーザーのレスに何度でも草を生やせる` シナリオと整合。
+- **v5 ステップ定義**: `reactions.steps.ts` から同日重複関連のステップ定義が削除されており、feature v5 との整合性が取れている。
+
+### BDD ステップ品質
+
+- **範囲攻撃ステップ定義**: 9 シナリオ分のステップが網羅的に実装されている。`createNamedBotWithPost` ヘルパーによるボット再利用（同名ボットは `botMap` で管理）、`executeMultiAttackCommand` によるダミーボット追加（ラストボットボーナス防止）等、テスト設計が堅牢。
+- **FAB テスト**: `FloatingActionMenu.test.tsx` は開閉状態遷移、FABメニュー表示/非表示、PostForm のレンダリング、アクセシビリティ（aria-label）をカバー。BDD シナリオ `@fab` とのトレーサビリティコメントあり。
+
+### ユビキタス言語
+
+- 「レス」「書き込み」「スレッド」「システムメッセージ」「通貨」「撃破」「BOTマーク」「草」等の用語使用が D-02 と一致。
+
+---
+
+## レビューサマリー
+
+| 重要度   | 件数  | ステータス |
+|----------|-------|-----------|
+| CRITICAL | 0     | pass      |
+| HIGH     | 2     | warn      |
+| MEDIUM   | 4     | info      |
+| LOW      | 2     | note      |
+
+**判定: WARNING** -- HIGH 2件の確認・対応を推奨します。
+
+### HIGH 事項の補足
+
+1. **HIGH-1 (OAuth state)**: Supabase Auth がサーバー側で state を内部管理している場合は実害なし。確認結果をドキュメント（user-registration.md）に明記すること。管理していない場合は state 生成・検証を追加する必要がある。
+2. **HIGH-2 (N+1 INSERT)**: 現在のボット規模（10体前後）では実害は限定的。Supabase の `insert()` 配列による一括挿入への書き換えは比較的容易であり、次回ボット関連タスクの際に対応を推奨する。

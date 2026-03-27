@@ -1,9 +1,9 @@
 # テスト監査レポート
 
-> 実行日: 2026-03-27
-> 対象スプリント: Sprint-134
-> タスクID: TASK-344-audit
-> 前回監査: P5-TA-S97（Sprint-96/97完了時点）
+> 実行日: 2026-03-28
+> 対象スプリント: Sprint-135
+> タスクID: AUDIT-135
+> 前回監査: TASK-344-audit（Sprint-134完了時点）
 
 ## 1. Pendingシナリオ管理状況
 
@@ -11,115 +11,118 @@
 
 | 指標 | 値 |
 |---|---|
-| 総pendingステップ数 | 14 |
-| D-10 S7.3適合 | 14 / 14 |
-| 代替テスト作成済み | 8 / 14 |
-| 代替テスト未作成（技術的負債） | 6 |
-| Phase未実装（S7.3範囲外） | 0 |
+| 総pendingステップ数（return "pending"） | 18 |
+| D-10 §7.3適合 | 17 / 18 |
+| 代替テスト作成済み | 18 / 18 |
+| 代替テスト未作成（技術的負債） | 0 |
+| Phase未実装（§7.3範囲外） | 0 |
 
-### Sprint-134対象: pending 0件
+### Sprint-135変更分: FAB pending 2シナリオ（6ステップ）���加
 
-command_copipe.feature は全8シナリオが通常実行であり、pendingステップは含まれない。Sprint-134 の変更ファイル（`features/step_definitions/command_system.steps.ts`）にも新規pendingは追加されていない。
+TASK-348で `thread.steps.ts` に6つのpendingステップが追加された。代替テスト `FloatingActionMenu.test.tsx` も同時に作成されている。
 
-### プロジェクト全体のpending内訳（参考情報）
+### プロジェクト全体のpending内訳
 
-| ファイル | ステップ数 | 理由 | 代替テスト | S7.3準拠 |
+| ファイル | ステップ数 | 理由 | 代替テスト | §7.3準拠 |
 |---|---|---|---|---|
-| bot_system.steps.ts | 6 | DOM/CSS表示（Web限定）: D-10 S7.3.1 | e2e/flows/bot-display.spec.ts 実在 | 適合 |
-| specialist_browser_compat.steps.ts | 4 | インフラ制約（HTTP:80/WAF）: Cloudflare設定レベル | Sprint-20実機検証済み | 適合 |
-| user_registration.steps.ts | 4 | Discord OAuth外部依存: サービス層でシミュレーション困難 | 代替テスト未作成 | 適合 |
+| thread.steps.ts（FAB） | 6 | DOM/CSS操作: §7.3.1 | FloatingActionMenu.test.tsx 実在 | 後述 |
+| bot_system.steps.ts | 6 | DOM/CSS表示（Web限定）: §7.3.1 | e2e/flows/bot-display.spec.ts 実在 | 適合 |
+| user_registration.steps.ts | 4 | Discord OAuth外部依存 | E2E auth-flow.spec.ts | 適合 |
+| specialist_browser_compat.steps.ts | 2 | インフラ制約（HTTP:80/WAF） | Sprint-20実機検証済み | 適合 |
 
-### 詳細: S7.3不適合一覧
+### 詳細: §7.3コメント規約の不統一（MEDIUM）
 
-全件適合。
+FABセクション（thread.steps.ts L2334-2405）の6つのpendingステップは、pending理由と代替テストパスがセクション見出しコメント（L2337-2338）���1箇所のみ記載されている。個別ステップのJSDocには `See: features/thread.feature @fab` のみで、代替テストのファイルパスが記載されていない。
 
-### 詳細: 技術的負債（代替テスト未作成）
+同一ファイル内の他のpendingステップ（polling L1696-1707, anchor_popup L1743-1750等）では個別JSDocに「代替検証:」行が含まれている。§7.3.2「ステップ定義のコメントに pending理由と代替テストのファイルパスを記載する」に対し、セクション見出しへの集約が許容されるかはグレーゾーンだが、ファイル内の一貫性に欠ける。
 
-| ステップ | 分類 | 備考 |
+代替テストは実在し実質的にカバーしているため、実害はない。
+
+### 代替テストの実質性検証
+
+**FloatingActionMenu.test.tsx** -- 良好
+
+- トレーサビリテ��: `features/thread.feature @fab`（2シナリオ名を明記）
+- テスト数: 7件（パネル開閉4件 + 閉じる動作2件 + エッジケース1件）
+- アサーション: CSSクラス（translate-y-0 / translate-y-full）、hidden属性、aria-label、data-thread-id
+- BDDシナリオ「フローティングメニューからボトムシートで書き込みフォームを開く」「ボトムシートの外側をタップするとフ��ームが閉じる」の意図を実質的にカバー
+
+**bot-display.spec.ts** -- テスト自体は良好だがスキップ状態
+
+- トレーサビリティ: `@feature bot_system.feature`（2シナリオ名を明記）
+- テスト数: 2件（目立たない表示、トグル切替）
+- アサーション: opacity値比較、可視性トグル検証
+- 注記: PostItem.tsxに撃破済みBOT表示分岐が未実装のため `test.fixme` でスキップ中。UI実装完了までは実行されない（前回から継続、Sprint-135スコープ外）
+
+### 前回からの技術的負債の変化
+
+| 前回（Sprint-134） | 今回（Sprint-135） | 変化 |
 |---|---|---|
-| user_registration.steps.ts: Discord OAuth 4ステップ | ブラウザ固有動作 | 前回から継続 |
-| specialist_browser_compat.steps.ts: HTTP:80 + WAF 2ステップ | インフラ制約 | 前回から継続 |
+| user_registration: OAuth 4ステップ | 同左 | 継続 |
+| specialist_browser_compat: 2ステップ | 同左 | 継続 |
+| thread(FAB): 未存在 | 6ステップ（代替テスト作成済み） | 新規追加・解消済み |
+
+Sprint-134時点で代替テスト未作成だった6件のうち、FABは代替テスト作成済みで追加。specialist_browser_compatは実機検証で代替済みのため、未作成の技術的負債は実質 user_registration OAuth 4ステップのみ。
 
 ## 2. テストピラミッド
 
 | 層 | ファイル数 | テスト数 | 前回比 | 判定 |
 |---|---|---|---|---|
-| 単体テスト (Vitest) | 96 | 1,914 | +39ファイル/多数 | 正常 |
-| BDDサービス層 (Cucumber) | 25 steps / 25 features | 394 scenarios | +4ファイル/+70 | 正常 |
-| E2E (Playwright) | 9 | 70 | +2ファイル | 正常 |
+| 単体テスト (Vitest) | 85 | 2,025 | +111テスト | 健全 |
+| BDDサービス層 (Cucumber) | 24 steps / 18 features | 382シナリオ (361 pass / 18 pending / 3 undefined) | +8 pass / +2 pending / -11 undefined | 健全 |
+| E2E/API (Playwright) | 9 | -- | 変更なし | 健全 |
 
-**判定:** 正常なピラミッド構造。下層（単体テスト 1,914件）> 中層（BDDサービス層 394シナリオ）> 上層（E2E 70件）。逆ピラミッドの兆候なし。
+テストピラミッドは正しい形状を維持。下層 > 中層 > 上層。逆ピラミッドの兆候なし。
 
-### ドメインルールのテストカバレッジ
+### ドメインルール単体テストカバレッジ
 
-`src/lib/domain/rules/` 配下12ファイル全てに対応する単体テストが存在する。
+`src/lib/domain/rules/` 配下の全13ファイルに対応する単体テストが存在（co-located 7件 + 外部配置 6件）。Sprint-135で新規追加された `attack-range-parser.ts` にも `rules/__tests__/attack-range-parser.test.ts` が存在する。下層空洞化なし。
 
-前回指摘（MEDIUM-2）の `mypage-display-rules.ts` は、`mypage-registration.test.ts` が全7エクスポート関数（isTemporaryUser, isPermanentUser, getAccountTypeLabel, getRegistrationMethodLabel, buildPatCopyValue, formatPatLastUsedAt, canUpgrade）をテストしており、**解消**と判定する。ファイルの配置が `rules/__tests__/` ではなく `__tests__/app/(web)/mypage/` だが、カバレッジとしては充足している。
+## 3. Featureカバレッジ
 
-下層空洞化の兆候なし。
+### Sprint-135変更対象
 
-## 3. Featureカバレッジ: command_copipe.feature
-
-| feature | 総シナリオ | 通常実行 | pending管理下 | 未定義 |
-|---|---|---|---|---|
-| command_copipe.feature | 8 | 8 | 0 | 0 |
-
-### ステップ定義マッピング
-
-**Background（3ステップ）:**
-
-| ステップ | 定義場所 |
-|---|---|
-| コマンドレジストリに以下のコマンドが登録されている: | command_system.steps.ts L98 |
-| ユーザーがログイン済みである | common.steps.ts |
-| 以下のコピペAAが登録されている: | command_copipe.steps.ts L55 |
-
-**シナリオ固有ステップ（8ステップ定義で全8シナリオをカバー）:**
-
-| ステップ | 定義場所 | 使用シナリオ |
+| feature | Sprint-135の変化 | 結果 |
 |---|---|---|
-| 本文に {string} を含めて投稿する | command_system.steps.ts | 全8シナリオ |
-| 書き込みがスレッドに追加される | specialist_browser_compat.steps.ts | S1 |
-| 書き込み本文は {string} がそのまま表示される | command_system.steps.ts L1097 | S1 |
-| 登録済みAAから1つが選択されレス末尾にマージ表示される | command_copipe.steps.ts L84 | S1 |
-| /^「(.+)」のAAがレス末尾にマージ表示される$/ | command_copipe.steps.ts L139 | S2, S3, S4, S6 |
-| 部分一致したAAからランダムに1件がレス末尾にマージ表示される | command_copipe.steps.ts L180 | S5, S7 |
-| マージ表示に {string} を含む通知が付与される | command_copipe.steps.ts L222 | S5, S7 |
-| レス末尾にエラー {string} がマージ表示される | command_system.steps.ts L1390 | S8 |
+| reactions.feature | v4->v5 同日制限撤廃（TASK-346） | 全シナリオPASS |
+| bot_system.feature | 範囲攻撃9シナリオのステップ定義追加（TASK-347） | UNDEFINED->PASS |
+| thread.feature | FAB 2シナリオのpending化（TASK-348） | UNDEFINED->PENDING |
+| command_hiroyuki.feature | ステップ定義新規作成��TASK-335） | 全シナリオPASS |
 
-未定義ステップ: **0件**
+### undefinedシナリオ（3件残存 -- 全て既存）
+
+nameフィルタで意図的に除外されたPhase 2/3依存シナリオ。Sprint-135で新規追加されたものではない。
+
+| シナリオ | feature | 除外理由 |
+|---|---|---|
+| 専ブラのコマンド文字列がゲームコマンドとして解釈される | specialist_browser_compat.feature | Phase 2コマンドシステム依存 |
+| 告発成功したボットにBOTマークが表示される | ai_accusation.feature | Phase 3 BOTマーク機能依存 |
+| BOTマークがついたボットは書き込みを継続する | ai_accusation.feature | Phase 3 BOTマーク機能依存 |
+
+### Cucumberスコープ外（paths未登録）
+
+| feature | ステータス |
+|---|---|
+| curation_bot.feature | ドラフト v2（未実装�� |
+| dev_board.feature | スコープ外 |
+| image_upload.feature | ドラフト_実装禁止 |
 
 ## 4. ステップ定義の実質性
 
-### assert(true) / expect(true) スタブアサーション
+| パターン | 検出数 |
+|---|---|
+| `assert(true)` / `expect(true)` | 0 |
+| `assert.ok(true)` | 0 |
+| Phase N / 実装予定 コメント付きスタブ | 0 |
 
-`features/step_definitions/` 全体を検索: **0件検出**。D-10 S7.3.2 準拠。
+スタブアサーションは検出されなかった。全PASSステップは実質的なアサーションを持つ。D-10 §7.3.2準拠。
 
-### command_copipe.steps.ts のアサーション品質
-
-全ステップ定義に実質的なアサーションが含まれていることを確認した。
-
-| ステップ | アサーション内容 | 判定 |
-|---|---|---|
-| 以下のコピペAAが登録されている: | InMemoryCopipeRepo._insert 実行（Givenセットアップ） | 実質あり |
-| 登録済みAAから1つが選択されレス末尾にマージ表示される | inlineSystemInfo != null + 【name】形式を含む | 実質あり |
-| /^「(.+)」のAAがレス末尾にマージ表示される$/ | inlineSystemInfo != null + includes(expectedName) | 実質あり |
-| 部分一致したAAからランダムに1件がレス末尾にマージ表示される | inlineSystemInfo != null + 【name】形式を含む | 実質あり |
-| マージ表示に {string} を含む通知が付与される | inlineSystemInfo != null + includes(expectedText) | 実質あり |
-
-### 補強テスト
-
-`src/__tests__/lib/services/handlers/copipe-handler.test.ts` に37件の単体テストが存在し、featureの全8シナリオの検索ロジック（ランダム、完全一致、部分一致、content フォールバック、一致なし）およびエッジケース（データ0件、空文字引数等）を網羅的に検証している。
-
-## 5. 前回監査との差分（P5-TA-S97 -> TASK-344-audit）
+## 5. 前回監査との差分
 
 | 前回指摘 | 今回の状態 |
 |---|---|
-| MEDIUM-1: 攻撃コスト/撃破報酬ステップの定数比較のみ | 継続（Sprint-134スコープ外、間接カバー済み） |
-| MEDIUM-2: mypage-display-rules.ts 直接単体テスト欠落 | **解消**: mypage-registration.test.ts が全7関数をカバー |
-| LOW-1: 代替テスト5ファイルに @feature/@scenario 注釈欠落 | 継続（Sprint-134スコープ外） |
-
-Sprint-134で新規指摘なし。
+| MEDIUM-1: 攻撃コスト/撃破報酬ステップの定数比較のみ | 継続（Sprint-135スコープ外） |
+| LOW-1: 代替テスト5ファイルに @feature/@scenario 注釈欠落 | 継続（Sprint-135スコープ外） |
 
 ## 6. レビューサマリー
 
@@ -127,9 +130,19 @@ Sprint-134で新規指摘なし。
 |---|---|---|
 | CRITICAL | 0 | pass |
 | HIGH | 0 | pass |
-| MEDIUM | 0 | pass |
-| LOW | 0 | pass |
+| MEDIUM | 1 | info |
+| LOW | 0 | -- |
+
+### MEDIUM-1: FAB pendingステップのコメント一貫性
+
+- 対象: `features/step_definitions/thread.steps.ts` L2340-2405（6ステップ）
+- 内容: 個別JSDocに代替テストのファイルパスが未記載。セクション見出し（L2338）にのみ���載
+- 根拠: D-10 §7.3.2「ステップ定義のコメントに pending理由と代替テストのファイルパスを記載する」
+- 実害: なし（代替テスト実在・実質カバー済み）
+- 推奨: 各ステップのJSDocに `代替検証: src/__tests__/app/(web)/_components/FloatingActionMenu.test.tsx` を追加し、同ファイル内の他pendingステップと一貫させる
+
+---
 
 **判定: APPROVE**
 
-command_copipe.feature の全8シナリオにステップ定義が存在し、pendingなし、未定義ステップなし、スタブアサーションなし。テストピラミッドは健全。ドメインルールのテストカバレッジに空洞なし。
+Sprint-135の主要変更（範囲攻撃9件PASS化、FAB 2件pending化+代替テスト作成、!hiroyukiステップ定義新規作成）は全てD-10規約に適合している。CRITICALおよびHIGHの問題はない。テストスイートの健全性は維持されている。

@@ -14,7 +14,7 @@
 
 v5で新設された !attack コマンドの処理フローは AttackHandler（D-08 attack.md）に記載する。BotServiceは AttackHandler から呼び出される「ボット側の操作API」を提供する立場に位置づける。
 
-v6 では Phase 3（ネタ師）・Phase 4（ユーザー作成ボット）に向け、BOT種別ごとに異なる「コンテンツ生成」「行動パターン」「スケジュール」の3つの関心事を Strategy パターンで分離する（TDR-008参照）。BotService は各 Strategy インターフェースを通じて処理を委譲し、BOT種別固有の振る舞いを知らない。既存の §2.2〜§2.10（HP管理・正体判定・撃破報酬等）は全BOT種別で共通のまま変更しない。
+v6 では Phase 3（キュレーションBOT）・Phase 4（ユーザー作成ボット）に向け、BOT種別ごとに異なる「コンテンツ生成」「行動パターン」「スケジュール」の3つの関心事を Strategy パターンで分離する（TDR-008参照）。BotService は各 Strategy インターフェースを通じて処理を委譲し、BOT種別固有の振る舞いを知らない。既存の §2.2〜§2.10（HP管理・正体判定・撃破報酬等）は全BOT種別で共通のまま変更しない。
 
 ---
 
@@ -45,7 +45,7 @@ BotPostResult {
 
 `bot_posts` へのINSERTはこのコンポーネントのみが行う。PostServiceは `bot_posts` を意識しない。
 
-荒らし役は `FixedMessageContentStrategy` + `RandomThreadBehaviorStrategy` + `FixedIntervalSchedulingStrategy` が解決され、従来と同一の動作を行う。ネタ師以降のBOT種別は対応する Strategy 実装に差し替わる（§2.12 参照）。
+荒らし役は `FixedMessageContentStrategy` + `RandomThreadBehaviorStrategy` + `FixedIntervalSchedulingStrategy` が解決され、従来と同一の動作を行う。キュレーションBOT以降のBOT種別は対応する Strategy 実装に差し替わる（§2.12 参照）。
 
 > **外部インターフェースの互換性**: GitHub Actions からの呼び出しシグネチャは `executeBotPost(botId)` に簡略化される（投稿先は BehaviorStrategy が内部で決定するため、`threadId` 引数は不要になる）。既存の呼び出し元は移行ステップ中に順次更新する。
 
@@ -237,7 +237,7 @@ interface ContentGenerationContext {
   botId: string;
   botProfileKey: string | null;
   threadId: string;
-  /** ネタ師用: 収集済みのネタ情報 */
+  /** キュレーションBOT用: 収集済みのネタ情報 */
   collectedTopic?: CollectedTopic;
   /** AI対話用: スレッドの直近レス（文脈理解に使用） */
   recentPosts?: RecentPostSummary[];
@@ -297,17 +297,17 @@ function resolveStrategies(
 |---|---|---|---|
 | ContentStrategy | `FixedMessageContentStrategy` | 2 (既存) | 荒らし役 |
 | ContentStrategy | `TutorialContentStrategy` | 2 (Sprint-84) | チュートリアルBOT |
-| ContentStrategy | `AiTopicContentStrategy` | 3 | ネタ師 |
+| ContentStrategy | `AiTopicContentStrategy` | 3 | キュレーションBOT |
 | ContentStrategy | `AiConversationContentStrategy` | 4 | 常連・火付け役 |
 | ContentStrategy | `UserPromptContentStrategy` | 4 | ユーザー作成ボット |
 | BehaviorStrategy | `RandomThreadBehaviorStrategy` | 2 (既存) | 荒らし役 |
 | BehaviorStrategy | `TutorialBehaviorStrategy` | 2 (Sprint-84) | チュートリアルBOT |
-| BehaviorStrategy | `ThreadCreatorBehaviorStrategy` | 3 | ネタ師 |
+| BehaviorStrategy | `ThreadCreatorBehaviorStrategy` | 3 | キュレーションBOT |
 | BehaviorStrategy | `ReplyBehaviorStrategy` | 4 | 常連・火付け役 |
 | BehaviorStrategy | `ConfigurableBehaviorStrategy` | 4 | ユーザー作成ボット |
 | SchedulingStrategy | `FixedIntervalSchedulingStrategy` | 2 (既存) | 荒らし役 |
 | SchedulingStrategy | `ImmediateSchedulingStrategy` | 2 (Sprint-84) | チュートリアルBOT（即時投稿、delay=0） |
-| SchedulingStrategy | `TopicDrivenSchedulingStrategy` | 3 | ネタ師 |
+| SchedulingStrategy | `TopicDrivenSchedulingStrategy` | 3 | キュレーションBOT |
 | SchedulingStrategy | `GachaSchedulingStrategy` | 4 | ユーザー作成ボット |
 
 #### 2.13.4 プロバイダー抽象化レイヤー（AiApiClient）
@@ -340,7 +340,7 @@ interface AiGenerateParams {
 
 **APIキー管理**: 各プロバイダーのAPIキーは環境変数で管理する（`GOOGLE_AI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`）。GitHub Actions Secrets に格納し、クライアントサイドコードには含めない（CLAUDE.md 横断的制約）。
 
-#### 2.13.5 ネタ師の行動フロー（Phase 3 主要ユースケース）
+#### 2.13.5 キュレーションBOTの行動フロー（Phase 3 主要ユースケース）
 
 ```
 GitHub Actions (cron)
@@ -365,7 +365,7 @@ BotService.executeBotPost(botId)
 ```
 
 設計ポイント:
-- ネタ師の `ThreadCreatorBehaviorStrategy` は `{ type: 'create_thread' }` を返す
+- キュレーションBOTの `ThreadCreatorBehaviorStrategy` は `{ type: 'create_thread' }` を返す
 - スレッド作成も PostService 経由で行い、DB 直書きは禁止（CLAUDE.md 横断的制約）
 - ネタ収集（Web スクレイピング + AI 要約）は外部の収集ジョブが事前に行い、結果を `collected_topics` テーブルにバッファする
 - 収集と投稿の分離により、外部 API 障害時もバッファ内のネタで投稿を継続可能
@@ -424,10 +424,10 @@ ai_config:
   temperature: 0.8                        # 生成温度（0.0-1.0）
 ```
 
-ネタ師プロファイルの例:
+キュレーションBOTプロファイルの例:
 
 ```yaml
-ネタ師_テクノロジー:
+キュレーションBOT_テクノロジー:
   hp: 500
   max_hp: 500
   reward:
@@ -474,7 +474,7 @@ src/lib/
       ai-api-client.ts                      # AiApiClient インターフェース
       content/
         fixed-message.ts                    # Phase 2: 固定文ランダム
-        ai-topic.ts                         # Phase 3: ネタ師用
+        ai-topic.ts                         # Phase 3: キュレーションBOT用
         ai-conversation.ts                  # Phase 4: 常連・火付け役用
         user-prompt.ts                      # Phase 4: ユーザー作成ボット用
       behavior/
@@ -549,7 +549,7 @@ bot-service.ts
   |
   +-- bot-strategies/behavior/*.ts     (BehaviorStrategy 実装群)
   |     +-- ThreadRepository           (スレッド一覧取得)
-  |     +-- CollectedTopicRepository   (ネタ師: ネタ取得)
+  |     +-- CollectedTopicRepository   (キュレーションBOT: ネタ取得)
   |
   +-- bot-strategies/scheduling/*.ts   (SchedulingStrategy 実装群)
 
@@ -633,7 +633,7 @@ RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。
 
 ### 5.5 新規テーブル: collected_topics（Phase 3）
 
-ネタ師ボットが収集したネタ情報のバッファ。
+キュレーションBOTが収集したネタ情報のバッファ。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -699,7 +699,7 @@ lurking 状態のボットへの !attack 成功時は、lurking -> revealed -> e
 
 ### 6.7 Strategy パターンの採用（v6）
 
-Phase 3（ネタ師）・Phase 4（ユーザー作成ボット）でBOT種別が増加する際、`executeBotPost` 内の if/switch 分岐で対応すると、コンテンツ生成 x 行動パターン x スケジュールの3軸の組み合わせ爆発が起きる。Strategy パターンで3軸を独立のインターフェースとして分離することで、BOT種別追加時に新 Strategy を追加するだけで既存コードの変更を最小限に抑える。
+Phase 3（キュレーションBOT）・Phase 4（ユーザー作成ボット）でBOT種別が増加する際、`executeBotPost` 内の if/switch 分岐で対応すると、コンテンツ生成 x 行動パターン x スケジュールの3軸の組み合わせ爆発が起きる。Strategy パターンで3軸を独立のインターフェースとして分離することで、BOT種別追加時に新 Strategy を追加するだけで既存コードの変更を最小限に抑える。
 
 検討した代替案:
 - **サブクラス継承**: 3軸の組み合わせを継承で表現すると菱形継承に陥る。TypeScript には多重継承がない
@@ -716,7 +716,7 @@ TDR-008 に正式な意思決定記録を残す。
 Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, Anthropic）を使い分ける可能性があるため、`AiApiClient` インターフェースでプロバイダー差異を吸収する。`bot_profiles.yaml` の `ai_config.provider` フィールドでボットごとにプロバイダーを指定可能とする。
 
 採用理由:
-- ネタ師は Gemini（低コスト・高速）、常連は Claude/GPT（文脈理解力重視）のように使い分けができる
+- キュレーションBOTは Gemini（低コスト・高速）、常連は Claude/GPT（文脈理解力重視）のように使い分けができる
 - 特定プロバイダー障害時に他プロバイダーへの切り替えが容易
 
 ### 6.10 チュートリアルBOTの設計方針（Sprint-84）
@@ -759,7 +759,7 @@ Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, An
 
 ### 6.12 ネタ収集と投稿の分離（v6）
 
-ネタ師の「ネタ収集」と「投稿」を分離し、`collected_topics` テーブルをバッファとする。収集ジョブと投稿ジョブは独立した GitHub Actions ジョブとして実行する。
+キュレーションBOTの「ネタ収集」と「投稿」を分離し、`collected_topics` テーブルをバッファとする。収集ジョブと投稿ジョブは独立した GitHub Actions ジョブとして実行する。
 
 採用理由:
 - 外部 API（RSS等）障害の影響を投稿から隔離

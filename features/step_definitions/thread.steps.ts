@@ -2330,3 +2330,76 @@ Then(
 		);
 	},
 );
+
+// ===========================================================================
+// フローティングアクションメニュー @fab
+// ===========================================================================
+// DOM/CSS 表示・操作のため Cucumber サービス層では検証不可（§7.3）
+// 代替検証: src/__tests__/app/(web)/_components/FloatingActionMenu.test.tsx
+
+/**
+ * スレッドを表示している（Given）。
+ *
+ * Note: "スレッドを表示する"（L1568、引数なし・When）とは別のステップ。
+ * @fab シナリオは DOM 操作のため pending。
+ *
+ * See: features/thread.feature @fab
+ */
+Given("スレッドを表示している", async function (this: BattleBoardWorld) {
+	// DOM 操作シナリオのためサービス層では pending
+	return "pending";
+});
+
+/**
+ * フローティングメニューの書き込みボタンをタップする（When）。
+ *
+ * See: features/thread.feature @fab
+ */
+When(
+	"フローティングメニューの書き込みボタンをタップする",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * ボトムシートで書き込みフォームが表示される（Then）。
+ *
+ * See: features/thread.feature @fab
+ */
+Then(
+	"ボトムシートで書き込みフォームが表示される",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * ボトムシートで書き込みフォームが表示されている（Given）。
+ *
+ * See: features/thread.feature @fab
+ */
+Given(
+	"ボトムシートで書き込みフォームが表示されている",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * ボトムシートの外側をタップする（When）。
+ *
+ * See: features/thread.feature @fab
+ */
+When("ボトムシートの外側をタップする", async function (this: BattleBoardWorld) {
+	return "pending";
+});
+
+/**
+ * ボトムシートが閉じる（Then）。
+ *
+ * See: features/thread.feature @fab
+ */
+Then("ボトムシートが閉じる", async function (this: BattleBoardWorld) {
+	return "pending";
+});

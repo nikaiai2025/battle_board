@@ -240,16 +240,20 @@
 
 ## 人間タスク（次回セッション開始時に確認）
 
-### HUMAN-003: ネタ師BOT詳細定義 + BDDシナリオ作成（優先度: 中）
+### HUMAN-003: キュレーションBOT詳細定義 + BDDシナリオ作成（優先度: 中）
+
+**進捗: BDDシナリオ作成済み（`features/curation_bot.feature` v2）**
 
 Strategy Step 3・4の着手に必要。`features/` の変更は人間承認必須。
 
-決めるべきこと:
-- ネタの収集元（どのWebソース？ RSS / API？）
-- AIプロンプトの方向性（要約型？煽り型？）
-- スレ立ての頻度・条件
-- HP・報酬パラメータ
-- BDDシナリオ（`features/bot_system.feature` に追加 or 別ファイル）
+決定済み:
+- 収集元: 5ch・ふたば・HackerNews・はてブ・Reddit・Wikipedia・YouTube（計12ソース）
+- スレタイ: 記事タイトルをそのまま使用（AI要約なし）
+- スレ立て頻度: 240〜360分ランダム間隔
+- HP: 100 / ゲームシステムはbot_system.feature準拠
+- BDDシナリオ: `features/curation_bot.feature`（独立ファイル）
+- 蓄積上限: ソースごと6件/回
+- 実装フェーズ: Phase A（1ソース検証）→ B（APIテスト）→ C（一括実装）
 
 ### ~~HUMAN-004~~ → Sprint-121で解消
 
@@ -267,7 +271,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | 人間タスク完了 | AI側で実行するスプリント |
 |---|---|
-| HUMAN-003 完了 | BOT Strategy Step 3・4（スキーマ拡張 + ネタ師実装） |
+| HUMAN-003 完了 | BOT Strategy Step 3・4（スキーマ拡張 + キュレーションBOT実装） |
 
 ## BOT Strategy移行 進捗
 
@@ -275,7 +279,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 |---|---|---|
 | Step 1〜2.5 | Strategy定義 + BotService委譲リファクタ + Phase 5検証 | **完了（Sprint-43〜45）** |
 | Step 3 | bot_profiles.yaml スキーマ拡張 | HUMAN-003 待ち |
-| Step 4 | ネタ師 Strategy 実装 + collected_topics + 収集ジョブ | HUMAN-003 待ち |
+| Step 4 | キュレーションBOT Strategy 実装 + collected_topics + 収集ジョブ | HUMAN-003 待ち |
 
 ## 技術負債リスト
 
@@ -291,6 +295,7 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 | TD-REG-003 | PAT平文がmypage APIに含まれる（専用API分離） | 中 | 人間判断待ち |
 | TD-REG-004 | MockBbsCgiResponseBuilder引数シグネチャ乖離 | 低 | 次のテスト整備 |
 | TD-REG-005 | NOT_REGISTERED単体テスト欠落 | 低 | 次のテスト整備 |
+| TD-REG-006 | `bulkReviveEliminated()` N+1 INSERT（Supabase一括insertで改善可） | 低 | 次のBOT関連タスク時 |
 
 ### ウォッチリスト（対応不要・監視のみ）
 - Cloudflare Vinext（実験的）、supabase-js v3、Playwright Agent CLI
