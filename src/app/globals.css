@@ -262,6 +262,98 @@
   --sidebar-ring: oklch(0.52 0.05 45);
 }
 
+/*
+ * 伝統的テーマ（有料・ライト系）
+ * 2ちゃんねるの伝統的な配色を再現。
+ * レンガ調の背景画像に、淡い緑色（#CCFFCC系）のカード面。
+ * テキストは黒、リンクは青。掲示板文化を感じるノスタルジックな配色。
+ * See: src/lib/domain/models/theme.ts THEME_CATALOG
+ */
+.classic,
+:root:has(.classic) {
+  /* background は緑（2ch伝統色）、card はグレー */
+  --background: oklch(0.92 0.06 145);
+  --foreground: oklch(0.15 0 0);
+  --card: oklch(0.93 0 0);
+  --card-foreground: oklch(0.15 0 0);
+  --popover: oklch(0.92 0.06 145);
+  --popover-foreground: oklch(0.15 0 0);
+  --primary: oklch(0.50 0.10 250);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.88 0.04 145);
+  --secondary-foreground: oklch(0.20 0 0);
+  --muted: oklch(0.86 0.05 145);
+  --muted-foreground: oklch(0.40 0.02 145);
+  --accent: oklch(0.85 0.06 130);
+  --accent-foreground: oklch(0.18 0 0);
+  --destructive: oklch(0.55 0.12 25);
+  --border: oklch(0.72 0.06 145);
+  --input: oklch(0.95 0.03 145);
+  --ring: oklch(0.50 0.10 250);
+  --chart-1: oklch(0.50 0.10 250);
+  --chart-2: oklch(0.55 0.06 145);
+  --chart-3: oklch(0.48 0.05 30);
+  --chart-4: oklch(0.58 0.04 200);
+  --chart-5: oklch(0.45 0.05 100);
+  --sidebar: oklch(0.88 0.05 145);
+  --sidebar-foreground: oklch(0.15 0 0);
+  --sidebar-primary: oklch(0.50 0.10 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.85 0.04 145);
+  --sidebar-accent-foreground: oklch(0.20 0 0);
+  --sidebar-border: oklch(0.72 0.06 145);
+  --sidebar-ring: oklch(0.50 0.08 250);
+}
+
+/* 伝統的テーマ: bodyにレンガ背景画像を敷く */
+body:has(.classic) {
+  background-image: url("/themes/brick.png") !important;
+  background-repeat: repeat;
+  background-size: 400px auto;
+  background-color: oklch(0.78 0.04 55) !important;
+}
+
+/* 伝統的テーマ: コンテンツ領域を中央寄せし緑背景で覆う。
+   左右の余白にレンガが見える2ch伝統レイアウトを再現。
+   .classic（レイアウトdiv）とその中のmain要素に緑背景を設定し、
+   レンガ上に文字が直接載ることを防ぐ。 */
+div.classic {
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+  /* 背景は透過 → ブロック間にレンガが見える */
+}
+
+/* 伝統的テーマ: ヘッダーはコンテナ幅を無視して全幅表示 */
+div.classic > header {
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+}
+
+/* 伝統的テーマ: スレッド一覧 — 各ブロックが緑背景で分離 */
+.classic main[data-page="board"] > * {
+  background-color: var(--background);
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* 伝統的テーマ: スレッド一覧 — ブロック間に隙間を作りレンガを見せる */
+.classic main[data-page="board"] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 伝統的テーマ: スレッド内容はグレーの1枚背景 */
+.classic main[data-page="thread"] {
+  background-color: var(--card);
+}
+
+/* 伝統的テーマ: その他のページ（マイページ等）は緑背景 */
+.classic main:not([data-page]) {
+  background-color: var(--background);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

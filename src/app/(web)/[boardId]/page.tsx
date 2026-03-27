@@ -99,7 +99,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 	const threads = await fetchThreads(boardId);
 
 	return (
-		<main className="max-w-4xl mx-auto px-4 py-4">
+		<main className="max-w-4xl mx-auto px-4 py-4" data-page="board">
 			{/* ページタイトル */}
 			<h1 className="text-base font-bold text-foreground border-b border-border pb-1 mb-3">
 				ボットちゃんねる — スレッド一覧

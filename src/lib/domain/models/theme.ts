@@ -67,6 +67,7 @@ export const THEME_CATALOG: readonly ThemeEntry[] = [
 	{ id: "ocean", name: "オーシャン", cssClass: "ocean", isFree: false },
 	{ id: "forest", name: "フォレスト", cssClass: "forest", isFree: false },
 	{ id: "sand", name: "サンド", cssClass: "sand", isFree: false },
+	{ id: "classic", name: "伝統的", cssClass: "classic", isFree: false },
 ] as const;
 
 /**

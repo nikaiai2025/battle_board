@@ -4,9 +4,12 @@
 
 ## 現在のフェーズ
 
-**敵対的コードレビュー実施中（Feature単位・全件順次実施）**
+**Sprint-134 完了。次スプリント計画中。**
 
-### 敵対的コードレビュー進捗
+スコープ外の未コミット変更あり（ユーザー確認待ち）:
+- `src/app/globals.css` / `src/lib/domain/models/theme.ts` / `src/app/(web)/[boardId]/[threadKey]/[[...range]]/page.tsx` / `src/app/(web)/[boardId]/page.tsx` / `public/themes/` — 「伝統的テーマ」機能追加 + data-page属性追加（stashから復元）
+
+### 敵対的コードレビュー進捗（一時中断中）
 
 | # | Feature | ステータス | 指摘/採用 | セッション |
 |---|---------|-----------|----------|-----------|
@@ -15,23 +18,28 @@
 | 3 | posting.feature | **完了** | 9/3 (CRITICAL:1, HIGH:2) | `20260326_posting` |
 | 4 | thread.feature | **完了** | 18/11 (CRITICAL:1, HIGH:10) | `20260326_thread` |
 | 5 | user_registration.feature | **完了** | 12/8 (CRITICAL:4, HIGH:2) | `20260326_user_registration` |
-| 6 | reactions.feature | 未着手 | | |
-| 7 | currency.feature | 未着手 | | |
-| 8 | incentive.feature | 未着手 | | |
-| 9 | welcome.feature | 未着手 | | |
-| 10 | bot_system.feature | 未着手 | | |
-| 11 | command_system.feature | 未着手 | | |
-| 12 | command_aori.feature | 未着手 | | |
-| 13 | command_newspaper.feature | 未着手 | | |
-| 14 | command_omikuji.feature | 未着手 | | |
-| 15 | command_iamsystem.feature | 未着手 | | |
-| 16 | command_livingbot.feature | 未着手 | | |
-| 17 | ai_accusation.feature | 未着手 | | |
-| 18 | investigation.feature | 未着手 | | |
-| 19 | mypage.feature | 未着手 | | |
-| 20 | specialist_browser_compat.feature | 未着手 | | |
-| 21 | dev_board.feature | 未着手 | | |
-| 22 | theme.feature | 未着手 | | |
+| 6〜22 | （残17件）| 未着手 | | |
+
+**Sprint-134 完了 — command_copipe.feature 8シナリオ修正**
+
+### Sprint-134の成果
+- TASK-342: 根本原因調査（bdd-architect）
+  - `本文に {string} を含めて投稿する` ステップの通貨自動補填欠如を特定
+- TASK-343: command_system.steps.ts に通貨自動補填 + IncentiveLog事前挿入ブロック追加
+- vitest: 2003テスト PASS / cucumber-js: 353 passed, 16 pending, 0 failed
+- コミット: 1d86004
+- フェーズ5: bdd-gate PASS / code-reviewer APPROVED / doc-reviewer APPROVED / test-auditor APPROVED
+
+**Sprint-133 完了 — コピペボット(HP:100) + 運営BOTコスト免除**
+
+### Sprint-133の成果
+- TASK-341: bot_system.feature の3シナリオ実装（BDDステップ定義）
+  - コピペボット作成ヘルパー / 運営BOTコスト免除ステップ追加
+- migration 00033: copipe bot レコード挿入（本番適用済み）
+- bot_profiles.yaml: コピペプロファイル追加（hp:100, base_reward:50）
+- vitest: 2003テスト PASS / cucumber-js: 345 passed
+- コミット: 5e3f57f
+- 本番スモーク: **30/35 PASS**（5件は設計上のスキップ）
 
 **Sprint-128 完了 — !copipe 曖昧ヒット通知フォーマット変更**
 
@@ -219,15 +227,16 @@
 
 ## テスト状況
 
-- vitest: **1928 PASS / 0 failed**（Sprint-127で+12。schema-consistency 1件はcopipe_entriesローカル未適用のため除外）
-- cucumber-js: 363シナリオ / **342 passed / 0 failed** / 16 pending（Sprint-127で+2）
+- vitest: **2003 PASS / 0 failed**（Sprint-134後）
+- cucumber-js: 374シナリオ / **353 passed / 0 failed** / 16 pending / 5 undefined（Sprint-134後）
   - pending 16件のうち11件はE2E層で検証済み（thread-ui 7 + polling 2 + bot-display 2）
   - 残りpending 5件: 専ブラインフラ3 + Discord OAuth 2
+  - undefined 5件: 既存の未実装ステップ
 - playwright E2E (ローカル): 16 passed, 0 fixme
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-114後):** 29/34 PASS（5件は設計上のスキップ）
+- **本番スモークテスト (Sprint-134後):** 17/17 PASS（e2e/smoke/navigation.spec.ts 全件）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -299,6 +308,10 @@ HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-134 | command_copipe.feature 8シナリオ修正（テストバグ修正） | completed | `tmp/orchestrator/sprint_134_plan.md` |
+| Sprint-133 | コピペボット(HP:100) + 運営BOTコスト免除 | completed | `tmp/orchestrator/sprint_133_plan.md` |
+| Sprint-132 | コピペAA スマホスクロール修正 | completed | — |
+| Sprint-131 | hiroyukiコマンドE2E修正 + おみくじv3 | completed | — |
 | Sprint-128 | !copipe 曖昧ヒット通知フォーマット変更 | completed | `tmp/orchestrator/sprint_128_plan.md` |
 | Sprint-127 | !copipe v2 + seed 195件投入 | completed | — |
 | Sprint-126 | !copipe コマンド実装 | completed | `tmp/orchestrator/sprint_126_plan.md` |

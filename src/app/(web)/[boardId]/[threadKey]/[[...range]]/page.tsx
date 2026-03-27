@@ -264,7 +264,7 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 	const pollingEnabled = resolvePollingEnabled(rangeSegment, thread.postCount);
 
 	return (
-		<main className="max-w-4xl mx-auto px-4 py-4">
+		<main className="max-w-4xl mx-auto px-4 py-4" data-page="thread">
 			{/* EliminatedBotToggleProvider: 撃破済みBOTレス表示トグルのContext
 			    main直下に配置し、thread-header〜PostListLiveWrapper全体をラップする。
 			    See: features/bot_system.feature @撃破済みボットのレス表示をトグルで切り替えられる
@@ -286,7 +286,7 @@ export default async function ThreadPage({ params }: ThreadPageProps) {
 
 					{/* thread-title: スレッドタイトル
 					    See: docs/specs/screens/thread-view.yaml > thread-title */}
-					<h1 id="thread-title" className="text-base font-bold text-foreground">
+					<h1 id="thread-title" className="text-xl font-bold text-red-600">
 						{thread.title}
 					</h1>
 					<p className="text-xs text-muted-foreground">

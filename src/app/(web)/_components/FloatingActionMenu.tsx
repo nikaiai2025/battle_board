@@ -22,7 +22,7 @@ import {
 	SettingsIcon,
 	XIcon,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	Sheet,
 	SheetContent,
@@ -83,6 +83,57 @@ export default function FloatingActionMenu({
 	const closePanel = useCallback(() => {
 		setActivePanel(null);
 	}, []);
+
+	// 書き込みパネルが開いているとき、mainを縮めてパネルと重ならないようにする。
+	// main に max-height + overflow-y を設定し、パネルは fixed bottom で配置。
+	useEffect(() => {
+		const main = document.querySelector("main");
+		if (!main) return;
+		if (activePanel === "post") {
+			// パネル高さを取得して main の高さを制限する
+			const updateMainHeight = () => {
+				const panelHeight = postPanelRef.current?.offsetHeight ?? 0;
+				const headerHeight =
+					document.querySelector("header")?.offsetHeight ?? 0;
+				main.style.maxHeight = `calc(100vh - ${headerHeight}px - ${panelHeight}px)`;
+				main.style.overflowY = "auto";
+			};
+			// パネルが開く前のスクロール位置（ページ下端からの距離）を記憶し、
+			// main内スクロールに変わった後も同じ位置を維持する
+			const scrollBottom =
+				document.documentElement.scrollHeight -
+				(window.scrollY + window.innerHeight);
+
+			requestAnimationFrame(() => {
+				updateMainHeight();
+				// main 内スクロールに切り替わったので、下端基準で位置を復元
+				requestAnimationFrame(() => {
+					const targetScrollTop =
+						main.scrollHeight - main.clientHeight - scrollBottom;
+					main.scrollTop = Math.max(0, targetScrollTop);
+				});
+			});
+			window.addEventListener("resize", updateMainHeight);
+			return () => {
+				// main のスクロール位置をページスクロールに復元
+				const mainScrollBottom =
+					main.scrollHeight - (main.scrollTop + main.clientHeight);
+				main.style.maxHeight = "";
+				main.style.overflowY = "";
+				window.removeEventListener("resize", updateMainHeight);
+				requestAnimationFrame(() => {
+					const targetPageScroll =
+						document.documentElement.scrollHeight -
+						window.innerHeight -
+						mainScrollBottom;
+					window.scrollTo(0, Math.max(0, targetPageScroll));
+				});
+			};
+		} else {
+			main.style.maxHeight = "";
+			main.style.overflowY = "";
+		}
+	}, [activePanel]);
 
 	// レス番号クリック → PostForm の insertText 実行時にパネルを自動で開く。
 	// PostForm は常時マウント（CSS で開閉）なので insertText の登録は常に有効。
