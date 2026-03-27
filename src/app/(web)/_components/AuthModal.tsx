@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Turnstile グローバル型の拡張宣言
 declare global {
@@ -61,9 +62,15 @@ export default function AuthModal({
 	const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [mounted, setMounted] = useState(false);
 	const turnstileContainerRef = useRef<HTMLDivElement>(null);
 	const turnstileWidgetIdRef = useRef<string | null>(null);
 	const scriptLoadedRef = useRef(false);
+
+	// クライアントサイドマウント検出（createPortal に必要）
+	useEffect(() => {
+		setMounted(true);
+	}, []);
 
 	// Turnstile スクリプトのロード
 	// See: docs/specs/screens/auth-verify.yaml > turnstile-widget
@@ -193,16 +200,24 @@ export default function AuthModal({
 	};
 
 	if (!isOpen) return null;
+	if (!mounted) return null;
 
-	return (
+	// createPortal で document.body 直下にマウントする。
+	// FloatingActionMenu が transform を持つため、その子孫では fixed がビューポート基準にならない。
+	// Portal により containing block の問題を回避し、z-[200] でフローティングパネル(z-50)より上に表示する。
+	return createPortal(
 		// モーダルオーバーレイ
 		<div
-			className="fixed inset-0 bg-black/50 z-50"
+			className="fixed inset-0 bg-black/50 z-[200]"
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="auth-header"
+			onClick={onClose}
 		>
-			<div className="fixed top-16 left-1/2 -translate-x-1/2 bg-card border border-border rounded shadow-lg p-6 w-full max-w-sm">
+			<div
+				className="fixed top-16 left-1/2 -translate-x-1/2 bg-card border border-border rounded shadow-lg p-6 w-full max-w-sm z-[201]"
+				onClick={(e) => e.stopPropagation()}
+			>
 				{/* auth-header: 書き込み認証タイトル */}
 				<h2 id="auth-header" className="text-lg font-bold text-foreground mb-2">
 					書き込み認証
@@ -256,6 +271,7 @@ export default function AuthModal({
 					</div>
 				</form>
 			</div>
-		</div>
+		</div>,
+		document.body,
 	);
 }
