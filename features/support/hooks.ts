@@ -10,6 +10,7 @@
 
 import { After, Before, BeforeAll } from "@cucumber/cucumber";
 import { accusationState } from "../step_definitions/ai_accusation.steps";
+import * as InMemoryCollectedTopicRepo from "./in-memory/collected-topic-repository";
 import { installMocks, resetAllStores } from "./mock-installer";
 import type { BattleBoardWorld } from "./world";
 
@@ -41,6 +42,11 @@ BeforeAll(() => {
 Before(async function (this: BattleBoardWorld, scenario: any) {
 	// インメモリストアを全てクリアする
 	resetAllStores();
+
+	// InMemoryCollectedTopicRepo のリセット（TASK-353 で追加）
+	// resetAllStores() には含まれていないため、ここで明示的にリセットする。
+	// See: features/curation_bot.feature
+	InMemoryCollectedTopicRepo.reset();
 
 	// AI告発シナリオの共有状態をリセットする（TASK-079 で追加）
 	// See: features/ai_accusation.feature

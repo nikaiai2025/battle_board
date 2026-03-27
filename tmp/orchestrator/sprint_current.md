@@ -252,20 +252,23 @@
 
 ## 人間タスク（次回セッション開始時に確認）
 
-### HUMAN-003: キュレーションBOT詳細定義 + BDDシナリオ作成（優先度: 中）
+### ~~HUMAN-003~~ → 完了（2026-03-28）
 
-**進捗: BDDシナリオ作成済み（`features/curation_bot.feature` v2）**
+キュレーションBOT詳細定義 + BDDシナリオ作成。
 
-Strategy Step 3・4の着手に必要。`features/` の変更は人間承認必須。
+成果物:
+- `features/curation_bot.feature` v2（承認済み）
+- `docs/architecture/components/bot.md` v7（§2.13.5, §5.5 等を更新）
+- D-01 Phase 3 / user_stories US-023〜025 / ubiquitous_language 更新済み
+- ソースコード型定義（types.ts）を新設計に整合
 
-決定済み:
-- 収集元: 5ch・ふたば・HackerNews・はてブ・Reddit・Wikipedia・YouTube（計12ソース）
-- スレタイ: 記事タイトルをそのまま使用（AI要約なし）
-- スレ立て頻度: 240〜360分ランダム間隔
-- HP: 100 / ゲームシステムはbot_system.feature準拠
-- BDDシナリオ: `features/curation_bot.feature`（独立ファイル）
-- 蓄積上限: ソースごと6件/回
-- 実装フェーズ: Phase A（1ソース検証）→ B（APIテスト）→ C（一括実装）
+決定事項:
+- 収集元: 計12ソース（5ch・ふたば・HackerNews・はてブ・Reddit・Wikipedia・YouTube）
+- Phase A 検証ソース: **速報+速報ボット**（subject.txt方式、既存の専ブラ互換知見を活用）
+- スレタイ: 記事タイトルそのまま（AI要約なし）
+- HP: 100 / 報酬: 50/20/3（コピペBOT同等）
+- 収集: GitHub Actions 日次 / 投稿: CF Cron（5分ポーリング）
+- 蓄積上限: 6件/ソース、未投稿アイテムから選択、当日→前日→スキップ
 
 ### ~~HUMAN-004~~ → Sprint-121で解消
 
@@ -279,19 +282,22 @@ Sprint-121で全5件を対応完了:
 
 ## AI側の次アクション
 
-HUMAN-004は Sprint-121で全件解消済み。残る人間タスクはHUMAN-003のみ。
+HUMAN-003/004 ともに完了。BOT Strategy Step 3・4 の着手が可能。
 
-| 人間タスク完了 | AI側で実行するスプリント |
+| 次アクション | 内容 |
 |---|---|
-| HUMAN-003 完了 | BOT Strategy Step 3・4（スキーマ拡張 + キュレーションBOT実装） |
+| BOT Strategy Step 3 | bot_profiles.yaml スキーマ拡張 + collected_topics マイグレーション |
+| BOT Strategy Step 4 Phase A | 速報+速報ボット（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + TopicDrivenSchedulingStrategy） |
 
 ## BOT Strategy移行 進捗
 
 | Step | 内容 | 状態 |
 |---|---|---|
 | Step 1〜2.5 | Strategy定義 + BotService委譲リファクタ + Phase 5検証 | **完了（Sprint-43〜45）** |
-| Step 3 | bot_profiles.yaml スキーマ拡張 | HUMAN-003 待ち |
-| Step 4 | キュレーションBOT Strategy 実装 + collected_topics + 収集ジョブ | HUMAN-003 待ち |
+| Step 3 | bot_profiles.yaml スキーマ拡張 + collected_topics マイグレーション | **着手可能** |
+| Step 4 Phase A | 速報+速報ボット: SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ | Step 3 完了後 |
+| Step 4 Phase B | API統合テスト | Phase A 完了後 |
+| Step 4 Phase C | 残り11ソースの一括実装 | Phase B 完了後 |
 
 ## 技術負債リスト
 

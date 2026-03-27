@@ -14,6 +14,11 @@ import type { Post } from "../../src/lib/domain/models/post";
 import type { Thread } from "../../src/lib/domain/models/thread";
 import type { User } from "../../src/lib/domain/models/user";
 import type {
+	CollectedItem,
+	CollectedTopic,
+	ICollectedTopicRepository,
+} from "../../src/lib/services/bot-strategies/types";
+import type {
 	MypageInfo,
 	PaginatedPostHistory,
 } from "../../src/lib/services/mypage-service";
@@ -274,6 +279,23 @@ export class BattleBoardWorld extends World {
 	lastBotBonusNotice: string | null = null;
 
 	// -------------------------------------------------------------------------
+	// キュレーションBOTコンテキスト
+	// See: features/curation_bot.feature
+	// -------------------------------------------------------------------------
+
+	/** InMemory CollectedTopicRepository（シナリオ内で共有） */
+	collectedTopicRepo: ICollectedTopicRepository | null = null;
+
+	/** 最後に収集ジョブで保存されたトピック群（Then 検証用） */
+	lastCollectedTopics: CollectedTopic[] = [];
+
+	/** 収集ジョブのエラー情報（Then 検証用） */
+	lastCollectionError: Error | null = null;
+
+	/** モックアダプターが返す収集アイテム（Given ステップでセット） */
+	mockCollectedItems: CollectedItem[] = [];
+
+	// -------------------------------------------------------------------------
 	// 時刻制御
 	// See: docs/architecture/bdd_test_strategy.md §5 時刻制御の方針
 	// -------------------------------------------------------------------------
@@ -333,6 +355,12 @@ export class BattleBoardWorld extends World {
 		// See: features/command_livingbot.feature
 		this.livingBotResults = [];
 		this.lastBotBonusNotice = null;
+		// キュレーションBOTコンテキストのリセット
+		// See: features/curation_bot.feature
+		this.collectedTopicRepo = null;
+		this.lastCollectedTopics = [];
+		this.lastCollectionError = null;
+		this.mockCollectedItems = [];
 		// 管理者コンテキストのリセット
 		// See: features/admin.feature
 		this.currentAdminId = null;

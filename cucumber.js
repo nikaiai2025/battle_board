@@ -95,6 +95,9 @@ module.exports = {
 			// TASK-335: !hiroyuki コマンド（ひろゆき風AI BOT召喚） BDD シナリオ追加
 			// See: features/command_hiroyuki.feature
 			"features/command_hiroyuki.feature",
+			// TASK-353: キュレーションBOT（バズ情報収集・スレッド自動投稿） BDD シナリオ追加
+			// See: features/curation_bot.feature
+			"features/curation_bot.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -162,6 +165,9 @@ module.exports = {
 			// TASK-335: !hiroyuki コマンド（ひろゆき風AI BOT召喚） BDD ステップ定義
 			// See: features/command_hiroyuki.feature
 			"features/step_definitions/command_hiroyuki.steps.ts",
+			// TASK-353: キュレーションBOT（バズ情報収集・スレッド自動投稿） BDD ステップ定義
+			// See: features/curation_bot.feature
+			"features/step_definitions/curation_bot.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

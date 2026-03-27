@@ -1,0 +1,52 @@
+# 日次収集バッチワークフロー
+#
+# 目的: 毎日 JST 06:00 (UTC 21:00) にバズ情報を収集し、collected_topics テーブルに保存する。
+# 実行内容: npx tsx src/lib/collection/collection-job.ts
+# 対象ソース (Phase A): 5ch ニュース速報+（subject.txt 方式）
+#
+# 収集フロー:
+#   1. bot_profiles.yaml から behavior_type=create_thread のプロファイルを列挙
+#   2. 各プロファイルの collection.adapter に対応するアダプターでバズ情報を収集
+#   3. バズスコア上位6件を collected_topics テーブルに保存
+#   4. 前回データは ON CONFLICT DO NOTHING により保持（失敗時のフェイルセーフ）
+#
+# See: features/curation_bot.feature @日次バッチでバズデータを収集・蓄積する
+# See: docs/architecture/components/bot.md §2.13.5
+#
+# 【必要なGitHub Secretsの設定】
+# リポジトリの Settings > Secrets and variables > Actions > New repository secret から以下を確認:
+#   SUPABASE_URL             - Supabase プロジェクト URL（既存の secret を使用）
+#   SUPABASE_SERVICE_ROLE_KEY - service_role キー（既存の secret を使用）
+
+name: Collect Buzz Topics (Daily Cron)
+
+on:
+  schedule:
+    # JST 06:00 = UTC 21:00 (前日)
+    # ニュース速報板のバズは深夜に落ち着くため、早朝に収集することで当日分の鮮度の高いデータが蓄積される。
+    - cron: "0 21 * * *"
+  workflow_dispatch: {}  # 手動実行（デバッグ・緊急実行用）
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run collection job
+        run: npx tsx src/lib/collection/collection-job.ts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

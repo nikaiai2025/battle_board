@@ -15,15 +15,68 @@
 // ---------------------------------------------------------------------------
 
 /**
- * キュレーションBOT用の収集済みネタ情報。
- * Phase 3 実装時に詳細を追加する。
- * See: docs/architecture/components/bot.md §2.12.5 キュレーションBOTの行動フロー
+ * キュレーションBOTが収集したバズ情報。
+ * See: docs/architecture/components/bot.md §2.13.5, §5.5 collected_topics
  */
 export interface CollectedTopic {
 	id: string;
-	generatedTitle: string;
-	generatedBody: string;
-	genre: string;
+	articleTitle: string;
+	content: string | null;
+	sourceUrl: string;
+	buzzScore: number;
+	collectedDate: string; // DATE (JST)
+}
+
+/**
+ * 収集アダプターが返すバズ情報。DBに保存前の中間型（id なし）。
+ * See: features/curation_bot.feature
+ * See: docs/architecture/components/bot.md §2.13.5
+ */
+export interface CollectedItem {
+	articleTitle: string;
+	content: string | null;
+	sourceUrl: string;
+	buzzScore: number;
+}
+
+/**
+ * CollectedTopicRepository の依存インターフェース。
+ * ThreadCreatorBehaviorStrategy が投稿候補を検索するために使用する。
+ * collection-job.ts が収集結果を保存するために使用する。
+ *
+ * See: features/curation_bot.feature
+ * See: docs/architecture/components/bot.md §5.5
+ */
+export interface ICollectedTopicRepository {
+	/**
+	 * 収集結果を保存する。
+	 * 同一 (source_bot_id, collected_date, source_url) のデータが既に存在する場合は
+	 * INSERT をスキップする（ON CONFLICT DO NOTHING）。
+	 * これにより、取得失敗時のリトライで前回データが上書きされない。
+	 *
+	 * See: features/curation_bot.feature @データ取得失敗時は前回の蓄積データを保持する
+	 */
+	save(
+		items: CollectedItem[],
+		botId: string,
+		collectedDate: string,
+	): Promise<void>;
+
+	/**
+	 * 指定BOT・指定日の未投稿候補を取得する。
+	 * is_posted = false のレコードを返す。
+	 *
+	 * See: features/curation_bot.feature @投稿済みアイテムは選択候補から除外される
+	 */
+	findUnpostedByBotId(botId: string, date: string): Promise<CollectedTopic[]>;
+
+	/**
+	 * 指定トピックを投稿済みにマークする。
+	 * is_posted = true, posted_at = postedAt に更新する。
+	 *
+	 * See: features/curation_bot.feature @投稿済みアイテムは選択候補から除外される
+	 */
+	markAsPosted(topicId: string, postedAt: Date): Promise<void>;
 }
 
 /**
@@ -58,15 +111,30 @@ export interface BotProfile {
 	max_hp: number;
 	reward: BotProfileReward;
 	fixed_messages: string[];
-	/** v6 拡張: コンテンツ生成方式（未指定時は 'fixed_message'）*/
-	content_strategy?: "fixed_message" | "ai_topic" | "ai_conversation";
+	/** v6 拡張: コンテンツ生成方式（未指定時は 'fixed_message'。create_thread 系は不使用）*/
+	content_strategy?: "fixed_message" | "ai_conversation";
 	/** v6 拡張: 行動パターン（未指定時は 'random_thread'）*/
 	behavior_type?: "random_thread" | "create_thread" | "reply";
 	/** v6 拡張: スケジュール設定（未指定時は fixed_interval）*/
 	scheduling?: {
 		type: string;
+		/** 既存フィールド（後方互換）*/
 		min?: number;
+		/** 既存フィールド（後方互換）*/
 		max?: number;
+		/** Phase 3 追加: 最小投稿間隔（分）。キュレーションBOT用 */
+		min_interval_minutes?: number;
+		/** Phase 3 追加: 最大投稿間隔（分）。キュレーションBOT用 */
+		max_interval_minutes?: number;
+	};
+	/** Phase 3 追加: 収集設定（キュレーションBOT用）*/
+	collection?: {
+		/** 収集アダプター識別子（例: 'subject_txt'）*/
+		adapter: string;
+		/** 収集元URL */
+		source_url: string;
+		/** 月次収集フラグ（未指定時は日次）*/
+		monthly?: boolean;
 	};
 }
 
@@ -123,7 +191,14 @@ export interface BehaviorContext {
  */
 export type BotAction =
 	| { type: "post_to_existing"; threadId: string }
-	| { type: "create_thread"; title: string; body: string };
+	| {
+			type: "create_thread";
+			title: string;
+			body: string;
+			/** Phase 3: ThreadCreatorBehaviorStrategy が markAsPosted の遅延呼び出しのために返す内部フィールド */
+			_selectedTopicId?: string;
+	  }
+	| { type: "skip" }; // 投稿候補なし（キュレーションBOTのデータ枯渇時等）
 
 /**
  * 行動パターン戦略インターフェース。

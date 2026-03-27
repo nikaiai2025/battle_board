@@ -36,9 +36,11 @@ import type {
 	BotProfile,
 	BotStrategies,
 	ContentGenerationContext,
+	ICollectedTopicRepository,
 	IThreadRepository,
 	SchedulingContext,
 } from "./bot-strategies/types";
+import type { CreateThreadResult } from "./post-service";
 
 // IThreadRepository は types.ts からインポートし、後方互換のため re-export する
 // See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
@@ -216,6 +218,20 @@ export type CreatePostFn = (input: {
 >;
 
 /**
+ * PostService.createThread の関数型（DI用）。
+ * BotService は PostService モジュール全体に依存せず、関数参照のみ受け取る。
+ * キュレーションBOT（create_thread アクション）の実行時に使用する。
+ *
+ * See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+ * See: docs/architecture/components/bot.md §2.13.5
+ */
+export type CreateThreadFn = (
+	input: { boardId: string; title: string; firstPostBody: string },
+	edgeToken: string | null,
+	ipHash: string,
+) => Promise<CreateThreadResult>;
+
+/**
  * AttackRepository の依存インターフェース。
  * 攻撃記録・1日1回制限チェックに使用する。
  */
@@ -320,6 +336,8 @@ export type ResolveStrategiesFn = (
 	options: {
 		threadRepository: IThreadRepository;
 		botProfiles?: BotProfilesYaml;
+		/** Phase 3: ThreadCreatorBehaviorStrategy が必要とする ICollectedTopicRepository */
+		collectedTopicRepository?: ICollectedTopicRepository;
 	},
 ) => BotStrategies;
 
@@ -386,6 +404,12 @@ export class BotService {
 	 *   See: features/command_aori.feature @Cron処理で煽りBOTがスポーンし対象レスに煽り文句を投稿する
 	 * @param dailyEventRepository - 日次イベントリポジトリ（DI・省略可）
 	 *   See: features/command_livingbot.feature @ラストボットボーナス
+	 * @param createThreadFn - PostService.createThread の関数参照（DI・省略可）
+	 *   キュレーションBOT（create_thread アクション）の実行時に使用する。
+	 *   See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+	 * @param collectedTopicRepository - 収集トピックリポジトリ（DI・省略可）
+	 *   ThreadCreatorBehaviorStrategy への DI および markAsPosted 呼び出しに使用する。
+	 *   See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
 	 */
 	constructor(
 		private readonly botRepository: IBotRepository,
@@ -398,6 +422,8 @@ export class BotService {
 		private readonly pendingTutorialRepository?: IPendingTutorialRepository,
 		private readonly pendingAsyncCommandRepository?: IPendingAsyncCommandRepository,
 		private readonly dailyEventRepository?: IDailyEventRepository,
+		private readonly createThreadFn?: CreateThreadFn,
+		private readonly collectedTopicRepository?: ICollectedTopicRepository,
 	) {
 		// ボットプロファイルデータをキャッシュする
 		// Cloudflare Workers 環境では fs.readFileSync が使えないため、
@@ -883,12 +909,89 @@ export class BotService {
 			};
 			const action = await strategies.behavior.decideAction(behaviorContext);
 
+			// skip アクション: 投稿候補なし → next_post_at のみ更新して終了
+			// See: features/curation_bot.feature @蓄積データが存在しない場合は投稿をスキップする
+			if (action.type === "skip") {
+				try {
+					const delayMinutes = strategies.scheduling.getNextPostDelay({
+						botId,
+						botProfileKey: bot.botProfileKey,
+					});
+					const nextPostAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+					await this.botRepository.updateNextPostAt(botId, nextPostAt);
+				} catch (err) {
+					console.error(
+						`BotService.executeBotPost: skip 時の next_post_at 更新に失敗（botId=${botId}）`,
+						err,
+					);
+				}
+				return null;
+			}
+
+			// create_thread アクション: スレッド作成処理
+			// See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
 			if (action.type === "create_thread") {
-				// Phase 3 以降: スレッド作成処理（現時点では未実装）
-				// See: docs/architecture/components/bot.md §2.12.5 キュレーションBOTの行動フロー
-				throw new Error(
-					"BotService.executeBotPost: create_thread アクションは Phase 3 以降に対応予定です",
+				if (!this.createThreadFn) {
+					throw new Error("executeBotPost: createThreadFn が未注入です");
+				}
+
+				const threadResult = await this.createThreadFn(
+					{
+						boardId: DEFAULT_BOARD_ID,
+						title: action.title,
+						firstPostBody: action.body,
+					},
+					null,
+					`bot-${botId}`,
 				);
+
+				if (!threadResult.success || !threadResult.firstPost) {
+					throw new Error(
+						`BotService.executeBotPost: createThread が失敗しました: ${threadResult.error ?? "不明"}`,
+					);
+				}
+
+				// createThread 成功後に投稿済みマークを付ける
+				// decideAction 内ではなくここで呼ぶことで、createThread 失敗時の不整合を防ぐ
+				// See: docs/architecture/components/bot.md §2.13.5 markAsPosted の遅延呼び出し
+				if (action._selectedTopicId && this.collectedTopicRepository) {
+					await this.collectedTopicRepository.markAsPosted(
+						action._selectedTopicId,
+						new Date(Date.now()),
+					);
+				}
+
+				// bot_posts に紐付け
+				try {
+					await this.botPostRepository.create(threadResult.firstPost.id, botId);
+					await this.botRepository.incrementTotalPosts(botId);
+				} catch (err) {
+					console.error(
+						`BotService.executeBotPost: bot_posts INSERT に失敗（postId=${threadResult.firstPost.id}, botId=${botId}）`,
+						err,
+					);
+				}
+
+				// next_post_at を更新
+				try {
+					const delayMinutes = strategies.scheduling.getNextPostDelay({
+						botId,
+						botProfileKey: bot.botProfileKey,
+					});
+					const nextPostAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+					await this.botRepository.updateNextPostAt(botId, nextPostAt);
+				} catch (err) {
+					console.error(
+						`BotService.executeBotPost: next_post_at 更新に失敗（botId=${botId}）`,
+						err,
+					);
+				}
+
+				return {
+					postId: threadResult.firstPost.id,
+					postNumber: threadResult.firstPost.postNumber,
+					dailyId: await this.getDailyId(botId),
+				};
 			}
 
 			resolvedThreadId = action.threadId;
@@ -1378,6 +1481,7 @@ export class BotService {
 				threadRepository:
 					this.threadRepository ?? this.createFallbackThreadRepository(),
 				botProfiles: this.botProfiles,
+				collectedTopicRepository: this.collectedTopicRepository,
 			});
 		}
 
@@ -1387,6 +1491,7 @@ export class BotService {
 			threadRepository:
 				this.threadRepository ?? this.createFallbackThreadRepository(),
 			botProfiles: this.botProfiles,
+			collectedTopicRepository: this.collectedTopicRepository,
 		});
 	}
 

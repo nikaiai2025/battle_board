@@ -90,4 +90,29 @@ export const botProfilesConfig: BotProfilesYaml = {
 		},
 		fixed_messages: ["!copipe"],
 	},
+	// Phase 3: 速報+速報ボット（キュレーションBOT Phase A）
+	// 5chニュース速報+のバズスレッドをキュレーションして転載する。
+	// 報酬パラメータはコピペBOT（同HP:100）と同等。
+	// See: features/curation_bot.feature
+	// See: config/bot_profiles.yaml (正本)
+	curation_newsplus: {
+		hp: 100,
+		max_hp: 100,
+		reward: {
+			base_reward: 50,
+			daily_bonus: 20,
+			attack_bonus: 3,
+		},
+		behavior_type: "create_thread",
+		scheduling: {
+			type: "topic_driven",
+			min_interval_minutes: 240,
+			max_interval_minutes: 360,
+		},
+		collection: {
+			adapter: "subject_txt",
+			source_url: "https://asahi.5ch.io/newsplus/subject.txt",
+		},
+		fixed_messages: [],
+	},
 };
