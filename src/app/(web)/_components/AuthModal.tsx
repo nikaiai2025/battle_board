@@ -197,12 +197,12 @@ export default function AuthModal({
 	return (
 		// モーダルオーバーレイ
 		<div
-			className="fixed inset-0 bg-black/50 flex items-start justify-center overflow-y-auto py-8 z-50"
+			className="fixed inset-0 bg-black/50 z-50"
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="auth-header"
 		>
-			<div className="bg-card border border-border rounded shadow-lg p-6 w-full max-w-sm mx-4">
+			<div className="fixed top-16 left-1/2 -translate-x-1/2 bg-card border border-border rounded shadow-lg p-6 w-full max-w-sm">
 				{/* auth-header: 書き込み認証タイトル */}
 				<h2 id="auth-header" className="text-lg font-bold text-foreground mb-2">
 					書き込み認証
