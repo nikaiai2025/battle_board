@@ -4,7 +4,7 @@
 
 ## 現在のフェーズ
 
-**Sprint-135 完了。次スプリント計画中。**
+**Sprint-136 完了。次スプリント計画中。**
 
 ### 敵対的コードレビュー進捗（一時中断中）
 
@@ -18,6 +18,17 @@
 | 6〜22 | （残17件）| 未着手 | | |
 
 **Sprint-134 完了 — command_copipe.feature 8シナリオ修正**
+
+**Sprint-136 完了 — キュレーションBOT Phase A（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ）**
+
+### Sprint-136の成果
+- TASK-349: アーキテクト設計書（詳細実装設計 12セクション）
+- TASK-350: DB基盤 — migration 00034(collected_topics) + CollectedTopicRepository + bot_profiles拡張
+- TASK-351: Strategy実装 — ThreadCreatorBehaviorStrategy + TopicDrivenSchedulingStrategy + NoOpContentStrategy + jst-date.ts + buzz-score.ts + strategy-resolver/bot-service更新
+- TASK-352: 収集ジョブ — SubjectTxtAdapter + collection-job.ts + GitHub Actions日次ワークフロー
+- TASK-353: BDDステップ定義 — curation_bot.feature 全13シナリオ PASS
+- vitest: 2084 PASS / cucumber-js: 373 passed(+12) / 本番スモーク: 17/17 PASS
+- コミット: 7a395c6
 
 **Sprint-135 完了 — 範囲攻撃BDDステップ + FAB pending + インカーネーションモデル + !w同日制限撤廃**
 
@@ -240,10 +251,11 @@
 
 ## テスト状況
 
-- vitest: **2025 PASS / 13 failed**（Sprint-135後。13件は全て既存失敗）
-- cucumber-js: 382シナリオ / **361 passed / 0 failed** / 18 pending / 3 undefined（Sprint-135後）
+- vitest: **2084 PASS / 13 failed**（Sprint-136後。13件は全て既存 Discord OAuth 関連）
+- cucumber-js: 394シナリオ / **373 passed / 0 failed** / 18 pending / 3 undefined（Sprint-136後）
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
-  - undefined 3件: 既存の未実装ステップ（Sprint-135で11件解消）
+  - undefined 3件: 既存の未実装ステップ
+  - +12: curation_bot.feature 全13シナリオ追加（うち1はbot_system.stepsで実装済みのHPステップ）
 - playwright E2E (ローカル): 16 passed, 0 fixme
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS（ローカル環境依存のため環境問題2件は除く）
@@ -286,16 +298,15 @@ HUMAN-003/004 ともに完了。BOT Strategy Step 3・4 の着手が可能。
 
 | 次アクション | 内容 |
 |---|---|
-| BOT Strategy Step 3 | bot_profiles.yaml スキーマ拡張 + collected_topics マイグレーション |
-| BOT Strategy Step 4 Phase A | 速報+速報ボット（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + TopicDrivenSchedulingStrategy） |
+| BOT Strategy Step 4 Phase B | API統合テスト（次回スプリントで着手可能） |
 
 ## BOT Strategy移行 進捗
 
 | Step | 内容 | 状態 |
 |---|---|---|
 | Step 1〜2.5 | Strategy定義 + BotService委譲リファクタ + Phase 5検証 | **完了（Sprint-43〜45）** |
-| Step 3 | bot_profiles.yaml スキーマ拡張 + collected_topics マイグレーション | **着手可能** |
-| Step 4 Phase A | 速報+速報ボット: SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ | Step 3 完了後 |
+| Step 3 | bot_profiles.yaml スキーマ拡張 + collected_topics マイグレーション | **完了（Sprint-136）** |
+| Step 4 Phase A | 速報+速報ボット: SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ | **完了（Sprint-136）** |
 | Step 4 Phase B | API統合テスト | Phase A 完了後 |
 | Step 4 Phase C | 残り11ソースの一括実装 | Phase B 完了後 |
 
@@ -331,6 +342,7 @@ HUMAN-003/004 ともに完了。BOT Strategy Step 3・4 の着手が可能。
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-136 | キュレーションBOT Phase A（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ） | completed | `tmp/orchestrator/sprint_136_plan.md` |
 | Sprint-135 | 範囲攻撃BDDステップ + FAB pending + インカーネーションモデル + !w同日制限撤廃 + Discord PKCE | completed | `tmp/orchestrator/sprint_135_plan.md` |
 | Sprint-134 | command_copipe.feature 8シナリオ修正（テストバグ修正） | completed | `tmp/orchestrator/sprint_134_plan.md` |
 | Sprint-133 | コピペボット(HP:100) + 運営BOTコスト免除 | completed | `tmp/orchestrator/sprint_133_plan.md` |
