@@ -77,7 +77,10 @@ import {
 	type INewspaperPendingRepository,
 	NewspaperHandler,
 } from "./handlers/newspaper-handler";
-import { OmikujiHandler } from "./handlers/omikuji-handler";
+import {
+	type IOmikujiPostRepository,
+	OmikujiHandler,
+} from "./handlers/omikuji-handler";
 import { TellHandler } from "./handlers/tell-handler";
 
 // ---------------------------------------------------------------------------
@@ -730,6 +733,26 @@ export class CommandService {
 			}
 		}
 
+		// !omikuji: 対象レスの dailyId 取得用 PostRepository を解決する
+		// PostNumberResolver と同一の post-repository を使用する
+		// See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
+		let resolvedOmikujiPostRepo: IOmikujiPostRepository | undefined;
+		if (this.postNumberResolver) {
+			try {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const PostRepo = require("../infrastructure/repositories/post-repository");
+				resolvedOmikujiPostRepo = {
+					findById: async (id: string) => {
+						const post = await PostRepo.findById(id);
+						if (!post) return null;
+						return { dailyId: post.dailyId };
+					},
+				};
+			} catch {
+				// テスト環境等で post-repository が利用できない場合は undefined（フォールバック）
+			}
+		}
+
 		// ハンドラをインスタンス化して Registry に登録する
 		// See: docs/architecture/components/command.md §2.2 新規コマンド追加の手順
 		// TellHandler は AccusationService に委譲する（D-08 accusation.md §1 分割方針）
@@ -740,9 +763,9 @@ export class CommandService {
 			new AbeshinzoHandler(),
 			...(resolvedHissiHandler ? [resolvedHissiHandler] : []),
 			...(resolvedKinouHandler ? [resolvedKinouHandler] : []),
-			// !omikuji: ターゲット任意パターン（依存サービスなし）
+			// !omikuji: ターゲット任意パターン（PostRepository で対象レスの dailyId を取得）
 			// See: features/command_omikuji.feature
-			new OmikujiHandler(),
+			new OmikujiHandler(resolvedOmikujiPostRepo),
 			// !iamsystem: ステルスでシステム偽装（依存サービスなし）
 			// See: features/command_iamsystem.feature
 			new IamsystemHandler(),

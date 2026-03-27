@@ -42,7 +42,7 @@ export default function VisionSection() {
 					<section>
 						<h3 className="font-bold text-foreground mb-1">掲示板文化の保全</h3>
 						<p className="text-muted-foreground leading-relaxed">
-							匿名掲示板はネットの主役を譲り、かつての掲示板文化——コピペ、定型句——が失われつつあります。
+							匿名掲示板はネットの主役を譲り、かつての掲示板文化（コピペ、定型句など）が失われつつあります。
 							それを掘り起こし、コマンドとして再現し、なるべく（費用・技術的に）持続可能な形で保全します。
 						</p>
 					</section>
@@ -73,7 +73,7 @@ export default function VisionSection() {
 						<p className="text-muted-foreground leading-relaxed">
 							本サイトの開発は全てAIが行っています。人間はコードを1行も書かず自然言語で指示するのみ（コードを書く知識はない）。
 							このサイト自体が今後のAIとの共存の在り方を模索する実証実験です。
-							ソースコードと開発記録・AIエージェント定義等はは全てGithubにて公開しています。（開発環境：ClaudeCode +α）
+							ソースコードと開発記録・AIエージェント定義等は全てGithubで公開しています。（開発環境：ClaudeCode +α。開発中のためバグがあります。予告なく修正が入ります）
 						</p>
 						<p className="mt-1">
 							<a

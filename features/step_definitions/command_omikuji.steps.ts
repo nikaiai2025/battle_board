@@ -4,10 +4,10 @@
  * !omikuji コマンド（おみくじ）のBDDシナリオを実装する。
  *
  * カバーするシナリオ（4件）:
- *   1. おみくじ結果が独立システムレスで即座に表示される
+ *   1. おみくじ結果がレス内マージで即座に表示される
  *   2. おみくじ結果は100件のセットからランダムに選択される
  *   3. ターゲットなしでは自分の運勢として表示される
- *   4. ターゲット指定時は対象レスの人の運勢として表示される
+ *   4. ターゲット指定時は対象レスの日替わりIDの運勢として表示される
  *
  * 再利用する既存ステップ（新規定義不要）:
  *   - "コマンドレジストリに以下のコマンドが登録されている:" (command_system.steps.ts)
@@ -54,6 +54,9 @@ const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
 /** BDD テストで使用する板 ID */
 const TEST_BOARD_ID = "livebot";
 
+/** ターゲットシナリオで使用するレス >>5 の日替わりID */
+const TARGET_DAILY_ID = "TrgDly05";
+
 // ---------------------------------------------------------------------------
 // シナリオ内で共有される状態
 // See: docs/architecture/bdd_test_strategy.md §3 Cucumber World 設計
@@ -70,24 +73,23 @@ let omikujiResults: string[] = [];
 // ---------------------------------------------------------------------------
 
 /**
- * スレッド内から最新の独立システムレス（★システム名義・isSystemMessage=true）を取得する。
- * investigation.steps.ts と同じパターン。
+ * スレッド内から最新の自分のレスの inlineSystemInfo を取得する。
+ * レス内マージ方式のため、独立システムレスではなく投稿者自身のレスを参照する。
  *
- * See: features/command_omikuji.feature @おみくじ結果が独立システムレスで即座に表示される
+ * See: features/command_omikuji.feature @おみくじ結果がレス内マージで即座に表示される
  */
-async function findLatestSystemPost(
+async function getLatestInlineSystemInfo(
 	threadId: string,
-): Promise<import("../../src/lib/domain/models/post").Post | null> {
+): Promise<string | null> {
 	const posts = await InMemoryPostRepo.findByThreadId(threadId);
-	const systemPosts = posts.filter(
-		(p) => p.displayName === "★システム" && p.isSystemMessage === true,
-	);
-	if (systemPosts.length === 0) return null;
-	return systemPosts[systemPosts.length - 1];
+	// 最新のシステムメッセージでないレス（ユーザーの投稿）を取得する
+	const userPosts = posts.filter((p) => !p.isSystemMessage);
+	if (userPosts.length === 0) return null;
+	return userPosts[userPosts.length - 1].inlineSystemInfo;
 }
 
 /**
- * コマンドを書き込んで実行し、独立レスの本文を返すヘルパー。
+ * コマンドを書き込んで実行するヘルパー。
  * 無料コマンド（!omikuji）専用。通貨残高の設定なし。
  *
  * See: features/command_omikuji.feature
@@ -143,14 +145,15 @@ async function runOmikuji(
 
 // ---------------------------------------------------------------------------
 // Given: スレッドにレス >>5 が存在する
-// See: features/command_omikuji.feature @ターゲット指定時は対象レスの人の運勢として表示される
+// See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
 // ---------------------------------------------------------------------------
 
 /**
  * スレッドにレス >>5 が存在する。
  * ターゲット指定シナリオで、対象レス番号5を持つダミーレスをスレッドに追加する。
+ * dailyId は TARGET_DAILY_ID ("TrgDly05") を設定する。
  *
- * See: features/command_omikuji.feature @ターゲット指定時は対象レスの人の運勢として表示される
+ * See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
  * See: docs/architecture/components/command.md §5 ターゲット任意パターン
  */
 Given("スレッドにレス >>5 が存在する", async function (this: BattleBoardWorld) {
@@ -171,7 +174,7 @@ Given("スレッドにレス >>5 が存在する", async function (this: BattleB
 		postNumber: 5,
 		authorId: crypto.randomUUID(),
 		displayName: "名無しさん",
-		dailyId: "TrgDly05",
+		dailyId: TARGET_DAILY_ID,
 		body: "ターゲットシナリオ用のレス >>5",
 		inlineSystemInfo: null,
 		isSystemMessage: false,
@@ -187,7 +190,7 @@ Given("スレッドにレス >>5 が存在する", async function (this: BattleB
 
 /**
  * "!omikuji" を2回実行する。
- * 独立システムレスの本文を2件収集して omikujiResults に保存する。
+ * レス内マージの inlineSystemInfo を2件収集して omikujiResults に保存する。
  *
  * See: features/command_omikuji.feature @おみくじ結果は100件のセットからランダムに選択される
  */
@@ -198,44 +201,43 @@ When(
 
 		for (let i = 0; i < 2; i++) {
 			await runOmikuji(this, commandString);
-			// 最新の独立システムレスを取得する
+			// 最新レスの inlineSystemInfo を取得する
 			assert(this.currentThreadId, "スレッドが設定されていません");
-			const sysPost = await findLatestSystemPost(this.currentThreadId);
-			if (sysPost) {
-				omikujiResults.push(sysPost.body);
+			const info = await getLatestInlineSystemInfo(this.currentThreadId);
+			if (info) {
+				omikujiResults.push(info);
 			}
 		}
 	},
 );
 
 // ---------------------------------------------------------------------------
-// Then: 「★システム」名義の独立レスでおみくじ結果が表示される
-// See: features/command_omikuji.feature @おみくじ結果が独立システムレスで即座に表示される
+// Then: レス末尾におみくじ結果がマージ表示される
+// See: features/command_omikuji.feature @おみくじ結果がレス内マージで即座に表示される
 // ---------------------------------------------------------------------------
 
 /**
- * 「★システム」名義の独立レスでおみくじ結果が表示される。
- * スレッド内に displayName="★システム" かつ isSystemMessage=true のレスが存在し、
- * OMIKUJI_RESULTS のいずれかを含むことを検証する。
+ * レス末尾におみくじ結果がマージ表示される。
+ * 最新レスの inlineSystemInfo が OMIKUJI_RESULTS のいずれかを含むことを検証する。
  *
- * See: features/command_omikuji.feature @おみくじ結果が独立システムレスで即座に表示される
+ * See: features/command_omikuji.feature @おみくじ結果がレス内マージで即座に表示される
  */
 Then(
-	"「★システム」名義の独立レスでおみくじ結果が表示される",
+	"レス末尾におみくじ結果がマージ表示される",
 	async function (this: BattleBoardWorld) {
 		assert(this.currentThreadId, "スレッドが設定されていません");
 
-		const sysPost = await findLatestSystemPost(this.currentThreadId);
-		assert(sysPost, "「★システム」名義の独立システムレスが見つかりません");
+		const info = await getLatestInlineSystemInfo(this.currentThreadId);
+		assert(
+			info,
+			"inlineSystemInfo が null です（おみくじ結果がマージされていません）",
+		);
 
 		// おみくじ結果のいずれかを含むことを確認する
-		// See: src/lib/services/handlers/omikuji-handler.ts > OMIKUJI_RESULTS
-		const containsResult = OMIKUJI_RESULTS.some((r) =>
-			sysPost.body.includes(r),
-		);
+		const containsResult = OMIKUJI_RESULTS.some((r) => info.includes(r));
 		assert(
 			containsResult,
-			`独立システムレスの本文「${sysPost.body}」がおみくじ結果セットのいずれも含みません`,
+			`inlineSystemInfo「${info}」がおみくじ結果セットのいずれも含みません`,
 		);
 	},
 );
@@ -274,89 +276,76 @@ Then("2つの結果は同一とは限らない", async function (this: BattleBoa
 });
 
 // ---------------------------------------------------------------------------
-// Then: 独立システムレスに「今日の運勢は」と結果が含まれる
+// Then: レス末尾に「今日の運勢は」と結果がマージ表示される
 // See: features/command_omikuji.feature @ターゲットなしでは自分の運勢として表示される
 // ---------------------------------------------------------------------------
 
 /**
- * 独立システムレスに「今日の運勢は」と結果が含まれる。
- * ターゲットなしの場合、「今日の運勢は…【結果】」形式のメッセージを検証する。
+ * レス末尾に「今日の運勢は」と結果がマージ表示される。
+ * ターゲットなしの場合、inlineSystemInfo に「今日の運勢は…【結果】」が含まれることを検証する。
  *
  * See: features/command_omikuji.feature @ターゲットなしでは自分の運勢として表示される
- * See: src/lib/services/handlers/omikuji-handler.ts
  */
 Then(
-	"独立システムレスに「今日の運勢は」と結果が含まれる",
+	"レス末尾に「今日の運勢は」と結果がマージ表示される",
 	async function (this: BattleBoardWorld) {
 		assert(this.currentThreadId, "スレッドが設定されていません");
 
-		const sysPost = await findLatestSystemPost(this.currentThreadId);
-		assert(sysPost, "「★システム」名義の独立システムレスが見つかりません");
+		const info = await getLatestInlineSystemInfo(this.currentThreadId);
+		assert(
+			info,
+			"inlineSystemInfo が null です（おみくじ結果がマージされていません）",
+		);
 
 		assert(
-			sysPost.body.includes("今日の運勢は"),
-			`独立システムレスの本文「${sysPost.body}」に「今日の運勢は」が含まれません`,
+			info.includes("今日の運勢は"),
+			`inlineSystemInfo「${info}」に「今日の運勢は」が含まれません`,
 		);
 
 		// おみくじ結果セットのいずれかも含まれることを確認する
-		const containsResult = OMIKUJI_RESULTS.some((r) =>
-			sysPost.body.includes(r),
-		);
+		const containsResult = OMIKUJI_RESULTS.some((r) => info.includes(r));
 		assert(
 			containsResult,
-			`独立システムレスの本文「${sysPost.body}」がおみくじ結果セットのいずれも含みません`,
+			`inlineSystemInfo「${info}」がおみくじ結果セットのいずれも含みません`,
 		);
 	},
 );
 
 // ---------------------------------------------------------------------------
-// Then: 独立システムレスに「>>5 の運勢は」と結果が含まれる
-// See: features/command_omikuji.feature @ターゲット指定時は対象レスの人の運勢として表示される
+// Then: レス末尾にレス >>5 の日替わりIDの運勢として結果がマージ表示される
+// See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
 // ---------------------------------------------------------------------------
 
 /**
- * 独立システムレスに「>>5 の運勢は」と結果が含まれる。
- * ターゲット指定の場合、「>>5 の運勢は…【結果】」形式のメッセージを検証する。
+ * レス末尾にレス >>5 の日替わりIDの運勢として結果がマージ表示される。
+ * ターゲット指定の場合、inlineSystemInfo に「ID:{dailyId} の運勢は」が含まれることを検証する。
+ * dailyId はレス >>5 に設定された TARGET_DAILY_ID ("TrgDly05") を期待する。
  *
- * See: features/command_omikuji.feature @ターゲット指定時は対象レスの人の運勢として表示される
- * See: src/lib/services/handlers/omikuji-handler.ts
- *
- * Note: CommandService の Step 1.5 で >>5 が UUID に解決されるため、
- *       ハンドラには UUID が渡される。そのため OmikujiHandler の independentMessage は
- *       「{UUID} の運勢は…」となる可能性がある。
- *       featureファイルは「>>5 の運勢は」と記述しているが、
- *       これはコマンドパーサーが >>5 をそのまま渡す（ターゲット任意＝UUID解決なし）パスを
- *       想定している。
- *       詳細は下記の Note を参照。
+ * See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
  */
 Then(
-	"独立システムレスに「>>5 の運勢は」と結果が含まれる",
+	"レス末尾にレス >>5 の日替わりIDの運勢として結果がマージ表示される",
 	async function (this: BattleBoardWorld) {
 		assert(this.currentThreadId, "スレッドが設定されていません");
 
-		const sysPost = await findLatestSystemPost(this.currentThreadId);
-		assert(sysPost, "「★システム」名義の独立システムレスが見つかりません");
-
-		// ターゲット参照（>>5 または解決済みUUID）が含まれることを確認する
-		// Note: command_system.steps.ts の "本文に {string} を含めて投稿する" ステップでは
-		//       postNumberResolver が設定されているため、>>5 は UUID に解決される。
-		//       OmikujiHandler には UUID が渡されるが、featureファイルは「>>5 の運勢は」を期待する。
-		//       この不整合を解決するため、ここでは「の運勢は」が含まれることのみ検証し、
-		//       さらに「おみくじ結果セットのいずれかを含む」ことを検証する。
-		//       See: features/command_omikuji.feature @ターゲット指定時は対象レスの人の運勢として表示される
-		//       See: docs/architecture/components/command.md §5 ターゲット任意パターン
+		const info = await getLatestInlineSystemInfo(this.currentThreadId);
 		assert(
-			sysPost.body.includes("の運勢は"),
-			`独立システムレスの本文「${sysPost.body}」に「の運勢は」が含まれません`,
+			info,
+			"inlineSystemInfo が null です（おみくじ結果がマージされていません）",
+		);
+
+		// 対象レスの日替わりID が含まれることを確認する
+		const expectedIdRef = `ID:${TARGET_DAILY_ID}`;
+		assert(
+			info.includes(expectedIdRef) && info.includes("の運勢は"),
+			`inlineSystemInfo「${info}」に「${expectedIdRef} の運勢は」が含まれません`,
 		);
 
 		// おみくじ結果セットのいずれかも含まれることを確認する
-		const containsResult = OMIKUJI_RESULTS.some((r) =>
-			sysPost.body.includes(r),
-		);
+		const containsResult = OMIKUJI_RESULTS.some((r) => info.includes(r));
 		assert(
 			containsResult,
-			`独立システムレスの本文「${sysPost.body}」がおみくじ結果セットのいずれも含みません`,
+			`inlineSystemInfo「${info}」がおみくじ結果セットのいずれも含みません`,
 		);
 	},
 );

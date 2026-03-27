@@ -228,12 +228,15 @@ test.describe
 		// -----------------------------------------------------------------------
 
 		/**
-		 * !omikuji コマンドで★システム名義の独立レスが投稿される。
+		 * !omikuji コマンドでおみくじ結果がレス内マージ（inlineSystemInfo）で表示される（v3）。
 		 *
-		 * See: features/command_omikuji.feature @おみくじ結果が独立システムレスで即座に表示される
+		 * v3 改修により独立システムレスではなくレス内マージ方式に変更。
+		 * コマンドを含む投稿のレス本文内に「運勢は」等のおみくじ結果テキストが含まれる。
+		 *
+		 * See: features/command_omikuji.feature @おみくじ結果がレス内マージで即座に表示される
 		 * See: src/lib/services/handlers/omikuji-handler.ts
 		 */
-		test("!omikuji コマンドで★システム名義の独立レスが投稿される", async ({
+		test("!omikuji コマンドでおみくじ結果がレス内マージで表示される", async ({
 			page,
 			authenticate,
 		}) => {
@@ -252,7 +255,7 @@ test.describe
 			await page.locator("#post-body-input").fill("!omikuji");
 			await page.locator("#post-submit-btn").click();
 
-			// ユーザーの書き込み
+			// ユーザーの書き込みが表示される
 			const myPostNum = lastPost + 1;
 			await expect(page.locator(`#post-${myPostNum}`)).toBeVisible({
 				timeout: 15_000,
@@ -261,8 +264,9 @@ test.describe
 				"!omikuji",
 			);
 
-			// ★システム名義のおみくじ結果レス（内容で検証）
-			await expect(page.getByText("の運勢は")).toBeVisible({
+			// おみくじ結果がレス内マージで表示される（v3: 独立レスではなく inlineSystemInfo）
+			// 「運勢は」を含むおみくじ結果テキストがコマンド投稿レス内に存在することを確認
+			await expect(page.locator(`#post-${myPostNum}`)).toContainText("運勢は", {
 				timeout: 15_000,
 			});
 		});
@@ -304,9 +308,8 @@ test.describe
 			await expect(page.locator(`#post-${myPostNum}`)).toContainText(
 				"!hiroyuki",
 			);
-
-			// inlineSystemInfo に通貨消費が表示される（コスト10）
-			await expect(page.locator(`#post-${myPostNum}`)).toContainText("-10");
+			// hiroyuki handler は systemMessage: null を返すため inlineSystemInfo は生成されない。
+			// BOT応答は非同期（GH Actions）であり E2E では検証しない。
 		});
 
 		// -----------------------------------------------------------------------

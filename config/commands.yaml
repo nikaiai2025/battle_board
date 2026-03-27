@@ -57,7 +57,6 @@ commands:
     description: "おみくじで運勢を占う。>>N 指定可能。"
     cost: 0
     targetFormat: null
-    responseType: independent
     enabled: true
     stealth: false
   iamsystem:

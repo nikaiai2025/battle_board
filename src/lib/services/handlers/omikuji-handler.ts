@@ -1,7 +1,7 @@
 /**
  * CommandHandler 実装: !omikuji（おみくじ）コマンド
  *
- * おみくじで運勢を占い、「★システム」名義の独立レスで即座に表示する。
+ * おみくじで運勢を占い、レス内マージで即座に表示する。
  * ターゲット任意パターン（>>N の有無でメッセージが変わる）の実装。
  *
  * See: features/command_omikuji.feature @omikuji
@@ -9,10 +9,10 @@
  *
  * !omikuji コマンドの仕様:
  *   - 引数なし: 「今日の運勢は…【結果】…」形式で自分の運勢を占う
- *   - 引数あり(>>N): 「>>N の運勢は…【結果】…」形式で対象レスの人の運勢を占う
+ *   - 引数あり(>>N): 「ID:xxx の運勢は…【結果】…」形式で対象レスの日替わりIDで表示
  *   - 通貨コスト: 0（無料）
  *   - 同期処理、BOT召喚なし、非同期キュー不使用
- *   - 結果は独立システムレス（independentMessage）として返す
+ *   - 結果はレス内マージ（systemMessage）として返す
  *   - 100件の結果セットからランダムに1つ選択する
  */
 
@@ -21,6 +21,18 @@ import type {
 	CommandHandler,
 	CommandHandlerResult,
 } from "../command-service";
+
+// ---------------------------------------------------------------------------
+// 依存インターフェース（DI用）
+// ---------------------------------------------------------------------------
+
+/**
+ * OmikujiHandler が使用する PostRepository のインターフェース。
+ * ターゲット指定時に対象レスの日替わりIDを取得するために使用する。
+ */
+export interface IOmikujiPostRepository {
+	findById(id: string): Promise<{ dailyId: string } | null>;
+}
 
 // ---------------------------------------------------------------------------
 // おみくじ結果セット（100件）
@@ -157,12 +169,12 @@ export const OMIKUJI_RESULTS: readonly string[] = [
  *   1. OMIKUJI_RESULTS から 1 件をランダムに選択する
  *   2. ctx.args の有無でメッセージを分岐する
  *      - 引数なし: 「今日の運勢は…【結果】…」
- *      - 引数あり: 「>>N の運勢は…【結果】…」
- *   3. return { success: true, systemMessage: null, independentMessage: 生成メッセージ }
+ *      - 引数あり: 「ID:xxx の運勢は…【結果】…」（対象レスの日替わりID）
+ *   3. return { success: true, systemMessage: 生成メッセージ }
  *
- * See: features/command_omikuji.feature @おみくじ結果が独立システムレスで即座に表示される
+ * See: features/command_omikuji.feature @おみくじ結果がレス内マージで即座に表示される
  * See: features/command_omikuji.feature @ターゲットなしでは自分の運勢として表示される
- * See: features/command_omikuji.feature @ターゲット指定時は対象レスの人の運勢として表示される
+ * See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
  * See: docs/architecture/components/command.md §5 ターゲット任意パターン
  */
 export class OmikujiHandler implements CommandHandler {
@@ -170,12 +182,17 @@ export class OmikujiHandler implements CommandHandler {
 	readonly commandName = "omikuji";
 
 	/**
+	 * @param postRepository - 対象レスの日替わりID取得に使用（DI。省略時は rawArgs フォールバック）
+	 */
+	constructor(private readonly postRepository?: IOmikujiPostRepository) {}
+
+	/**
 	 * !omikuji コマンドを実行する。
 	 *
 	 * See: features/command_omikuji.feature @omikuji
 	 *
-	 * @param ctx - コマンド実行コンテキスト（ctx.args[0] はターゲット参照 or undefined）
-	 * @returns コマンド実行結果（independentMessage におみくじ結果）
+	 * @param ctx - コマンド実行コンテキスト（ctx.args[0] は解決済みUUID or undefined）
+	 * @returns コマンド実行結果（systemMessage におみくじ結果をレス内マージ）
 	 */
 	async execute(ctx: CommandContext): Promise<CommandHandlerResult> {
 		// ステップ1: おみくじ結果をランダムに選択する
@@ -188,25 +205,32 @@ export class OmikujiHandler implements CommandHandler {
 		// ハンドラが args の有無で分岐するだけで実現する。
 		const targetArg = ctx.args[0];
 
-		let independentMessage: string;
+		let systemMessage: string;
 		if (targetArg) {
-			// ターゲットあり: 対象レスの人の運勢を占う
-			// CommandService の Step 1.5 で >>N が UUID に解決されている場合、
-			// 表示用に元の >>N 形式を取り出すことが難しいため、
-			// command-parser が返した生の args をそのまま使う。
-			// ただし command_omikuji.feature では >>5 形式のまま渡されることを想定している。
-			// See: features/command_omikuji.feature @ターゲット指定時は対象レスの人の運勢として表示される
-			independentMessage = `${targetArg} の運勢は…${selected}`;
+			// ターゲットあり: 対象レスの日替わりIDで運勢を表示する
+			// CommandService の Step 1.5 で >>N → UUID に解決済み。
+			// UUID からレスを取得し、dailyId を表示用に使う。
+			// See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
+			let displayId: string;
+			if (this.postRepository) {
+				const post = await this.postRepository.findById(targetArg);
+				displayId = post
+					? `ID:${post.dailyId}`
+					: (ctx.rawArgs?.[0] ?? targetArg);
+			} else {
+				// PostRepository 未注入時: rawArgs（>>N 形式）にフォールバック
+				displayId = ctx.rawArgs?.[0] ?? targetArg;
+			}
+			systemMessage = `${displayId} の運勢は…${selected}`;
 		} else {
 			// ターゲットなし: 自分の運勢を占う
 			// See: features/command_omikuji.feature @ターゲットなしでは自分の運勢として表示される
-			independentMessage = `今日の運勢は…${selected}`;
+			systemMessage = `今日の運勢は…${selected}`;
 		}
 
 		return {
 			success: true,
-			systemMessage: null,
-			independentMessage,
+			systemMessage,
 		};
 	}
 }
