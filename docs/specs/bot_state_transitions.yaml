@@ -1,10 +1,11 @@
 # D-05 ボット（Bot）状態遷移仕様書
-# ステータス: ドラフト v5
+# ステータス: ドラフト v5.1
 # 作成日: 2026-03-07
-# 最終更新: 2026-03-16
+# 最終更新: 2026-03-28
 # 対象: Phase 2 (MVP) -- 運営ボット（荒らし役）10体並行稼働
 #
 # 変更履歴:
+#   v5.1 (2026-03-28): eliminated->lurking 遷移をインカーネーションモデルに変更（D-08 bot.md §6.11）
 #   v5 (2026-03-16): bot_system.feature v5 に全面対応
 #     - HP: 30 -> 10 (即死級チュートリアルMob)
 #     - 10体並行稼働を反映
@@ -169,20 +170,26 @@ transitions:
     description: >
       撃破済みボットが翌日にHP初期値で復活し、新しい偽装IDで再び潜伏する。
       チュートリアルBOTは復活せず、daily-maintenanceでクリーンアップされる。
+      インカーネーションモデル（§6.11）により、旧レコードは凍結し新規レコードを作成する。
     guard:
       - ボットの状態が eliminated である
       - bot_profile_key != 'tutorial'（チュートリアルBOTは復活対象外）
     action:
-      - is_active = true に更新
-      - is_revealed = false に更新
-      - hp = max_hp に復帰
-      - revealed_at = NULL に更新
-      - eliminated_at = NULL に更新
-      - eliminated_by = NULL に更新
-      - daily_id を新しい偽装IDに再生成
-      - daily_id_date を当日に更新
-      - survival_days = 0 にリセット（撃破時にリセット）
-      - times_attacked = 0 にリセット
+      - 旧レコード: is_active = false のまま凍結保持（bot_posts 紐付けも維持）
+      - "新レコード INSERT: 同一 bot_profile_key・name で新世代を作成"
+      - hp = max_hp
+      - is_active = true
+      - is_revealed = false
+      - revealed_at = NULL
+      - eliminated_at = NULL
+      - eliminated_by = NULL
+      - daily_id を新しい偽装IDで生成
+      - daily_id_date = 当日
+      - survival_days = 0
+      - times_attacked = 0
+    implementation_note: >
+      旧レコードの UPDATE ではなく新規 INSERT。旧レスへの攻撃は旧 botId 経由で
+      is_active=false（撃破済み）と判定される。詳細は D-08 bot.md §6.11 参照。
     feature_ref: bot_system.feature#撃破済みボットは翌日にHP初期値で復活する
 
   # --- lurking -> lurking (日次リセット) ---

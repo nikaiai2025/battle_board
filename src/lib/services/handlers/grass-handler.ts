@@ -18,7 +18,7 @@
  *   - 削除済みレス → エラー "削除されたレスには草を生やせません"
  *   - システムメッセージ → エラー "システムメッセージには草を生やせません"
  *   - 自己草 → エラー "自分のレスには草を生やせません"
- *   - 同日重複 → エラー "今日は既にこのユーザーに草を生やしています"
+ *   - 同日重複制限: 廃止済み（v5 仕様）— 何度でも草を生やせる
  */
 
 import type { Post } from "../../domain/models/post";
@@ -95,12 +95,11 @@ export interface IGrassBotPostRepository {
  *   5. 受領者（対象レスの authorId）の特定
  *      - authorId != null → 人間ユーザー (receiverId)
  *      - authorId == null → botPostRepository.findByPostId() でボット判定 (receiverBotId)
- *   6. 重複チェック（GrassRepository.existsForToday）
- *   7. 草記録作成（GrassRepository.create）
- *   8. 草カウント加算
+ *   6. 草記録作成（GrassRepository.create）— 重複制限なし（v5 仕様）
+ *   7. 草カウント加算
  *      - 人間: GrassRepository.incrementGrassCount(receiverId)
  *      - ボット: GrassRepository.incrementBotGrassCount(receiverBotId)（LEAK-1修正）
- *   9. システムメッセージ生成（formatGrassMessage）
+ *   8. システムメッセージ生成（formatGrassMessage）
  *
  * See: features/reactions.feature
  * See: tmp/workers/bdd-architect_TASK-098/grass_system_design.md §4.1
@@ -216,29 +215,16 @@ export class GrassHandler implements CommandHandler {
 			}
 		}
 
-		// BOT草付与パス: ステップ6（重複チェック）・ステップ7（grass_reactions INSERT）をスキップ
+		// BOT草付与パス: ステップ6（草記録 INSERT）をスキップ
 		// BOTのbotUserIdはusersテーブルに存在しないため、grass_reactions.giver_idのFK制約違反を回避する。
-		// チュートリアルBOTは1回限りの !w デモであり、重複チェック不要。
+		// チュートリアルBOTは !w デモであり、記録不要。
 		// See: tmp/reports/debug_TASK-DEBUG-119.md
 		if (!ctx.isBotGiver) {
-			// ステップ6: 同日重複チェック
-			// See: features/reactions.feature @同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
+			// ステップ6: 草記録作成
+			// 同日・同一ユーザーへの重複制限は廃止済み（v5 仕様）。
+			// 何度でも草を生やせるため、毎回記録を作成する。
+			// See: features/reactions.feature @同日中に同一ユーザーのレスに何度でも草を生やせる
 			const today = new Date(Date.now()).toISOString().split("T")[0]; // YYYY-MM-DD
-			const alreadyGiven = await this.grassRepository.existsForToday(
-				ctx.userId,
-				receiverId,
-				receiverBotId,
-				today,
-			);
-			if (alreadyGiven) {
-				return {
-					success: false,
-					systemMessage: "今日は既にこのユーザーに草を生やしています",
-				};
-			}
-
-			// ステップ7: 草記録作成
-			// UNIQUE制約違反の場合は null が返る（existsForToday で事前チェック済みだが二重防御）
 			await this.grassRepository.create({
 				giverId: ctx.userId,
 				receiverId,
@@ -249,7 +235,7 @@ export class GrassHandler implements CommandHandler {
 			});
 		}
 
-		// ステップ8: 草カウント加算（BOT草付与パスでも実行する）
+		// ステップ7: 草カウント加算（BOT草付与パスでも実行する）
 		// - 人間: users.grass_count を +1（GrassRepository.incrementGrassCount）
 		// - ボット: bots.grass_count を +1（GrassRepository.incrementBotGrassCount）
 		//   LEAK-1修正: ボットへの草も正しいカウントを表示する（「計0本」固定を解消）
@@ -264,7 +250,7 @@ export class GrassHandler implements CommandHandler {
 				await this.grassRepository.incrementBotGrassCount(receiverBotId);
 		}
 
-		// ステップ9: システムメッセージ生成
+		// ステップ8: システムメッセージ生成
 		// See: features/reactions.feature §草を生やした結果がレス末尾にマージ表示される
 		const systemMessage = formatGrassMessage(
 			targetPost.postNumber,

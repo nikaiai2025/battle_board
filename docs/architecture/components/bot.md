@@ -1,8 +1,8 @@
 # D-08 コンポーネント境界設計書: Bot（AIボットシステム）
 
-> ステータス: ドラフト v6 / 2026-03-17
+> ステータス: ドラフト v7 / 2026-03-28
 > 関連D-07: SS 3.2 BotService / SS 5.4 ボット認証 / TDR-008
-> 関連D-05: bot_state_transitions.yaml v5
+> 関連D-05: bot_state_transitions.yaml v5.1
 
 ---
 
@@ -161,9 +161,11 @@ DailyResetResult {
 1. 全ボットの偽装IDを再生成
 2. revealed -> lurking（BOTマーク解除）
 3. lurking のまま日次リセット: survival_days +1
-4. eliminated -> lurking（HP初期値復帰、survival_days=0、times_attacked=0、`next_post_at` を再設定）（TDR-010: 撃破からの復活時に次回投稿予定時刻を設定し、投稿サイクルを再開する）
+4. eliminated → 新レコード INSERT（インカーネーションモデル — §6.11 参照）
+   - 旧レコード: `is_active = false` のまま凍結保持（`bot_posts` 紐付けも維持）
+   - 新レコード: 同一 `bot_profile_key`・`name` で INSERT。HP=max_hp, is_active=true, is_revealed=false, survival_days=0, times_attacked=0, `next_post_at` を再設定（TDR-010）
+   - `BotRepository.bulkReviveEliminated()` は UPDATE → INSERT に変更する
    - **チュートリアルBOT（`bot_profile_key = 'tutorial'`）は復活対象から除外する。** チュートリアルBOTは1回限りの消耗品であり、日次リセットで復活しない設計。
-   - `BotRepository.bulkReviveEliminated()` は `.or("bot_profile_key.is.null,bot_profile_key.neq.tutorial")` 条件で除外を実装する。
    - See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
 5. attacks テーブルの前日分レコードをクリーンアップ
 6. 撃破済みチュートリアルBOTのクリーンアップ（`BotRepository.deleteEliminatedTutorialBots()`）
@@ -726,7 +728,36 @@ Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, An
 - **自動クリーンアップ**: 撃破後は翌日の `deleteEliminatedTutorialBots` で DB から削除する。7日経過した未撃破チュートリアルBOTも削除する（チュートリアル放置ユーザーへの配慮）。
 - **botUserId の追加**: チュートリアルBOTの書き込み `>>N !w\n新参おるやん🤣` には `!w` コマンドが含まれる。BOT書き込み時の `resolvedAuthorId` は通常 null だが、`PostInput.botUserId` フィールドを追加することでコマンドパイプラインが BOT 自身の ID で実行される。GrassHandler の voter_id に FK 制約がないため、botId をそのまま利用できる。
 
-### 6.11 ネタ収集と投稿の分離（v6）
+### 6.11 インカーネーションモデル — ボット復活方式
+
+運営ボットの日次リセット復活時、既存レコードを UPDATE せず **新規レコードを INSERT** する。旧レコードは撃破済み状態のまま凍結し、履歴として永続保持する。
+
+**背景（UPDATE 方式の問題）**:
+
+`bot_posts` は `postId → botId` で紐づく。UPDATE 方式では復活後のボットが過去日の書き込みと同一 botId を共有するため、前日撃破されたレスに翌日攻撃すると「未撃破」扱いになる。偽装 ID リセットの意味が消失し「毎日が新しい推理ゲーム」の設計意図と矛盾する。
+
+**方針**:
+
+| 操作 | 対象 | 内容 |
+|---|---|---|
+| 凍結 | 旧 bots レコード | `is_active = false` のまま保持。`bot_posts` 紐付けも維持 |
+| INSERT | 新 bots レコード | 同一 `bot_profile_key`・`name` で新世代を作成。HP=max_hp, is_active=true, is_revealed=false, survival_days=0 |
+
+**既存ロジックへの影響**:
+
+旧レスへの操作は旧 botId → 旧 bots レコード（凍結済み）を参照するため、以下はすべて変更不要で正しく動作する。
+
+- BOTマーク表示: 旧 bot の `is_revealed` を参照 → 表示維持
+- `!attack >>旧レス番号`: 旧 bot の `is_active = false` → 「撃破済み」でスキップ
+- `!tell >>旧レス番号`: 旧 bot の `is_revealed = true` → 既に暴露済みとして処理
+- 投稿 cron: `WHERE is_active = true` → 新レコードのみ対象
+- `canAttackToday`: 新 botId に対する攻撃記録なし → 全員攻撃可能
+
+**適用対象**: 日次リセットで復活する全運営ボット。チュートリアルBOTは復活しないため対象外。
+
+**DB増加量**: 1日最大10レコード（荒らし役10体）。問題にならない規模。
+
+### 6.12 ネタ収集と投稿の分離（v6）
 
 ネタ師の「ネタ収集」と「投稿」を分離し、`collected_topics` テーブルをバッファとする。収集ジョブと投稿ジョブは独立した GitHub Actions ジョブとして実行する。
 

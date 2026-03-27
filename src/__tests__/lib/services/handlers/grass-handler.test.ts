@@ -247,32 +247,29 @@ describe("GrassHandler バリデーション", () => {
 	});
 
 	// ---
-	// 同日重複
-	// See: features/reactions.feature @同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
+	// 同日重複制限なし（v5 仕様）
+	// See: features/reactions.feature @同日中に同一ユーザーのレスに何度でも草を生やせる
 	// ---
-	describe("同日重複", () => {
-		it("同日に同一受領者に既に草を生やしている場合、失敗してエラーメッセージを返す", async () => {
+	describe("同日重複制限なし", () => {
+		it("同日に同一受領者に既に草を生やしていても成功する（制限廃止）", async () => {
 			const grassRepo = createMockGrassRepository({
-				existsForToday: vi.fn().mockResolvedValue(true), // 重複あり
+				incrementGrassCount: vi.fn().mockResolvedValue(2),
 			});
 			const handler = createHandler(createMockPostRepository(), grassRepo);
 			const ctx = createCtx();
 			const result = await handler.execute(ctx);
 
-			expect(result.success).toBe(false);
-			expect(result.systemMessage).toBe(
-				"今日は既にこのユーザーに草を生やしています",
-			);
+			expect(result.success).toBe(true);
 		});
 
-		it("重複がある場合 incrementGrassCount は呼ばれない", async () => {
+		it("同日重複でも incrementGrassCount が呼ばれる（制限廃止）", async () => {
 			const grassRepo = createMockGrassRepository({
-				existsForToday: vi.fn().mockResolvedValue(true),
+				incrementGrassCount: vi.fn().mockResolvedValue(2),
 			});
 			const handler = createHandler(createMockPostRepository(), grassRepo);
 			await handler.execute(createCtx());
 
-			expect(grassRepo.incrementGrassCount).not.toHaveBeenCalled();
+			expect(grassRepo.incrementGrassCount).toHaveBeenCalledWith("user-a-001");
 		});
 	});
 });
@@ -502,46 +499,6 @@ describe("GrassHandler 正常系", () => {
 			expect(handler.commandName).toBe("w");
 		});
 	});
-
-	// ---
-	// 重複チェックの引数検証
-	// ---
-	describe("重複チェック（existsForToday の呼び出し）", () => {
-		it("人間への草のとき existsForToday は receiverId を渡す", async () => {
-			const post = createHumanPost({ authorId: "user-a-001" });
-			const grassRepo = createMockGrassRepository();
-			const handler = createHandler(createMockPostRepository(post), grassRepo);
-			const ctx = createCtx({ userId: "user-b-001" });
-			await handler.execute(ctx);
-
-			expect(grassRepo.existsForToday).toHaveBeenCalledWith(
-				"user-b-001",
-				"user-a-001",
-				null,
-				expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
-			);
-		});
-
-		it("ボットへの草のとき existsForToday は receiverBotId を渡す", async () => {
-			const botPost = createBotPost();
-			const grassRepo = createMockGrassRepository();
-			const botPostRepo = createMockBotPostRepository({ botId: "bot-001" });
-			const handler = createHandler(
-				createMockPostRepository(botPost),
-				grassRepo,
-				botPostRepo,
-			);
-			const ctx = createCtx({ userId: "user-b-001" });
-			await handler.execute(ctx);
-
-			expect(grassRepo.existsForToday).toHaveBeenCalledWith(
-				"user-b-001",
-				null,
-				"bot-001",
-				expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-			);
-		});
-	});
 });
 
 // ---------------------------------------------------------------------------
@@ -683,7 +640,9 @@ describe("GrassHandler BOT草付与パス (isBotGiver)", () => {
 	});
 
 	// ---
-	// 自己草チェック・重複チェックのスキップ
+	// 自己草チェックのスキップ
+	// Note: 重複チェックは v5 仕様で廃止済み（全ユーザーに適用）
+	// See: features/reactions.feature @同日中に同一ユーザーのレスに何度でも草を生やせる
 	// ---
 	describe("バリデーションスキップ", () => {
 		it("isBotGiver=true の場合、自己草チェックをスキップする", async () => {
@@ -700,9 +659,9 @@ describe("GrassHandler BOT草付与パス (isBotGiver)", () => {
 			expect(result.success).toBe(true);
 		});
 
-		it("isBotGiver=true の場合、重複チェックをスキップする", async () => {
+		it("isBotGiver=true の場合、GrassRepository.create はスキップされる（FK制約回避）", async () => {
+			// BOT草付与パス: grass_reactions.giver_id のFK制約違反を回避するため INSERT をスキップ
 			const grassRepo = createMockGrassRepository({
-				existsForToday: vi.fn().mockResolvedValue(true), // 重複ありでも通過
 				incrementGrassCount: vi.fn().mockResolvedValue(1),
 			});
 			const handler = createHandler(createMockPostRepository(), grassRepo);
@@ -710,17 +669,7 @@ describe("GrassHandler BOT草付与パス (isBotGiver)", () => {
 			const result = await handler.execute(ctx);
 
 			expect(result.success).toBe(true);
-		});
-
-		it("isBotGiver=true の場合、existsForToday は呼ばれない", async () => {
-			const grassRepo = createMockGrassRepository({
-				incrementGrassCount: vi.fn().mockResolvedValue(1),
-			});
-			const handler = createHandler(createMockPostRepository(), grassRepo);
-			const ctx = createCtx({ isBotGiver: true });
-			await handler.execute(ctx);
-
-			expect(grassRepo.existsForToday).not.toHaveBeenCalled();
+			expect(grassRepo.create).not.toHaveBeenCalled();
 		});
 	});
 

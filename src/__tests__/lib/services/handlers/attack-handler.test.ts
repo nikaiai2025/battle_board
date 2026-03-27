@@ -1184,5 +1184,163 @@ describe("AttackHandler", () => {
 			expect(result.success).toBe(false);
 			expect(result.systemMessage).toContain("最大10");
 		});
+
+		it("カンマ区切りで飛び地のボットを攻撃する", async () => {
+			// See: features/bot_system.feature @カンマ区切りで飛び地のボットを攻撃する
+			const botPost4 = createHumanPost({
+				id: "post-4",
+				postNumber: 4,
+			});
+			const botPost6 = createHumanPost({
+				id: "post-6",
+				postNumber: 6,
+			});
+
+			const { handler, botService, getBalance } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[4, botPost4],
+					[6, botPost6],
+				]),
+				isBotByPostId: new Map([
+					["post-4", true],
+					["post-6", true],
+				]),
+				botInfoByPostId: new Map([
+					[
+						"post-4",
+						createBotInfo({
+							botId: "bot-a",
+							name: "荒らし役A",
+							isActive: true,
+						}),
+					],
+					[
+						"post-6",
+						createBotInfo({
+							botId: "bot-b",
+							name: "荒らし役B",
+							isActive: true,
+						}),
+					],
+				]),
+				damageResultByBotId: new Map([
+					[
+						"bot-a",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+					[
+						"bot-b",
+						createDamageResultEliminated({
+							previousHp: 10,
+							remainingHp: 0,
+							reward: 15,
+						}),
+					],
+				]),
+				balance: 100,
+			});
+
+			const result = await handler.execute(createCtx({ args: [">>4,6"] }));
+
+			expect(result.success).toBe(true);
+			expect(result.systemMessage).toContain("連続攻撃");
+			expect(result.systemMessage).toContain(">>4:");
+			expect(result.systemMessage).toContain(">>6:");
+			expect(result.systemMessage).toContain("荒らし役A");
+			expect(result.systemMessage).toContain("荒らし役B");
+			// レス5は含まれない（飛び地）
+			expect(result.systemMessage).not.toContain(">>5:");
+			// コスト: 2 × 5 = 10
+			expect(getBalance()).toBe(100 - 10);
+			expect(botService.applyDamage).toHaveBeenCalledTimes(2);
+		});
+
+		it("カンマ区切りと連続範囲の混合で攻撃する", async () => {
+			// See: features/bot_system.feature @カンマ区切りと連続範囲の混合で複数ボットを攻撃する
+			const botPost4 = createHumanPost({
+				id: "post-4",
+				postNumber: 4,
+			});
+			const botPost6 = createHumanPost({
+				id: "post-6",
+				postNumber: 6,
+			});
+			const botPost10 = createHumanPost({
+				id: "post-10",
+				postNumber: 10,
+			});
+			const botPost11 = createHumanPost({
+				id: "post-11",
+				postNumber: 11,
+			});
+
+			const { handler, getBalance } = createMultiTargetHandler({
+				postsByNumber: new Map([
+					[4, botPost4],
+					[6, botPost6],
+					[10, botPost10],
+					[11, botPost11],
+				]),
+				isBotByPostId: new Map([
+					["post-4", true],
+					["post-6", true],
+					["post-10", true],
+					["post-11", true],
+				]),
+				botInfoByPostId: new Map([
+					[
+						"post-4",
+						createBotInfo({
+							botId: "bot-a",
+							isActive: true,
+						}),
+					],
+					[
+						"post-6",
+						createBotInfo({
+							botId: "bot-b",
+							isActive: true,
+						}),
+					],
+					[
+						"post-10",
+						createBotInfo({
+							botId: "bot-c",
+							isActive: true,
+						}),
+					],
+					[
+						"post-11",
+						createBotInfo({
+							botId: "bot-d",
+							isActive: true,
+						}),
+					],
+				]),
+				damageResultByBotId: new Map([
+					["bot-a", createDamageResultEliminated({ reward: 15 })],
+					["bot-b", createDamageResultEliminated({ reward: 15 })],
+					["bot-c", createDamageResultEliminated({ reward: 15 })],
+					["bot-d", createDamageResultEliminated({ reward: 15 })],
+				]),
+				balance: 100,
+			});
+
+			const result = await handler.execute(
+				createCtx({ args: [">>4,6,10-11"] }),
+			);
+
+			expect(result.success).toBe(true);
+			expect(result.systemMessage).toContain(">>4:");
+			expect(result.systemMessage).toContain(">>6:");
+			expect(result.systemMessage).toContain(">>10:");
+			expect(result.systemMessage).toContain(">>11:");
+			// 4件 × 5 = 20
+			expect(getBalance()).toBe(100 - 20);
+		});
 	});
 });

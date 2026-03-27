@@ -17,10 +17,8 @@
  *     - 草カウントが 30 本に達すると 🍎 に変化する
  *     - 草カウントが 40 本に達すると 🫘 に変化する
  *     - 草カウントが 50 本に達すると 🌱 に戻りループする
- *   重複制限:
- *     - 同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
- *     - 同一ユーザーの別レスに草を生やしても重複として扱われる
- *     - 日付が変われば同じユーザーに再度草を生やせる
+ *   重複制限なし（v5 仕様）:
+ *     - 同日中に同一ユーザーのレスに何度でも草を生やせる
  *     - 異なる付与先ユーザーにはそれぞれ草を生やせる
  *   自己草禁止:
  *     - 自分が書いたレスには草を生やせない
@@ -225,9 +223,9 @@ const InMemoryGrassRepo = {
 	/**
 	 * 草リアクションを記録する。
 	 *
-	 * UNIQUE制約違反（重複）の場合は null を返す（existsForToday で事前チェック済み）。
+	 * 重複制限は廃止済み（v5 仕様）。毎回記録を作成する。
 	 *
-	 * See: features/reactions.feature §重複制限
+	 * See: features/reactions.feature @同日中に同一ユーザーのレスに何度でも草を生やせる
 	 * See: src/lib/infrastructure/repositories/grass-repository.ts > create
 	 */
 	async create(params: {
@@ -238,17 +236,6 @@ const InMemoryGrassRepo = {
 		threadId: string;
 		givenDate: string;
 	}): Promise<{ id: string } | null> {
-		// 二重防御: 既に存在する場合は null を返す
-		const alreadyExists = await this.existsForToday(
-			params.giverId,
-			params.receiverId,
-			params.receiverBotId,
-			params.givenDate,
-		);
-		if (alreadyExists) {
-			return null;
-		}
-
 		const id = crypto.randomUUID();
 		grassReactionsStore.push({
 			id,
@@ -622,7 +609,6 @@ AfterStep(async function (
 		!isGrassSuccess &&
 		(info.includes("草を生やせません") ||
 			info.includes("指定されたレスが見つかりません") ||
-			info.includes("今日は既にこのユーザーに草を生やしています") ||
 			info.includes("自分のレスには") ||
 			info.includes("対象レスを指定してください") ||
 			info.includes("削除されたレスには") ||
@@ -1006,131 +992,10 @@ Given(
 );
 
 // ---------------------------------------------------------------------------
-// Given: 重複制限のセットアップ
+// Note: 重複制限セットアップステップ（今日ユーザー/昨日ユーザー系）は v5 仕様で廃止済み。
+// 同日重複制限が撤廃されたため、これらのステップは不要になった。
+// See: features/reactions.feature @同日中に同一ユーザーのレスに何度でも草を生やせる
 // ---------------------------------------------------------------------------
-
-/**
- * 今日ユーザー "UserB" が "UserA" のレスに草を生やし済みである。
- *
- * 同日重複チェックのために、既存の草記録を挿入する。
- *
- * See: features/reactions.feature @同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
- * See: docs/architecture/bdd_test_strategy.md §5.2 相対時刻の禁止
- */
-Given(
-	/^今日ユーザー "([^"]+)" が "([^"]+)" のレスに草を生やし済みである$/,
-	async function (
-		this: BattleBoardWorld,
-		giverName: string,
-		receiverName: string,
-	) {
-		await ensureCurrentUserAndThread(this);
-
-		const { userId: giverId } = await ensureNamedUserForGrass(this, giverName);
-		const { userId: receiverId } = await ensureNamedUserForGrass(
-			this,
-			receiverName,
-		);
-
-		// GrassHandler が `new Date(Date.now()).toISOString().split("T")[0]` で
-		// 同日判定を行うのと同じ計算式を使い、UTC 今日の日付を取得する。
-		// Date.now スタブにより GrassHandler もテスト側も同一の日付を参照する。
-		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
-		const today = new Date(Date.now()).toISOString().split("T")[0];
-
-		// 既存の草記録をインメモリストアに直接挿入する
-		grassReactionsStore.push({
-			id: crypto.randomUUID(),
-			giverId,
-			receiverId,
-			receiverBotId: null,
-			targetPostId: "dummy-post-for-preexisting-grass",
-			threadId: this.currentThreadId!,
-			givenDate: today,
-		});
-	},
-);
-
-/**
- * 今日ユーザー "UserB" がレス >>N 経由で "UserA" に草を生やし済みである。
- *
- * 別レス重複チェック用（同一ユーザーの別レスへの草は重複として扱われる）。
- *
- * See: features/reactions.feature @同一ユーザーの別レスに草を生やしても重複として扱われる
- */
-Given(
-	/^今日ユーザー "([^"]+)" がレス >>(\d+) 経由で "([^"]+)" に草を生やし済みである$/,
-	async function (
-		this: BattleBoardWorld,
-		giverName: string,
-		_postNumberStr: string,
-		receiverName: string,
-	) {
-		await ensureCurrentUserAndThread(this);
-
-		const { userId: giverId } = await ensureNamedUserForGrass(this, giverName);
-		const { userId: receiverId } = await ensureNamedUserForGrass(
-			this,
-			receiverName,
-		);
-
-		// GrassHandler と同じ計算式（new Date(Date.now()) で UTC 今日の日付を取得）
-		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
-		const today = new Date(Date.now()).toISOString().split("T")[0];
-
-		grassReactionsStore.push({
-			id: crypto.randomUUID(),
-			giverId,
-			receiverId,
-			receiverBotId: null,
-			targetPostId: "dummy-post-for-preexisting-grass",
-			threadId: this.currentThreadId!,
-			givenDate: today,
-		});
-	},
-);
-
-/**
- * 昨日ユーザー "UserB" が "UserA" のレスに草を生やし済みである。
- *
- * 昨日の草記録を設定する（日付変更後の再付与テスト用）。
- *
- * See: features/reactions.feature @日付が変われば同じユーザーに再度草を生やせる
- * See: docs/architecture/bdd_test_strategy.md §5.1 時計凍結の原則
- */
-Given(
-	/^昨日ユーザー "([^"]+)" が "([^"]+)" のレスに草を生やし済みである$/,
-	async function (
-		this: BattleBoardWorld,
-		giverName: string,
-		receiverName: string,
-	) {
-		await ensureCurrentUserAndThread(this);
-
-		const { userId: giverId } = await ensureNamedUserForGrass(this, giverName);
-		const { userId: receiverId } = await ensureNamedUserForGrass(
-			this,
-			receiverName,
-		);
-
-		// 昨日の UTC 日付を計算する（Date.now() ベース）
-		// GrassHandler が new Date(Date.now()) を使うため、ここでも同じ基準を使う
-		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
-		const todayMs = Date.now();
-		const yesterdayMs = todayMs - 24 * 60 * 60 * 1000;
-		const yesterday = new Date(yesterdayMs).toISOString().split("T")[0];
-
-		grassReactionsStore.push({
-			id: crypto.randomUUID(),
-			giverId,
-			receiverId,
-			receiverBotId: null,
-			targetPostId: "dummy-post-for-preexisting-grass",
-			threadId: this.currentThreadId!,
-			givenDate: yesterday,
-		});
-	},
-);
 
 // ---------------------------------------------------------------------------
 // Given: ボット書き込みセットアップ
@@ -1323,34 +1188,9 @@ When(
 	},
 );
 
-/**
- * 日付が変更された後にユーザー "UserX" が "!w >>N" を実行する。
- *
- * 時刻を翌日（2026-03-18）に進めてからコマンドを実行する。
- *
- * See: features/reactions.feature @日付が変われば同じユーザーに再度草を生やせる
- * See: docs/architecture/bdd_test_strategy.md §5.1 時計凍結の原則
- */
-When(
-	/^日付が変更された後にユーザー "([^"]+)" が "!w >>(\d+)" を実行する$/,
-	async function (
-		this: BattleBoardWorld,
-		giverName: string,
-		postNumberStr: string,
-	) {
-		const postNumber = parseInt(postNumberStr, 10);
-		await ensureCurrentUserAndThread(this);
-
-		// 「昨日の草記録」の Given ステップで昨日の日付を設定済み。
-		// GrassHandler は new Date(Date.now()) で今日の UTC 日付を計算する。
-		// Date.now スタブにより GrassHandler もテスト側も同一の日付を参照する。
-		// 昨日 != 今日 のため重複チェックを通過し草が付与される。
-		// See: src/lib/services/handlers/grass-handler.ts > execute (step6)
-
-		const { userId: giverId } = await ensureNamedUserForGrass(this, giverName);
-		await executeGrassCommand(this, postNumber, giverId);
-	},
-);
+// Note: 「日付が変更された後にユーザー "X" が "!w >>N" を実行する」ステップは v5 仕様で廃止済み。
+// 重複制限撤廃により「日付変更後に再付与可能」シナリオが不要になった。
+// See: features/reactions.feature @同日中に同一ユーザーのレスに何度でも草を生やせる
 
 // ---------------------------------------------------------------------------
 // Then: アサーション（reactions.feature 固有のもの）
@@ -1472,7 +1312,6 @@ Then(
  * PostService パス: AfterStep フックが inlineSystemInfo から lastGrassResult を設定する。
  * どちらのパスでも lastGrassResult.success === false であることを確認する。
  *
- * See: features/reactions.feature @同日中に同一ユーザーのレスに2回目の草を生やそうとすると拒否される
  * See: features/reactions.feature @自分が書いたレスには草を生やせない
  * See: features/reactions.feature @存在しないレスに草を生やそうとするとエラーになる
  */

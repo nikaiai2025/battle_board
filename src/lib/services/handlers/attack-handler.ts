@@ -29,7 +29,7 @@ import type {
 } from "../../domain/models/currency";
 import type { Post } from "../../domain/models/post";
 import {
-	isRangeFormat,
+	isMultiTargetFormat,
 	parseAttackRange,
 } from "../../domain/rules/attack-range-parser";
 import type { BotInfo, DamageResult } from "../bot-service";
@@ -196,10 +196,10 @@ export class AttackHandler implements CommandHandler {
 			};
 		}
 
-		// >>N-M 形式の範囲指定を検出 → 複数ターゲット攻撃
+		// 複数ターゲット指定（>>N-M / >>N,M / >>N,M-O）を検出
 		// CommandService の PostNumberResolver は >>N のみ解決するため、
-		// >>N-M はそのまま文字列として渡される。
-		if (isRangeFormat(targetArg)) {
+		// これらの形式はそのまま文字列として渡される。
+		if (isMultiTargetFormat(targetArg)) {
 			return await this.executeMultiTarget(ctx, targetArg);
 		}
 
