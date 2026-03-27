@@ -197,7 +197,7 @@ export default function AuthModal({
 	return (
 		// モーダルオーバーレイ
 		<div
-			className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+			className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-[15vh] z-50"
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="auth-header"
