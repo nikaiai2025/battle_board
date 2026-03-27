@@ -291,17 +291,26 @@ export default function PostItem({ post }: PostItemProps) {
 					{/* inline-separator: 本文とシステム情報を視覚的に分離する区切り線
 						See: docs/specs/screens/thread-view.yaml > inline-separator */}
 					<hr className="border-border mb-1" />
-					{/* inline-system-content: システム情報テキスト（AA互換フォント）
-						AA（アスキーアート）を正しく表示するため、MS Pゴシック互換フォント+16px で描画する。
+					{/* inline-system-content: システム情報テキスト
+						AA（!copipe結果）を含む場合はMS Pゴシック互換フォント+16pxで描画する。
+						copipe結果は「【name】\n（AA本文）」形式のため、「【】+改行」でAA判定する。
+						おみくじは「…【大吉】テキスト」形式（改行なし）なので誤判定しない。
+						それ以外のシステム情報（書き込み報酬等）は通常フォント。
 						See: docs/specs/screens/thread-view.yaml > inline-system-content
 						See: config/copipe-seed.txt ヘッダー「AA表示の前提フォントとスペース方針」 */}
 					<p
-						className="text-muted-foreground whitespace-pre-wrap"
-						style={{
-							fontFamily: "var(--font-aa)",
-							fontSize: "16px",
-							lineHeight: "18px",
-						}}
+						className={`text-muted-foreground whitespace-pre-wrap ${
+							!/【.+】\n/.test(post.inlineSystemInfo) ? "text-xs" : ""
+						}`}
+						style={
+							/【.+】\n/.test(post.inlineSystemInfo)
+								? {
+										fontFamily: "var(--font-aa)",
+										fontSize: "16px",
+										lineHeight: "18px",
+									}
+								: undefined
+						}
 					>
 						{post.inlineSystemInfo}
 					</p>

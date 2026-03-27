@@ -67,7 +67,7 @@ function trimBlankLines(text: string): string {
  */
 function parseCopipeSeed(filePath: string): CopipeEntry[] {
 	const raw = fs.readFileSync(filePath, "utf-8");
-	const lines = raw.split("\n");
+	const lines = raw.split(/\r?\n/);
 
 	const entries: CopipeEntry[] = [];
 	let currentName: string | null = null;
