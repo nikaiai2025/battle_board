@@ -63,19 +63,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 		return NextResponse.redirect(new URL("/auth/error", req.nextUrl.origin));
 	}
 
-	// --- PKCE ストレージを Cookie から復元する ---
+	// --- PKCE code_verifier を Cookie から取得する ---
 	// OAuth開始時（/api/auth/login/discord または /api/auth/register/discord）に
 	// 設定した bb-pkce-state Cookie から code_verifier を復元する。
-	// See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
-	const pkceStateCookie = req.cookies.get(PKCE_STATE_COOKIE)?.value;
-	let pkceStorage: Record<string, string> | undefined;
-	if (pkceStateCookie) {
-		try {
-			pkceStorage = JSON.parse(pkceStateCookie) as Record<string, string>;
-		} catch {
-			// 不正なCookie値は無視（フォールバック: pkceStorageなしで進む）
-		}
-	}
+	// See: src/lib/services/registration-service.ts loginWithDiscord/registerWithDiscord
+	const codeVerifier = req.cookies.get(PKCE_STATE_COOKIE)?.value;
 
 	let result: Awaited<
 		ReturnType<typeof RegistrationService.handleOAuthCallback>
@@ -89,7 +81,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 			code,
 			userId,
 			"discord",
-			pkceStorage,
+			codeVerifier,
 		);
 	} else {
 		// フロー2: Discordログインフロー（flow=login または flow なし）
@@ -98,7 +90,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 			code,
 			undefined,
 			"discord",
-			pkceStorage,
+			codeVerifier,
 		);
 	}
 

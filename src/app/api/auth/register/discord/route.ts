@@ -75,25 +75,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 		const origin = req.nextUrl.origin;
 		const redirectTo = `${origin}/api/auth/callback?flow=register&userId=${userId}`;
 
-		const result = await RegistrationService.registerWithDiscord(redirectTo);
+		const result = RegistrationService.registerWithDiscord(redirectTo);
 
-		// PKCE ストレージを Cookie に保存する（コールバック時に code_verifier を復元するため）
-		// See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
+		// PKCE code_verifier を Cookie に保存する（コールバック時に code exchange で使用）
 		const response = NextResponse.json(
 			{ success: true, redirectUrl: result.redirectUrl },
 			{ status: 200 },
 		);
-		response.cookies.set(
-			PKCE_STATE_COOKIE,
-			JSON.stringify(result.pkceStorage),
-			{
-				httpOnly: true,
-				secure: process.env.NODE_ENV === "production",
-				sameSite: "lax",
-				maxAge: 60 * 10, // 10分間有効（OAuth フロー完了までの猶予）
-				path: "/",
-			},
-		);
+		response.cookies.set(PKCE_STATE_COOKIE, result.codeVerifier, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "lax",
+			maxAge: 60 * 10, // 10分間有効（OAuth フロー完了までの猶予）
+			path: "/",
+		});
 		return response;
 	} catch (err) {
 		console.error("[POST /api/auth/register/discord] Error:", err);

@@ -17,15 +17,79 @@
  *   - PAT は 32文字 hex（crypto.randomBytes(16).toString('hex')）
  */
 
-import { randomBytes, randomUUID } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import * as EdgeTokenRepository from "../infrastructure/repositories/edge-token-repository";
 import * as UserRepository from "../infrastructure/repositories/user-repository";
 // createClient の直接 import を削除（レイヤー規約準拠）
 import {
 	createAuthOnlyClient,
-	createPkceOAuthClient,
 	supabaseAdmin,
 } from "../infrastructure/supabase/client";
+
+// ---------------------------------------------------------------------------
+// PKCE ユーティリティ（手動実装）
+// ---------------------------------------------------------------------------
+
+/**
+ * PKCE code_verifier と code_challenge を生成する。
+ * Supabase SDK の PKCE サポートに依存せず、Node.js crypto で直接実装することで
+ * CF Workers 環境でも確実に動作させる。
+ *
+ * RFC7636 準拠:
+ *   - code_verifier: 32バイトのランダム値を base64url エンコード（43文字）
+ *   - code_challenge: SHA-256(code_verifier) を base64url エンコード
+ *   - code_challenge_method: S256
+ */
+function generatePkce(): { verifier: string; challenge: string } {
+	const verifier = randomBytes(32).toString("base64url");
+	const challenge = createHash("sha256").update(verifier).digest("base64url");
+	return { verifier, challenge };
+}
+
+/**
+ * Supabase Auth REST API に直接 PKCE code exchange を行う。
+ * POST /auth/v1/token?grant_type=pkce
+ *
+ * SDK の exchangeCodeForSession() ではなく直接 fetch を使うことで、
+ * SDK 内部のストレージ依存を排除し CF Workers 上でも確実に動作させる。
+ *
+ * @param code - Supabase Auth から受け取った authorization code
+ * @param codeVerifier - OAuth 開始時に生成した PKCE verifier
+ * @returns Supabase Auth ユーザー ID、またはエラー時 null
+ */
+async function exchangeCodeForSupabaseUser(
+	code: string,
+	codeVerifier: string,
+): Promise<string | null> {
+	const supabaseUrl = process.env.SUPABASE_URL;
+	const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+	if (!supabaseUrl || !supabaseAnonKey) {
+		console.error("exchangeCodeForSupabaseUser: missing env vars");
+		return null;
+	}
+
+	const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=pkce`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			apikey: supabaseAnonKey,
+		},
+		body: JSON.stringify({
+			auth_code: code,
+			code_verifier: codeVerifier,
+		}),
+	});
+
+	if (!response.ok) {
+		const body = await response.text();
+		console.error(`exchangeCodeForSupabaseUser: ${response.status} ${body}`);
+		return null;
+	}
+
+	const data = (await response.json()) as { user?: { id?: string } };
+	return data?.user?.id ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -131,38 +195,36 @@ export async function registerWithEmail(
 
 /**
  * Discord アカウントで本登録するための OAuth URL を返す。
- * Supabase Auth signInWithOAuth({ provider: 'discord' }) の認可 URL を返す。
- * PKCE フローを使用し、code_verifier をストレージに保存する。
- * 呼び出し元は pkceStorage を Cookie に保存すること。
+ * Supabase Auth の /auth/v1/authorize エンドポイントへの URL を手動で構築する。
+ * PKCE フロー（S256）を使用し、code_verifier を呼び出し元が Cookie に保存する。
+ *
+ * SDK の signInWithOAuth() を使わない理由:
+ *   SDK 内部の PKCE 実装が CF Workers のストレージ環境と相性が悪く、
+ *   code_challenge が URL に付与されないケースがあるため、直接構築に切り替えた。
  *
  * See: features/user_registration.feature @仮ユーザーがDiscordアカウントで本登録する
  * See: docs/architecture/components/user-registration.md §7.2 Discord連携
- * See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
  *
  * @param redirectTo - Discord認可後のコールバックURL
- * @returns redirectUrl: Discord認可画面のURL, pkceStorage: Cookieに保存するPKCEストレージ
+ * @returns redirectUrl: Discord認可画面のURL, codeVerifier: Cookieに保存するPKCE verifier
  */
-export async function registerWithDiscord(
-	redirectTo: string,
-): Promise<{ redirectUrl: string; pkceStorage: Record<string, string> }> {
-	const { client, getStorage } = createPkceOAuthClient();
+export function registerWithDiscord(redirectTo: string): {
+	redirectUrl: string;
+	codeVerifier: string;
+} {
+	const { verifier, challenge } = generatePkce();
 
-	const { data, error } = await client.auth.signInWithOAuth({
+	const supabaseUrl = process.env.SUPABASE_URL ?? "";
+	const params = new URLSearchParams({
 		provider: "discord",
-		options: {
-			redirectTo,
-			scopes: "identify",
-			skipBrowserRedirect: true,
-		},
+		redirect_to: redirectTo,
+		scopes: "identify",
+		code_challenge: challenge,
+		code_challenge_method: "S256",
 	});
 
-	if (error || !data.url) {
-		throw new Error(
-			`RegistrationService.registerWithDiscord failed: ${error?.message ?? "URL not returned"}`,
-		);
-	}
-
-	return { redirectUrl: data.url, pkceStorage: getStorage() };
+	const redirectUrl = `${supabaseUrl}/auth/v1/authorize?${params.toString()}`;
+	return { redirectUrl, codeVerifier: verifier };
 }
 
 /**
@@ -298,79 +360,85 @@ export async function loginWithEmail(
 
 /**
  * Discord アカウントでのログイン開始。Discord OAuth フロー開始 URL を返す。
- * PKCE フローを使用し、code_verifier をストレージに保存する。
- * 呼び出し元は pkceStorage を Cookie に保存すること。
+ * Supabase Auth の /auth/v1/authorize エンドポイントへの URL を手動で構築する。
+ * PKCE フロー（S256）を使用し、code_verifier を呼び出し元が Cookie に保存する。
+ *
+ * SDK の signInWithOAuth() を使わない理由:
+ *   SDK 内部の PKCE 実装が CF Workers のストレージ環境と相性が悪く、
+ *   code_challenge が URL に付与されないケースがあるため、直接構築に切り替えた。
  *
  * See: features/user_registration.feature @本登録ユーザーがDiscordアカウントでログインする
  * See: docs/architecture/components/user-registration.md §5.2 ログイン > loginWithDiscord
- * See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
  *
  * @param redirectTo - Discord認可後のコールバックURL
- * @returns redirectUrl: Discord認可画面のURL, pkceStorage: Cookieに保存するPKCEストレージ
+ * @returns redirectUrl: Discord認可画面のURL, codeVerifier: Cookieに保存するPKCE verifier
  */
-export async function loginWithDiscord(
-	redirectTo: string,
-): Promise<{ redirectUrl: string; pkceStorage: Record<string, string> }> {
-	const { client, getStorage } = createPkceOAuthClient();
+export function loginWithDiscord(redirectTo: string): {
+	redirectUrl: string;
+	codeVerifier: string;
+} {
+	const { verifier, challenge } = generatePkce();
 
-	const { data, error } = await client.auth.signInWithOAuth({
+	const supabaseUrl = process.env.SUPABASE_URL ?? "";
+	const params = new URLSearchParams({
 		provider: "discord",
-		options: {
-			redirectTo,
-			scopes: "identify",
-			skipBrowserRedirect: true,
-		},
+		redirect_to: redirectTo,
+		scopes: "identify",
+		code_challenge: challenge,
+		code_challenge_method: "S256",
 	});
 
-	if (error || !data.url) {
-		throw new Error(
-			`RegistrationService.loginWithDiscord failed: ${error?.message ?? "URL not returned"}`,
-		);
-	}
-
-	return { redirectUrl: data.url, pkceStorage: getStorage() };
+	const redirectUrl = `${supabaseUrl}/auth/v1/authorize?${params.toString()}`;
+	return { redirectUrl, codeVerifier: verifier };
 }
 
 /**
  * OAuth コールバックを処理し、ログインを完了する。
- * Supabase Auth exchangeCodeForSession() でセッション取得後、ログイン処理を行う。
+ * Supabase Auth REST API に直接 PKCE code exchange を行いユーザー取得後、ログイン処理を行う。
  *
  * 処理手順:
- *   1. Supabase Auth exchangeCodeForSession() でセッション取得（PKCE verifier使用）
+ *   1. PKCE code exchange（POST /auth/v1/token?grant_type=pkce）で supabase_auth_id 取得
  *   2. supabase_auth_id で users レコードを検索
  *   3. 見つかった場合: 新 edge-token を発行してログイン完了（ログインフロー）
  *   4. 見つからない場合: completeRegistration() で本登録完了（本登録フロー）
  *
+ * SDK を使わない理由:
+ *   SDK の exchangeCodeForSession() は内部ストレージに保存した code_verifier を使うが、
+ *   CF Workers ではリクエスト間でストレージが保持されないため、直接 REST API を呼ぶ。
+ *
  * See: docs/architecture/components/user-registration.md §5.2 ログイン > handleOAuthCallback
- * See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
  *
  * @param code - Supabase Auth コールバックの code パラメータ
  * @param pendingUserId - 本登録フローの場合、紐付け先の仮ユーザーID（ログインフローの場合は不要）
  * @param registrationType - 本登録方法: 'email' | 'discord'（本登録フローの場合に使用）
- * @param pkceStorage - OAuth開始時にCookieに保存したPKCEストレージ（code_verifierを含む）
+ * @param codeVerifier - OAuth開始時にCookieに保存した PKCE code_verifier
  * @returns LoginResult（ログイン成功時は userId と edgeToken を含む）
  */
 export async function handleOAuthCallback(
 	code: string,
 	pendingUserId?: string,
 	registrationType: "email" | "discord" = "discord",
-	pkceStorage?: Record<string, string>,
+	codeVerifier?: string,
 ): Promise<LoginResult> {
-	// Step 1: コードをセッションに交換
-	// PKCE フロー: pkceStorage に保存された code_verifier を使用する
-	// See: src/lib/infrastructure/supabase/client.ts createPkceOAuthClient()
-	const authClient = pkceStorage
-		? createPkceOAuthClient(pkceStorage).client
-		: supabaseAdmin;
+	// Step 1: PKCE code exchange で supabase_auth_id を取得
+	// codeVerifier が存在する場合（Discord OAuth）は手動 REST API 呼び出し
+	// See: exchangeCodeForSupabaseUser() の実装コメント
+	let supabaseAuthId: string | null = null;
 
-	const { data: sessionData, error: sessionError } =
-		await authClient.auth.exchangeCodeForSession(code);
-
-	if (sessionError || !sessionData.user) {
-		return { success: false, reason: "invalid_credentials" };
+	if (codeVerifier) {
+		supabaseAuthId = await exchangeCodeForSupabaseUser(code, codeVerifier);
+	} else {
+		// codeVerifier なしの場合（旧互換 or メールフロー）は SDK を使用
+		const { data: sessionData, error: sessionError } =
+			await supabaseAdmin.auth.exchangeCodeForSession(code);
+		if (!sessionError && sessionData.user) {
+			supabaseAuthId = sessionData.user.id;
+		}
 	}
 
-	const supabaseAuthId = sessionData.user.id;
+	if (!supabaseAuthId) {
+		return { success: false, reason: "invalid_credentials" };
+	}
 
 	// Step 2: supabase_auth_id で users レコードを検索
 	let user = await UserRepository.findBySupabaseAuthId(supabaseAuthId);
