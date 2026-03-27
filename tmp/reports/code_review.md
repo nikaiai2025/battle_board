@@ -197,3 +197,85 @@ export async function findByCommandType(
 
 1. **HIGH-1**: processAoriCommands のエラー時 pending 未削除 -- 無限リトライにより Cron 処理のリソースが消費され続ける実害がある。
 2. **HIGH-2**: GEMINI_API_KEY 未設定時のサイレントフォールバック -- 運用時のトラブルシュート性を大きく損なう。
+
+---
+---
+
+# Code Review Report: TASK-343 (Sprint-134)
+
+> Reviewer: bdd-code-reviewer
+> Task: TASK-344-review
+> Date: 2026-03-27
+> Scope: Sprint-134 -- command_copipe.feature 8シナリオ失敗修正
+
+---
+
+## 対象
+
+| 項目 | 値 |
+|---|---|
+| Sprint | Sprint-134 |
+| 実装タスク | TASK-343 |
+| レビュータスク | TASK-344-review |
+| 変更ファイル | `features/step_definitions/command_system.steps.ts` (L696-745) |
+| 修正方針根拠 | `tmp/workers/bdd-architect_TASK-342/analysis.md` |
+
+## 変更概要
+
+`本文に {string} を含めて投稿する` ステップ（L691-774）に、既存の `{string} を実行する` ステップ（L785-968）と同等の以下2ブロックを追加:
+
+1. **通貨自動補填ブロック** (L701-725): コマンドレジストリからコストを参照し、有料コマンド実行時に残高0なら100に補填
+2. **IncentiveLog事前挿入ブロック** (L732-745): `new_thread_join` ボーナスの重複付与を防止するため、IncentiveLogにダミーレコードを事前挿入
+
+## 指摘事項
+
+### [MEDIUM-1] コード重複 (DRY原則違反) -- 通貨自動補填ブロックとIncentiveLog事前挿入ブロック
+
+**ファイル:** `features/step_definitions/command_system.steps.ts`
+- 通貨自動補填: L701-725 (新規) vs L897-921 (既存)
+- IncentiveLog事前挿入: L732-745 (新規) vs L928-941 (既存)
+
+**問題点:** 2つの When ステップに、変数名（`bodyContent` vs `commandString`）以外が完全に同一のロジックが約50行複製されています。今後この周辺のロジックに変更があった場合、2箇所を同期し忘れるリスクがあります。
+
+**修正案:** 共通ヘルパー関数への抽出を推奨。次にこの周辺を変更する際にリファクタリングすべき。
+
+---
+
+### [MEDIUM-2] IncentiveLog事前挿入が無条件に実行される
+
+**ファイル:** `features/step_definitions/command_system.steps.ts` L732-745
+
+**問題点:** 通貨自動補填はコスト条件で分岐するが、IncentiveLog事前挿入は無条件で実行される。無料コマンド（`!omikuji` 等）のシナリオでも `new_thread_join` のIncentiveLogが挿入される。既存ステップと同じ振る舞いであり実害はないが、将来のインセンティブ関連シナリオ追加時に予期しない副作用の可能性あり。
+
+**修正案:** 有料コマンドの場合のみIncentiveLogを事前挿入する条件分岐の追加を推奨（MEDIUM-1 のリファクタリングと同時に対応）。
+
+---
+
+### [LOW-1] `this.currentUserId!` の non-null assertion
+
+**ファイル:** `features/step_definitions/command_system.steps.ts` L715, L719, L738
+
+**問題点:** 通貨補填・IncentiveLog挿入で `this.currentUserId!` を使用しているが、この時点では assert によるチェックがない。Background の実行順序上、実行時には常にセットされているため実害はないが、既存の `{string} を実行する` ステップ（L829）には `assert(this.currentUserId, ...)` がある。
+
+**修正案:** 通貨補填ブロックの前に assert を追加するか、ガード条件を使用。
+
+---
+
+## 確認済み・問題なし
+
+- **import文:** `InMemoryCurrencyRepo` と `InMemoryIncentiveLogRepo` は既にファイル冒頭（L27-28）で import 済み。追加不要。
+- **タスクID:** コメント内の `TASK-343` は Sprint-134 計画書と整合。
+- **他 feature への影響:** 分析書（TASK-342 Section 3）の影響範囲分析が正確。`balance === 0 かつ cmdCost > 0` の条件により、既に残高設定済みの他シナリオには影響しない。
+- **正規表現パターン:** `/^(![\w]+)/` は既存ステップと同一。先頭コマンドのみマッチする仕様は一貫している。
+- **テスト結果:** cucumber-js 353 passed / vitest 2003 PASS 確認済み（Sprint計画書より）。
+
+## レビューサマリー
+
+| 重要度 | 件数 | ステータス |
+|--------|------|-----------|
+| CRITICAL | 0 | pass |
+| HIGH | 0 | pass |
+| MEDIUM | 2 | info |
+| LOW | 1 | note |
+
+**判定: APPROVED** -- CRITICAL/HIGH の問題はありません。MEDIUM 2件は将来のリファクタリング候補として記録しますが、マージをブロックする理由にはなりません。

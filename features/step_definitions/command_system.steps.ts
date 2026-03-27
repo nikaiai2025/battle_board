@@ -693,6 +693,57 @@ When(
 	async function (this: BattleBoardWorld, bodyContent: string) {
 		const PostService = getPostService();
 
+		// 通貨残高がデフォルト 0 のままだと有料コマンド実行時に
+		// CommandService Step 3 の通貨不足チェックで弾かれる（TASK-343）。
+		// コマンドコストが 0 のシナリオでは通貨残高 0 のまま維持する必要があるため、
+		// コマンドレジストリからコストを参照し、有料コマンドのみデフォルト値を付与する。
+		// See: features/command_copipe.feature @コピペコマンドが実行される
+		{
+			const cmdNameMatch = bodyContent.match(/^(![\w]+)/);
+			const registry = (this as any).commandRegistry as
+				| Array<{ name: string; cost: number }>
+				| undefined;
+			let cmdCost = 0;
+			if (cmdNameMatch && registry) {
+				const entry = registry.find((r) => r.name === cmdNameMatch[1]);
+				if (entry) {
+					cmdCost = entry.cost;
+				}
+			}
+			if (cmdCost > 0) {
+				const balance = await InMemoryCurrencyRepo.getBalance(
+					this.currentUserId!,
+				);
+				if (balance === 0) {
+					InMemoryCurrencyRepo._upsert({
+						userId: this.currentUserId!,
+						balance: 100,
+						updatedAt: new Date(Date.now()),
+					});
+				}
+			}
+		}
+
+		// PostService.createPost 経由でコマンドを実行する際、IncentiveService が
+		// new_thread_join ボーナス (+3) を付与してしまう場合がある。
+		// 通貨消費シナリオの残高検証を正確にするため、IncentiveLog を事前挿入して
+		// 重複チェックにより実際のボーナス付与をブロックする（TASK-343）。
+		// See: features/command_copipe.feature @コピペコマンドが実行される
+		{
+			const jstOffset = 9 * 60 * 60 * 1000;
+			const jstNow = new Date(Date.now() + jstOffset);
+			const todayJst = jstNow.toISOString().slice(0, 10);
+			InMemoryIncentiveLogRepo._insert({
+				id: crypto.randomUUID(),
+				userId: this.currentUserId!,
+				eventType: "new_thread_join",
+				amount: 0,
+				contextId: this.currentThreadId,
+				contextDate: todayJst,
+				createdAt: new Date(Date.now()),
+			});
+		}
+
 		assert(this.currentThreadId, "書き込み対象のスレッドが設定されていません");
 		assert(this.currentEdgeToken, "ユーザーがログイン済みである必要があります");
 
