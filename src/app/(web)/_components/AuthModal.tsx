@@ -215,9 +215,12 @@ export default function AuthModal({
 				</p>
 
 				<form onSubmit={handleSubmit} id="auth-form">
-					{/* turnstile-widget: Cloudflare Turnstile CAPTCHA */}
-					<div className="mb-3" id="turnstile-widget">
-						<div ref={turnstileContainerRef} />
+					{/* turnstile-widget: Cloudflare Turnstile CAPTCHA
+            min-h-[65px]: Turnstile iframe (300x65) の表示領域を確保し、
+            レンダリング前に高さ0で hidden 扱いになることを防止する
+        */}
+					<div className="mb-4" id="turnstile-widget">
+						<div ref={turnstileContainerRef} className="min-h-[65px]" />
 					</div>
 
 					{/* auth-error: 認証失敗メッセージ */}
