@@ -69,6 +69,7 @@ tmp/
 #### アスキーアート・コピペ
 - https://burontosan.com/
 - https://w.atwiki.jp/ataawk/
+- https://kaomojich.com/aa/magao/
 - ネットの海に放流・拡散した方々
 
 #### 掲示板の先行実装
