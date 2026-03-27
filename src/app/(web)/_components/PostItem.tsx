@@ -296,24 +296,29 @@ export default function PostItem({ post }: PostItemProps) {
 						copipe結果は「【name】\n（AA本文）」形式のため、「【】+改行」でAA判定する。
 						おみくじは「…【大吉】テキスト」形式（改行なし）なので誤判定しない。
 						それ以外のシステム情報（書き込み報酬等）は通常フォント。
+						AA時は折り返し禁止（whitespace-pre）＋横スクロール（overflow-x-auto）でスマホ表示崩れを防ぐ。
 						See: docs/specs/screens/thread-view.yaml > inline-system-content
 						See: config/copipe-seed.txt ヘッダー「AA表示の前提フォントとスペース方針」 */}
-					<p
-						className={`text-muted-foreground whitespace-pre-wrap ${
-							!/【.+】\n/.test(post.inlineSystemInfo) ? "text-xs" : ""
-						}`}
-						style={
-							/【.+】\n/.test(post.inlineSystemInfo)
-								? {
-										fontFamily: "var(--font-aa)",
-										fontSize: "16px",
-										lineHeight: "18px",
-									}
-								: undefined
-						}
-					>
-						{post.inlineSystemInfo}
-					</p>
+					{/* See: features/command_system.feature @コマンド実行結果がレス末尾に区切り線付きで表示される */}
+					{(() => {
+						const isAA = /【.+】\n/.test(post.inlineSystemInfo);
+						return isAA ? (
+							// AA: 横スクロール有効（折り返し禁止）
+							<div className="overflow-x-auto">
+								<p
+									className="text-muted-foreground whitespace-pre"
+									style={{ fontFamily: "var(--font-aa)", fontSize: "16px", lineHeight: "18px" }}
+								>
+									{post.inlineSystemInfo}
+								</p>
+							</div>
+						) : (
+							// 非AA: 従来通り（折り返しあり）
+							<p className="text-muted-foreground text-xs whitespace-pre-wrap">
+								{post.inlineSystemInfo}
+							</p>
+						);
+					})()}
 				</div>
 			)}
 		</article>
