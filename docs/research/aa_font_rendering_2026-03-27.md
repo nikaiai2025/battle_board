@@ -50,11 +50,41 @@ AAが崩れて表示されるため、正しく入力・確認できない。
 VSCodeは特定ファイルだけにフォントを適用する機能を持たないため、plaintext全体への適用となった。
 （カスタム言語IDの登録には拡張機能の開発が必要であり、過剰。）
 
+## スマホブラウザの問題: MS Pゴシックが存在しない
+
+PC（Windows）にはMS Pゴシックが標準搭載されているが、**iOSおよびAndroidにはMS Pゴシックが存在しない**。
+スマホブラウザでフォントスタックが`MS PGothic → monospace`のみだった場合、フォールバックがOSのモノスペースフォントになり、AAが盛大にズレる。
+
+### 解決策: Monapo Webフォントの配信
+
+**Monapo**（パブリックドメイン）をWebフォントとして `public/fonts/monapo.woff2` に配置し、`globals.css` の `@font-face` で登録した。
+
+```css
+@font-face {
+  font-family: "Monapo";
+  src: url("/fonts/monapo.woff2") format("woff2");
+  font-display: swap;
+}
+```
+
+フォントスタックの順序:
+
+```
+MS PGothic（PC/Windows優先） → Monapo（スマホ・非Windows向けWebフォント） → monospace（最終フォールバック）
+```
+
+- **PC（Windows）:** OS搭載のMS Pゴシックが適用される → 専ブラと一致
+- **スマホ（iOS/Android）:** MS PGothicなし → Monapo Webフォントが適用される → ズレ解消
+- **その他環境:** monospacefフォールバック（最低限の可読性）
+
+Monapoはモナーフォントの派生で、MS PGothicと同等の「全角1文字 = 半角2文字」比率を持つ。パブリックドメインのため利用制限なし。
+
 ## まとめ
 
 | 層 | フォント | 設定箇所 |
 |---|---|---|
 | 専ブラ（ChMate等） | MS Pゴシック（デフォルト） | ユーザー端末依存 |
-| Web版（AA表示時） | MS PGothic → Monapo → monospace | `PostItem.tsx` + CSS変数 `--font-aa` |
+| Web版・PC（AA表示時） | MS PGothic（OS搭載） | `PostItem.tsx` + CSS変数 `--font-aa` |
+| Web版・スマホ（AA表示時） | Monapo（Webフォント配信） | `public/fonts/monapo.woff2` + `globals.css @font-face` |
 | 開発環境（VSCode） | MS PGothic | `.vscode/settings.json` |
 | データ正本 | MS Pゴシック 16pxで正しく表示される状態 | `config/copipe-seed.txt` |
