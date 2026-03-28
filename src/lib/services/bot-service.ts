@@ -130,6 +130,22 @@ export interface IBotRepository {
 		dailyId: string,
 		dailyIdDate: string,
 	): Promise<void>;
+	/**
+	 * 全BOTの偽装IDを一括更新する（日次リセット Step 1 バッチ化）。
+	 * entries 配列の各要素 { botId, dailyId } を受け取り、全件を dailyIdDate で一括更新する。
+	 * N回の個別UPDATE を1回のバッチ操作に置き換え、Vercel Hobby 10秒制限内で完了させる。
+	 * See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+	 */
+	bulkUpdateDailyIds(
+		entries: Array<{ botId: string; dailyId: string }>,
+		dailyIdDate: string,
+	): Promise<void>;
+	/**
+	 * is_active=true の全BOTの survival_days を一括 +1 する（日次リセット Step 3 バッチ化）。
+	 * N回の個別RPC呼び出しを1回のSQL操作に置き換える。
+	 * See: features/bot_system.feature @日次リセットでボットの生存日数がカウントされる
+	 */
+	bulkIncrementSurvivalDays(): Promise<void>;
 	bulkResetRevealed(): Promise<number>;
 	/**
 	 * 撃破済みボットを復活させる（インカーネーションモデル）。
@@ -759,28 +775,27 @@ export class BotService {
 	async performDailyReset(): Promise<DailyResetResult> {
 		const today = this.getTodayJst();
 
-		// Step 1: 全ボットを取得して偽装 ID を再生成
+		// Step 1: 全ボットを取得して偽装 ID を一括再生成（TASK-355: バッチ化）
+		// 偽装IDはBOTごとに異なるランダム値が必要なため、アプリ側で生成してバッチ渡しする。
+		// 旧実装: for ループ内で N回の個別 updateDailyId → Vercel Hobby 10秒超過の原因。
+		// 新実装: bulkUpdateDailyIds で1回のバッチ操作に集約。
 		const allBots = await this.botRepository.findAll();
-		let idsRegenerated = 0;
-
-		for (const bot of allBots) {
-			const newDailyId = this.generateFakeDailyId();
-			await this.botRepository.updateDailyId(bot.id, newDailyId, today);
-			idsRegenerated++;
-		}
+		const dailyIdEntries = allBots.map((bot) => ({
+			botId: bot.id,
+			dailyId: this.generateFakeDailyId(),
+		}));
+		await this.botRepository.bulkUpdateDailyIds(dailyIdEntries, today);
+		const idsRegenerated = allBots.length;
 
 		// Step 2: revealed -> lurking（BOTマーク一括解除）
 		// See: docs/specs/bot_state_transitions.yaml #daily_reset > revealed -> lurking
 		const botsRevealed = await this.botRepository.bulkResetRevealed();
 
-		// Step 3: lurking/revealed ボット（is_active=true）の survival_days +1
-		// eliminated（is_active=false）は +1 しない
+		// Step 3: is_active=true の全ボットの survival_days を一括 +1（TASK-355: バッチ化）
+		// 旧実装: for ループ内で isActive を判定し N回の個別 incrementSurvivalDays。
+		// 新実装: bulkIncrementSurvivalDays で is_active=true のBOTを一括 UPDATE。
 		// See: docs/specs/bot_state_transitions.yaml #daily_reset
-		for (const bot of allBots) {
-			if (bot.isActive) {
-				await this.botRepository.incrementSurvivalDays(bot.id);
-			}
-		}
+		await this.botRepository.bulkIncrementSurvivalDays();
 
 		// Step 4: eliminated -> 新レコード INSERT（インカーネーションモデル）
 		// 旧レコードは is_active=false のまま凍結保持し、新レコードを INSERT して返す。

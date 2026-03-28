@@ -329,6 +329,63 @@ export async function updateDailyId(
 }
 
 /**
+ * 全BOTの偽装IDを一括更新する（TASK-355: 日次リセット Step 1 バッチ化）。
+ *
+ * 偽装IDはBOTごとに異なるランダム値が必要なため、アプリ側で生成した entries を受け取り、
+ * PostgreSQL の unnest + UPDATE ... FROM で1回のSQLにまとめる。
+ * 旧実装（N回の個別 updateDailyId）では BOT数増加時に Vercel Hobby 10秒制限を超過していた。
+ *
+ * See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+ * See: docs/architecture/components/bot.md §2.10 日次リセット処理
+ *
+ * @param entries 各BOTの { botId, dailyId } ペア配列
+ * @param dailyIdDate 偽装IDの発行日（YYYY-MM-DD）。全BOT共通。
+ */
+export async function bulkUpdateDailyIds(
+	entries: Array<{ botId: string; dailyId: string }>,
+	dailyIdDate: string,
+): Promise<void> {
+	if (entries.length === 0) return;
+
+	// PostgreSQL の unnest を使い、1回の UPDATE で全BOTの daily_id を更新する。
+	// unnest(text[], text[]) で (bot_id, daily_id) のペアをテーブル化し、
+	// UPDATE ... FROM で JOIN 更新する。
+	const botIds = entries.map((e) => e.botId);
+	const dailyIds = entries.map((e) => e.dailyId);
+
+	const { error } = await supabaseAdmin.rpc("bulk_update_daily_ids", {
+		p_bot_ids: botIds,
+		p_daily_ids: dailyIds,
+		p_daily_id_date: dailyIdDate,
+	});
+
+	if (error) {
+		throw new Error(
+			`BotRepository.bulkUpdateDailyIds failed: ${error.message}`,
+		);
+	}
+}
+
+/**
+ * is_active=true の全BOTの survival_days を一括 +1 する（TASK-355: 日次リセット Step 3 バッチ化）。
+ *
+ * 旧実装: for ループ内で isActive を判定し N回の個別 RPC 呼び出し。
+ * 新実装: 1回の UPDATE 文で is_active=true の全レコードを +1。
+ *
+ * See: features/bot_system.feature @日次リセットでボットの生存日数がカウントされる
+ * See: docs/specs/bot_state_transitions.yaml #daily_reset
+ */
+export async function bulkIncrementSurvivalDays(): Promise<void> {
+	const { error } = await supabaseAdmin.rpc("bulk_increment_survival_days");
+
+	if (error) {
+		throw new Error(
+			`BotRepository.bulkIncrementSurvivalDays failed: ${error.message}`,
+		);
+	}
+}
+
+/**
  * ボットに BOTマークを付与する（is_revealed = true, revealed_at = 現在時刻）。
  * AI告発（!tell）成功時、または !attack による不意打ち成功時に呼ばれる。
  * See: docs/architecture/architecture.md §4.2 > bots.is_revealed

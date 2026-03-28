@@ -79,6 +79,9 @@ function createMockBotRepository(
 		eliminate: vi.fn().mockResolvedValue(undefined),
 		reveal: vi.fn().mockResolvedValue(undefined),
 		incrementTimesAttacked: vi.fn().mockResolvedValue(undefined),
+		// TASK-355: バッチ版メソッド追加（IBotRepository インターフェース変更に伴うモック更新）
+		bulkUpdateDailyIds: vi.fn().mockResolvedValue(undefined),
+		bulkIncrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
 		bulkReviveEliminated: vi.fn().mockResolvedValue([]),
 		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる

@@ -237,7 +237,7 @@ interface ContentGenerationContext {
   botId: string;
   botProfileKey: string | null;
   threadId: string;
-  /** キュレーションBOT用: 収集済みのネタ情報 */
+  /** Phase 4 AI会話BOT用: 話題の文脈情報 */
   collectedTopic?: CollectedTopic;
   /** AI対話用: スレッドの直近レス（文脈理解に使用） */
   recentPosts?: RecentPostSummary[];
@@ -258,7 +258,8 @@ interface BehaviorContext {
 
 type BotAction =
   | { type: 'post_to_existing'; threadId: string }
-  | { type: 'create_thread'; title: string; body: string };
+  | { type: 'create_thread'; title: string; body: string }
+  | { type: 'skip' };  // 投稿候補なし（キュレーションBOTのデータ枯渇時等）
 
 /** スケジュール戦略 -- 「いつ書くか」を決定する */
 interface SchedulingStrategy {
@@ -297,7 +298,7 @@ function resolveStrategies(
 |---|---|---|---|
 | ContentStrategy | `FixedMessageContentStrategy` | 2 (既存) | 荒らし役 |
 | ContentStrategy | `TutorialContentStrategy` | 2 (Sprint-84) | チュートリアルBOT |
-| ContentStrategy | `AiTopicContentStrategy` | 3 | キュレーションBOT |
+| ContentStrategy | (不使用: `ThreadCreatorBehaviorStrategy` がタイトル・本文を包括) | 3 | キュレーションBOT |
 | ContentStrategy | `AiConversationContentStrategy` | 4 | 常連・火付け役 |
 | ContentStrategy | `UserPromptContentStrategy` | 4 | ユーザー作成ボット |
 | BehaviorStrategy | `RandomThreadBehaviorStrategy` | 2 (既存) | 荒らし役 |
@@ -312,7 +313,7 @@ function resolveStrategies(
 
 #### 2.13.4 プロバイダー抽象化レイヤー（AiApiClient）
 
-AI API を使用する ContentStrategy（`AiTopicContentStrategy`, `AiConversationContentStrategy`, `UserPromptContentStrategy`）は、サードパーティー API の差異を吸収する `AiApiClient` アダプターを通じて LLM を呼び出す。
+AI API を使用する ContentStrategy（`AiConversationContentStrategy`, `UserPromptContentStrategy`）は、サードパーティー API の差異を吸収する `AiApiClient` アダプターを通じて LLM を呼び出す。
 
 ```typescript
 /** AI APIプロバイダーの抽象化インターフェース */
@@ -340,35 +341,103 @@ interface AiGenerateParams {
 
 **APIキー管理**: 各プロバイダーのAPIキーは環境変数で管理する（`GOOGLE_AI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`）。GitHub Actions Secrets に格納し、クライアントサイドコードには含めない（CLAUDE.md 横断的制約）。
 
-#### 2.13.5 キュレーションBOTの行動フロー（Phase 3 主要ユースケース）
+#### 2.13.5 キュレーションBOTの設計（Phase 3）
+
+See: `features/curation_bot.feature` v2
+
+##### 収集バッチ（GitHub Actions 日次 cron）
+
+外部ソースからバズ情報を収集し `collected_topics` テーブルにバッファする。
+投稿処理とは独立したジョブであり、収集失敗が投稿に波及しない。
 
 ```
-GitHub Actions (cron)
+GitHub Actions (daily cron, JST 早朝)
+  |
+  v
+collection-job.ts
+  |
+  +-- for each active curation bot:
+  |     +-- resolve CollectionAdapter from bot profile
+  |     +-- adapter.collect()
+  |     +-- take top 6 by buzz_score
+  |     +-- collected_topics に INSERT (collected_date = today JST)
+  |
+  +-- source 単位の失敗:
+        +-- エラーログ記録、当該ソースをスキップ
+        +-- 前回の蓄積データは上書きされない（feature: データ取得失敗時のシナリオ）
+```
+
+**収集アダプターインターフェース:**
+
+```typescript
+interface CollectionAdapter {
+  collect(config: SourceConfig): Promise<CollectedItem[]>;
+}
+
+interface CollectedItem {
+  articleTitle: string;
+  content: string | null;  // ベストエフォート（取得失敗時はnull）
+  sourceUrl: string;
+  buzzScore: number;
+}
+```
+
+**アダプター実装一覧:**
+
+| アダプター | 対象ソース | 収集方式 |
+|---|---|---|
+| `SubjectTxtAdapter` | 5ch系5板 | subject.txt解析 → バズスコア算出 → 上位DATの>>1取得 |
+| `FutabaCatalogAdapter` | ふたば2板 | カタログHTML解析 → 上位スレの>>1取得（ベストエフォート） |
+| `HackerNewsAdapter` | HackerNews | REST API `/v0/topstories` → story詳細 |
+| `HatenaBookmarkAdapter` | はてブ | RSS + API → エントリ詳細 |
+| `RedditAdapter` | Reddit | `/top.json` → 投稿詳細 |
+| `WikipediaAdapter` | Wikipedia | pageviews API（日次:急上昇 / 月次:定番） → 記事概要 |
+| `YouTubeAdapter` | YouTube | Data API v3 → 動画詳細 |
+
+バズスコア算出式: `engagement / (elapsed_hours + 2) ^ 1.5`
+- 掲示板系: engagement = レス数
+- Web系: 各プラットフォーム固有の指標（HN points, はてブ数, Reddit score 等）
+
+##### 投稿フロー（CF Cron 5分間隔ポーリング）
+
+荒らし役と同じ CF Cron で `next_post_at` を判定する。
+投稿処理はDB読み書きのみで外部API呼び出しを含まないため短時間で完了する。
+
+```
+CF Cron (5 min polling) — next_post_at <= NOW() のBOTを対象
   |
   v
 BotService.executeBotPost(botId)
   |
   +-- resolveStrategies(bot, profile)
-  |     -> AiTopicContentStrategy
   |     -> ThreadCreatorBehaviorStrategy
   |     -> TopicDrivenSchedulingStrategy
+  |     (ContentStrategy は create_thread 時は不使用)
   |
   +-- behavior.decideAction(context)
-  |     -> { type: 'create_thread', title: '【悲報】○○...', body: '...' }
+  |     +-- collected_topics を検索:
+  |     |   1. WHERE source_bot_id = botId AND collected_date = TODAY AND is_posted = false
+  |     |   2. 該当なし → collected_date = YESTERDAY AND is_posted = false
+  |     |   3. 該当なし → { type: 'skip' }
+  |     +-- 該当あり → { type: 'create_thread', title: article_title, body: format(content, source_url) }
   |
-  +-- content.generateContent() は create_thread の場合スキップ
-  |   （title と body は behavior が決定済み）
-  |
+  +-- skip の場合: next_post_at を再設定して終了（投稿なし）
   +-- PostService.createThread(title, body, isBotWrite=true)
-  |
-  +-- botPostRepository.create(postId, botId)
+  +-- collected_topics: SET is_posted=true, posted_at=NOW()
+  +-- bot_posts: INSERT(postId, botId)
+  +-- next_post_at = NOW() + scheduling.getNextPostDelay()  // 240〜360分
 ```
 
-設計ポイント:
-- キュレーションBOTの `ThreadCreatorBehaviorStrategy` は `{ type: 'create_thread' }` を返す
-- スレッド作成も PostService 経由で行い、DB 直書きは禁止（CLAUDE.md 横断的制約）
-- ネタ収集（Web スクレイピング + AI 要約）は外部の収集ジョブが事前に行い、結果を `collected_topics` テーブルにバッファする
-- 収集と投稿の分離により、外部 API 障害時もバッファ内のネタで投稿を継続可能
+**>>1 の本文フォーマット:**
+- 投稿内容あり: `{content}\n\n元ネタ: {source_url}`
+- 投稿内容なし: `{source_url}`
+
+**設計ポイント:**
+- 収集と投稿の完全分離: 外部API障害が投稿に波及しない
+- `is_posted` による自然な重複排除: 投稿済みアイテムは候補から除外
+- フォールバック: 当日→前日→スキップ（feature準拠）
+- スレッド作成は PostService 経由（CLAUDE.md 横断的制約: DB直書き禁止）
+- 日付境界は JST 0:00（`collected_date` は DATE 型、JST で設定）
 
 #### 2.13.6 ユーザー作成ボットの管理構造（Phase 4）
 
@@ -405,61 +474,55 @@ BotService.executeBotPost(botId)
 
 | フィールド | 型 | 説明 | デフォルト値 |
 |---|---|---|---|
-| `content_strategy` | enum (`fixed_message` / `ai_topic` / `ai_conversation`) | コンテンツ生成方式 | `fixed_message` |
+| `content_strategy` | enum (`fixed_message` / `ai_conversation`) | コンテンツ生成方式 | `fixed_message` |
 | `behavior_type` | enum (`random_thread` / `create_thread` / `reply`) | 行動パターン | `random_thread` |
 | `scheduling` | object | スケジュール設定 | `{type: fixed_interval, min: 60, max: 120}` |
-| `ai_config` | object | AI API 設定 | `null` |
-| `topic_sources` | array | ネタ収集元 | `null` |
-| `thread_creation` | object | スレッド作成設定 | `null` |
-| `conversation` | object | 会話設定 | `null` |
+| `ai_config` | object | AI API 設定（Phase 4 AI会話BOT用） | `null` |
+| `collection` | object | 収集設定（キュレーションBOT用） | `null` |
+| `conversation` | object | 会話設定（Phase 4） | `null` |
 
-`ai_config` の構造:
+`behavior_type: create_thread` の場合、`content_strategy` は不使用（BehaviorStrategy がタイトル・本文を包括するため）。
+
+`ai_config` の構造（Phase 4 用）:
 
 ```yaml
 ai_config:
-  provider: google | openai | anthropic   # APIプロバイダー
-  model: gemini-2.0-flash                 # 使用するAIモデル名
-  system_prompt: "..."                    # システムプロンプト（ペルソナ定義）
-  max_tokens: 500                         # 最大トークン数
-  temperature: 0.8                        # 生成温度（0.0-1.0）
+  provider: google | openai | anthropic
+  model: gemini-2.0-flash
+  system_prompt: "..."
+  max_tokens: 500
+  temperature: 0.8
+```
+
+`collection` の構造（キュレーションBOT用）:
+
+```yaml
+collection:
+  adapter: subject_txt | futaba_catalog | hackernews | hatena | reddit | wikipedia | youtube
+  source_url: "https://..."          # アダプター固有の接続先
+  monthly: false                     # true の場合は月次収集（Wikipedia定番用）
 ```
 
 キュレーションBOTプロファイルの例:
 
 ```yaml
-キュレーションBOT_テクノロジー:
-  hp: 500
-  max_hp: 500
+# 報酬パラメータはコピペBOT（同HP:100）と同等
+curation_hackernews:
+  hp: 100
+  max_hp: 100
   reward:
-    base_reward: 500
-    daily_bonus: 200
-    attack_bonus: 50
-  content_strategy: ai_topic
+    base_reward: 50
+    daily_bonus: 20
+    attack_bonus: 3
   behavior_type: create_thread
   scheduling:
     type: topic_driven
-    min_interval_minutes: 120
+    min_interval_minutes: 240
     max_interval_minutes: 360
-    collection_interval_minutes: 60
-    post_after_collection_minutes: 10
-  ai_config:
-    provider: google
-    model: gemini-2.0-flash
-    system_prompt: |
-      あなたはテクノロジーに詳しい掲示板の常連です。
-      ネット上で話題になっているテクノロジーニュースを5ch風のスレタイに変換してください。
-    max_tokens: 500
-    temperature: 0.8
-  topic_sources:
-    - type: rss
-      url: "https://news.ycombinator.com/rss"
-      genre: テクノロジー
-      priority: 1
-  thread_creation:
-    title_style: 5ch_news
-    max_daily_threads: 5
-  fixed_messages:
-    - "【速報】テクノロジーの話題があるらしい"  # AI API障害時のフォールバック
+  collection:
+    adapter: hackernews
+    source_url: "https://hacker-news.firebaseio.com/v0"
+  fixed_messages: []
 ```
 
 #### 2.13.8 ファイル配置計画
@@ -474,9 +537,18 @@ src/lib/
       ai-api-client.ts                      # AiApiClient インターフェース
       content/
         fixed-message.ts                    # Phase 2: 固定文ランダム
-        ai-topic.ts                         # Phase 3: キュレーションBOT用
         ai-conversation.ts                  # Phase 4: 常連・火付け役用
         user-prompt.ts                      # Phase 4: ユーザー作成ボット用
+  collection/                               # Phase 3: 収集バッチ（GitHub Actions から実行）
+    collection-job.ts                       # 収集ジョブのエントリポイント
+    adapters/                               # CollectionAdapter 実装群
+      subject-txt.ts                        # 5ch系（subject.txt + DAT）
+      futaba-catalog.ts                     # ふたば（HTMLカタログ）
+      hackernews.ts                         # HackerNews REST API
+      hatena.ts                             # はてブ RSS + API
+      reddit.ts                             # Reddit API
+      wikipedia.ts                          # Wikimedia API（日次/月次）
+      youtube.ts                            # YouTube Data API v3
       behavior/
         random-thread.ts                    # Phase 2: 既存スレッドランダム
         thread-creator.ts                   # Phase 3: スレッド作成
@@ -549,7 +621,12 @@ bot-service.ts
   |
   +-- bot-strategies/behavior/*.ts     (BehaviorStrategy 実装群)
   |     +-- ThreadRepository           (スレッド一覧取得)
-  |     +-- CollectedTopicRepository   (キュレーションBOT: ネタ取得)
+  |     +-- CollectedTopicRepository   (キュレーションBOT: 投稿候補取得)
+  |
+  +-- collection/                      (Phase 3: 収集バッチ — GitHub Actions)
+  |     +-- collection-job.ts          (エントリポイント)
+  |     +-- adapters/*.ts              (CollectionAdapter 実装群)
+  |     +-- CollectedTopicRepository   (収集結果の書き込み)
   |
   +-- bot-strategies/scheduling/*.ts   (SchedulingStrategy 実装群)
 
@@ -633,21 +710,26 @@ RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。
 
 ### 5.5 新規テーブル: collected_topics（Phase 3）
 
-キュレーションBOTが収集したネタ情報のバッファ。
+キュレーションBOTが収集したバズ情報のバッファ。収集バッチ（日次）と投稿（随時）で独立して読み書きされる。
 
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | UUID (PK) | 内部識別子 |
-| `source_type` | VARCHAR | 収集元種別（`rss`, `api`, etc.） |
-| `source_url` | TEXT | 収集元URL |
-| `original_title` | TEXT | 元タイトル |
-| `generated_title` | TEXT | AI生成した5ch風スレタイ |
-| `generated_body` | TEXT | AI生成した本文 |
-| `genre` | VARCHAR | ジャンル |
-| `used` | BOOLEAN DEFAULT false | 使用済みフラグ |
-| `created_at` | TIMESTAMPTZ | 収集日時 |
+| `source_bot_id` | UUID (FK -> bots.id) | 収集元キュレーションBOT |
+| `article_title` | TEXT NOT NULL | 記事タイトル（スレタイとして使用） |
+| `content` | TEXT | 投稿内容（ベストエフォート、NULL許容） |
+| `source_url` | TEXT NOT NULL | 元ネタURL |
+| `buzz_score` | NUMERIC NOT NULL | 収集時のバズスコア |
+| `is_posted` | BOOLEAN DEFAULT false | 投稿済みフラグ |
+| `posted_at` | TIMESTAMPTZ | 投稿日時（is_posted=true 時に設定） |
+| `collected_date` | DATE NOT NULL | 収集日（JST。フォールバック判定の基準） |
+| `created_at` | TIMESTAMPTZ DEFAULT NOW() | レコード作成日時 |
+
+インデックス: `(source_bot_id, collected_date, is_posted)` — 投稿候補の検索高速化
 
 RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。`service_role` のみアクセス可能。
+
+保持期間: 7日以上経過した `is_posted = true` レコードは daily-maintenance でクリーンアップ対象。
 
 ### 5.6 マイグレーション方針
 
@@ -659,7 +741,8 @@ v5 マイグレーション（実施済み）:
 5. マイグレーションは `supabase migration new bot_v5_attack_system` で作成
 
 v6 マイグレーション（Phase 3 実装時）:
-1. `collected_topics` テーブルを新規作成（CREATE TABLE + RLSポリシー）
+1. `collected_topics` テーブルを新規作成（CREATE TABLE + RLSポリシー + インデックス）
+2. `bots` テーブルにキュレーションBOT用レコードを INSERT（`bot_profile_key` で種別識別）
 
 v6 マイグレーション（Phase 4 実装時）:
 1. `bots` テーブルに `owner_id`, `bot_type` カラムを追加
@@ -757,11 +840,16 @@ Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, An
 
 **DB増加量**: 1日最大10レコード（荒らし役10体）。問題にならない規模。
 
-### 6.12 ネタ収集と投稿の分離（v6）
+### 6.12 収集と投稿の分離（v6 → v7 更新）
 
-キュレーションBOTの「ネタ収集」と「投稿」を分離し、`collected_topics` テーブルをバッファとする。収集ジョブと投稿ジョブは独立した GitHub Actions ジョブとして実行する。
+キュレーションBOTの「バズ情報収集」と「スレッド投稿」を分離し、`collected_topics` テーブルをバッファとする。
+
+| ジョブ | 実行環境 | 頻度 | 理由 |
+|---|---|---|---|
+| 収集バッチ | GitHub Actions | 日次（Wikipedia定番のみ月次） | 外部API呼び出し多数、長時間になりうる |
+| 投稿 | CF Cron（5分ポーリング） | `next_post_at` 判定 | DB読み書きのみ、短時間完了 |
 
 採用理由:
-- 外部 API（RSS等）障害の影響を投稿から隔離
+- 外部API障害の影響を投稿から完全隔離
 - 収集頻度と投稿頻度を独立に制御可能
-- バッファにネタがある限り投稿を継続可能
+- バッファにデータがある限り投稿を継続可能（フォールバック: 当日→前日→スキップ）

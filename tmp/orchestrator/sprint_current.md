@@ -1,10 +1,23 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-28
+> 最終更新: 2026-03-29
 
 ## 現在のフェーズ
 
-**Sprint-136 完了。次スプリント計画中。**
+**Sprint-138 完了。デプロイ・スモークテスト中。**
+
+**Sprint-138 完了 — Ops基盤障害修正（performDailyResetバッチ化 + ci-failureラベル + collect-topics手動確認）**
+
+### Sprint-138の成果
+- TASK-355: `performDailyReset` の逐次DB呼び出し(O(N))をバッチSQL操作に変更
+  - `bulkUpdateDailyIds`: unnest + UPDATE ... FROM で全BOTのdaily_idを一括更新
+  - `bulkIncrementSurvivalDays`: is_active=true の全BOTのsurvival_daysを一括+1
+  - 03-22以降の断続的Daily Maintenance 500エラー（Vercel Hobby 10秒制限超過）を修正
+- TASK-356: PostgreSQL RPC関数マイグレーション (00035) 作成・ローカル適用確認
+- ci-failure ラベル作成: CI Failure Notifier がIssue作成できない障害を修正
+- collect-topics スケジュール: 手動トリガー成功確認。自動スケジュールは経過観察
+- vitest: 2087 PASS / cucumber-js: 373 PASS
+- コミット: (pending)
 
 ### 敵対的コードレビュー進捗（一時中断中）
 
@@ -19,7 +32,16 @@
 
 **Sprint-134 完了 — command_copipe.feature 8シナリオ修正**
 
+**Sprint-137 完了 — createBotService DI 欠落ホットフィックス（createThreadFn / collectedTopicRepository 注入）**
+
 **Sprint-136 完了 — キュレーションBOT Phase A（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ）**
+
+### Sprint-137の成果
+- TASK-354: `createBotService()` に `createThread` と `collectedTopicRepository` を DI 注入
+  - `collectedTopicRepository` 未注入により CF cron で毎回 `"behavior_type='create_thread' には collectedTopicRepository が必要です"` エラーが発生していた問題を修正
+  - `next_post_at` 未更新により毎回エラーが繰り返される状態も解消
+- vitest: 2084 PASS / cucumber-js: 373 PASS / 本番スモーク: 17/17 PASS
+- コミット: a4af902
 
 ### Sprint-136の成果
 - TASK-349: アーキテクト設計書（詳細実装設計 12セクション）
@@ -342,6 +364,7 @@ HUMAN-003/004 ともに完了。BOT Strategy Step 3・4 の着手が可能。
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-137 | createBotService DI 欠落ホットフィックス | completed | `tmp/orchestrator/sprint_137_plan.md` |
 | Sprint-136 | キュレーションBOT Phase A（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ） | completed | `tmp/orchestrator/sprint_136_plan.md` |
 | Sprint-135 | 範囲攻撃BDDステップ + FAB pending + インカーネーションモデル + !w同日制限撤廃 + Discord PKCE | completed | `tmp/orchestrator/sprint_135_plan.md` |
 | Sprint-134 | command_copipe.feature 8シナリオ修正（テストバグ修正） | completed | `tmp/orchestrator/sprint_134_plan.md` |

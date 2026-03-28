@@ -86,6 +86,8 @@ function createMockBotRepository(
 		eliminate: vi.fn().mockResolvedValue(undefined),
 		reveal: vi.fn().mockResolvedValue(undefined),
 		incrementTimesAttacked: vi.fn().mockResolvedValue(undefined),
+		bulkUpdateDailyIds: vi.fn().mockResolvedValue(undefined),
+		bulkIncrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
 		bulkReviveEliminated: vi.fn().mockResolvedValue([]),
 		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
@@ -1045,8 +1047,9 @@ describe("BotService", () => {
 			expect(attackRepo.deleteByDateBefore).toHaveBeenCalled();
 		});
 
-		it("lurking/revealed 状態のボットの survival_days が +1 される", async () => {
+		it("lurking/revealed 状態のボットの survival_days が +1 される（バッチ処理）", async () => {
 			// See: docs/specs/bot_state_transitions.yaml #daily_reset
+			// TASK-355: 個別 incrementSurvivalDays ではなく bulkIncrementSurvivalDays を使用
 			const bots = [
 				createLurkingBot({ id: "bot-001" }),
 				createRevealedBot({ id: "bot-002" }),
@@ -1067,11 +1070,14 @@ describe("BotService", () => {
 
 			await service.performDailyReset();
 
-			expect(botRepo.incrementSurvivalDays).toHaveBeenCalledWith("bot-001");
-			expect(botRepo.incrementSurvivalDays).toHaveBeenCalledWith("bot-002");
+			// bulkIncrementSurvivalDays が呼ばれること（is_active=true をDB側で絞り込む）
+			expect(botRepo.bulkIncrementSurvivalDays).toHaveBeenCalledTimes(1);
 		});
 
-		it("eliminated 状態のボットの survival_days は +1 されない", async () => {
+		it("eliminated 状態のボットの survival_days はバッチ処理で除外される", async () => {
+			// TASK-355: bulkIncrementSurvivalDays は is_active=true のBOTのみを対象とする。
+			// eliminated のBOTが含まれる場合でも、bulk操作は呼ばれるが
+			// DB側のWHERE条件で is_active=true のみ更新される。
 			const bots = [createEliminatedBot({ id: "bot-003" })];
 			const revivedBot = createLurkingBot({ id: "bot-003-new" });
 			const botRepo = createMockBotRepository();
@@ -1090,7 +1096,105 @@ describe("BotService", () => {
 
 			await service.performDailyReset();
 
-			expect(botRepo.incrementSurvivalDays).not.toHaveBeenCalledWith("bot-003");
+			// bulkIncrementSurvivalDays が呼ばれることを確認（DB側でis_active=trueフィルタ）
+			expect(botRepo.bulkIncrementSurvivalDays).toHaveBeenCalledTimes(1);
+			// 個別の incrementSurvivalDays は呼ばれないこと
+			expect(botRepo.incrementSurvivalDays).not.toHaveBeenCalled();
+		});
+
+		it("Step 1: bulkUpdateDailyIds がBOT数分のエントリで呼ばれる（個別 updateDailyId は呼ばれない）", async () => {
+			// TASK-355: 逐次ループをバッチ操作に置き換え
+			// See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+			const allBots = [
+				createLurkingBot({ id: "bot-001" }),
+				createRevealedBot({ id: "bot-002" }),
+				createEliminatedBot({ id: "bot-003" }),
+			];
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(allBots);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue([]);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.performDailyReset();
+
+			// bulkUpdateDailyIds がBOT数分のエントリで1回呼ばれること
+			expect(botRepo.bulkUpdateDailyIds).toHaveBeenCalledTimes(1);
+			const [entries, dailyIdDate] = (
+				botRepo.bulkUpdateDailyIds as ReturnType<typeof vi.fn>
+			).mock.calls[0];
+			expect(entries).toHaveLength(3);
+			expect(typeof dailyIdDate).toBe("string");
+			// 各エントリが正しいbotIdと8文字の偽装IDを持つこと
+			for (const entry of entries) {
+				expect(typeof entry.botId).toBe("string");
+				expect(typeof entry.dailyId).toBe("string");
+				expect(entry.dailyId).toHaveLength(8);
+			}
+			// 個別の updateDailyId は呼ばれないこと
+			expect(botRepo.updateDailyId).not.toHaveBeenCalled();
+		});
+
+		it("Step 3: bulkIncrementSurvivalDays が1回呼ばれる（個別 incrementSurvivalDays は呼ばれない）", async () => {
+			// TASK-355: 逐次ループをバッチ操作に置き換え
+			// See: features/bot_system.feature @日次リセットでボットの生存日数がカウントされる
+			const bots = [
+				createLurkingBot({ id: "bot-001" }),
+				createRevealedBot({ id: "bot-002" }),
+				createEliminatedBot({ id: "bot-003" }),
+			];
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue(bots);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				1,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue([]);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.performDailyReset();
+
+			// bulkIncrementSurvivalDays が1回呼ばれること
+			expect(botRepo.bulkIncrementSurvivalDays).toHaveBeenCalledTimes(1);
+			// 個別の incrementSurvivalDays は呼ばれないこと
+			expect(botRepo.incrementSurvivalDays).not.toHaveBeenCalled();
+		});
+
+		it("BOTが0件の場合も bulkUpdateDailyIds が空配列で安全に呼ばれる", async () => {
+			// TASK-355: エッジケース（空配列）
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue([]);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.performDailyReset();
+
+			expect(botRepo.bulkUpdateDailyIds).toHaveBeenCalledTimes(1);
+			const [entries] = (botRepo.bulkUpdateDailyIds as ReturnType<typeof vi.fn>)
+				.mock.calls[0];
+			expect(entries).toHaveLength(0);
 		});
 
 		it("日次リセット後に撃破済みチュートリアルBOTのクリーンアップが実行される", async () => {

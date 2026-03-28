@@ -304,6 +304,43 @@ export async function updateDailyId(
 }
 
 /**
+ * 全BOTの偽装IDを一括更新する（TASK-355: 日次リセット Step 1 バッチ化）。
+ * entries 配列の各要素 { botId, dailyId } を受け取り、全件の dailyId と dailyIdDate を更新する。
+ * 本番実装（bot-repository.ts > bulkUpdateDailyIds）と同一の振る舞いを持つ。
+ *
+ * See: src/lib/infrastructure/repositories/bot-repository.ts > bulkUpdateDailyIds
+ * See: features/bot_system.feature @翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する
+ */
+export async function bulkUpdateDailyIds(
+	entries: Array<{ botId: string; dailyId: string }>,
+	dailyIdDate: string,
+): Promise<void> {
+	for (const entry of entries) {
+		assertUUID(entry.botId, "BotRepository.bulkUpdateDailyIds.botId");
+		const bot = store.find((b) => b.id === entry.botId);
+		if (bot) {
+			bot.dailyId = entry.dailyId;
+			bot.dailyIdDate = dailyIdDate;
+		}
+	}
+}
+
+/**
+ * is_active=true の全BOTの survival_days を一括 +1 する（TASK-355: 日次リセット Step 3 バッチ化）。
+ * 本番実装（bot-repository.ts > bulkIncrementSurvivalDays）と同一の振る舞いを持つ。
+ *
+ * See: src/lib/infrastructure/repositories/bot-repository.ts > bulkIncrementSurvivalDays
+ * See: features/bot_system.feature @日次リセットでボットの生存日数がカウントされる
+ */
+export async function bulkIncrementSurvivalDays(): Promise<void> {
+	for (const bot of store) {
+		if (bot.isActive) {
+			bot.survivalDays += 1;
+		}
+	}
+}
+
+/**
  * ボットの次回投稿予定時刻を更新する。
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */
