@@ -205,3 +205,4 @@ curl -s "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/
 - `wrangler tail` はリアルタイム専用であり、蓄積ログの取得には使えない
 - 蓄積期間は最大72時間（Free プラン）
 - OAuth トークン（`wrangler login`）ではこのAPIの認証が通らない。専用 API Token が必要
+- ログの出力先は `ゴミ箱/` ディレクトリにすること（プロジェクトに残す価値のない一時ファイルのため）
