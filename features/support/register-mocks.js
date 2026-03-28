@@ -209,6 +209,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/copipe-repository.ts",
 		"./in-memory/copipe-repository.ts",
 	],
+	// user-copipe リポジトリ（TASK-357 で追加）
+	// See: features/user_copipe.feature
+	[
+		"src/lib/infrastructure/repositories/user-copipe-repository.ts",
+		"./in-memory/user-copipe-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

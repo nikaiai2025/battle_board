@@ -260,6 +260,58 @@ components:
           type: string
       required: [error, message]
 
+    # --- ユーザーコピペ管理 ---
+    # See: features/user_copipe.feature
+
+    UserCopipeEntry:
+      type: object
+      description: ユーザー登録コピペエントリ
+      properties:
+        id:
+          type: integer
+          description: エントリID（編集・削除で使用）
+        name:
+          type: string
+          maxLength: 50
+          example: しょぼーん
+        content:
+          type: string
+          maxLength: 5000
+          description: AA本文
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, content, createdAt, updatedAt]
+
+    CreateUserCopipeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+      required: [name, content]
+
+    UpdateUserCopipeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+      required: [name, content]
+
     CommandResult:
       type: object
       description: >
@@ -1173,6 +1225,140 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Notification"
+
+  # -----------------------------------------
+  # ユーザーコピペ管理
+  # See: features/user_copipe.feature
+  # -----------------------------------------
+  /api/mypage/copipe:
+    get:
+      operationId: listUserCopipe
+      summary: 自分の登録コピペ一覧取得
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      responses:
+        "200":
+          description: コピペ一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserCopipeEntry"
+                required: [entries]
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createUserCopipe
+      summary: コピペ新規登録
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserCopipeRequest"
+      responses:
+        "201":
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCopipeEntry"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/mypage/copipe/{id}:
+    put:
+      operationId: updateUserCopipe
+      summary: コピペ編集（本人のみ）
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserCopipeRequest"
+      responses:
+        "200":
+          description: 編集成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCopipeEntry"
+        "400":
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 権限なし（他人のエントリ）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: エントリが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteUserCopipe
+      summary: コピペ削除（本人のみ）
+      tags: [マイページ]
+      security:
+        - edgeTokenCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: 削除成功
+        "403":
+          description: 権限なし（他人のエントリ）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: エントリが存在しない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # -----------------------------------------
   # 通貨

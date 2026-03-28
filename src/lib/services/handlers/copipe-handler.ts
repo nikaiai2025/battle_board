@@ -1,12 +1,15 @@
 /**
  * CommandHandler 実装: !copipe（コピペAA再現）コマンド
  *
- * copipe_entries テーブルに登録されたコピペ(AA)を、
+ * copipe_entries および user_copipe_entries テーブルに登録されたコピペ(AA)を、
  * 引数なし(ランダム)または名前・本文指定で検索し、レス末尾にマージ表示する。
  *
  * 検索ロジック（優先順）:
- *   1. 引数なし  → ランダム1件を表示
- *   2. 引数あり  → name 完全一致あれば表示
+ *   1. 引数なし  → ランダム1件を表示（両テーブルから）
+ *   2. 引数あり  → name 完全一致（両テーブル）
+ *       - 0件: name 部分一致へ
+ *       - 1件: 即表示
+ *       - 2件以上: ランダム1件 +「N件ヒット」通知
  *   3. 完全一致なし → name 部分一致
  *       - 1件: 表示
  *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット）」通知
@@ -22,6 +25,7 @@
  * - 応答形式: レス末尾にマージ（systemMessage）
  *
  * See: features/command_copipe.feature @copipe
+ * See: features/user_copipe.feature @管理者データとユーザーデータで同名のコピペが存在する場合はランダムに1件表示される
  * See: docs/architecture/components/command.md §5
  */
 
@@ -45,12 +49,14 @@ import type {
  *      - 引数あり: name 完全一致 → name 部分一致 → content 部分一致の順で検索
  *   2. 検索結果に応じて systemMessage を生成する
  *      - 成功（1件特定）: 「【name】\ncontent」形式
- *      - 曖昧（複数件）: ランダム1件を表示 + 「曖昧です（N件ヒット）」通知を付与
+ *      - 完全一致が複数件: ランダム1件を表示 + 「N件ヒット」通知
+ *      - 曖昧（部分一致で複数件）: ランダム1件を表示 + 「曖昧です（N件ヒット）」通知
  *      - 未発見: エラーメッセージ「見つかりません」
  *      - データなし: エラーメッセージ「コピペデータがありません」
  *   3. return { success: true, systemMessage: ... }
  *
  * See: features/command_copipe.feature
+ * See: features/user_copipe.feature @copipe
  */
 export class CopipeHandler implements CommandHandler {
 	/** コマンド名（! を除いた名前） */
@@ -65,6 +71,7 @@ export class CopipeHandler implements CommandHandler {
 	 * !copipe コマンドを実行する。
 	 *
 	 * See: features/command_copipe.feature @copipe
+	 * See: features/user_copipe.feature @copipe
 	 *
 	 * @param ctx - コマンド実行コンテキスト（ctx.args[0] は名前キーワード or undefined）
 	 * @returns コマンド実行結果（systemMessage にレス末尾マージ内容）
@@ -95,6 +102,7 @@ export class CopipeHandler implements CommandHandler {
 	 * データが0件の場合は「コピペデータがありません」エラーを返す。
 	 *
 	 * See: features/command_copipe.feature @引数なしでランダムにAAが表示される
+	 * See: features/user_copipe.feature @ユーザー登録コピペが!copipeのランダム選択に含まれる
 	 */
 	private async _handleRandom(): Promise<CommandHandlerResult> {
 		const entry = await this.copipeRepository.findRandom();
@@ -117,13 +125,15 @@ export class CopipeHandler implements CommandHandler {
 	 * 引数あり: name 完全一致 → name 部分一致 → content 部分一致の順で検索する。
 	 *
 	 * 優先順:
-	 *   1. name 完全一致 → 即表示
-	 *   2. name 部分一致 1件 → 表示
-	 *   3. name 部分一致 N件 → ランダム1件 +「曖昧です（N件ヒット）」通知
-	 *   4. name 一致なし → content 部分一致にフォールバック
-	 *      4a. 1件 → 表示
-	 *      4b. N件 → ランダム1件 +「曖昧です（N件ヒット）」通知
-	 *      4c. 0件 →「見つかりません」エラー
+	 *   1. name 完全一致0件 → name 部分一致へ
+	 *   2. name 完全一致1件 → 即表示
+	 *   3. name 完全一致2件以上 → ランダム1件 +「N件ヒット」通知
+	 *   4. name 部分一致1件 → 表示
+	 *   5. name 部分一致N件 → ランダム1件 +「曖昧です（N件ヒット）」通知
+	 *   6. name 一致なし → content 部分一致にフォールバック
+	 *      6a. 1件 → 表示
+	 *      6b. N件 → ランダム1件 +「曖昧です（N件ヒット）」通知
+	 *      6c. 0件 →「見つかりません」エラー
 	 *
 	 * See: features/command_copipe.feature @完全一致でAAが表示される
 	 * See: features/command_copipe.feature @完全一致が存在する場合は部分一致より優先される
@@ -132,18 +142,32 @@ export class CopipeHandler implements CommandHandler {
 	 * See: features/command_copipe.feature @名前に一致せず本文に一致する場合はAAが表示される
 	 * See: features/command_copipe.feature @本文検索で複数件ヒットした場合はランダムに1件表示される
 	 * See: features/command_copipe.feature @一致するAAがない場合はエラーになる
+	 * See: features/user_copipe.feature @管理者データとユーザーデータで同名のコピペが存在する場合はランダムに1件表示される
 	 *
 	 * @param name - 検索するキーワード
 	 */
 	private async _handleSearch(name: string): Promise<CommandHandlerResult> {
-		// Step 1: name 完全一致を検索する
-		const exactMatch = await this.copipeRepository.findByName(name);
+		// Step 1: name 完全一致を検索する（両テーブルからの配列）
+		const exactMatches = await this.copipeRepository.findByName(name);
 
-		if (exactMatch) {
-			// name 完全一致あり → 即表示（部分一致・content 検索はスキップ）
+		if (exactMatches.length === 1) {
+			// name 完全一致が1件 → 即表示（部分一致・content 検索はスキップ）
+			// See: features/command_copipe.feature @完全一致でAAが表示される
 			return {
 				success: true,
-				systemMessage: `【${exactMatch.name}】\n${exactMatch.content}`,
+				systemMessage: `【${exactMatches[0].name}】\n${exactMatches[0].content}`,
+			};
+		}
+
+		if (exactMatches.length >= 2) {
+			// name 完全一致が2件以上（管理者データとユーザーデータで同名など）
+			// → ランダム1件 +「N件ヒット」通知
+			// See: features/user_copipe.feature @管理者データとユーザーデータで同名のコピペが存在する場合はランダムに1件表示される
+			const randomIndex = Math.floor(Math.random() * exactMatches.length);
+			const entry = exactMatches[randomIndex];
+			return {
+				success: true,
+				systemMessage: `【${entry.name}】\n${entry.content}\n（${exactMatches.length}件ヒット）`,
 			};
 		}
 

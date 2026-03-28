@@ -4,13 +4,18 @@
  * BDD テスト用の Supabase 非依存実装。
  * copipe-repository.ts と同一シグネチャの関数を提供する。
  *
+ * 内部ストア:
+ *   adminStore: copipe_entries 相当（管理者データ）
+ *   userStore:  user_copipe_entries 相当（ユーザー登録データ）
+ *
  * 検索ロジック（本番実装と同一）:
- *   findRandom()               → ストアからランダム1件を返す
- *   findByName(name)           → 完全一致（name === entry.name）
- *   findByNamePartial(name)    → 部分一致（name を含む && 完全一致は除外）
- *   findByContentPartial(query) → content 部分一致（全文検索フォールバック）
+ *   findRandom()               → 両ストアをマージしてランダム1件を返す
+ *   findByName(name)           → 完全一致（name === entry.name）を両ストアから返す
+ *   findByNamePartial(name)    → 部分一致（name を含む && 完全一致は除外）を両ストアから返す
+ *   findByContentPartial(query) → content 部分一致（全文検索フォールバック）を両ストアから返す
  *
  * See: features/command_copipe.feature
+ * See: features/user_copipe.feature
  * See: src/lib/infrastructure/repositories/copipe-repository.ts
  * See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
  */
@@ -21,8 +26,11 @@ import type { CopipeEntry } from "../../../src/lib/infrastructure/repositories/c
 // インメモリストア
 // ---------------------------------------------------------------------------
 
-/** シナリオ間でリセットされるエントリストア */
-const store: CopipeEntry[] = [];
+/** シナリオ間でリセットされる管理者コピペストア（copipe_entries 相当） */
+const adminStore: CopipeEntry[] = [];
+
+/** シナリオ間でリセットされるユーザーコピペストア（user_copipe_entries 相当） */
+const userStore: CopipeEntry[] = [];
 
 /** 連番カウンター（IDの一意性を保証する） */
 let idCounter = 1;
@@ -37,23 +45,44 @@ let idCounter = 1;
  * See: features/support/mock-installer.ts > resetAllStores
  */
 export function reset(): void {
-	store.length = 0;
+	adminStore.length = 0;
+	userStore.length = 0;
 	idCounter = 1;
 }
 
 /**
- * テスト用ヘルパー: エントリを直接ストアに追加する。
+ * テスト用ヘルパー: 管理者コピペエントリをストアに追加する（copipe_entries 相当）。
  * BDDステップ定義で「以下のコピペAAが登録されている」等の事前条件に使用する。
  *
  * See: features/command_copipe.feature Background
+ * See: features/user_copipe.feature
  *
  * @param entry - 登録するエントリ（content は省略可能、省略時はダミーコンテンツを使用）
  */
 export function _insert(entry: { name: string; content?: string }): void {
-	store.push({
+	adminStore.push({
 		id: idCounter++,
 		name: entry.name,
 		content: entry.content ?? `【${entry.name}】のAA本文（テスト用ダミー）`,
+		createdAt: new Date(Date.now()),
+	});
+}
+
+/**
+ * テスト用ヘルパー: ユーザーコピペエントリをストアに追加する（user_copipe_entries 相当）。
+ * BDDステップ定義で「自分が以下のコピペを登録済みである」等の事前条件に使用する。
+ *
+ * See: features/user_copipe.feature
+ *
+ * @param entry - 登録するエントリ（content は省略可能、省略時はダミーコンテンツを使用）
+ */
+export function _insertUser(entry: { name: string; content?: string }): void {
+	userStore.push({
+		id: idCounter++,
+		name: entry.name,
+		content:
+			entry.content ??
+			`【${entry.name}】のAA本文（ユーザー登録・テスト用ダミー）`,
 		createdAt: new Date(Date.now()),
 	});
 }
@@ -65,36 +94,43 @@ export function _insert(entry: { name: string; content?: string }): void {
 /**
  * ランダムに1件のコピペエントリを取得する。
  *
- * InMemory実装では Math.random() でランダム選択する（テスト容易性）。
+ * adminStore と userStore の両方をマージしてランダム選択する。
  * データが0件の場合は null を返す。
  *
  * See: src/lib/infrastructure/repositories/copipe-repository.ts > findRandom
  * See: features/command_copipe.feature @引数なしでランダムにAAが表示される
+ * See: features/user_copipe.feature @ユーザー登録コピペが!copipeのランダム選択に含まれる
  */
 export async function findRandom(): Promise<CopipeEntry | null> {
-	if (store.length === 0) return null;
-	const index = Math.floor(Math.random() * store.length);
-	return store[index];
+	// 両ストアをマージしてランダム選択する
+	const allEntries = [...adminStore, ...userStore];
+	if (allEntries.length === 0) return null;
+	const index = Math.floor(Math.random() * allEntries.length);
+	return allEntries[index];
 }
 
 /**
  * 名前で完全一致検索する。
- * 一致しない場合は null を返す。
+ * 両ストアから完全一致したエントリを配列で返す。
+ * 一致しない場合は空配列を返す。
  *
  * See: src/lib/infrastructure/repositories/copipe-repository.ts > findByName
  * See: features/command_copipe.feature @完全一致でAAが表示される
+ * See: features/user_copipe.feature @管理者データとユーザーデータで同名のコピペが存在する場合はランダムに1件表示される
  *
  * @param name - 検索する名前（完全一致）
  */
-export async function findByName(name: string): Promise<CopipeEntry | null> {
-	const found = store.find((entry) => entry.name === name);
-	return found ?? null;
+export async function findByName(name: string): Promise<CopipeEntry[]> {
+	// 両ストアから完全一致するエントリをすべて返す
+	const adminMatches = adminStore.filter((entry) => entry.name === name);
+	const userMatches = userStore.filter((entry) => entry.name === name);
+	return [...adminMatches, ...userMatches];
 }
 
 /**
  * 名前で部分一致検索する（完全一致を除く）。
  *
- * name を含む（部分一致）かつ完全一致ではないエントリを返す。
+ * name を含む（部分一致）かつ完全一致ではないエントリを両ストアから返す。
  * 本番実装の SQL: WHERE name LIKE '%name%' AND name != 'name'
  *
  * See: src/lib/infrastructure/repositories/copipe-repository.ts > findByNamePartial
@@ -105,16 +141,20 @@ export async function findByName(name: string): Promise<CopipeEntry | null> {
  * @returns 部分一致したエントリの配列（完全一致は除外済み）
  */
 export async function findByNamePartial(name: string): Promise<CopipeEntry[]> {
-	return store.filter(
-		// 部分一致（name を含む）かつ完全一致は除外
-		(entry) => entry.name.includes(name) && entry.name !== name,
-	);
+	// 部分一致（name を含む）かつ完全一致は除外するフィルタ
+	const isPartialMatch = (entry: CopipeEntry) =>
+		entry.name.includes(name) && entry.name !== name;
+
+	return [
+		...adminStore.filter(isPartialMatch),
+		...userStore.filter(isPartialMatch),
+	];
 }
 
 /**
  * content（AA本文）で部分一致検索する。
  *
- * query を content に含むエントリを返す。
+ * query を content に含むエントリを両ストアから返す。
  * 本番実装の SQL: WHERE content LIKE '%query%'
  *
  * See: src/lib/infrastructure/repositories/copipe-repository.ts > findByContentPartial
@@ -127,5 +167,12 @@ export async function findByNamePartial(name: string): Promise<CopipeEntry[]> {
 export async function findByContentPartial(
 	query: string,
 ): Promise<CopipeEntry[]> {
-	return store.filter((entry) => entry.content.includes(query));
+	// 両ストアから content に query を含むエントリをすべて返す
+	const adminMatches = adminStore.filter((entry) =>
+		entry.content.includes(query),
+	);
+	const userMatches = userStore.filter((entry) =>
+		entry.content.includes(query),
+	);
+	return [...adminMatches, ...userMatches];
 }

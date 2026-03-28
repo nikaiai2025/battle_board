@@ -3,7 +3,10 @@
  *
  * 検索ロジック（優先順）:
  *   1. 引数なし  → ランダム1件
- *   2. 引数あり  → name 完全一致
+ *   2. 引数あり  → name 完全一致（両テーブル）
+ *       - 0件: name 部分一致へ
+ *       - 1件: 即表示
+ *       - 2件以上: ランダム1件 +「N件ヒット」通知
  *   3. 完全一致なし → name 部分一致
  *       - 1件: 表示
  *       - 2件以上: ランダム1件 +「曖昧です（N件ヒット。うち１件をランダム表示）」通知
@@ -18,8 +21,10 @@
  *   - 空文字引数の扱い
  *   - 特殊文字を含む name の検索
  *   - 曖昧ヒット時のランダム性（インデックスが範囲内であること）
+ *   - 完全一致複数件（管理者データとユーザーデータで同名）のランダム1件表示
  *
  * See: features/command_copipe.feature @copipe
+ * See: features/user_copipe.feature @管理者データとユーザーデータで同名のコピペが存在する場合はランダムに1件表示される
  * See: src/lib/services/handlers/copipe-handler.ts
  */
 
@@ -41,6 +46,7 @@ function makeEntry(id: number, name: string, content: string): CopipeEntry {
 
 /**
  * ICopipeRepository のテスト用モックを生成する。
+ * findByName のデフォルトは空配列（改修後のシグネチャ: Promise<CopipeEntry[]>）。
  *
  * @param overrides - 各メソッドの挙動をオーバーライドする
  */
@@ -49,7 +55,7 @@ function createMockRepo(
 ): ICopipeRepository {
 	return {
 		findRandom: async () => null,
-		findByName: async () => null,
+		findByName: async () => [], // 変更: null → []
 		findByNamePartial: async () => [],
 		findByContentPartial: async () => [],
 		...overrides,
@@ -159,19 +165,19 @@ describe("ランダム選択（引数なし）", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 完全一致
+// 完全一致（1件）
 // See: features/command_copipe.feature @完全一致でAAが表示される
 // See: features/command_copipe.feature @完全一致が存在する場合は部分一致より優先される
 // ---------------------------------------------------------------------------
 
-describe("完全一致検索", () => {
+describe("完全一致検索（1件）", () => {
 	it("引数ありの場合、findByName を呼び出す", async () => {
 		let calledWith: string | null = null;
 		const entry = makeEntry(1, "ぬるぽ", "( ゚д゚)、ペッ");
 		const repo = createMockRepo({
 			findByName: async (name) => {
 				calledWith = name;
-				return entry;
+				return [entry]; // 配列で返す（改修後）
 			},
 		});
 		const handler = createHandler(repo);
@@ -180,11 +186,11 @@ describe("完全一致検索", () => {
 		expect(calledWith).toBe("ぬるぽ");
 	});
 
-	it("完全一致がある場合、そのエントリを systemMessage として返す", async () => {
+	it("完全一致が1件ある場合、そのエントリを systemMessage として返す", async () => {
 		// See: features/command_copipe.feature @完全一致でAAが表示される
 		const entry = makeEntry(1, "ドッキングにぼし", "にぼし本文");
 		const repo = createMockRepo({
-			findByName: async (name) => (name === "ドッキングにぼし" ? entry : null),
+			findByName: async (name) => (name === "ドッキングにぼし" ? [entry] : []),
 		});
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["ドッキングにぼし"]));
@@ -193,13 +199,13 @@ describe("完全一致検索", () => {
 		expect(result.systemMessage).toContain("にぼし本文");
 	});
 
-	it("完全一致がある場合、部分一致検索・content検索は行わない", async () => {
+	it("完全一致が1件ある場合、部分一致検索・content検索は行わない", async () => {
 		// See: features/command_copipe.feature @完全一致が存在する場合は部分一致より優先される
 		let partialCalled = false;
 		let contentCalled = false;
 		const entry = makeEntry(1, "ぬるぽ", "ガッ");
 		const repo = createMockRepo({
-			findByName: async () => entry,
+			findByName: async () => [entry],
 			findByNamePartial: async () => {
 				partialCalled = true;
 				return [];
@@ -215,6 +221,122 @@ describe("完全一致検索", () => {
 		expect(partialCalled).toBe(false);
 		expect(contentCalled).toBe(false);
 	});
+
+	it("完全一致1件の場合、systemMessage は【name】\\ncontent 形式である", async () => {
+		const entry = makeEntry(1, "ぬるぽ", "ガッ");
+		const repo = createMockRepo({
+			findByName: async () => [entry],
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["ぬるぽ"]));
+
+		expect(result.systemMessage).toBe("【ぬるぽ】\nガッ");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// 完全一致（複数件） — 管理者データとユーザーデータで同名
+// See: features/user_copipe.feature @管理者データとユーザーデータで同名のコピペが存在する場合はランダムに1件表示される
+// ---------------------------------------------------------------------------
+
+describe("完全一致検索（複数件）", () => {
+	it("完全一致が2件以上ある場合、「N件ヒット」通知が含まれる", async () => {
+		// See: features/user_copipe.feature @管理者データとユーザーデータで同名のコピペが存在する場合はランダムに1件表示される
+		const adminEntry = makeEntry(1, "しょぼーん", "管理者版AA");
+		const userEntry = makeEntry(2, "しょぼーん", "ユーザー版AA");
+		const repo = createMockRepo({
+			findByName: async () => [adminEntry, userEntry],
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["しょぼーん"]));
+
+		expect(result.success).toBe(true);
+		expect(result.systemMessage).toContain("2件ヒット");
+	});
+
+	it("完全一致が2件以上ある場合、「（N件ヒット）」通知が付与される", async () => {
+		// See: features/user_copipe.feature @マージ表示に "2件ヒット" を含む通知が付与される
+		const adminEntry = makeEntry(1, "しょぼーん", "管理者版AA");
+		const userEntry = makeEntry(2, "しょぼーん", "ユーザー版AA");
+		const repo = createMockRepo({
+			findByName: async () => [adminEntry, userEntry],
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["しょぼーん"]));
+
+		expect(result.systemMessage).toContain("（2件ヒット）");
+	});
+
+	it("完全一致が2件以上ある場合、部分一致検索・content検索は行わない", async () => {
+		let partialCalled = false;
+		let contentCalled = false;
+		const adminEntry = makeEntry(1, "しょぼーん", "管理者版AA");
+		const userEntry = makeEntry(2, "しょぼーん", "ユーザー版AA");
+		const repo = createMockRepo({
+			findByName: async () => [adminEntry, userEntry],
+			findByNamePartial: async () => {
+				partialCalled = true;
+				return [];
+			},
+			findByContentPartial: async () => {
+				contentCalled = true;
+				return [];
+			},
+		});
+		const handler = createHandler(repo);
+		await handler.execute(createCtx(["しょぼーん"]));
+
+		expect(partialCalled).toBe(false);
+		expect(contentCalled).toBe(false);
+	});
+
+	it("完全一致が2件の場合、ランダムに1件が選ばれ name と content が systemMessage に含まれる", async () => {
+		// See: features/user_copipe.feature @完全一致したAAからランダムに1件がレス末尾にマージ表示される
+		const adminEntry = makeEntry(1, "しょぼーん", "管理者版AA");
+		const userEntry = makeEntry(2, "しょぼーん", "ユーザー版AA");
+		const repo = createMockRepo({
+			findByName: async () => [adminEntry, userEntry],
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["しょぼーん"]));
+
+		// ランダムで選ばれたエントリのいずれかが含まれること
+		const containsAdminEntry = result.systemMessage!.includes("管理者版AA");
+		const containsUserEntry = result.systemMessage!.includes("ユーザー版AA");
+		expect(containsAdminEntry || containsUserEntry).toBe(true);
+	});
+
+	it("完全一致が3件の場合、「（3件ヒット）」通知が付与される", async () => {
+		const entries = [
+			makeEntry(1, "しょぼーん", "管理者版AA"),
+			makeEntry(2, "しょぼーん", "ユーザーA版AA"),
+			makeEntry(3, "しょぼーん", "ユーザーB版AA"),
+		];
+		const repo = createMockRepo({
+			findByName: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["しょぼーん"]));
+
+		expect(result.systemMessage).toContain("（3件ヒット）");
+	});
+
+	it("完全一致複数件の場合、ランダムインデックスが配列範囲内である", async () => {
+		const entries = Array.from({ length: 5 }, (_, i) =>
+			makeEntry(i + 1, "しょぼーん", `バージョン${i + 1}`),
+		);
+		const repo = createMockRepo({
+			findByName: async () => entries,
+		});
+		const handler = createHandler(repo);
+		const result = await handler.execute(createCtx(["しょぼーん"]));
+
+		// 結果はいずれかのエントリの content を含むこと
+		const matchedEntry = entries.find((e) =>
+			result.systemMessage!.includes(e.content),
+		);
+		expect(matchedEntry).toBeDefined();
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -227,7 +349,7 @@ describe("name 部分一致検索（1件）", () => {
 		// See: features/command_copipe.feature @部分一致で1件に特定できる場合はAAが表示される
 		const entry = makeEntry(1, "ドッキングにぼし", "にぼし本文");
 		const repo = createMockRepo({
-			findByName: async () => null, // 完全一致なし
+			findByName: async () => [], // 完全一致なし
 			findByNamePartial: async () => [entry], // 部分一致1件
 		});
 		const handler = createHandler(repo);
@@ -240,7 +362,7 @@ describe("name 部分一致検索（1件）", () => {
 	it("name 部分一致1件の場合も【name】\\ncontent 形式で返す", async () => {
 		const entry = makeEntry(1, "ドッキングにぼし", "にぼし本文テスト");
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [entry],
 		});
 		const handler = createHandler(repo);
@@ -253,7 +375,7 @@ describe("name 部分一致検索（1件）", () => {
 		const entry = makeEntry(1, "ドッキングにぼし", "にぼし本文テスト");
 		let contentCalled = false;
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [entry],
 			findByContentPartial: async () => {
 				contentCalled = true;
@@ -280,7 +402,7 @@ describe("name 部分一致検索（複数件）", () => {
 			makeEntry(2, "しょぼんぬ", "(´・ω・`) <しょぼんぬ>"),
 		];
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => entries,
 		});
 		const handler = createHandler(repo);
@@ -297,7 +419,7 @@ describe("name 部分一致検索（複数件）", () => {
 			makeEntry(2, "しょぼんぬ", "(´・ω・`) <しょぼんぬ>"),
 		];
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => entries,
 		});
 		const handler = createHandler(repo);
@@ -315,7 +437,7 @@ describe("name 部分一致検索（複数件）", () => {
 			makeEntry(3, "しょぼしょぼ", "C"),
 		];
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => entries,
 		});
 		const handler = createHandler(repo);
@@ -333,7 +455,7 @@ describe("name 部分一致検索（複数件）", () => {
 			makeEntry(2, "しょぼんぬ", "(´・ω・`) <しょぼんぬ>"),
 		];
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => entries,
 		});
 		const handler = createHandler(repo);
@@ -356,7 +478,7 @@ describe("name 部分一致検索（複数件）", () => {
 		];
 		let contentCalled = false;
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => entries,
 			findByContentPartial: async () => {
 				contentCalled = true;
@@ -380,7 +502,7 @@ describe("content 部分一致フォールバック（1件）", () => {
 		// See: features/command_copipe.feature @名前に一致せず本文に一致する場合はAAが表示される
 		const entry = makeEntry(1, "ぬるぽ", "JavaのNullPointerExceptionのAA");
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => [entry],
 		});
@@ -395,7 +517,7 @@ describe("content 部分一致フォールバック（1件）", () => {
 		// See: features/command_copipe.feature @名前に一致せず本文に一致する場合はAAが表示される
 		const entry = makeEntry(1, "ぬるぽ", "Java例外のAA本文");
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => [entry],
 		});
@@ -408,7 +530,7 @@ describe("content 部分一致フォールバック（1件）", () => {
 	it("name 一致なし時に findByContentPartial を呼び出す", async () => {
 		let contentCalledWith: string | null = null;
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async (query) => {
 				contentCalledWith = query;
@@ -435,7 +557,7 @@ describe("content 部分一致フォールバック（複数件）", () => {
 			makeEntry(2, "しょぼんぬ", "顔文字ショボンヌのAA"),
 		];
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => entries,
 		});
@@ -453,7 +575,7 @@ describe("content 部分一致フォールバック（複数件）", () => {
 			makeEntry(2, "しょぼんぬ", "顔文字ショボンヌのAA"),
 		];
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => entries,
 		});
@@ -472,7 +594,7 @@ describe("content 部分一致フォールバック（複数件）", () => {
 			makeEntry(2, "しょぼんぬ", "顔文字ショボンヌのAA"),
 		];
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => entries,
 		});
@@ -495,7 +617,7 @@ describe("一致なし", () => {
 	it("name 完全一致・部分一致・content 部分一致すべてなし → 「見つかりません」を返す", async () => {
 		// See: features/command_copipe.feature @一致するAAがない場合はエラーになる
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => [],
 		});
@@ -528,7 +650,7 @@ describe("エッジケース", () => {
 			"（`・ω・´）彡 ┻━┻\n>>>1\n\"quoted\"\n'single'\n`backtick`";
 		const entry = makeEntry(1, "テーブルひっくり返し", specialContent);
 		const repo = createMockRepo({
-			findByName: async () => entry,
+			findByName: async () => [entry], // 配列で返す（改修後）
 		});
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["テーブルひっくり返し"]));
@@ -539,7 +661,7 @@ describe("エッジケース", () => {
 	it("Unicodeや絵文字を含む name でも正しく動作する", async () => {
 		const entry = makeEntry(1, "😂草🌱", "草生える本文\n🌿");
 		const repo = createMockRepo({
-			findByName: async () => entry,
+			findByName: async () => [entry], // 配列で返す（改修後）
 		});
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["😂草🌱"]));
@@ -581,7 +703,7 @@ describe("エッジケース", () => {
 	it("非常に長い名前でも動作する（境界値: 1000文字）", async () => {
 		const longName = "あ".repeat(1000);
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => [],
 		});
@@ -599,7 +721,7 @@ describe("エッジケース", () => {
 			makeEntry(i + 1, `エントリ${i + 1}`, `内容${i + 1}`),
 		);
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => entries,
 		});
 		const handler = createHandler(repo);
@@ -615,7 +737,7 @@ describe("エッジケース", () => {
 	it("content 部分一致にフォールバックする場合、Unicodeを含むクエリでも動作する", async () => {
 		const entry = makeEntry(1, "絵文字AA", "本文に😂が含まれる");
 		const repo = createMockRepo({
-			findByName: async () => null,
+			findByName: async () => [],
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => [entry],
 		});
@@ -639,7 +761,7 @@ describe("引数結合（複数 args を結合して検索）", () => {
 		const repo = createMockRepo({
 			findByName: async (name) => {
 				calledWith = name;
-				return null;
+				return [];
 			},
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => [],
@@ -654,7 +776,7 @@ describe("引数結合（複数 args を結合して検索）", () => {
 		// See: features/command_copipe.feature @完全一致でAAが表示される
 		const entry = makeEntry(1, "ドッキング にぼし", "にぼし本文");
 		const repo = createMockRepo({
-			findByName: async (name) => (name === "ドッキング にぼし" ? entry : null),
+			findByName: async (name) => (name === "ドッキング にぼし" ? [entry] : []),
 		});
 		const handler = createHandler(repo);
 		const result = await handler.execute(createCtx(["ドッキング", "にぼし"]));
@@ -668,7 +790,7 @@ describe("引数結合（複数 args を結合して検索）", () => {
 		const repo = createMockRepo({
 			findByName: async (name) => {
 				calledWith = name;
-				return null;
+				return [];
 			},
 			findByNamePartial: async () => [],
 			findByContentPartial: async () => [],

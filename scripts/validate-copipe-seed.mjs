@@ -32,7 +32,7 @@ function trimBlankLines(text) {
 	return text.replace(/^(\s*\n)+/, "").replace(/(\n\s*)+$/, "");
 }
 
-const lines = raw.split("\n");
+const lines = raw.split(/\r?\n/);
 const entries = [];
 const errors = [];
 const names = new Map(); // name → line number

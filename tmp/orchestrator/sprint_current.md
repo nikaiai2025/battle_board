@@ -17,7 +17,21 @@
 - ci-failure ラベル作成: CI Failure Notifier がIssue作成できない障害を修正
 - collect-topics スケジュール: 手動トリガー成功確認。自動スケジュールは経過観察
 - vitest: 2087 PASS / cucumber-js: 373 PASS
-- コミット: (pending)
+- コミット: bfae891
+- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
+
+### CF Observability 既知エラー（解消済み・再調査不要）
+
+2026-03-29 に CF Observability の実エラーを調査し、以下は解消済みと判定。ログに残存するが対応不要。
+
+| 検出日 | エンドポイント | エラー概要 | 修正Sprint/コミット |
+|---|---|---|---|
+| 03-24 | `GET /api/admin/users` | Too many subrequests (`getBalance` N+1) | Sprint-118 / 237ef50 |
+| 03-22 ×2 | `POST /api/internal/bot/execute` | UUID パースエラー（"新参おるやん🤣"をUUID解析） | cebd451（チュートリアルBOT本文を改行区切りに変更） |
+| 03-21 | `POST /api/internal/bot/execute` | FK制約違反 (`incentive_logs.user_id` BOT未登録) + exceededCpu | Sprint-95 / 6225e73（BOT書き込み時インセンティブスキップ） |
+
+**未解消（次スプリント候補）:**
+- 03-27: `POST /api/threads/.../posts` — Too many subrequests (`countActiveThreads`)。独立システムレス再帰呼び出しでサブリクエスト上限到達
 
 ### 敵対的コードレビュー進捗（一時中断中）
 

@@ -67,6 +67,10 @@ Authorization: Bearer {CLOUDFLARE_OBSERVABILITY_TOKEN}
 
 ユーザーの指示に応じて時間範囲と件数を調整する。デフォルトは直近1時間・20件。
 
+#### 実エラーのみ取得（デフォルト）
+
+OpenNext の内部サブリクエストトレースや "Network connection lost."（クライアント接続断）などのノイズを除外し、真のアプリケーションエラーのみを取得する。
+
 ```bash
 source .env.prod
 NOW_MS=$(($(date +%s)*1000))
@@ -79,7 +83,38 @@ curl -s "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/
     "queryId": "events-query",
     "timeframe": {"from": '$FROM_MS', "to": '$NOW_MS'},
     "view": "events",
-    "limit": 20
+    "limit": 20,
+    "parameters": {
+      "filters": [{
+        "kind": "group",
+        "filterCombination": "and",
+        "filters": [
+          {"kind": "filter", "key": "$metadata.error", "operation": "exists", "type": "string", "value": ""},
+          {"kind": "filter", "key": "$metadata.error", "operation": "not_includes", "type": "string", "value": "Network connection lost"}
+        ]
+      }]
+    }
+  }'
+```
+
+#### 全イベント取得（フィルタなし）
+
+ノイズを含む全イベントを確認したい場合に使用する。
+
+```bash
+source .env.prod
+NOW_MS=$(($(date +%s)*1000))
+FROM_MS=$(($NOW_MS - 3600000))  # 1時間前
+
+curl -s "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/observability/telemetry/query" \
+  -H "Authorization: Bearer $CLOUDFLARE_OBSERVABILITY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "queryId": "events-query",
+    "timeframe": {"from": '$FROM_MS', "to": '$NOW_MS'},
+    "view": "events",
+    "limit": 20,
+    "parameters": {}
   }'
 ```
 
@@ -94,23 +129,62 @@ curl -s "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/
 
 レスポンスの構造:
 - `result.events.events[]` — イベント配列
-- 各イベントのフィールド:
-  - `timestamp` — Unix ミリ秒
-  - `$metadata.message` — console.log 本文
-  - `$metadata.level` — ログレベル (info/warn/error)
-  - `$workers.event.request.url` — リクエストURL
-  - `$workers.event.request.method` — HTTPメソッド
-  - `$workers.event.response.status` — レスポンスステータス
-  - `$workers.outcome` — ok / exception
-  - `$workers.eventType` — fetch / cron
-  - `source.url.path` — URLパス（otelデータセットの場合）
+- 各イベントはネストされたオブジェクト構造（ドット区切りの平坦キーではない）:
+
+```jsonc
+{
+  "timestamp": 1774627108699,          // Unix ミリ秒
+  "dataset": "cloudflare-workers",
+  "source": {
+    "level": "error",                  // ログレベル
+    "message": "..."                   // console.log 本文
+  },
+  "$metadata": {
+    "level": "error",                  // ログレベル（sourceと同値）
+    "error": "...",                     // エラー詳細（実エラーのみ存在）
+    "message": "...",                   // console.log 本文
+    "trigger": "POST /api/...",        // トリガー概要
+    "service": "battle-board"
+  },
+  "$workers": {
+    "outcome": "ok",                   // ok / exception / exceededCpu
+    "eventType": "fetch",              // fetch / cron
+    "scriptName": "battle-board",
+    "event": {
+      "request": {
+        "url": "https://...",          // リクエストURL
+        "method": "POST",             // HTTPメソッド
+        "path": "/api/..."            // URLパス
+      }
+    }
+  }
+}
+```
+
+**注意:** APIのフィルタ条件ではドット区切り（`$metadata.error`）で指定するが、レスポンスJSONではネスト構造（`e['$metadata'].error`）でアクセスする。
 
 ### 3. フィルタリング
 
-ユーザーが条件を指定した場合、取得後にフィルタする:
-- **エラーのみ**: `$metadata.level == "error"` または `$workers.outcome != "ok"`
-- **特定パス**: `$workers.event.request.url` や `source.url.path` で部分一致
-- **cronのみ**: `$workers.eventType == "cron"`
+デフォルトクエリは実エラーのみを取得する。追加の絞り込みが必要な場合は `filters` 配列に条件を追加する。
+
+**フィルタ構文:**
+```json
+{"kind": "filter", "key": "<フィールド>", "operation": "<演算子>", "type": "string", "value": "<値>"}
+```
+
+**利用可能な演算子:** `eq`, `neq`, `includes`, `not_includes`, `starts_with`, `regex`, `exists`, `is_null`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`
+
+**複数条件の結合:** `kind: "group"` + `filterCombination: "and" | "or"` でグループ化（最大4段階ネスト可）
+
+**よく使う条件:**
+- **特定エラー文字列**: `{"key": "$metadata.error", "operation": "includes", "value": "..."}`
+- **特定パス**: `{"key": "$workers.event.request.url", "operation": "includes", "value": "/api/..."}`
+- **cronのみ**: `{"key": "$workers.eventType", "operation": "eq", "value": "cron"}`
+- **HTTP 500のみ**: `{"key": "$workers.event.response.status", "operation": "eq", "type": "number", "value": 500}`
+
+**ノイズに関する注意:**
+- `$metadata.level == "error"` はフィルタに使わない。OpenNext の内部サブリクエストトレース（Supabase `/rest/v1/*` への正常な fetch）が大量に含まれる
+- `$metadata.error` フィールドの `exists` + 特定ノイズの `not_includes` が最も信頼性の高い実エラー抽出方法
 
 ## 補足: 利用可能なキー一覧の取得
 

@@ -98,6 +98,9 @@ module.exports = {
 			// TASK-353: キュレーションBOT（バズ情報収集・スレッド自動投稿） BDD シナリオ追加
 			// See: features/curation_bot.feature
 			"features/curation_bot.feature",
+			// TASK-359: ユーザーコピペ管理（マイページからのAA登録・編集・削除） BDD シナリオ追加
+			// See: features/user_copipe.feature
+			"features/user_copipe.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -168,6 +171,9 @@ module.exports = {
 			// TASK-353: キュレーションBOT（バズ情報収集・スレッド自動投稿） BDD ステップ定義
 			// See: features/curation_bot.feature
 			"features/step_definitions/curation_bot.steps.ts",
+			// TASK-359: ユーザーコピペ管理 BDD ステップ定義
+			// See: features/user_copipe.feature
+			"features/step_definitions/user_copipe.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

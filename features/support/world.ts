@@ -279,6 +279,32 @@ export class BattleBoardWorld extends World {
 	lastBotBonusNotice: string | null = null;
 
 	// -------------------------------------------------------------------------
+	// ユーザーコピペコンテキスト
+	// See: features/user_copipe.feature
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 別ユーザーが登録したコピペのエントリIDマップ（name → entryId）。
+	 * 認可テスト（他人のコピペを編集・削除しようとする）で使用する。
+	 * シナリオ間の独立性を保証するため reset() でクリアする。
+	 *
+	 * See: features/user_copipe.feature @他人の登録コピペは編集できない
+	 * See: features/user_copipe.feature @他人の登録コピペは削除できない
+	 */
+	otherUserCopipeIds: Map<string, number> = new Map();
+
+	/**
+	 * 自分が登録したコピペのエントリIDマップ（name → entryId）。
+	 * 「自分が以下のコピペを登録済みである」ステップで設定される。
+	 * currentUserId が後から変わる場合（コマンドレジストリ設定時等）でも
+	 * 削除・編集対象のエントリIDを参照できるよう保持する。
+	 *
+	 * See: features/user_copipe.feature @自分の登録コピペを削除する
+	 * See: features/user_copipe.feature @削除したコピペは!copipeで検索されなくなる
+	 */
+	myCopipeEntryIds: Map<string, number> = new Map();
+
+	// -------------------------------------------------------------------------
 	// キュレーションBOTコンテキスト
 	// See: features/curation_bot.feature
 	// -------------------------------------------------------------------------
@@ -355,6 +381,10 @@ export class BattleBoardWorld extends World {
 		// See: features/command_livingbot.feature
 		this.livingBotResults = [];
 		this.lastBotBonusNotice = null;
+		// ユーザーコピペコンテキストのリセット
+		// See: features/user_copipe.feature
+		this.otherUserCopipeIds = new Map();
+		this.myCopipeEntryIds = new Map();
 		// キュレーションBOTコンテキストのリセット
 		// See: features/curation_bot.feature
 		this.collectedTopicRepo = null;
