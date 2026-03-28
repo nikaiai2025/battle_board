@@ -1,7 +1,7 @@
 ---
 task_id: DOCREVIEW-135
 sprint_id: Sprint-135
-status: assigned
+status: completed
 assigned_to: bdd-doc-reviewer
 artifacts_dir: tmp/workers/bdd-doc-reviewer_DOCREVIEW-135
 created_at: 2026-03-28T15:30:00+09:00

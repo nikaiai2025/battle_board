@@ -1,7 +1,7 @@
 ---
 task_id: TASK-344-audit
 sprint_id: Sprint-134
-status: assigned
+status: completed
 assigned_to: bdd-test-auditor
 artifacts_dir: tmp/workers/bdd-test-auditor_TASK-344
 depends_on: []

@@ -1,7 +1,7 @@
 ---
 task_id: TASK-349
 sprint_id: Sprint-136
-status: assigned
+status: completed
 assigned_to: bdd-architect
 artifacts_dir: tmp/workers/bdd-architect_TASK-349
 depends_on: []

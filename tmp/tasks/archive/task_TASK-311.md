@@ -1,7 +1,7 @@
 ---
 task_id: TASK-311
 sprint_id: Sprint-114-hotfix
-status: assigned
+status: completed
 assigned_to: bdd-architect
 artifacts_dir: tmp/workers/bdd-architect_TASK-311
 depends_on: []

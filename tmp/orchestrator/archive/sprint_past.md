@@ -2,6 +2,81 @@
 
 > sprint_current.md から移植した、今後のスプリントで参照不要な履歴情報。
 
+## 完了済みスプリント成果（Sprint-111〜137）
+
+### Sprint-137の成果
+- TASK-354: `createBotService()` に `createThread` と `collectedTopicRepository` を DI 注入
+- vitest: 2084 PASS / cucumber-js: 373 PASS / 本番スモーク: 17/17 PASS
+- コミット: a4af902
+
+### Sprint-136の成果
+- TASK-349〜353: キュレーションBOT Phase A（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ + BDD13シナリオ）
+- vitest: 2084 PASS / cucumber-js: 373 passed(+12) / 本番スモーク: 17/17 PASS
+- コミット: 7a395c6
+
+### Sprint-135の成果
+- TASK-345〜348: ボット日次リセット インカーネーション + !w同日制限撤廃 + 範囲攻撃BDD + FAB pending
+- vitest: 2025テスト PASS / cucumber-js: 361 passed, 18 pending / 本番スモーク: 17/17 PASS
+- フェーズ5: 全PASS
+
+### Sprint-134の成果
+- TASK-342/343: command_copipe.feature 8シナリオ修正（通貨自動補填 + IncentiveLog事前挿入ブロック）
+- vitest: 2003テスト PASS / cucumber-js: 353 passed
+
+### Sprint-133の成果
+- TASK-341: コピペボット(HP:100) + 運営BOTコスト免除
+- vitest: 2003テスト PASS / cucumber-js: 345 passed
+
+### Sprint-128の成果
+- TASK-332: !copipe 曖昧ヒット通知フォーマット変更
+
+### Sprint-127の成果
+- TASK-330: !copipe v2 改修 + seed 195件投入
+
+### Sprint-126の成果
+- TASK-328/329: !copipe コマンド実装 + インフラ（Seed Script + GHA）
+
+### Sprint-125の成果
+- TASK-327: 削除済みレス非表示バグ修正（is_deletedフィルタ除去）
+
+### Sprint-122〜124の成果
+- TOCTOU原子採番 + soft deleteフィルタ + completeRegistrationアトミック化
+
+### Sprint-121の成果
+- TASK-319〜322: HUMAN-004解消 + リファクタリング2件 + BOT-DIAGクリーンアップ
+
+### Sprint-120の成果
+- TASK-317/318: !newspaper GHA 403修正 + welcome bot !w 復旧
+
+### Sprint-119の成果
+- TASK-316: GrassHandler BOT草付与パス実装
+
+### Sprint-118の成果
+- TASK-315: getUserList N+1修正（サブリクエスト52→3）
+
+### Sprint-117の成果
+- TASK-314: 管理者ユーザー管理 機能欠損修正 + BAN設計意図明文化
+
+### Sprint-116の成果
+- TASK-313: パスワード再設定フロントエンド + バックエンド
+
+### Sprint-115の成果
+- TASK-312: loginWithEmail レイヤー規約違反修正
+
+### Sprint-114後のホットフィックス3件
+- メール本登録リダイレクト不備 / チュートリアルBOT cron再投稿エラー / auth-code重複レコード防御
+
+### Sprint-113の成果
+- TASK-307〜309: BOT情報漏洩修正 + 専ブラedgeTokenフォールバック
+
+### Sprint-112の成果
+- TASK-301〜306: 管理者課金ステータス変更 + 管理画面修正 + 開発環境整備
+
+### Sprint-111の成果
+- TASK-298〜300: 管理画面スレッド管理UI + !wバグ修正 + 非同期コマンド即時トリガー
+
+---
+
 ## 完了済みスプリント成果（Sprint-75〜104）
 
 ### Sprint-104の成果

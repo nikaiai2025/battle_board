@@ -1,7 +1,7 @@
 ---
 task_id: TASK-344-doc
 sprint_id: Sprint-134
-status: assigned
+status: completed
 assigned_to: bdd-doc-reviewer
 artifacts_dir: tmp/workers/bdd-doc-reviewer_TASK-344
 depends_on: []

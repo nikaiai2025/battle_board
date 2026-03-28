@@ -1,7 +1,7 @@
 ---
 task_id: AUDIT-135
 sprint_id: Sprint-135
-status: assigned
+status: completed
 assigned_to: bdd-test-auditor
 artifacts_dir: tmp/workers/bdd-test-auditor_AUDIT-135
 created_at: 2026-03-28T15:30:00+09:00
