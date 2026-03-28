@@ -1624,7 +1624,11 @@ export function createBotService(): BotService {
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const ThreadRepository = require("../infrastructure/repositories/thread-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const { createPost } = require("./post-service");
+	const { createPost, createThread } = require("./post-service");
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const {
+		collectedTopicRepository,
+	} = require("../infrastructure/repositories/collected-topic-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const PendingTutorialRepository = require("../infrastructure/repositories/pending-tutorial-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -1664,5 +1668,8 @@ export function createBotService(): BotService {
 		undefined, // resolveStrategiesFn（省略 → デフォルトの resolveStrategies を使用）
 		pendingTutorialRepository, // processPendingTutorials で使用
 		pendingAsyncCommandRepository, // processAoriCommands で使用
+		undefined, // dailyEventRepository（位置9）— 機能ガード済みのため undefined で可
+		createThread, // createThreadFn（位置10）— キュレーションBOTのスレッド作成に使用
+		collectedTopicRepository, // collectedTopicRepository（位置11）— キュレーションBOTの記事選択に使用
 	);
 }
