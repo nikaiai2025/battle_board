@@ -132,6 +132,7 @@ function createMockBotPostRepository(
 ): IBotPostRepository {
 	return {
 		findByPostId: vi.fn().mockResolvedValue(record),
+		findByPostIds: vi.fn().mockResolvedValue(record ? [record] : []),
 		create: vi.fn().mockResolvedValue(undefined),
 	};
 }
@@ -970,6 +971,7 @@ describe("BotService", () => {
 			const botRepo = createMockBotRepository(bot);
 			const failingBotPostRepo: IBotPostRepository = {
 				findByPostId: vi.fn().mockResolvedValue(null),
+				findByPostIds: vi.fn().mockResolvedValue([]),
 				create: vi.fn().mockRejectedValue(new Error("DB接続エラー")),
 			};
 			const service = new BotService(

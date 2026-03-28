@@ -50,9 +50,38 @@ import type {
 export interface IAttackBotService {
 	isBot(postId: string): Promise<boolean>;
 	getBotByPostId(postId: string): Promise<BotInfo | null>;
+	/**
+	 * 複数の投稿IDからBOT情報を一括取得する。
+	 * N+1問題を解消するため、バッチクエリで処理する。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
+	 *
+	 * @param postIds - 判定対象のレスID配列
+	 * @returns BOTレスの postId → BotInfo マッピング（非BOTレスは含まれない）
+	 */
+	getBotsByPostIds(postIds: string[]): Promise<Map<string, BotInfo>>;
 	revealBot(botId: string): Promise<void>;
+	/**
+	 * BOT情報を直接渡してBOTマークを付与する（findById の重複を排除）。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S2
+	 *
+	 * @param bot - 既に取得済みのBOT情報
+	 */
+	revealBotWithInfo(bot: BotInfo): Promise<void>;
 	applyDamage(
 		botId: string,
+		damage: number,
+		attackerId: string,
+	): Promise<DamageResult>;
+	/**
+	 * BOT情報を直接渡してダメージを適用する（findById の重複を排除）。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S2
+	 *
+	 * @param bot - 既に取得済みのBOT情報
+	 * @param damage - 与えるダメージ量
+	 * @param attackerId - 攻撃者のユーザーID
+	 */
+	applyDamageWithInfo(
+		bot: BotInfo,
 		damage: number,
 		attackerId: string,
 	): Promise<DamageResult>;
@@ -100,6 +129,16 @@ export interface IAttackPostRepository {
 		threadId: string,
 		postNumber: number,
 	): Promise<Post | null>;
+	/**
+	 * スレッドIDと複数レス番号からレスを一括取得する。
+	 * N+1問題を解消するため、WHERE thread_id = ? AND post_number IN (...) で1クエリにまとめる。
+	 * 複数ターゲット攻撃（>>N-M 形式）の事前検証フェーズで使用する。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
+	 */
+	findByThreadIdAndPostNumbers(
+		threadId: string,
+		postNumbers: number[],
+	): Promise<Post[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,10 +315,13 @@ export class AttackHandler implements CommandHandler {
 	 * 複数ターゲット攻撃の処理。
 	 *
 	 * 1. 範囲パース → レス番号配列
-	 * 2. 各ターゲットの事前検証（有効/スキップの判定）
-	 * 3. 有効ターゲット数 × コストの残高チェック
-	 * 4. 有効ターゲットを順に攻撃（途中で残高不足なら中断）
-	 * 5. 全結果を集約した表示文を生成
+	 * 2. S1: バッチクエリで全レスを一括取得 + BOT判定を一括取得
+	 * 3. 事前検証（バッチ取得結果を使い、ループ内クエリを最小化）
+	 * 4. 有効ターゲット数 × コストの残高チェック
+	 * 5. S3: ローカル残高追跡で攻撃ループ内の getBalance を排除
+	 * 6. 全結果を集約した表示文を生成
+	 *
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1/S3
 	 */
 	private async executeMultiTarget(
 		ctx: CommandContext,
@@ -293,7 +335,26 @@ export class AttackHandler implements CommandHandler {
 
 		const { postNumbers } = rangeResult;
 
-		// 2. 各ターゲットの事前検証
+		// 2. S1: バッチクエリで全レスを一括取得
+		// N個の findByThreadIdAndPostNumber → 1回の findByThreadIdAndPostNumbers
+		const posts = await this.postRepository.findByThreadIdAndPostNumbers(
+			ctx.threadId,
+			postNumbers,
+		);
+		const postByNumber = new Map<number, Post>();
+		for (const post of posts) {
+			postByNumber.set(post.postNumber, post);
+		}
+
+		// S1: バッチクエリでBOT情報を一括取得
+		// N個の isBot + getBotByPostId → 1回の getBotsByPostIds
+		const postIds = posts.map((p) => p.id);
+		const botInfoByPostId =
+			postIds.length > 0
+				? await this.botService.getBotsByPostIds(postIds)
+				: new Map<string, BotInfo>();
+
+		// 3. 事前検証（バッチ取得結果を使ってループ内クエリを最小化）
 		const validTargets: ValidTarget[] = [];
 		const skippedTargets: SkippedTarget[] = [];
 		const attackedBotIds = new Set<string>(); // 範囲内の同一ボット重複検出
@@ -304,13 +365,15 @@ export class AttackHandler implements CommandHandler {
 				pn,
 				attackedBotIds,
 				validTargets,
+				postByNumber,
+				botInfoByPostId,
 			);
 			if (skipReason) {
 				skippedTargets.push({ postNumber: pn, reason: skipReason });
 			}
 		}
 
-		// 3. 有効ターゲットが0件ならエラー
+		// 4. 有効ターゲットが0件ならエラー
 		if (validTargets.length === 0) {
 			return {
 				success: false,
@@ -318,7 +381,7 @@ export class AttackHandler implements CommandHandler {
 			};
 		}
 
-		// 4. 残高チェック（有効ターゲット数 × コスト）
+		// 5. 残高チェック（有効ターゲット数 × コスト）
 		const totalCost = validTargets.length * this.cost;
 		const balance = await this.currencyService.getBalance(ctx.userId);
 		if (balance < totalCost) {
@@ -328,15 +391,16 @@ export class AttackHandler implements CommandHandler {
 			};
 		}
 
-		// 5. 有効ターゲットを順に攻撃
+		// 6. S3: ローカル残高追跡で攻撃ループ内の getBalance を排除
+		// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S3
+		let localBalance = balance;
 		const results: TargetResult[] = [];
 		const eliminationNotices: string[] = [];
 		let lastBotBonusNotice: string | null = null;
 
 		for (const target of validTargets) {
-			// 賠償金等で残高が次のコスト分を下回った場合は中断
-			const currentBalance = await this.currencyService.getBalance(ctx.userId);
-			if (currentBalance < this.cost) {
+			// S3: ローカル変数で残高チェック（DB問い合わせなし）
+			if (localBalance < this.cost) {
 				results.push({
 					postNumber: target.postNumber,
 					message: "残高不足で中断",
@@ -354,6 +418,8 @@ export class AttackHandler implements CommandHandler {
 
 			if (target.type === "bot") {
 				const r = await this.executeSingleBotAttack(ctx, target);
+				// S3: ローカル残高からコストを減算
+				localBalance -= this.cost;
 				results.push(r);
 				if (r.eliminationNotice) {
 					eliminationNotices.push(r.eliminationNotice);
@@ -363,6 +429,11 @@ export class AttackHandler implements CommandHandler {
 				}
 			} else {
 				const r = await this.executeSingleHumanAttack(ctx, target);
+				// S3: ローカル残高からコスト + 賠償金を減算
+				localBalance -= this.cost;
+				const compensationAmount = this.cost * this.compensationMultiplier;
+				const actualCompensation = Math.min(compensationAmount, localBalance);
+				localBalance -= actualCompensation;
 				results.push(r);
 			}
 		}
@@ -386,29 +457,33 @@ export class AttackHandler implements CommandHandler {
 
 	/**
 	 * 個別ターゲットの事前検証。
+	 * S1最適化: バッチ取得済みの postByNumber / botInfoByPostId を参照し、
+	 * ループ内での個別 DB クエリを排除する。canAttackToday のみ個別クエリが残る。
+	 *
 	 * 有効な場合は validTargets に追加し null を返す。
 	 * 無効な場合はスキップ理由文字列を返す。
+	 *
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
 	 */
 	private async preValidateTarget(
 		ctx: CommandContext,
 		postNumber: number,
 		attackedBotIds: Set<string>,
 		validTargets: ValidTarget[],
+		postByNumber: Map<number, Post>,
+		botInfoByPostId: Map<string, BotInfo>,
 	): Promise<string | null> {
-		const post = await this.postRepository.findByThreadIdAndPostNumber(
-			ctx.threadId,
-			postNumber,
-		);
+		// S1: バッチ取得済みのマップからレスを参照（DB問い合わせなし）
+		const post = postByNumber.get(postNumber);
 
 		if (!post) return "存在しないレス";
 		if (post.authorId === ctx.userId) return "自分の書き込み";
 		if (post.isSystemMessage) return "システムメッセージ";
 
-		const isBot = await this.botService.isBot(post.id);
+		// S1: バッチ取得済みのマップからBOT情報を参照（DB問い合わせなし）
+		const botInfo = botInfoByPostId.get(post.id);
 
-		if (isBot) {
-			const botInfo = await this.botService.getBotByPostId(post.id);
-			if (!botInfo) return "ボット情報取得失敗";
+		if (botInfo) {
 			if (!botInfo.isActive) return "撃破済み";
 
 			// 範囲内の同一ボット重複チェック
@@ -416,7 +491,7 @@ export class AttackHandler implements CommandHandler {
 				return "同じボットには1日1回のみ";
 			}
 
-			// 同日攻撃済みチェック
+			// 同日攻撃済みチェック（バッチ化対象外 — AttackRepository のバッチメソッドは中期改善 M1 で対応）
 			const canAttack = await this.botService.canAttackToday(
 				ctx.userId,
 				botInfo.botId,
@@ -447,7 +522,10 @@ export class AttackHandler implements CommandHandler {
 
 	/**
 	 * 複数ターゲット攻撃: BOTへの単体攻撃実行。
-	 * executeFlowB のコアロジックを使用するが、結果を TargetResult で返す。
+	 * S2最適化: revealBotWithInfo / applyDamageWithInfo を使用し、
+	 * BotService 内部の重複 findById を排除する。
+	 *
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S2
 	 */
 	private async executeSingleBotAttack(
 		ctx: CommandContext,
@@ -465,14 +543,14 @@ export class AttackHandler implements CommandHandler {
 			return { postNumber, message: "残高不足で中断" };
 		}
 
-		// 不意打ち（lurking） → revealBot
+		// S2: 不意打ち（lurking） → revealBotWithInfo（botInfo を直接渡して重複 findById を排除）
 		if (!botInfo.isRevealed) {
-			await this.botService.revealBot(botInfo.botId);
+			await this.botService.revealBotWithInfo(botInfo);
 		}
 
-		// HP減少
-		const damageResult = await this.botService.applyDamage(
-			botInfo.botId,
+		// S2: HP減少 → applyDamageWithInfo（botInfo を直接渡して重複 findById を排除）
+		const damageResult = await this.botService.applyDamageWithInfo(
+			botInfo,
 			this.damage,
 			ctx.userId,
 		);
@@ -526,7 +604,9 @@ export class AttackHandler implements CommandHandler {
 
 	/**
 	 * 複数ターゲット攻撃: 人間への単体攻撃実行。
-	 * executeFlowC のコアロジックを使用するが、結果を TargetResult で返す。
+	 * S3最適化: debit の戻り値 newBalance を使い、getBalance 呼び出しを排除する。
+	 *
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S3
 	 */
 	private async executeSingleHumanAttack(
 		ctx: CommandContext,
@@ -544,9 +624,9 @@ export class AttackHandler implements CommandHandler {
 			return { postNumber, message: "残高不足で中断" };
 		}
 
-		// 賠償金計算・支払い
+		// S3: debit の戻り値 newBalance を使い、getBalance 呼び出しを排除
+		const attackerBalance = deductResult.newBalance;
 		const compensationAmount = this.cost * this.compensationMultiplier;
-		const attackerBalance = await this.currencyService.getBalance(ctx.userId);
 		const actualCompensation = Math.min(compensationAmount, attackerBalance);
 
 		if (actualCompensation > 0) {

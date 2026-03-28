@@ -139,8 +139,15 @@ function createMockBotService(
 	return {
 		isBot: vi.fn().mockResolvedValue(options.isBot ?? false),
 		getBotByPostId: vi.fn().mockResolvedValue(options.botInfo ?? null),
+		getBotsByPostIds: vi.fn().mockResolvedValue(new Map()),
 		revealBot: vi.fn().mockResolvedValue(undefined),
+		revealBotWithInfo: vi.fn().mockResolvedValue(undefined),
 		applyDamage: vi
+			.fn()
+			.mockResolvedValue(
+				options.damageResult ?? createDamageResultNotEliminated(),
+			),
+		applyDamageWithInfo: vi
 			.fn()
 			.mockResolvedValue(
 				options.damageResult ?? createDamageResultNotEliminated(),
@@ -171,6 +178,7 @@ function createMockPostRepository(
 	return {
 		findById: vi.fn().mockResolvedValue(post),
 		findByThreadIdAndPostNumber: vi.fn().mockResolvedValue(post),
+		findByThreadIdAndPostNumbers: vi.fn().mockResolvedValue(post ? [post] : []),
 	};
 }
 
@@ -702,10 +710,30 @@ describe("AttackHandler", () => {
 				getBotByPostId: vi.fn().mockImplementation((postId: string) => {
 					return Promise.resolve(options.botInfoByPostId?.get(postId) ?? null);
 				}),
+				// S1: getBotsByPostIds はバッチ取得 — botInfoByPostId マップから該当するものを返す
+				getBotsByPostIds: vi.fn().mockImplementation((postIds: string[]) => {
+					const result = new Map<string, BotInfo>();
+					for (const postId of postIds) {
+						const info = options.botInfoByPostId?.get(postId);
+						if (info) {
+							result.set(postId, info);
+						}
+					}
+					return Promise.resolve(result);
+				}),
 				revealBot: vi.fn().mockResolvedValue(undefined),
+				// S2: revealBotWithInfo — バッチ取得済みの BotInfo を受け取る
+				revealBotWithInfo: vi.fn().mockResolvedValue(undefined),
 				applyDamage: vi.fn().mockImplementation((botId: string) => {
 					const result =
 						options.damageResultByBotId?.get(botId) ??
+						createDamageResultEliminated();
+					return Promise.resolve(result);
+				}),
+				// S2: applyDamageWithInfo — BotInfo を直接受け取る
+				applyDamageWithInfo: vi.fn().mockImplementation((bot: BotInfo) => {
+					const result =
+						options.damageResultByBotId?.get(bot.botId) ??
 						createDamageResultEliminated();
 					return Promise.resolve(result);
 				}),
@@ -751,6 +779,15 @@ describe("AttackHandler", () => {
 					.mockImplementation((_threadId: string, postNumber: number) => {
 						return Promise.resolve(
 							options.postsByNumber.get(postNumber) ?? null,
+						);
+					}),
+				findByThreadIdAndPostNumbers: vi
+					.fn()
+					.mockImplementation((_threadId: string, postNumbers: number[]) => {
+						return Promise.resolve(
+							postNumbers
+								.map((pn) => options.postsByNumber.get(pn) ?? null)
+								.filter((p): p is Post => p !== null),
 						);
 					}),
 			};
@@ -846,7 +883,8 @@ describe("AttackHandler", () => {
 			expect(result.systemMessage).toContain("荒らし役B");
 			// コスト: 2 × 5 = 10
 			expect(getBalance()).toBe(100 - 10);
-			expect(botService.applyDamage).toHaveBeenCalledTimes(2);
+			// S2: 複数ターゲット攻撃では applyDamageWithInfo が使われる
+			expect(botService.applyDamageWithInfo).toHaveBeenCalledTimes(2);
 		});
 
 		it("コイン不足のため全体が失敗する", async () => {
@@ -1256,7 +1294,8 @@ describe("AttackHandler", () => {
 			expect(result.systemMessage).not.toContain(">>5:");
 			// コスト: 2 × 5 = 10
 			expect(getBalance()).toBe(100 - 10);
-			expect(botService.applyDamage).toHaveBeenCalledTimes(2);
+			// S2: 複数ターゲット攻撃では applyDamageWithInfo が使われる
+			expect(botService.applyDamageWithInfo).toHaveBeenCalledTimes(2);
 		});
 
 		it("カンマ区切りと連続範囲の混合で攻撃する", async () => {
@@ -1341,6 +1380,283 @@ describe("AttackHandler", () => {
 			expect(result.systemMessage).toContain(">>11:");
 			// 4件 × 5 = 20
 			expect(getBalance()).toBe(100 - 20);
+		});
+
+		// =====================================================================
+		// S1: 事前検証のバッチ化
+		// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
+		// =====================================================================
+
+		describe("S1: 事前検証のバッチ化", () => {
+			it("複数ターゲット攻撃で findByThreadIdAndPostNumbers が1回呼ばれる（個別 findByThreadIdAndPostNumber は呼ばれない）", async () => {
+				const botPostA = createHumanPost({
+					id: "post-a",
+					postNumber: 10,
+				});
+				const botPostB = createHumanPost({
+					id: "post-b",
+					postNumber: 11,
+				});
+
+				const { handler, postRepository } = createMultiTargetHandler({
+					postsByNumber: new Map([
+						[10, botPostA],
+						[11, botPostB],
+					]),
+					isBotByPostId: new Map([
+						["post-a", true],
+						["post-b", true],
+					]),
+					botInfoByPostId: new Map([
+						["post-a", createBotInfo({ botId: "bot-a", isActive: true })],
+						["post-b", createBotInfo({ botId: "bot-b", isActive: true })],
+					]),
+					balance: 100,
+				});
+
+				await handler.execute(createCtx({ args: [">>10-11"] }));
+
+				// S1: バッチメソッドが1回呼ばれることを確認
+				expect(
+					postRepository.findByThreadIdAndPostNumbers,
+				).toHaveBeenCalledTimes(1);
+				expect(
+					postRepository.findByThreadIdAndPostNumbers,
+				).toHaveBeenCalledWith("thread-001", [10, 11]);
+				// 個別メソッドは呼ばれない
+				expect(
+					postRepository.findByThreadIdAndPostNumber,
+				).not.toHaveBeenCalled();
+			});
+
+			it("複数ターゲット攻撃で getBotsByPostIds が1回呼ばれる（個別 isBot/getBotByPostId は呼ばれない）", async () => {
+				const botPostA = createHumanPost({
+					id: "post-a",
+					postNumber: 10,
+				});
+				const botPostB = createHumanPost({
+					id: "post-b",
+					postNumber: 11,
+				});
+
+				const { handler, botService } = createMultiTargetHandler({
+					postsByNumber: new Map([
+						[10, botPostA],
+						[11, botPostB],
+					]),
+					isBotByPostId: new Map([
+						["post-a", true],
+						["post-b", true],
+					]),
+					botInfoByPostId: new Map([
+						["post-a", createBotInfo({ botId: "bot-a", isActive: true })],
+						["post-b", createBotInfo({ botId: "bot-b", isActive: true })],
+					]),
+					balance: 100,
+				});
+
+				await handler.execute(createCtx({ args: [">>10-11"] }));
+
+				// S1: バッチメソッドが1回呼ばれることを確認
+				expect(botService.getBotsByPostIds).toHaveBeenCalledTimes(1);
+				expect(botService.getBotsByPostIds).toHaveBeenCalledWith([
+					"post-a",
+					"post-b",
+				]);
+				// 個別メソッドは呼ばれない
+				expect(botService.isBot).not.toHaveBeenCalled();
+				expect(botService.getBotByPostId).not.toHaveBeenCalled();
+			});
+		});
+
+		// =====================================================================
+		// S2: BotService 重複 findById 排除
+		// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S2
+		// =====================================================================
+
+		describe("S2: revealBotWithInfo / applyDamageWithInfo の使用", () => {
+			it("複数ターゲット攻撃でlurking BOTに対し revealBotWithInfo が呼ばれる（revealBot ではない）", async () => {
+				const botPost = createHumanPost({
+					id: "post-a",
+					postNumber: 10,
+				});
+				const info = createBotInfo({
+					botId: "bot-a",
+					isActive: true,
+					isRevealed: false,
+				});
+
+				const { handler, botService } = createMultiTargetHandler({
+					postsByNumber: new Map([[10, botPost]]),
+					isBotByPostId: new Map([["post-a", true]]),
+					botInfoByPostId: new Map([["post-a", info]]),
+					balance: 100,
+				});
+
+				await handler.execute(createCtx({ args: [">>10-10"] }));
+
+				// S2: revealBotWithInfo が BotInfo を受け取って呼ばれる
+				expect(botService.revealBotWithInfo).toHaveBeenCalledWith(info);
+				// 旧メソッドは呼ばれない
+				expect(botService.revealBot).not.toHaveBeenCalled();
+			});
+
+			it("複数ターゲット攻撃でBOTに対し applyDamageWithInfo が呼ばれる（applyDamage ではない）", async () => {
+				const botPost = createHumanPost({
+					id: "post-a",
+					postNumber: 10,
+				});
+				const info = createBotInfo({
+					botId: "bot-a",
+					isActive: true,
+					isRevealed: true,
+				});
+
+				const { handler, botService } = createMultiTargetHandler({
+					postsByNumber: new Map([[10, botPost]]),
+					isBotByPostId: new Map([["post-a", true]]),
+					botInfoByPostId: new Map([["post-a", info]]),
+					damageResultByBotId: new Map([
+						["bot-a", createDamageResultNotEliminated()],
+					]),
+					balance: 100,
+				});
+
+				await handler.execute(createCtx({ args: [">>10-10"] }));
+
+				// S2: applyDamageWithInfo が BotInfo を受け取って呼ばれる
+				expect(botService.applyDamageWithInfo).toHaveBeenCalledWith(
+					info,
+					DEFAULT_DAMAGE,
+					"attacker-user-001",
+				);
+				// 旧メソッドは呼ばれない
+				expect(botService.applyDamage).not.toHaveBeenCalled();
+			});
+
+			it("revealed BOTに対しては revealBotWithInfo が呼ばれない", async () => {
+				const botPost = createHumanPost({
+					id: "post-a",
+					postNumber: 10,
+				});
+				const info = createBotInfo({
+					botId: "bot-a",
+					isActive: true,
+					isRevealed: true,
+				});
+
+				const { handler, botService } = createMultiTargetHandler({
+					postsByNumber: new Map([[10, botPost]]),
+					isBotByPostId: new Map([["post-a", true]]),
+					botInfoByPostId: new Map([["post-a", info]]),
+					balance: 100,
+				});
+
+				await handler.execute(createCtx({ args: [">>10-10"] }));
+
+				expect(botService.revealBotWithInfo).not.toHaveBeenCalled();
+				expect(botService.revealBot).not.toHaveBeenCalled();
+			});
+		});
+
+		// =====================================================================
+		// S3: 攻撃ループ内の getBalance 削除
+		// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S3
+		// =====================================================================
+
+		describe("S3: ローカル残高追跡", () => {
+			it("複数ターゲット攻撃で getBalance は事前チェックの1回のみ呼ばれる（ループ内では呼ばれない）", async () => {
+				const botPostA = createHumanPost({
+					id: "post-a",
+					postNumber: 10,
+				});
+				const botPostB = createHumanPost({
+					id: "post-b",
+					postNumber: 11,
+				});
+				const botPostC = createHumanPost({
+					id: "post-c",
+					postNumber: 12,
+				});
+
+				const { handler, currencyService } = createMultiTargetHandler({
+					postsByNumber: new Map([
+						[10, botPostA],
+						[11, botPostB],
+						[12, botPostC],
+					]),
+					isBotByPostId: new Map([
+						["post-a", true],
+						["post-b", true],
+						["post-c", true],
+					]),
+					botInfoByPostId: new Map([
+						["post-a", createBotInfo({ botId: "bot-a", isActive: true })],
+						["post-b", createBotInfo({ botId: "bot-b", isActive: true })],
+						["post-c", createBotInfo({ botId: "bot-c", isActive: true })],
+					]),
+					balance: 100,
+				});
+
+				await handler.execute(createCtx({ args: [">>10-12"] }));
+
+				// S3: getBalance は残高チェック（ステップ5）の1回のみ
+				expect(currencyService.getBalance).toHaveBeenCalledTimes(1);
+			});
+
+			it("人間攻撃の賠償金でローカル残高が減少し、次のターゲットで残高不足になると中断する", async () => {
+				const botPost10 = createHumanPost({
+					id: "post-10",
+					postNumber: 10,
+				});
+				const humanPost11 = createHumanPost({
+					id: "post-11",
+					postNumber: 11,
+					authorId: "human-target",
+				});
+				const botPost12 = createHumanPost({
+					id: "post-12",
+					postNumber: 12,
+				});
+
+				const { handler, currencyService, getBalance } =
+					createMultiTargetHandler({
+						postsByNumber: new Map([
+							[10, botPost10],
+							[11, humanPost11],
+							[12, botPost12],
+						]),
+						isBotByPostId: new Map([
+							["post-10", true],
+							["post-11", false],
+							["post-12", true],
+						]),
+						botInfoByPostId: new Map([
+							["post-10", createBotInfo({ botId: "bot-10", isActive: true })],
+							["post-12", createBotInfo({ botId: "bot-12", isActive: true })],
+						]),
+						damageResultByBotId: new Map([
+							[
+								"bot-10",
+								createDamageResultEliminated({
+									previousHp: 10,
+									remainingHp: 0,
+									reward: 15,
+								}),
+							],
+						]),
+						// >>10: BOT攻撃 -5 → 残20, >>11: 人間攻撃 -5-15(賠償) → 残0, >>12: 中断
+						balance: 25,
+					});
+
+				const result = await handler.execute(createCtx({ args: [">>10-12"] }));
+
+				expect(result.success).toBe(true);
+				expect(result.systemMessage).toContain("中断");
+				// S3: getBalance は1回のみ（ループ内では呼ばれない）
+				expect(currencyService.getBalance).toHaveBeenCalledTimes(1);
+				expect(getBalance()).toBe(0);
+			});
 		});
 	});
 });

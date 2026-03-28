@@ -360,6 +360,43 @@ export async function findByThreadIdAndPostNumber(
 }
 
 /**
+ * 指定スレッド内の複数レス番号のレスを一括取得する。
+ * N+1問題を解消するため、WHERE thread_id = ? AND post_number IN (...) で1クエリにまとめる。
+ * 複数ターゲット攻撃（>>N-M 形式）の事前検証フェーズで使用する。
+ *
+ * See: features/bot_system.feature @複数ターゲット攻撃
+ * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
+ *
+ * @param threadId - スレッドの UUID
+ * @param postNumbers - 取得対象のレス番号配列
+ * @returns Post 配列（post_number ASC ソート済み）。存在しないレス番号は結果に含まれない
+ */
+export async function findByThreadIdAndPostNumbers(
+	threadId: string,
+	postNumbers: number[],
+): Promise<Post[]> {
+	// 空配列の場合はクエリを発行しない（Supabase の IN 句は空配列でエラーになる場合がある）
+	if (postNumbers.length === 0) {
+		return [];
+	}
+
+	const { data, error } = await supabaseAdmin
+		.from("posts")
+		.select("*")
+		.eq("thread_id", threadId)
+		.in("post_number", postNumbers)
+		.order("post_number", { ascending: true });
+
+	if (error) {
+		throw new Error(
+			`PostRepository.findByThreadIdAndPostNumbers failed: ${error.message}`,
+		);
+	}
+
+	return (data as PostRow[]).map(rowToPost);
+}
+
+/**
  * レス番号の原子採番 + INSERT を RPC 1回で実行する。
  * DB 側の insert_post_with_next_number 関数で threads テーブルの行ロック (FOR UPDATE)
  * を取得し、採番と INSERT を単一トランザクション内で原子的に実行する。

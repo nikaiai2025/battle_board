@@ -94,7 +94,7 @@ vi.mock("../../../lib/services/currency-service", () => ({
 }));
 
 vi.mock("../../../lib/services/incentive-service", () => ({
-	evaluateOnPost: vi.fn().mockResolvedValue({ granted: [] }),
+	evaluateOnPost: vi.fn().mockResolvedValue({ granted: [], skipped: [] }),
 }));
 
 vi.mock(
@@ -207,7 +207,9 @@ import * as BotPostRepository from "../../../lib/infrastructure/repositories/bot
 import * as BotRepository from "../../../lib/infrastructure/repositories/bot-repository";
 import * as PostRepository from "../../../lib/infrastructure/repositories/post-repository";
 import * as ThreadRepository from "../../../lib/infrastructure/repositories/thread-repository";
+import * as UserRepository from "../../../lib/infrastructure/repositories/user-repository";
 import * as AuthService from "../../../lib/services/auth-service";
+import * as IncentiveService from "../../../lib/services/incentive-service";
 import {
 	createPost,
 	getPostListWithBotMark,
@@ -534,6 +536,236 @@ describe("PostService.getPostListWithBotMark", () => {
 			expect(PostRepository.findByThreadId).toHaveBeenCalledWith("thread-001", {
 				latestCount: 50,
 			});
+		});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// S4: createPost 内の重複クエリ排除テスト
+// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §4.2, §5.1 S4
+// ---------------------------------------------------------------------------
+
+describe("PostService.createPost — S4 重複クエリ排除", () => {
+	/** 認証済み人間ユーザーの書き込みを準備するヘルパー */
+	function setupAuthenticatedHumanWrite() {
+		vi.clearAllMocks();
+		setCommandService(null);
+
+		vi.mocked(ThreadRepository.findById).mockResolvedValue(createTestThread());
+		vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+			valid: true,
+			userId: "user-001",
+			authorIdSeed: "seed-abc",
+		} as any);
+		vi.mocked(AuthService.isIpBanned).mockResolvedValue(false);
+		vi.mocked(UserRepository.findById).mockResolvedValue({
+			id: "user-001",
+			username: null,
+			isPremium: false,
+			isBanned: false,
+			streakDays: 0,
+			lastPostDate: null,
+			lastIpHash: null,
+			isVerified: true,
+			createdAt: new Date("2026-03-20T00:00:00Z"),
+		} as any);
+		vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+			createTestCreatedPost({ authorId: "user-001", postNumber: 1 }),
+		);
+		vi.mocked(PostRepository.findByThreadId).mockResolvedValue([]);
+		vi.mocked(PostRepository.countByAuthorId).mockResolvedValue(1);
+		vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(undefined);
+		vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(undefined);
+		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
+		vi.mocked(IncentiveService.evaluateOnPost).mockResolvedValue({
+			granted: [],
+			skipped: [],
+		});
+	}
+
+	beforeEach(() => {
+		setupAuthenticatedHumanWrite();
+	});
+
+	// -----------------------------------------------------------------------
+	// S4-1: isUserBanned の重複排除（-1クエリ）
+	// 現状: Step 2b で AuthService.isUserBanned → UserRepository.findById
+	//       Step 3 で UserRepository.findById
+	// 改善: Step 3 の findById 結果で banned 判定。AuthService.isUserBanned 不使用
+	// -----------------------------------------------------------------------
+
+	describe("S4-1: isUserBanned の重複排除", () => {
+		it("認証済みユーザーの書き込みで AuthService.isUserBanned が呼ばれない（findById 結果で判定）", async () => {
+			await createPost({
+				threadId: "thread-001",
+				body: "通常の書き込み",
+				edgeToken: "token-abc",
+				ipHash: "seed-abc",
+				isBotWrite: false,
+			});
+
+			// S4-1: AuthService.isUserBanned は呼ばれないこと（重複クエリ排除）
+			expect(AuthService.isUserBanned).not.toHaveBeenCalled();
+			// 代わりに UserRepository.findById で取得した結果で banned 判定する
+			expect(UserRepository.findById).toHaveBeenCalledWith("user-001");
+		});
+
+		it("isBanned=true のユーザーは Step 3 の findById 結果で書き込みが拒否される", async () => {
+			vi.mocked(UserRepository.findById).mockResolvedValue({
+				id: "user-001",
+				username: null,
+				isPremium: false,
+				isBanned: true, // BAN されたユーザー
+				streakDays: 0,
+				lastPostDate: null,
+				lastIpHash: null,
+				isVerified: true,
+				createdAt: new Date("2026-03-20T00:00:00Z"),
+			} as any);
+
+			const result = await createPost({
+				threadId: "thread-001",
+				body: "BANユーザーの書き込み",
+				edgeToken: "token-abc",
+				ipHash: "seed-abc",
+				isBotWrite: false,
+			});
+
+			expect(result).toMatchObject({
+				success: false,
+				code: "USER_BANNED",
+			});
+			// AuthService.isUserBanned は呼ばれない
+			expect(AuthService.isUserBanned).not.toHaveBeenCalled();
+		});
+
+		it("BOT書き込みでは UserRepository.findById も AuthService.isUserBanned も呼ばれない", async () => {
+			await createPost({
+				threadId: "thread-001",
+				body: "BOTの書き込み",
+				edgeToken: null,
+				ipHash: "bot-ip",
+				isBotWrite: true,
+			});
+
+			expect(AuthService.isUserBanned).not.toHaveBeenCalled();
+			// BOT書き込みでは User 情報取得自体をスキップ
+			expect(UserRepository.findById).not.toHaveBeenCalled();
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// S4-2: PostRepository.findByThreadId の重複排除（-1クエリ）
+	// 現状: Step 7(sync) と Step 11(deferred) で2回呼ばれる
+	// 改善: Step 7 の結果を保持し deferred phase に渡す
+	// -----------------------------------------------------------------------
+
+	describe("S4-2: findByThreadId の重複排除", () => {
+		it("アンカー付き書き込みで PostRepository.findByThreadId が1回のみ呼ばれる（deferred でDB再取得しない）", async () => {
+			const existingPost = createHumanPost({
+				id: "post-existing",
+				postNumber: 1,
+				authorId: "user-002",
+			});
+			vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
+				existingPost,
+			]);
+
+			await createPost({
+				threadId: "thread-001",
+				body: ">>1 返信です",
+				edgeToken: "token-abc",
+				ipHash: "seed-abc",
+				isBotWrite: false,
+			});
+
+			// findByThreadId はアンカー解析用の1回のみ（deferred phase での再取得なし）
+			expect(PostRepository.findByThreadId).toHaveBeenCalledTimes(1);
+		});
+
+		it("deferred phase に pre-fetched threadPosts（新規レス追加済み）が渡される", async () => {
+			const existingPost = createHumanPost({
+				id: "post-existing",
+				postNumber: 1,
+				authorId: "user-002",
+			});
+			vi.mocked(PostRepository.findByThreadId).mockResolvedValue([
+				existingPost,
+			]);
+			const newPost = createTestCreatedPost({
+				id: "post-new-001",
+				postNumber: 2,
+				authorId: "user-001",
+			});
+			vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+				newPost,
+			);
+
+			await createPost({
+				threadId: "thread-001",
+				body: ">>1 返信です",
+				edgeToken: "token-abc",
+				ipHash: "seed-abc",
+				isBotWrite: false,
+			});
+
+			// deferred phase の options に cachedThreadPosts が渡されること
+			expect(IncentiveService.evaluateOnPost).toHaveBeenCalledTimes(2);
+			const deferredCall = vi.mocked(IncentiveService.evaluateOnPost).mock
+				.calls[1];
+			const deferredOptions = deferredCall[1];
+			// cachedThreadPosts が存在し、既存レス + 新規レスの両方を含むこと
+			expect(deferredOptions).toHaveProperty("cachedThreadPosts");
+			const cachedPosts = (deferredOptions as any).cachedThreadPosts;
+			expect(cachedPosts).toHaveLength(2);
+			expect(cachedPosts.map((p: any) => p.id)).toContain("post-existing");
+			expect(cachedPosts.map((p: any) => p.id)).toContain("post-new-001");
+		});
+
+		it("アンカーなし書き込みでは cachedThreadPosts が渡されない（findByThreadId 未呼出のため）", async () => {
+			await createPost({
+				threadId: "thread-001",
+				body: "アンカーなしの書き込み",
+				edgeToken: "token-abc",
+				ipHash: "seed-abc",
+				isBotWrite: false,
+			});
+
+			// アンカーなし → findByThreadId は呼ばれない
+			expect(PostRepository.findByThreadId).not.toHaveBeenCalled();
+			// deferred phase では cachedThreadPosts が undefined（DB から再取得される）
+			expect(IncentiveService.evaluateOnPost).toHaveBeenCalledTimes(2);
+			const deferredCall = vi.mocked(IncentiveService.evaluateOnPost).mock
+				.calls[1];
+			const deferredOptions = deferredCall[1];
+			expect(deferredOptions).not.toHaveProperty("cachedThreadPosts");
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// S4-3: ThreadRepository.findById の重複排除 — 見送り
+	// locked_files 外テスト (src/lib/services/__tests__/post-service.test.ts) が
+	// deferred phase の第2引数を厳密一致で検証しており、cachedThread 追加で失敗するため見送り。
+	// IncentiveService 側のインターフェース（cachedThread オプション）は準備済み。
+	// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4
+	// -----------------------------------------------------------------------
+
+	describe("S4-3: ThreadRepository.findById（見送り）", () => {
+		it("deferred phase に cachedThread は渡されない（S4-3 未適用）", async () => {
+			await createPost({
+				threadId: "thread-001",
+				body: "通常の書き込み",
+				edgeToken: "token-abc",
+				ipHash: "seed-abc",
+				isBotWrite: false,
+			});
+
+			// S4-3 未適用のため cachedThread は渡されない
+			expect(IncentiveService.evaluateOnPost).toHaveBeenCalledTimes(2);
+			const deferredCall = vi.mocked(IncentiveService.evaluateOnPost).mock
+				.calls[1];
+			const deferredOptions = deferredCall[1];
+			expect(deferredOptions).not.toHaveProperty("cachedThread");
 		});
 	});
 });

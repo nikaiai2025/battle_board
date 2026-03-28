@@ -70,6 +70,20 @@ export interface EvaluateOnPostOptions {
 	 * See: tmp/workers/bdd-architect_TASK-070/analysis.md §4 方針A: 二段階評価
 	 */
 	phase?: EvaluatePhase;
+	/**
+	 * S4-2 最適化: PostService が事前取得済みのスレッド内レス一覧。
+	 * 指定時は deferred phase で PostRepository.findByThreadId を呼ばずにこの値を使用する。
+	 * PostService.createPost では sync phase で取得した結果 + 新規レスを結合して渡す。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4
+	 */
+	cachedThreadPosts?: Post[];
+	/**
+	 * S4-3 最適化: PostService が事前取得済みのスレッド情報。
+	 * 指定時は deferred phase で ThreadRepository.findById を呼ばずにこの値を使用する。
+	 * PostService.createPost では Step 0 で取得した結果をそのまま渡す。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4
+	 */
+	cachedThread?: import("../domain/models/thread").Thread;
 }
 
 // ---------------------------------------------------------------------------
@@ -483,21 +497,36 @@ export async function evaluateOnPost(
 
 	if (runDeferred) {
 		// スレッドのレス一覧を取得（遅延評価ボーナス共通）
+		// S4-2 最適化: cachedThreadPosts が渡された場合はDBクエリをスキップする
+		// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4
 		let threadPosts: Post[];
-		try {
-			threadPosts = await PostRepository.findByThreadId(ctx.threadId);
-		} catch (err) {
-			console.error("[IncentiveService] スレッドレス一覧取得中にエラー:", err);
-			threadPosts = [];
+		if (options.cachedThreadPosts) {
+			threadPosts = options.cachedThreadPosts;
+		} else {
+			try {
+				threadPosts = await PostRepository.findByThreadId(ctx.threadId);
+			} catch (err) {
+				console.error(
+					"[IncentiveService] スレッドレス一覧取得中にエラー:",
+					err,
+				);
+				threadPosts = [];
+			}
 		}
 
 		// スレッド情報を取得（遅延評価ボーナス共通）
+		// S4-3 最適化: cachedThread が渡された場合はDBクエリをスキップする
+		// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4
 		let thread;
-		try {
-			thread = await ThreadRepository.findById(ctx.threadId);
-		} catch (err) {
-			console.error("[IncentiveService] スレッド情報取得中にエラー:", err);
-			thread = null;
+		if (options.cachedThread) {
+			thread = options.cachedThread;
+		} else {
+			try {
+				thread = await ThreadRepository.findById(ctx.threadId);
+			} catch (err) {
+				console.error("[IncentiveService] スレッド情報取得中にエラー:", err);
+				thread = null;
+			}
 		}
 
 		// -------------------------------------------------------------------------

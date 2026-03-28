@@ -4,21 +4,20 @@
 
 ## 現在のフェーズ
 
-**Sprint-138 完了。デプロイ・スモークテスト中。**
+**Sprint-139 完了 — ユーザーコピペ管理機能 + !copipe マージ検索**
+
+### Sprint-139の成果
+- TASK-357: UserCopipe CRUD バックエンド（Repository + Service + API 4本 + InMemory + 単体テスト37件）
+- TASK-358: CopipeRepository マージ検索（findByName 配列化 + 両テーブル並列検索 + CopipeHandler 3分岐）
+- TASK-359: BDDステップ定義（user_copipe.feature 全16シナリオ PASS）
+- Migration 00036: user_copipe_entries テーブル作成
+- cf-workers-logs スキル更新: デフォルトフィルタ追加 + レスポンス構造修正
+- vitest: 2131 PASS / cucumber-js: 389 passed (+16)
+- コミット: 3227525
+- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
+- PostService サブリクエスト監査レポート作成（`tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/`）
 
 **Sprint-138 完了 — Ops基盤障害修正（performDailyResetバッチ化 + ci-failureラベル + collect-topics手動確認）**
-
-### Sprint-138の成果
-- TASK-355: `performDailyReset` の逐次DB呼び出し(O(N))をバッチSQL操作に変更
-  - `bulkUpdateDailyIds`: unnest + UPDATE ... FROM で全BOTのdaily_idを一括更新
-  - `bulkIncrementSurvivalDays`: is_active=true の全BOTのsurvival_daysを一括+1
-  - 03-22以降の断続的Daily Maintenance 500エラー（Vercel Hobby 10秒制限超過）を修正
-- TASK-356: PostgreSQL RPC関数マイグレーション (00035) 作成・ローカル適用確認
-- ci-failure ラベル作成: CI Failure Notifier がIssue作成できない障害を修正
-- collect-topics スケジュール: 手動トリガー成功確認。自動スケジュールは経過観察
-- vitest: 2087 PASS / cucumber-js: 373 PASS
-- コミット: bfae891
-- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ### CF Observability 既知エラー（解消済み・再調査不要）
 
@@ -287,16 +286,16 @@
 
 ## テスト状況
 
-- vitest: **2084 PASS / 13 failed**（Sprint-136後。13件は全て既存 Discord OAuth 関連）
-- cucumber-js: 394シナリオ / **373 passed / 0 failed** / 18 pending / 3 undefined（Sprint-136後）
+- vitest: **2131 PASS / 13 failed**（Sprint-139後。13件は全て既存 Discord OAuth 関連）
+- cucumber-js: 410シナリオ / **389 passed / 0 failed** / 18 pending / 3 undefined（Sprint-139後）
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 3件: 既存の未実装ステップ
-  - +12: curation_bot.feature 全13シナリオ追加（うち1はbot_system.stepsで実装済みのHPステップ）
+  - +16: user_copipe.feature 全16シナリオ追加（Sprint-139）
 - playwright E2E (ローカル): 16 passed, 0 fixme
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS（ローカル環境依存のため環境問題2件は除く）
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-135後):** 17/17 PASS（e2e/smoke/navigation.spec.ts 全件）
+- **本番スモークテスト (Sprint-139後):** 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -378,6 +377,8 @@ HUMAN-003/004 ともに完了。BOT Strategy Step 3・4 の着手が可能。
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-139 | ユーザーコピペ管理機能 + !copipe マージ検索 | completed | `tmp/orchestrator/sprint_139_plan.md` |
+| Sprint-138 | Ops基盤障害修正（performDailyResetバッチ化） | completed | `tmp/orchestrator/sprint_138_plan.md` |
 | Sprint-137 | createBotService DI 欠落ホットフィックス | completed | `tmp/orchestrator/sprint_137_plan.md` |
 | Sprint-136 | キュレーションBOT Phase A（SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ） | completed | `tmp/orchestrator/sprint_136_plan.md` |
 | Sprint-135 | 範囲攻撃BDDステップ + FAB pending + インカーネーションモデル + !w同日制限撤廃 + Discord PKCE | completed | `tmp/orchestrator/sprint_135_plan.md` |

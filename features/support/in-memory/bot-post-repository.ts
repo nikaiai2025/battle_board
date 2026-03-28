@@ -67,6 +67,28 @@ export async function findByPostId(
 }
 
 /**
+ * 複数の投稿IDからBOT投稿レコードを一括取得する。
+ * 本番実装の findByPostIds に対応するインメモリ実装。
+ * N+1問題を解消するため、指定した postIds に一致するレコードをまとめて返す。
+ *
+ * See: src/lib/infrastructure/repositories/bot-post-repository.ts > findByPostIds
+ * See: features/bot_system.feature @複数ターゲット攻撃
+ * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
+ *
+ * @param postIds - 取得対象の投稿ID配列
+ * @returns 紐付けレコードの配列（BOTの書き込みに該当するものだけ返される）
+ */
+export async function findByPostIds(
+	postIds: string[],
+): Promise<{ postId: string; botId: string }[]> {
+	if (postIds.length === 0) {
+		return [];
+	}
+	const idSet = new Set(postIds);
+	return store.filter((r) => idSet.has(r.postId));
+}
+
+/**
  * 指定したボットの全書き込み紐付けレコードを取得する。
  * See: src/lib/infrastructure/repositories/bot-post-repository.ts
  */

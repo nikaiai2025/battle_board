@@ -106,6 +106,7 @@ function createMockBotRepository(
 function createMockBotPostRepository(): IBotPostRepository {
 	return {
 		findByPostId: vi.fn().mockResolvedValue(null),
+		findByPostIds: vi.fn().mockResolvedValue([]),
 		create: vi.fn().mockResolvedValue(undefined),
 	};
 }

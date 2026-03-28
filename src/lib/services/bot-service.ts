@@ -82,6 +82,13 @@ export interface BotInfo {
 	totalPosts: number;
 	accusedCount: number;
 	timesAttacked: number;
+	/**
+	 * ボットプロファイルキー。撃破報酬計算に使用する。
+	 * applyDamageWithInfo で findById の重複を排除するために追加。
+	 * 既存の getBotByPostId 経由では省略可能（後方互換）。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S2
+	 */
+	botProfileKey?: string | null;
 }
 
 /**
@@ -207,6 +214,15 @@ export interface IBotPostRepository {
 	findByPostId(
 		postId: string,
 	): Promise<{ postId: string; botId: string } | null>;
+	/**
+	 * 複数の投稿IDからBOT投稿レコードを一括取得する。
+	 * N+1問題を解消するため、WHERE post_id IN (...) で1クエリにまとめる。
+	 * 複数ターゲット攻撃の事前検証フェーズで使用する。
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
+	 */
+	findByPostIds(
+		postIds: string[],
+	): Promise<{ postId: string; botId: string }[]>;
 	/** ボット書き込み紐付けレコードを作成する（executeBotPost で使用）。 */
 	create(postId: string, botId: string): Promise<void>;
 }
@@ -521,7 +537,66 @@ export class BotService {
 			totalPosts: bot.totalPosts,
 			accusedCount: bot.accusedCount,
 			timesAttacked: bot.timesAttacked,
+			botProfileKey: bot.botProfileKey,
 		};
+	}
+
+	// ---------------------------------------------------------------------------
+	// §2.4b バッチボット情報逆引き
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * 複数の postId からボット情報を一括逆引きする。
+	 *
+	 * N+1問題を解消するため、バッチクエリで bot_posts と bots を取得する。
+	 * 複数ターゲット攻撃の事前検証フェーズで使用する。
+	 *
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S1
+	 *
+	 * @param postIds - 対象レスID配列
+	 * @returns postId → BotInfo のマッピング（非BOTレスは含まれない）
+	 */
+	async getBotsByPostIds(postIds: string[]): Promise<Map<string, BotInfo>> {
+		const result = new Map<string, BotInfo>();
+		if (postIds.length === 0) return result;
+
+		// 1クエリで全BOT投稿レコードを一括取得
+		const botPosts = await this.botPostRepository.findByPostIds(postIds);
+		if (botPosts.length === 0) return result;
+
+		// 重複を排除してボットIDを収集
+		const uniqueBotIds = [...new Set(botPosts.map((bp) => bp.botId))];
+
+		// 各ボットの情報を取得（ボット数は通常少数のため個別取得で十分）
+		const botMap = new Map<string, Bot>();
+		for (const botId of uniqueBotIds) {
+			const bot = await this.botRepository.findById(botId);
+			if (bot) {
+				botMap.set(botId, bot);
+			}
+		}
+
+		// postId → BotInfo のマッピングを構築
+		for (const bp of botPosts) {
+			const bot = botMap.get(bp.botId);
+			if (!bot) continue;
+
+			result.set(bp.postId, {
+				botId: bot.id,
+				name: bot.name,
+				hp: bot.hp,
+				maxHp: bot.maxHp,
+				isActive: bot.isActive,
+				isRevealed: bot.isRevealed,
+				survivalDays: bot.survivalDays,
+				totalPosts: bot.totalPosts,
+				accusedCount: bot.accusedCount,
+				timesAttacked: bot.timesAttacked,
+				botProfileKey: bot.botProfileKey,
+			});
+		}
+
+		return result;
 	}
 
 	// ---------------------------------------------------------------------------
@@ -551,6 +626,23 @@ export class BotService {
 		if (bot.isRevealed) return;
 
 		await this.botRepository.reveal(botId);
+	}
+
+	/**
+	 * BOT情報を直接渡してBOTマークを付与する（findById の重複を排除）。
+	 *
+	 * getBotByPostId で取得済みの BotInfo を受け取り、findById を省略する。
+	 * 複数ターゲット攻撃で、事前検証フェーズで取得済みの botInfo を再利用する。
+	 *
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S2
+	 *
+	 * @param bot - 既に取得済みのBOT情報
+	 */
+	async revealBotWithInfo(bot: BotInfo): Promise<void> {
+		// 冪等: 既に revealed なら何もしない
+		if (bot.isRevealed) return;
+
+		await this.botRepository.reveal(bot.botId);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -616,6 +708,64 @@ export class BotService {
 
 		// HP 減少（撃破なし）
 		await this.botRepository.updateHp(botId, remainingHp);
+
+		return {
+			previousHp,
+			remainingHp,
+			eliminated: false,
+			eliminatedBy: null,
+			reward: null,
+		};
+	}
+
+	/**
+	 * BOT情報を直接渡してダメージを適用する（findById の重複を排除）。
+	 *
+	 * getBotByPostId で取得済みの BotInfo を受け取り、findById を省略する。
+	 * ロジックは applyDamage と同一。
+	 *
+	 * See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S2
+	 *
+	 * @param bot - 既に取得済みのBOT情報（botProfileKey を含むこと推奨）
+	 * @param damage - 与えるダメージ量
+	 * @param attackerId - 攻撃者のユーザーID
+	 * @returns ダメージ処理結果
+	 */
+	async applyDamageWithInfo(
+		bot: BotInfo,
+		damage: number,
+		attackerId: string,
+	): Promise<DamageResult> {
+		const previousHp = bot.hp;
+		const remainingHp = previousHp - damage;
+
+		// times_attacked を +1（撃破報酬計算で使用するため先に実行）
+		await this.botRepository.incrementTimesAttacked(bot.botId);
+		const newTimesAttacked = bot.timesAttacked + 1;
+
+		if (remainingHp <= 0) {
+			// 撃破処理
+			await this.botRepository.updateHp(bot.botId, 0);
+			await this.botRepository.eliminate(bot.botId, attackerId);
+
+			// 撃破報酬を計算（botProfileKey が BotInfo に含まれていればそれを使用、なければデフォルト）
+			const rewardParams = this.getRewardParams(bot.botProfileKey ?? null);
+			const reward = calculateEliminationReward(
+				{ survivalDays: bot.survivalDays, timesAttacked: newTimesAttacked },
+				rewardParams,
+			);
+
+			return {
+				previousHp,
+				remainingHp: 0,
+				eliminated: true,
+				eliminatedBy: attackerId,
+				reward,
+			};
+		}
+
+		// HP 減少（撃破なし）
+		await this.botRepository.updateHp(bot.botId, remainingHp);
 
 		return {
 			previousHp,

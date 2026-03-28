@@ -222,6 +222,32 @@ export async function findByThreadIdAndPostNumber(
 }
 
 /**
+ * 指定スレッド内の複数レス番号のレスを一括取得する。
+ * 本番実装の findByThreadIdAndPostNumbers に対応するインメモリ実装。
+ * N+1問題を解消するため、1回のループで複数レス番号を取得する。
+ *
+ * See: src/lib/infrastructure/repositories/post-repository.ts > findByThreadIdAndPostNumbers
+ * See: features/bot_system.feature @複数ターゲット攻撃
+ *
+ * @param threadId - スレッドの UUID
+ * @param postNumbers - 取得対象のレス番号配列
+ * @returns Post 配列（post_number ASC ソート済み）
+ */
+export async function findByThreadIdAndPostNumbers(
+	threadId: string,
+	postNumbers: number[],
+): Promise<Post[]> {
+	assertUUID(threadId, "PostRepository.findByThreadIdAndPostNumbers.threadId");
+	if (postNumbers.length === 0) {
+		return [];
+	}
+	const numberSet = new Set(postNumbers);
+	return Array.from(store.values())
+		.filter((p) => p.threadId === threadId && numberSet.has(p.postNumber))
+		.sort((a, b) => a.postNumber - b.postNumber);
+}
+
+/**
  * レス番号の原子採番 + レス作成を一体的に実行する。
  * 本番実装の insert_post_with_next_number RPC に対応するインメモリ版。
  *

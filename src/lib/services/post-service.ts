@@ -377,29 +377,27 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		};
 	}
 
-	// Step 2b: ユーザーBAN チェック（認証後）
-	// BANされたユーザーの書き込みを認証後に拒否する。
-	// ボット書き込みはユーザーBAN チェックをスキップする（内部処理）。
+	// Step 3 (前倒し): ユーザー情報取得（表示名の解決 + BAN判定に使用）
+	// S4-1 最適化: 従来の Step 2b (AuthService.isUserBanned) は UserRepository.findById を
+	// 内部で呼ぶため、Step 3 と合わせて同一ユーザーに対し findById が2回実行されていた。
+	// Step 3 を前倒しして findById 結果で BAN 判定も行い、1クエリ削減する。
 	// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
-	// See: tmp/feature_plan_admin_expansion.md §2-c BANチェックフロー ③
-	if (!input.isBotWrite && authResult.userId) {
-		const userBanned = await AuthService.isUserBanned(authResult.userId);
-		if (userBanned) {
-			return {
-				success: false,
-				error: "このアカウントは書き込みが禁止されています",
-				code: "USER_BANNED",
-			};
-		}
-	}
-
-	// Step 3: ユーザー情報取得（表示名の解決に使用）
+	// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4-1
 	let resolvedDisplayName = input.displayName ?? DEFAULT_DISPLAY_NAME;
 	let resolvedAuthorId: string | null = null;
 
 	if (authResult.userId && !input.isBotWrite) {
 		const user = await UserRepository.findById(authResult.userId);
 		if (user) {
+			// Step 2b 代替: findById 結果から BAN 判定（-1クエリ）
+			// See: features/admin.feature @BANされたユーザーの書き込みが拒否される
+			if (user.isBanned) {
+				return {
+					success: false,
+					error: "このアカウントは書き込みが禁止されています",
+					code: "USER_BANNED",
+				};
+			}
 			resolvedAuthorId = user.id;
 			// 有料ユーザーかつユーザーネームが設定されている場合は displayName を上書き
 			// ただし明示的に displayName が渡された場合はそちらを優先する
@@ -569,6 +567,10 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	// PostContext を構築（同期・遅延の両方で再利用する）
 	let postContext: PostContext | null = null;
 
+	// S4-2: sync phase で取得したスレッド内レス一覧を保持し、deferred phase で再利用する
+	// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4
+	let cachedThreadPosts: Post[] | null = null;
+
 	// BOT書き込み時は IncentiveService をスキップする
 	// BOTの botUserId は users テーブルに存在しないため、FK制約違反を起こす無駄なクエリを防ぎ
 	// Cloudflare Workers の subrequest 上限到達を回避する
@@ -583,8 +585,11 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 
 			if (anchors.length > 0) {
 				// アンカー先レスの著者IDを取得（最初のアンカーのみ対象）
-				const targetPosts = await PostRepository.findByThreadId(input.threadId);
-				const targetPost = targetPosts.find((p) => p.postNumber === anchors[0]);
+				// S4-2: 取得結果を cachedThreadPosts に保持して deferred phase で再利用する
+				cachedThreadPosts = await PostRepository.findByThreadId(input.threadId);
+				const targetPost = cachedThreadPosts.find(
+					(p) => p.postNumber === anchors[0],
+				);
 				if (targetPost?.authorId) {
 					// isReplyTo にはアンカー先レスのID（UUID）を設定する
 					// See: src/lib/domain/models/incentive.ts PostContext.isReplyTo
@@ -831,9 +836,19 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 				postId: createdPost.id,
 				postNumber: createdPost.postNumber,
 			};
-			await IncentiveService.evaluateOnPost(deferredContext, {
-				phase: "deferred",
-			});
+
+			// S4-2: sync phase で取得済みの threadPosts を deferred phase に渡し、重複クエリを削減
+			// See: tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/subrequest_audit.md §5.1 S4
+			// 注: S4-3 (cachedThread) は locked_files 外テストとの互換性のため見送り
+			const deferredOptions: IncentiveService.EvaluateOnPostOptions = {
+				phase: "deferred" as const,
+			};
+			// S4-2: cachedThreadPosts に新規レスを追加して渡す（-1クエリ）
+			if (cachedThreadPosts) {
+				deferredOptions.cachedThreadPosts = [...cachedThreadPosts, createdPost];
+			}
+
+			await IncentiveService.evaluateOnPost(deferredContext, deferredOptions);
 		} catch (err) {
 			// インセンティブ失敗は書き込みを巻き戻さない
 			console.error(
