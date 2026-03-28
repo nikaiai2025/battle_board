@@ -148,12 +148,14 @@ export default function MypagePage() {
 				cache: "no-store",
 			});
 			if (res.ok) {
-				const data = (await res.json()) as Array<{
-					id: number;
-					content: string;
-					expiresAt: string;
-				}>;
-				setVocabList(data);
+				const json = (await res.json()) as {
+					entries: Array<{
+						id: number;
+						content: string;
+						expiresAt: string;
+					}>;
+				};
+				setVocabList(json.entries ?? []);
 			}
 		} catch {
 			// サイレントに処理する
