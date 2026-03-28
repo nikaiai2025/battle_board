@@ -33,9 +33,22 @@ interface ThreadListResponse {
 	threads: Thread[];
 }
 
+/** 投稿者種別: 人間/BOT/システム */
+type PosterType = "human" | "bot" | "system";
+
+/** BOT投稿の付加情報（BOT名とBOT詳細へのリンク用botId） */
+interface BotInfo {
+	botId: string;
+	botName: string;
+}
+
 interface ThreadDetailResponse {
 	thread: Thread;
 	posts: Post[];
+	/** 投稿IDをキーとする投稿者種別マップ */
+	posterTypeMap?: Record<string, PosterType>;
+	/** BOT投稿の付加情報マップ（BOT投稿のpostIdのみエントリあり） */
+	botInfoMap?: Record<string, BotInfo>;
 }
 
 /** スレッド削除確認ダイアログの状態 */
@@ -144,6 +157,18 @@ export default function AdminThreadsPage() {
 	const [postListError, setPostListError] = useState<string | null>(null);
 
 	// ---------------------------------------------------------------------------
+	// 状態管理: BOT情報（スレッド詳細モード）
+	// See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+	// ---------------------------------------------------------------------------
+
+	/** 投稿IDをキーとする投稿者種別マップ */
+	const [posterTypeMap, setPosterTypeMap] = useState<
+		Record<string, PosterType>
+	>({});
+	/** BOT投稿の付加情報マップ */
+	const [botInfoMap, setBotInfoMap] = useState<Record<string, BotInfo>>({});
+
+	// ---------------------------------------------------------------------------
 	// 状態管理: 確認ダイアログ
 	// ---------------------------------------------------------------------------
 
@@ -209,6 +234,10 @@ export default function AdminThreadsPage() {
 			const data = (await res.json()) as ThreadDetailResponse;
 			setSelectedThread(data.thread);
 			setPosts(data.posts);
+			// BOT情報マップを設定する（APIレスポンスに含まれる場合）
+			// See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+			setPosterTypeMap(data.posterTypeMap ?? {});
+			setBotInfoMap(data.botInfoMap ?? {});
 		} catch {
 			setPostListError("ネットワークエラーが発生しました。");
 		} finally {
@@ -225,6 +254,8 @@ export default function AdminThreadsPage() {
 		setPosts([]);
 		setPostListError(null);
 		setDeletePostConfirm(null);
+		setPosterTypeMap({});
+		setBotInfoMap({});
 	}
 
 	// ---------------------------------------------------------------------------
@@ -517,6 +548,11 @@ export default function AdminThreadsPage() {
 							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 								名前
 							</th>
+							{/* 種別カラム: 人間/BOT/システムの識別
+                  See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる */}
+							<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
+								種別
+							</th>
 							<th className="px-3 py-2 font-medium text-muted-foreground">
 								本文
 							</th>
@@ -535,7 +571,7 @@ export default function AdminThreadsPage() {
 						{isLoadingPosts ? (
 							<tr>
 								<td
-									colSpan={6}
+									colSpan={7}
 									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									読み込み中...
@@ -544,7 +580,7 @@ export default function AdminThreadsPage() {
 						) : posts.length === 0 ? (
 							<tr>
 								<td
-									colSpan={6}
+									colSpan={7}
 									className="px-3 py-6 text-center text-muted-foreground text-sm"
 								>
 									レスが見つかりません
@@ -575,10 +611,37 @@ export default function AdminThreadsPage() {
 											post.displayName
 										)}
 									</td>
+									{/* 種別バッジ: 人間/BOT/システムの識別 + BOT詳細リンク
+                      See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる */}
+									<td className="px-3 py-2 text-xs whitespace-nowrap">
+										{posterTypeMap[post.id] === "bot" ? (
+											<span className="inline-flex items-center gap-1">
+												<span className="inline-block px-1.5 py-0.5 bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 text-xs font-bold rounded">
+													BOT
+												</span>
+												{botInfoMap[post.id] && (
+													<Link
+														href={`/admin/bots/${botInfoMap[post.id].botId}`}
+														className="text-blue-600 hover:underline text-xs"
+													>
+														{botInfoMap[post.id].botName}
+													</Link>
+												)}
+											</span>
+										) : posterTypeMap[post.id] === "system" ? (
+											<span className="inline-block px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-300 text-xs rounded">
+												システム
+											</span>
+										) : (
+											<span className="text-muted-foreground text-xs">
+												人間
+											</span>
+										)}
+									</td>
 									{/* 本文（先頭50文字）*/}
 									<td className="px-3 py-2 text-xs text-foreground max-w-xs">
 										{post.body.slice(0, 50)}
-										{post.body.length > 50 && "…"}
+										{post.body.length > 50 && "..."}
 									</td>
 									{/* 投稿日時 */}
 									<td className="px-3 py-2 text-xs whitespace-nowrap">

@@ -10,6 +10,7 @@
  */
 
 import type { Bot } from "../../domain/models/bot";
+import type { IUserBotVocabularyRepository } from "../../infrastructure/repositories/user-bot-vocabulary-repository";
 import { RandomThreadBehaviorStrategy } from "./behavior/random-thread";
 import { ThreadCreatorBehaviorStrategy } from "./behavior/thread-creator";
 import { TutorialBehaviorStrategy } from "./behavior/tutorial";
@@ -40,6 +41,8 @@ export interface ResolveStrategiesOptions {
 	botProfiles?: BotProfilesYaml;
 	/** Phase 3: ThreadCreatorBehaviorStrategy が必要とする ICollectedTopicRepository */
 	collectedTopicRepository?: ICollectedTopicRepository;
+	/** ユーザー語録リポジトリ（語録プール構築に使用。省略時は固定文のみで後方互換動作） */
+	vocabRepo?: IUserBotVocabularyRepository;
 }
 
 /**
@@ -107,7 +110,11 @@ export function resolveStrategies(
 
 	// デフォルト解決: Phase 2 荒らし役の3 Strategy を返す
 	// See: docs/architecture/components/bot.md §2.12.2 解決の優先順位 > 3. デフォルト
-	const content = new FixedMessageContentStrategy(options.botProfiles);
+	// See: features/user_bot_vocabulary.feature @ユーザー語録が荒らしBOTの書き込みに使用される
+	const content = new FixedMessageContentStrategy(
+		options.botProfiles,
+		options.vocabRepo,
+	);
 	const behavior = new RandomThreadBehaviorStrategy(options.threadRepository);
 	const scheduling = new FixedIntervalSchedulingStrategy();
 

@@ -67,6 +67,9 @@ import * as InMemoryPostRepo from "./in-memory/post-repository";
 import * as InMemorySupabaseClient from "./in-memory/supabase-client";
 import * as InMemoryThreadRepo from "./in-memory/thread-repository";
 import * as InMemoryTurnstileClient from "./in-memory/turnstile-client";
+// user-bot-vocabulary リポジトリ（TASK-367 で追加）
+// See: features/user_bot_vocabulary.feature
+import * as InMemoryUserBotVocabRepo from "./in-memory/user-bot-vocabulary-repository";
 // user-copipe リポジトリ（TASK-357 で追加）
 // See: features/user_copipe.feature
 import * as InMemoryUserCopipeRepo from "./in-memory/user-copipe-repository";
@@ -142,6 +145,9 @@ export function resetAllStores(): void {
 	// copipe リポジトリのリセット（TASK-328 で追加）
 	// See: features/command_copipe.feature
 	InMemoryCopipeRepo.reset();
+	// user-bot-vocabulary リポジトリのリセット（TASK-367 で追加）
+	// See: features/user_bot_vocabulary.feature
+	InMemoryUserBotVocabRepo.reset();
 	// user-copipe リポジトリのリセット（TASK-357 で追加）
 	// See: features/user_copipe.feature
 	InMemoryUserCopipeRepo.reset();
@@ -187,6 +193,9 @@ export {
 	InMemorySupabaseClient,
 	InMemoryThreadRepo,
 	InMemoryTurnstileClient,
+	// user-bot-vocabulary リポジトリ（TASK-367 で追加）
+	// See: features/user_bot_vocabulary.feature
+	InMemoryUserBotVocabRepo,
 	// user-copipe リポジトリ（TASK-357 で追加）
 	// See: features/user_copipe.feature
 	InMemoryUserCopipeRepo,

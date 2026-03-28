@@ -221,6 +221,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/dev-post-repository.ts",
 		"./in-memory/dev-post-repository.ts",
 	],
+	// user-bot-vocabulary リポジトリ（TASK-367 で追加）
+	// See: features/user_bot_vocabulary.feature
+	[
+		"src/lib/infrastructure/repositories/user-bot-vocabulary-repository.ts",
+		"./in-memory/user-bot-vocabulary-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

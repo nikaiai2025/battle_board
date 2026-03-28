@@ -30,6 +30,35 @@ import {
 	type RewardParams,
 } from "../domain/rules/elimination-reward";
 import type { Attack } from "../infrastructure/repositories/attack-repository";
+import type { IUserBotVocabularyRepository } from "../infrastructure/repositories/user-bot-vocabulary-repository";
+
+// ---------------------------------------------------------------------------
+// UserBotVocabularyRepository の遅延ロード
+// ---------------------------------------------------------------------------
+// top-level の `import * as` は Supabase クライアントの即時初期化を誘発し、
+// vitest 環境（環境変数なし）で "supabaseUrl is required" エラーを引き起こす。
+// 実行時に初めて require し、BDD テストでは register-mocks.js のキャッシュ差し替え、
+// vitest 単体テストでは require 失敗時に undefined を返す（後方互換動作:
+// vocabRepo 省略時は固定文のみ使用される）。
+// See: features/user_bot_vocabulary.feature @ユーザー語録が荒らしBOTの書き込みに使用される
+let _vocabRepoCache: IUserBotVocabularyRepository | undefined;
+let _vocabRepoLoaded = false;
+function getVocabRepo(): IUserBotVocabularyRepository | undefined {
+	if (!_vocabRepoLoaded) {
+		_vocabRepoLoaded = true;
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports
+			_vocabRepoCache =
+				require("../infrastructure/repositories/user-bot-vocabulary-repository") as IUserBotVocabularyRepository;
+		} catch {
+			// vitest 環境等で Supabase クライアント初期化に失敗した場合は
+			// undefined を返す。vocabRepo 未指定時は固定文のみで後方互換動作する。
+			_vocabRepoCache = undefined;
+		}
+	}
+	return _vocabRepoCache;
+}
+
 import { resolveStrategies as defaultResolveStrategies } from "./bot-strategies/strategy-resolver";
 import type {
 	BehaviorContext,
@@ -370,6 +399,8 @@ export type ResolveStrategiesFn = (
 		botProfiles?: BotProfilesYaml;
 		/** Phase 3: ThreadCreatorBehaviorStrategy が必要とする ICollectedTopicRepository */
 		collectedTopicRepository?: ICollectedTopicRepository;
+		/** ユーザー語録リポジトリ（語録プール構築に使用。省略時は固定文のみで後方互換動作） */
+		vocabRepo?: IUserBotVocabularyRepository;
 	},
 ) => BotStrategies;
 
@@ -1647,16 +1678,20 @@ export class BotService {
 					this.threadRepository ?? this.createFallbackThreadRepository(),
 				botProfiles: this.botProfiles,
 				collectedTopicRepository: this.collectedTopicRepository,
+				// See: features/user_bot_vocabulary.feature @ユーザー語録が荒らしBOTの書き込みに使用される
+				vocabRepo: getVocabRepo(),
 			});
 		}
 
 		// デフォルト: strategy-resolver.ts の resolveStrategies を使用する
 		// See: docs/architecture/components/bot.md §2.12.2 resolveStrategies 解決ルール
+		// See: features/user_bot_vocabulary.feature @ユーザー語録が荒らしBOTの書き込みに使用される
 		return defaultResolveStrategies(bot, profile, {
 			threadRepository:
 				this.threadRepository ?? this.createFallbackThreadRepository(),
 			botProfiles: this.botProfiles,
 			collectedTopicRepository: this.collectedTopicRepository,
+			vocabRepo: getVocabRepo(),
 		});
 	}
 

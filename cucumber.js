@@ -104,6 +104,9 @@ module.exports = {
 			// TASK-363: 開発連絡板 BDD シナリオ追加
 			// See: features/dev_board.feature
 			"features/dev_board.feature",
+			// TASK-367: ユーザー語録登録 BDD シナリオ追加
+			// See: features/user_bot_vocabulary.feature
+			"features/user_bot_vocabulary.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -180,6 +183,9 @@ module.exports = {
 			// TASK-363: 開発連絡板 BDD ステップ定義
 			// See: features/dev_board.feature
 			"features/step_definitions/dev_board.steps.ts",
+			// TASK-367: ユーザー語録登録 BDD ステップ定義
+			// See: features/user_bot_vocabulary.feature
+			"features/step_definitions/user_bot_vocabulary.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

@@ -849,11 +849,30 @@ When("ボットが書き込みを行う", async function (this: BattleBoardWorld
 		return;
 	}
 
-	// 荒らし役ボット: 固定文リストからランダムに選択してInMemoryPostRepo に直接挿入する
-	const selectedMessage =
-		TROLL_FIXED_MESSAGES[
-			Math.floor(Math.random() * TROLL_FIXED_MESSAGES.length)
-		];
+	// 荒らし役ボット: 語録プール（管理者固定文 + ユーザー語録）からランダムに選択
+	// See: features/bot_system.feature @荒らし役ボットは語録プールからランダムに書き込む
+	// See: features/user_bot_vocabulary.feature @ユーザー語録が荒らしBOTの書き込みに使用される
+	const { FixedMessageContentStrategy } =
+		require("../../src/lib/services/bot-strategies/content/fixed-message") as typeof import("../../src/lib/services/bot-strategies/content/fixed-message");
+	const InMemoryUserBotVocabRepo =
+		require("../support/in-memory/user-bot-vocabulary-repository") as typeof import("../support/in-memory/user-bot-vocabulary-repository");
+
+	// カスタムボットプロファイル対応（語録プールテスト用）
+	// See: features/user_bot_vocabulary.feature @管理者の固定文リストが空である
+	// See: features/user_bot_vocabulary.feature @管理者の固定文に「...」のみがある
+	const botProfiles = (this as any)._emptyBotProfiles
+		? {} // 固定文リストが空の状態を再現
+		: ((this as any)._customBotProfiles ?? undefined);
+
+	const strategy = new FixedMessageContentStrategy(
+		botProfiles,
+		InMemoryUserBotVocabRepo,
+	);
+	const selectedMessage = await strategy.generateContent({
+		botId: this.currentBot.id,
+		botProfileKey: this.currentBot.botProfileKey,
+		threadId: this.currentThreadId,
+	});
 	const botPostId = crypto.randomUUID();
 	InMemoryPostRepo._insert({
 		id: botPostId,
@@ -873,16 +892,26 @@ When("ボットが書き込みを行う", async function (this: BattleBoardWorld
 });
 
 Then(
-	"書き込み本文は荒らし役の固定文リストに含まれるいずれかの文である",
+	"書き込み本文は荒らし役の語録プールに含まれるいずれかの文である",
 	async function (this: BattleBoardWorld) {
 		assert(this.currentThreadId, "スレッドIDが設定されていません");
 		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
 		const botPosts = posts.filter((p) => !p.authorId);
 		assert(botPosts.length > 0, "ボットの書き込みが存在することを期待しました");
+
+		// 語録プール = 管理者固定文 + 有効なユーザー語録
+		// See: features/bot_system.feature @荒らし役ボットは語録プールからランダムに書き込む
+		// See: features/user_bot_vocabulary.feature @管理者固定文とユーザー語録がマージされてランダム選択される
+		const InMemoryUserBotVocabRepo =
+			require("../support/in-memory/user-bot-vocabulary-repository") as typeof import("../support/in-memory/user-bot-vocabulary-repository");
+		const activeVocabs = await InMemoryUserBotVocabRepo.findAllActive();
+		const userVocabContents = activeVocabs.map((v) => v.content);
+		const pool = [...TROLL_FIXED_MESSAGES, ...userVocabContents];
+
 		for (const post of botPosts) {
 			assert(
-				TROLL_FIXED_MESSAGES.includes(post.body),
-				`書き込み本文 "${post.body}" が固定文リストに含まれることを期待しました`,
+				pool.includes(post.body),
+				`書き込み本文 "${post.body}" が語録プール（固定文 + ユーザー語録）に含まれることを期待しました`,
 			);
 		}
 	},

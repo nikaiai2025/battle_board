@@ -91,6 +91,17 @@ export default function MypagePage() {
 	const [selectedFontId, setSelectedFontId] = useState<string>("gothic");
 	const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
 
+	// 語録管理の状態
+	// See: features/user_bot_vocabulary.feature
+	const [vocabInput, setVocabInput] = useState("");
+	const [vocabError, setVocabError] = useState<string | null>(null);
+	const [vocabSuccess, setVocabSuccess] = useState(false);
+	const [isSubmittingVocab, setIsSubmittingVocab] = useState(false);
+	const [vocabList, setVocabList] = useState<
+		Array<{ id: number; content: string; expiresAt: string }>
+	>([]);
+	const [isLoadingVocab, setIsLoadingVocab] = useState(false);
+
 	// ---------------------------------------------------------------------------
 	// データ取得
 	// ---------------------------------------------------------------------------
@@ -126,18 +137,88 @@ export default function MypagePage() {
 		}
 	}, []);
 
+	/**
+	 * 語録一覧を取得する。
+	 * See: features/user_bot_vocabulary.feature @マイページに自分の登録語録と有効期限が表示される
+	 */
+	const fetchVocabList = useCallback(async () => {
+		setIsLoadingVocab(true);
+		try {
+			const res = await fetch("/api/mypage/vocabularies", {
+				cache: "no-store",
+			});
+			if (res.ok) {
+				const data = (await res.json()) as Array<{
+					id: number;
+					content: string;
+					expiresAt: string;
+				}>;
+				setVocabList(data);
+			}
+		} catch {
+			// サイレントに処理する
+		} finally {
+			setIsLoadingVocab(false);
+		}
+	}, []);
+
 	useEffect(() => {
 		const init = async () => {
 			setIsLoading(true);
 			await fetchMypageInfo();
+			await fetchVocabList();
 			setIsLoading(false);
 		};
 		void init();
-	}, [fetchMypageInfo]);
+	}, [fetchMypageInfo, fetchVocabList]);
 
 	// ---------------------------------------------------------------------------
 	// イベントハンドラ
 	// ---------------------------------------------------------------------------
+
+	/**
+	 * 語録を登録する。
+	 * See: features/user_bot_vocabulary.feature @マイページから語録を登録する
+	 * See: features/user_bot_vocabulary.feature @残高不足の場合は登録できない
+	 */
+	const handleRegisterVocab = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setVocabError(null);
+		setVocabSuccess(false);
+		setIsSubmittingVocab(true);
+
+		try {
+			const res = await fetch("/api/mypage/vocabularies", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ content: vocabInput }),
+			});
+
+			const data = (await res.json()) as {
+				error?: string;
+				id?: number;
+				content?: string;
+				expiresAt?: string;
+			};
+
+			if (!res.ok) {
+				setVocabError(data.error ?? "登録に失敗しました。");
+				return;
+			}
+
+			// 成功: 入力クリア + 一覧再取得 + 残高再取得
+			setVocabInput("");
+			setVocabSuccess(true);
+			await fetchVocabList();
+			await fetchMypageInfo();
+			// 3秒後に成功メッセージをクリア
+			setTimeout(() => setVocabSuccess(false), 3000);
+		} catch {
+			setVocabError("ネットワークエラーが発生しました。");
+		} finally {
+			setIsSubmittingVocab(false);
+		}
+	};
 
 	/**
 	 * ユーザーネームを設定する。
@@ -585,7 +666,9 @@ export default function MypagePage() {
 					data-testid="registration-section"
 					className="bg-blue-50 border border-blue-200 rounded p-4 space-y-3"
 				>
-					<h2 className="text-base font-bold text-blue-800">本登録（無料です）</h2>
+					<h2 className="text-base font-bold text-blue-800">
+						本登録（無料です）
+					</h2>
 					<p className="text-sm text-blue-700">
 						メールアドレスまたは Discord アカウントで本登録すると、Cookie
 						喪失・端末変更時でも同一ユーザーとして復帰できます。
@@ -778,7 +861,9 @@ export default function MypagePage() {
 				id="upgrade-section"
 				className="bg-card border border-border rounded p-4 space-y-2"
 			>
-				<h2 className="text-base font-bold text-foreground">有料プラン※未実装。今は全員有料プラン扱い</h2>
+				<h2 className="text-base font-bold text-foreground">
+					有料プラン※未実装。今は全員有料プラン扱い
+				</h2>
 				<p className="text-sm text-muted-foreground">
 					有料プランに加入するとユーザーネームが設定できます。配色・文字フォントも変更できます。
 				</p>
@@ -849,6 +934,95 @@ export default function MypagePage() {
 				>
 					{mypageInfo.grassIcon} {mypageInfo.grassCount}本
 				</p>
+			</section>
+
+			{/* =============================
+          語録管理セクション
+          See: features/user_bot_vocabulary.feature @マイページから語録を登録する
+          See: features/user_bot_vocabulary.feature @マイページに自分の登録語録と有効期限が表示される
+          ============================= */}
+			<section
+				data-testid="vocabulary-section"
+				className="bg-card border border-border rounded p-4 space-y-3"
+			>
+				<h2 className="text-base font-bold text-foreground">
+					語録管理（荒らしBOT）
+				</h2>
+				<p className="text-sm text-muted-foreground">
+					荒らしBOTの語録を登録できます。1件20ポイント、24時間で自動失効します。
+				</p>
+
+				{/* 語録登録フォーム
+            See: features/user_bot_vocabulary.feature @マイページから語録を登録する */}
+				<form
+					onSubmit={(e) => {
+						void handleRegisterVocab(e);
+					}}
+					className="space-y-2"
+				>
+					<div className="flex gap-2">
+						<input
+							data-testid="vocab-input"
+							type="text"
+							value={vocabInput}
+							onChange={(e) => setVocabInput(e.target.value)}
+							placeholder="語録を入力（最大30文字、!禁止）"
+							maxLength={30}
+							className="flex-1 border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+						/>
+						<button
+							data-testid="vocab-submit"
+							type="submit"
+							disabled={isSubmittingVocab}
+							className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+						>
+							{isSubmittingVocab ? "登録中..." : "登録（20pt）"}
+						</button>
+					</div>
+					{vocabError && (
+						<p data-testid="vocab-error" className="text-red-600 text-xs">
+							{vocabError}
+						</p>
+					)}
+					{vocabSuccess && (
+						<p data-testid="vocab-success" className="text-green-600 text-xs">
+							語録を登録しました
+						</p>
+					)}
+				</form>
+
+				{/* 語録一覧
+            See: features/user_bot_vocabulary.feature @マイページに自分の登録語録と有効期限が表示される
+            See: features/user_bot_vocabulary.feature @期限切れの語録は一覧に表示されない */}
+				<div>
+					<h3 className="text-sm font-medium text-muted-foreground mb-2">
+						登録済み語録
+					</h3>
+					{isLoadingVocab ? (
+						<p className="text-muted-foreground text-xs">読み込み中...</p>
+					) : vocabList.length === 0 ? (
+						<p
+							data-testid="vocab-empty"
+							className="text-muted-foreground text-xs"
+						>
+							登録済みの語録はありません
+						</p>
+					) : (
+						<ul data-testid="vocab-list" className="space-y-1">
+							{vocabList.map((vocab) => (
+								<li
+									key={vocab.id}
+									className="flex justify-between items-center text-sm border-b border-border py-1"
+								>
+									<span className="text-foreground">{vocab.content}</span>
+									<span className="text-xs text-muted-foreground">
+										{new Date(vocab.expiresAt).toLocaleString("ja-JP")} まで
+									</span>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
 			</section>
 
 			{/* =============================

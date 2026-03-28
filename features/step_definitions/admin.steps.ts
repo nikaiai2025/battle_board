@@ -15,6 +15,8 @@ import { Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
 import {
 	InMemoryAdminRepo,
+	InMemoryBotPostRepo,
+	InMemoryBotRepo,
 	InMemoryCurrencyRepo,
 	InMemoryDailyStatsRepo,
 	InMemoryIpBanRepo,
@@ -2496,4 +2498,733 @@ Then("再削除の結果はnot_foundエラーである", function (this: BattleB
 		"not_found",
 		`エラーコード "not_found" を期待しましたが "${errorResult.code}" でした`,
 	);
+});
+
+// ===========================================================================
+// BOT管理ステップ定義
+// See: features/admin.feature @BOT管理シナリオ群
+// US-017: BOT管理
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// BOT情報取得ヘルパー
+// See: docs/architecture/bdd_test_strategy.md §2 外部依存のモック戦略
+// ---------------------------------------------------------------------------
+
+/**
+ * BotRepository を動的 require で取得するヘルパー（BOT管理用）。
+ * register-mocks.js によるモック差し替え後に呼び出す必要があるため動的ロード。
+ */
+function getBotRepository() {
+	return require("../../src/lib/infrastructure/repositories/bot-repository") as typeof import("../../src/lib/infrastructure/repositories/bot-repository");
+}
+
+/**
+ * BotPostRepository を動的 require で取得するヘルパー（BOT管理用）。
+ */
+function getBotPostRepository() {
+	return require("../../src/lib/infrastructure/repositories/bot-post-repository") as typeof import("../../src/lib/infrastructure/repositories/bot-post-repository");
+}
+
+/** 活動中BOT一覧取得結果（Then ステップでのアサーション用） */
+let activeBotListResult:
+	| import("../../src/lib/domain/models/bot").Bot[]
+	| null = null;
+
+/** 撃破済みBOT一覧取得結果（Then ステップでのアサーション用） */
+let eliminatedBotListResult:
+	| import("../../src/lib/domain/models/bot").Bot[]
+	| null = null;
+
+/** BOT詳細取得結果（Then ステップでのアサーション用） */
+let botDetailResult: {
+	bot: import("../../src/lib/domain/models/bot").Bot;
+	posts: Array<{
+		id: string;
+		threadId: string;
+		body: string;
+		createdAt: Date | string;
+		threadTitle?: string;
+	}>;
+} | null = null;
+
+/** スレッド詳細のBOT情報マップ取得結果（Then ステップでのアサーション用） */
+let threadBotInfoResult: {
+	posterTypeMap: Record<string, "human" | "bot" | "system">;
+	botInfoMap: Record<string, { botId: string; botName: string }>;
+	posts: Array<{
+		id: string;
+		isSystemMessage: boolean;
+	}>;
+} | null = null;
+
+// ---------------------------------------------------------------------------
+// Scenario: 管理者がスレッド詳細で投稿者の種別を識別できる
+// See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+// ---------------------------------------------------------------------------
+
+/**
+ * スレッドに人間の投稿・BOTの投稿・システムメッセージを作成する。
+ * InMemory リポジトリにテストデータを直接登録する。
+ *
+ * See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+ */
+Given(
+	"スレッド {string} に人間の投稿とBOTの投稿とシステムメッセージが存在する",
+	async function (this: BattleBoardWorld, threadTitle: string) {
+		// スレッドを作成する
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: Math.floor(Date.now() / 1000).toString(),
+			boardId: TEST_BOARD_ID,
+			title: threadTitle,
+			createdBy: "system",
+		});
+		this.currentThreadId = thread.id;
+		this.currentThreadTitle = threadTitle;
+
+		// BOTを作成する
+		const bot = await InMemoryBotRepo.create({
+			name: "テストBOT",
+			persona: "テスト用ペルソナ",
+			hp: 10,
+			maxHp: 10,
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			dailyId: "botdly01",
+			dailyIdDate: "2026-03-29",
+			grassCount: 0,
+			botProfileKey: "arashi",
+			nextPostAt: null,
+		});
+
+		// 人間の投稿（>>1）
+		const humanPostId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: humanPostId,
+			threadId: thread.id,
+			postNumber: 1,
+			authorId: TEST_NON_ADMIN_USER_ID,
+			displayName: "名無しさん",
+			dailyId: "testdly",
+			body: "人間の投稿です",
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(Date.now() - 3000),
+		});
+
+		// BOTの投稿（>>2）— bot_posts に紐付けを登録
+		const botPostId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: botPostId,
+			threadId: thread.id,
+			postNumber: 2,
+			authorId: null,
+			displayName: "名無しさん",
+			dailyId: "botdly01",
+			body: "BOTの投稿です",
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(Date.now() - 2000),
+		});
+		InMemoryBotPostRepo._insert(botPostId, bot.id);
+
+		// システムメッセージ（>>3）
+		const systemPostId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: systemPostId,
+			threadId: thread.id,
+			postNumber: 3,
+			authorId: null,
+			displayName: "★システム",
+			dailyId: "",
+			body: "システムメッセージです",
+			isSystemMessage: true,
+			isDeleted: false,
+			createdAt: new Date(Date.now() - 1000),
+		});
+	},
+);
+
+/**
+ * 管理者がスレッド詳細を表示する。
+ * BDDテストではサービス層/リポジトリ層を直接呼び出す。
+ * APIルートが行うBOT情報の構築ロジックを再現する。
+ *
+ * See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+ * See: src/app/api/admin/threads/[threadId]/route.ts > GET
+ */
+When(
+	"管理者がスレッド {string} の詳細を表示する",
+	async function (this: BattleBoardWorld, _threadTitle: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+		assert(this.currentThreadId, "currentThreadId が設定されていません");
+
+		const BotPostRepo = getBotPostRepository();
+		const BotRepo = getBotRepository();
+
+		// スレッドのレス一覧を取得する
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+
+		// BOT情報をバッチ取得する（APIルートと同一ロジック）
+		const postIds = posts.map((p) => p.id);
+		const botPosts =
+			postIds.length > 0 ? await BotPostRepo.findByPostIds(postIds) : [];
+
+		// botIdを抽出してbot情報を取得する
+		const uniqueBotIds = [...new Set(botPosts.map((bp) => bp.botId))];
+		const bots =
+			uniqueBotIds.length > 0 ? await BotRepo.findByIds(uniqueBotIds) : [];
+
+		// botId -> Bot名のマップを構築する
+		const botNameMap = new Map(bots.map((b) => [b.id, b.name]));
+
+		// postId -> botId のマップを構築する
+		const postBotMap = new Map(botPosts.map((bp) => [bp.postId, bp.botId]));
+
+		// botInfoMap の構築
+		const botInfoMap: Record<string, { botId: string; botName: string }> = {};
+		for (const bp of botPosts) {
+			botInfoMap[bp.postId] = {
+				botId: bp.botId,
+				botName: botNameMap.get(bp.botId) ?? "Unknown",
+			};
+		}
+
+		// posterTypeMap の構築
+		const posterTypeMap: Record<string, "human" | "bot" | "system"> = {};
+		for (const post of posts) {
+			if (post.isSystemMessage) {
+				posterTypeMap[post.id] = "system";
+			} else if (postBotMap.has(post.id)) {
+				posterTypeMap[post.id] = "bot";
+			} else {
+				posterTypeMap[post.id] = "human";
+			}
+		}
+
+		threadBotInfoResult = {
+			posterTypeMap,
+			botInfoMap,
+			posts: posts.map((p) => ({
+				id: p.id,
+				isSystemMessage: p.isSystemMessage,
+			})),
+		};
+		this.lastResult = { type: "success", data: threadBotInfoResult };
+	},
+);
+
+/**
+ * 各投稿に投稿者種別バッジが表示されることを検証する。
+ * posterTypeMap に human/bot/system の3種別が含まれることを確認する。
+ *
+ * See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+ */
+Then(
+	"各投稿に「人間」「BOT」「システム」の種別バッジが表示される",
+	function (this: BattleBoardWorld) {
+		assert(threadBotInfoResult, "スレッド詳細のBOT情報が取得されていません");
+
+		const types = Object.values(threadBotInfoResult.posterTypeMap);
+		assert(
+			types.includes("human"),
+			"posterTypeMap に 'human' が含まれていません",
+		);
+		assert(types.includes("bot"), "posterTypeMap に 'bot' が含まれていません");
+		assert(
+			types.includes("system"),
+			"posterTypeMap に 'system' が含まれていません",
+		);
+	},
+);
+
+/**
+ * BOT投稿にBOT名が表示されることを検証する。
+ * botInfoMap にBOT投稿のエントリがあり、botName が空でないことを確認する。
+ *
+ * See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+ */
+Then("BOT投稿にはBOT名が表示される", function (this: BattleBoardWorld) {
+	assert(threadBotInfoResult, "スレッド詳細のBOT情報が取得されていません");
+
+	const botInfoEntries = Object.entries(threadBotInfoResult.botInfoMap);
+	assert(
+		botInfoEntries.length > 0,
+		"botInfoMap にBOT投稿のエントリが存在しません",
+	);
+
+	for (const [postId, info] of botInfoEntries) {
+		assert(
+			info.botName && info.botName.length > 0,
+			`投稿 ${postId} のBOT名が空です`,
+		);
+	}
+});
+
+/**
+ * BOT投稿からBOT詳細画面へのリンクが表示されることを検証する。
+ * botInfoMap にBOT投稿のエントリがあり、botId が存在することを確認する。
+ * （UIはbotIdを使って /admin/bots/[botId] へのリンクを生成する）
+ *
+ * See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+ */
+Then(
+	"BOT投稿からBOT詳細画面へのリンクが表示される",
+	function (this: BattleBoardWorld) {
+		assert(threadBotInfoResult, "スレッド詳細のBOT情報が取得されていません");
+
+		const botInfoEntries = Object.entries(threadBotInfoResult.botInfoMap);
+		assert(
+			botInfoEntries.length > 0,
+			"botInfoMap にBOT投稿のエントリが存在しません",
+		);
+
+		for (const [postId, info] of botInfoEntries) {
+			assert(
+				info.botId && info.botId.length > 0,
+				`投稿 ${postId} の botId が空です（リンク生成不可）`,
+			);
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Scenario: 管理者が活動中のBOT一覧を閲覧できる
+// See: features/admin.feature @管理者が活動中のBOT一覧を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * 活動中のBOTを N 体インメモリストアに登録する。
+ *
+ * See: features/admin.feature @管理者が活動中のBOT一覧を閲覧できる
+ */
+Given(
+	"活動中のBOTが{int}体存在する",
+	async function (this: BattleBoardWorld, count: number) {
+		for (let i = 1; i <= count; i++) {
+			InMemoryBotRepo._insert({
+				id: crypto.randomUUID(),
+				name: `活動BOT${i}`,
+				persona: `ペルソナ${i}`,
+				hp: 10 - i,
+				maxHp: 10,
+				isActive: true,
+				isRevealed: false,
+				revealedAt: null,
+				dailyId: `actdly0${i}`,
+				dailyIdDate: "2026-03-29",
+				survivalDays: i * 2,
+				totalPosts: i * 5,
+				accusedCount: i,
+				timesAttacked: 0,
+				grassCount: 0,
+				botProfileKey: "arashi",
+				nextPostAt: null,
+				eliminatedAt: null,
+				eliminatedBy: null,
+				createdAt: new Date(Date.now() - i * 86400000),
+			});
+		}
+	},
+);
+
+/**
+ * 管理者がBOT一覧画面で「活動中」を表示する。
+ * BotRepository.findActive を呼び出す。
+ *
+ * See: features/admin.feature @管理者が活動中のBOT一覧を閲覧できる
+ * See: src/app/api/admin/bots/route.ts > GET (status=active)
+ */
+When(
+	"管理者がBOT一覧画面で「活動中」を表示する",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const BotRepo = getBotRepository();
+		activeBotListResult = await BotRepo.findActive();
+		this.lastResult = { type: "success", data: activeBotListResult };
+	},
+);
+
+/**
+ * 活動中のBOTが一覧表示されることを検証する。
+ *
+ * See: features/admin.feature @管理者が活動中のBOT一覧を閲覧できる
+ */
+Then("活動中のBOTが一覧表示される", function (this: BattleBoardWorld) {
+	assert(activeBotListResult, "活動中BOT一覧取得結果が存在しません");
+	assert(
+		activeBotListResult.length > 0,
+		`活動中のBOTが1体以上一覧表示されることを期待しましたが 0 体でした`,
+	);
+});
+
+/**
+ * 各BOTの名前、HP/最大HP、生存日数、投稿数、告発回数が表示されることを検証する。
+ *
+ * See: features/admin.feature @管理者が活動中のBOT一覧を閲覧できる
+ */
+Then(
+	"各BOTの名前、HP\\/最大HP、生存日数、投稿数、告発回数が表示される",
+	function (this: BattleBoardWorld) {
+		assert(activeBotListResult, "活動中BOT一覧取得結果が存在しません");
+
+		for (const bot of activeBotListResult) {
+			assert(bot.name, `BOTに名前が存在しません: ${bot.id}`);
+			assert(typeof bot.hp === "number", `BOTにHPが存在しません: ${bot.id}`);
+			assert(
+				typeof bot.maxHp === "number",
+				`BOTに最大HPが存在しません: ${bot.id}`,
+			);
+			assert(
+				typeof bot.survivalDays === "number",
+				`BOTに生存日数が存在しません: ${bot.id}`,
+			);
+			assert(
+				typeof bot.totalPosts === "number",
+				`BOTに投稿数が存在しません: ${bot.id}`,
+			);
+			assert(
+				typeof bot.accusedCount === "number",
+				`BOTに告発回数が存在しません: ${bot.id}`,
+			);
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Scenario: 管理者が撃破済みのBOT一覧を閲覧できる
+// See: features/admin.feature @管理者が撃破済みのBOT一覧を閲覧できる
+// ---------------------------------------------------------------------------
+
+/**
+ * 撃破済みのBOTを N 体インメモリストアに登録する。
+ *
+ * See: features/admin.feature @管理者が撃破済みのBOT一覧を閲覧できる
+ */
+Given(
+	"撃破済みのBOTが{int}体存在する",
+	async function (this: BattleBoardWorld, count: number) {
+		for (let i = 1; i <= count; i++) {
+			const eliminatorId = crypto.randomUUID();
+			InMemoryBotRepo._insert({
+				id: crypto.randomUUID(),
+				name: `撃破BOT${i}`,
+				persona: `ペルソナ${i}`,
+				hp: 0,
+				maxHp: 10,
+				isActive: false,
+				isRevealed: false,
+				revealedAt: null,
+				dailyId: `elmdly0${i}`,
+				dailyIdDate: "2026-03-29",
+				survivalDays: i * 3,
+				totalPosts: i * 10,
+				accusedCount: i * 2,
+				timesAttacked: i,
+				grassCount: 0,
+				botProfileKey: "arashi",
+				nextPostAt: null,
+				eliminatedAt: new Date(Date.now() - i * 3600000),
+				eliminatedBy: eliminatorId,
+				createdAt: new Date(Date.now() - i * 86400000 * 2),
+			});
+		}
+	},
+);
+
+/**
+ * 管理者がBOT一覧画面で「撃破済み」を表示する。
+ * BotRepository.findEliminated を呼び出す。
+ *
+ * See: features/admin.feature @管理者が撃破済みのBOT一覧を閲覧できる
+ * See: src/app/api/admin/bots/route.ts > GET (status=eliminated)
+ */
+When(
+	"管理者がBOT一覧画面で「撃破済み」を表示する",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const BotRepo = getBotRepository();
+		eliminatedBotListResult = await BotRepo.findEliminated();
+		this.lastResult = { type: "success", data: eliminatedBotListResult };
+	},
+);
+
+/**
+ * 撃破済みのBOTが一覧表示されることを検証する。
+ *
+ * See: features/admin.feature @管理者が撃破済みのBOT一覧を閲覧できる
+ */
+Then("撃破済みのBOTが一覧表示される", function (this: BattleBoardWorld) {
+	assert(eliminatedBotListResult, "撃破済みBOT一覧取得結果が存在しません");
+	assert(
+		eliminatedBotListResult.length > 0,
+		`撃破済みのBOTが1体以上一覧表示されることを期待しましたが 0 体でした`,
+	);
+});
+
+/**
+ * 各BOTの名前、生存日数、撃破日時、撃破者が表示されることを検証する。
+ *
+ * See: features/admin.feature @管理者が撃破済みのBOT一覧を閲覧できる
+ */
+Then(
+	"各BOTの名前、生存日数、撃破日時、撃破者が表示される",
+	function (this: BattleBoardWorld) {
+		assert(eliminatedBotListResult, "撃破済みBOT一覧取得結果が存在しません");
+
+		for (const bot of eliminatedBotListResult) {
+			assert(bot.name, `BOTに名前が存在しません: ${bot.id}`);
+			assert(
+				typeof bot.survivalDays === "number",
+				`BOTに生存日数が存在しません: ${bot.id}`,
+			);
+			assert(
+				bot.eliminatedAt !== null,
+				`BOTに撃破日時が存在しません: ${bot.id}`,
+			);
+			assert(bot.eliminatedBy !== null, `BOTに撃破者が存在しません: ${bot.id}`);
+		}
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Scenario: 管理者がBOTの詳細を確認できる
+// See: features/admin.feature @管理者がBOTの詳細を確認できる
+// ---------------------------------------------------------------------------
+
+/** BOT詳細テスト用の名前付きBOT ID マップ */
+const namedBotMap = new Map<string, string>();
+
+/** BOT詳細テスト用のアクティブスレッドID */
+let botDetailActiveThreadId: string | null = null;
+
+/** BOT詳細テスト用の休眠スレッドID */
+let botDetailDormantThreadId: string | null = null;
+
+/**
+ * 活動中のBOT "荒らしBOT" をインメモリストアに登録する。
+ *
+ * See: features/admin.feature @管理者がBOTの詳細を確認できる
+ */
+Given(
+	"活動中のBOT {string} が存在する",
+	async function (this: BattleBoardWorld, botName: string) {
+		const bot = await InMemoryBotRepo.create({
+			name: botName,
+			persona: `${botName}のペルソナ`,
+			hp: 8,
+			maxHp: 10,
+			isActive: true,
+			isRevealed: false,
+			revealedAt: null,
+			dailyId: "dtldly01",
+			dailyIdDate: "2026-03-29",
+			grassCount: 0,
+			botProfileKey: "arashi",
+			nextPostAt: null,
+		});
+		namedBotMap.set(botName, bot.id);
+	},
+);
+
+/**
+ * BOTがアクティブスレッドに投稿している状態を設定する。
+ * アクティブスレッドに N 件 + 休眠スレッドに1件（除外対象）を作成する。
+ *
+ * See: features/admin.feature @管理者がBOTの詳細を確認できる
+ */
+Given(
+	"{string} がアクティブスレッドに{int}件投稿している",
+	async function (this: BattleBoardWorld, botName: string, postCount: number) {
+		const botId = namedBotMap.get(botName);
+		assert(botId, `BOT "${botName}" が存在しません`);
+
+		// アクティブスレッドを作成する
+		const activeThread = await InMemoryThreadRepo.create({
+			threadKey: `bot-detail-active-${Date.now()}`,
+			boardId: TEST_BOARD_ID,
+			title: "BOTテスト用アクティブスレッド",
+			createdBy: "system",
+		});
+		botDetailActiveThreadId = activeThread.id;
+
+		// アクティブスレッドに投稿を登録する
+		for (let i = 1; i <= postCount; i++) {
+			const postId = crypto.randomUUID();
+			InMemoryPostRepo._insert({
+				id: postId,
+				threadId: activeThread.id,
+				postNumber: i,
+				authorId: null,
+				displayName: "名無しさん",
+				dailyId: "dtldly01",
+				body: `${botName}のアクティブ投稿 ${i}`,
+				isSystemMessage: false,
+				isDeleted: false,
+				createdAt: new Date(Date.now() - (postCount - i) * 60000),
+			});
+			InMemoryBotPostRepo._insert(postId, botId);
+		}
+
+		// 休眠スレッドに1件投稿を作成する（除外対象の検証用）
+		const dormantThread = await InMemoryThreadRepo.create({
+			threadKey: `bot-detail-dormant-${Date.now()}`,
+			boardId: TEST_BOARD_ID,
+			title: "BOTテスト用休眠スレッド",
+			createdBy: "system",
+		});
+		botDetailDormantThreadId = dormantThread.id;
+		// 休眠フラグを設定する（_insert で isDormant=true のスレッドを上書き登録）
+		InMemoryThreadRepo._insert({ ...dormantThread, isDormant: true });
+
+		// 休眠スレッドに投稿を登録する
+		const dormantPostId = crypto.randomUUID();
+		InMemoryPostRepo._insert({
+			id: dormantPostId,
+			threadId: dormantThread.id,
+			postNumber: 1,
+			authorId: null,
+			displayName: "名無しさん",
+			dailyId: "dtldly01",
+			body: `${botName}の休眠スレッド投稿`,
+			isSystemMessage: false,
+			isDeleted: false,
+			createdAt: new Date(Date.now() - 86400000),
+		});
+		InMemoryBotPostRepo._insert(dormantPostId, botId);
+	},
+);
+
+/**
+ * 管理者がBOT詳細画面を表示する。
+ * BotRepository.findById + BotPostRepository.findByBotId で基本情報と投稿を取得し、
+ * 休眠スレッドの投稿を除外する（APIルートと同一ロジック）。
+ *
+ * See: features/admin.feature @管理者がBOTの詳細を確認できる
+ * See: src/app/api/admin/bots/[botId]/route.ts > GET
+ */
+When(
+	"管理者がBOT {string} の詳細画面を表示する",
+	async function (this: BattleBoardWorld, botName: string) {
+		assert(this.currentAdminId, "管理者がログイン済みである必要があります");
+
+		const botId = namedBotMap.get(botName);
+		assert(botId, `BOT "${botName}" が存在しません`);
+
+		const BotRepo = getBotRepository();
+		const BotPostRepo = getBotPostRepository();
+
+		// BOT基本情報を取得する
+		const bot = await BotRepo.findById(botId);
+		assert(bot, `BOT "${botName}" が見つかりません`);
+
+		// BOTの全投稿紐付けを取得する
+		const botPosts = await BotPostRepo.findByBotId(botId);
+
+		if (botPosts.length === 0) {
+			botDetailResult = { bot, posts: [] };
+			this.lastResult = { type: "success", data: botDetailResult };
+			return;
+		}
+
+		// 各投稿の詳細を取得し、休眠スレッドの投稿を除外する
+		const postsWithThread: Array<{
+			id: string;
+			threadId: string;
+			body: string;
+			createdAt: Date | string;
+			threadTitle?: string;
+		}> = [];
+
+		for (const bp of botPosts) {
+			const post = await InMemoryPostRepo.findById(bp.postId);
+			if (!post || post.isDeleted) continue;
+
+			// スレッドの休眠状態を確認する
+			const thread = await InMemoryThreadRepo.findById(post.threadId);
+			if (!thread || thread.isDormant) continue;
+
+			postsWithThread.push({
+				id: post.id,
+				threadId: post.threadId,
+				body: post.body,
+				createdAt: post.createdAt,
+				threadTitle: thread.title,
+			});
+		}
+
+		botDetailResult = { bot, posts: postsWithThread };
+		this.lastResult = { type: "success", data: botDetailResult };
+	},
+);
+
+/**
+ * BOTの稼働状態と統計情報が表示されることを検証する。
+ *
+ * See: features/admin.feature @管理者がBOTの詳細を確認できる
+ */
+Then("BOTの稼働状態と統計情報が表示される", function (this: BattleBoardWorld) {
+	assert(botDetailResult, "BOT詳細取得結果が存在しません");
+	const { bot } = botDetailResult;
+
+	assert(bot.name, "BOT名が存在しません");
+	assert(typeof bot.isActive === "boolean", "isActive が存在しません");
+	assert(typeof bot.hp === "number", "HP が存在しません");
+	assert(typeof bot.maxHp === "number", "最大HP が存在しません");
+	assert(typeof bot.survivalDays === "number", "生存日数が存在しません");
+	assert(typeof bot.totalPosts === "number", "投稿数が存在しません");
+	assert(typeof bot.accusedCount === "number", "告発回数が存在しません");
+});
+
+/**
+ * アクティブスレッドでの投稿履歴が表示されることを検証する。
+ *
+ * See: features/admin.feature @管理者がBOTの詳細を確認できる
+ */
+Then(
+	"アクティブスレッドでの投稿履歴が表示される",
+	function (this: BattleBoardWorld) {
+		assert(botDetailResult, "BOT詳細取得結果が存在しません");
+
+		// アクティブスレッドの投稿が含まれていることを確認する
+		assert(
+			botDetailResult.posts.length > 0,
+			`アクティブスレッドの投稿が0件です`,
+		);
+
+		// アクティブスレッドの投稿のみ含まれていることを確認する
+		if (botDetailActiveThreadId) {
+			const activePosts = botDetailResult.posts.filter(
+				(p) => p.threadId === botDetailActiveThreadId,
+			);
+			assert(
+				activePosts.length > 0,
+				"アクティブスレッドの投稿が結果に含まれていません",
+			);
+		}
+	},
+);
+
+/**
+ * 休眠スレッドの投稿が表示されないことを検証する。
+ *
+ * See: features/admin.feature @管理者がBOTの詳細を確認できる
+ */
+Then("休眠スレッドの投稿は表示されない", function (this: BattleBoardWorld) {
+	assert(botDetailResult, "BOT詳細取得結果が存在しません");
+
+	// 休眠スレッドの投稿が含まれていないことを確認する
+	if (botDetailDormantThreadId) {
+		const dormantPosts = botDetailResult.posts.filter(
+			(p) => p.threadId === botDetailDormantThreadId,
+		);
+		assert.strictEqual(
+			dormantPosts.length,
+			0,
+			`休眠スレッドの投稿が ${dormantPosts.length} 件含まれています（除外されるべき）`,
+		);
+	}
 });

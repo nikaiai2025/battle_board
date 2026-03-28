@@ -136,6 +136,46 @@ export async function findActive(): Promise<Bot[]> {
 }
 
 /**
+ * 撃破済み（eliminatedAt !== null）のボットを全件取得する。
+ * 管理画面のBOT一覧（撃破済みタブ）で使用する。
+ *
+ * See: src/lib/infrastructure/repositories/bot-repository.ts > findEliminated
+ * See: features/admin.feature @管理者が撃破済みのBOT一覧を閲覧できる
+ *
+ * @returns 撃破済みボットの配列（eliminatedAt 降順）
+ */
+export async function findEliminated(): Promise<Bot[]> {
+	return store
+		.filter((b) => b.eliminatedAt !== null)
+		.sort(
+			(a, b) =>
+				(b.eliminatedAt?.getTime() ?? 0) - (a.eliminatedAt?.getTime() ?? 0),
+		)
+		.map((b) => ({ ...b }));
+}
+
+/**
+ * 複数のbot_idに対応するボット情報を一括取得する。
+ * スレッド詳細のBOT情報表示（botInfoMap構築）に使用する。
+ *
+ * See: src/lib/infrastructure/repositories/bot-repository.ts > findByIds
+ * See: features/admin.feature @管理者がスレッド詳細で投稿者の種別を識別できる
+ *
+ * @param botIds bot_idの配列
+ * @returns Bot配列（見つかったものだけ返される）
+ */
+export async function findByIds(botIds: string[]): Promise<Bot[]> {
+	if (botIds.length === 0) {
+		return [];
+	}
+	for (const id of botIds) {
+		assertUUID(id, "BotRepository.findByIds.botId");
+	}
+	const idSet = new Set(botIds);
+	return store.filter((b) => idSet.has(b.id)).map((b) => ({ ...b }));
+}
+
+/**
  * 新規ボットを作成する。
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  */

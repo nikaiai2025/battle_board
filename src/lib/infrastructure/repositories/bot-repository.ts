@@ -226,6 +226,28 @@ export async function findAll(): Promise<Bot[]> {
 }
 
 /**
+ * 撃破済み（eliminated_at IS NOT NULL）のボットを全件取得する。
+ * 管理画面のBOT一覧（撃破済みタブ）で使用する。
+ *
+ * See: features/admin.feature @管理者が撃破済みのBOT一覧を閲覧できる
+ *
+ * @returns 撃破済みボットの配列
+ */
+export async function findEliminated(): Promise<Bot[]> {
+	const { data, error } = await supabaseAdmin
+		.from("bots")
+		.select("*")
+		.not("eliminated_at", "is", null)
+		.order("eliminated_at", { ascending: false });
+
+	if (error) {
+		throw new Error(`BotRepository.findEliminated failed: ${error.message}`);
+	}
+
+	return (data as BotRow[]).map(rowToBot);
+}
+
+/**
  * 全ボットの件数を取得する（is_active フラグ問わず）。
  * ダッシュボードのBOT総数表示に使用する。
  *
