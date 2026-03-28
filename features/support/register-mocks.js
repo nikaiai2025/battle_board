@@ -215,6 +215,12 @@ const REPO_MOCKS = [
 		"src/lib/infrastructure/repositories/user-copipe-repository.ts",
 		"./in-memory/user-copipe-repository.ts",
 	],
+	// dev-post リポジトリ（TASK-363 で追加）
+	// See: features/dev_board.feature
+	[
+		"src/lib/infrastructure/repositories/dev-post-repository.ts",
+		"./in-memory/dev-post-repository.ts",
+	],
 ];
 
 for (const [srcRelPath, mockRelPath] of REPO_MOCKS) {

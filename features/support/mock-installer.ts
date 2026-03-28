@@ -47,6 +47,9 @@ import * as InMemoryDailyEventRepo from "./in-memory/daily-event-repository";
 // 日次統計リポジトリ（TASK-107 で追加）
 // See: features/admin.feature @ダッシュボードシナリオ群
 import * as InMemoryDailyStatsRepo from "./in-memory/daily-stats-repository";
+// dev-post リポジトリ（TASK-363 で追加）
+// See: features/dev_board.feature
+import * as InMemoryDevPostRepo from "./in-memory/dev-post-repository";
 // Edge-token リポジトリ（TASK-085 で追加）
 // See: features/authentication.feature
 import * as InMemoryEdgeTokenRepo from "./in-memory/edge-token-repository";
@@ -142,6 +145,9 @@ export function resetAllStores(): void {
 	// user-copipe リポジトリのリセット（TASK-357 で追加）
 	// See: features/user_copipe.feature
 	InMemoryUserCopipeRepo.reset();
+	// dev-post リポジトリのリセット（TASK-363 で追加）
+	// See: features/dev_board.feature
+	InMemoryDevPostRepo.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +172,8 @@ export {
 	InMemoryDailyEventRepo,
 	// 日次統計リポジトリ（TASK-107 で追加）
 	InMemoryDailyStatsRepo,
+	// dev-post リポジトリ（TASK-363 で追加）
+	InMemoryDevPostRepo,
 	// Edge-token リポジトリ（TASK-085 で追加）
 	InMemoryEdgeTokenRepo,
 	InMemoryIncentiveLogRepo,

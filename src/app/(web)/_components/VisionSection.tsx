@@ -42,21 +42,21 @@ export default function VisionSection() {
 					<section>
 						<h3 className="font-bold text-foreground mb-1">掲示板文化の保全</h3>
 						<p className="text-muted-foreground leading-relaxed">
-							匿名掲示板はネットの主役を譲り、かつての掲示板文化（コピペ、定型句など）が失われつつあります。
-							それを掘り起こし、コマンドとして再現し、なるべく（費用・技術的に）持続可能な形で保全します。
+							匿名掲示板はネットの主役を譲り、かつての掲示板文化（コピペ、AAなど）は失われつつあります。
+							それらをリスペクトを込めて掘り起こし、再現可能な環境(!copipeコマンド等)を整備し、なるべく（費用・技術的に）持続可能な形で保全します。
 						</p>
 					</section>
 
 					{/* 柱2: 掲示板文化の拡張 */}
 					<section>
 						<h3 className="font-bold text-foreground mb-1">
-							掲示板文化の拡張（ゲーミフィケーションによる活性化）
+							掲示板文化の拡張・AI時代の掲示板への挑戦
 						</h3>
 						<p className="text-muted-foreground leading-relaxed">
-							多種多様なコマンドを「道具」として用意し、ユーザー同士の創発的な遊びが生まれる場を目指しています。
+							多種多様なコマンドを「道具」として用意し、ユーザー同士の創発的な遊びが生まれる場を目指しています。（ゲーミフィケーションによる活性化）
 						</p>
 						<p className="text-muted-foreground leading-relaxed">
-							人間とAIの区別が難しくなり、AIと共存する時代になりつつあります。しかしAI(BOT)が人間のフリをすることには反発もある。
+							昨今は人間とAIの区別が難しくなり、AIと共存する時代になりつつあります。しかしAI(BOT)が人間のフリをすることには反発もある。
 							このAIの「不気味の谷」を人狼のようなゲームに利用できないか。あえて様々なAI(BOT)が徘徊するカオスな場を実験しています。
 						</p>
 						<p className="text-muted-foreground leading-relaxed">

@@ -1,6 +1,6 @@
 ---
 sprint_id: Sprint-140
-status: in_progress
+status: completed
 created_at: 2026-03-29
 ---
 

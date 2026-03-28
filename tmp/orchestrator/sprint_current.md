@@ -4,18 +4,22 @@
 
 ## 現在のフェーズ
 
+**Sprint-140 完了 — PostService/AttackHandler サブリクエスト最適化**
+
+### Sprint-140の成果
+- TASK-360: Repository バッチメソッド追加（findByThreadIdAndPostNumbers, findByPostIds）
+- TASK-361: AttackHandler 最適化（S1: 事前検証バッチ化 / S2: 重複findById排除 / S3: ローカル残高追跡）
+- TASK-362: PostService 重複クエリ排除（S4-1: isUserBanned排除 / S4-2: findByThreadIdキャッシュ。S4-3は見送り）
+- サブリクエスト削減効果: 約47クエリ（ワーストケース 139〜161 → 推定92〜114）
+- vitest: 2145 PASS（+14新規テスト）/ cucumber-js: 389 passed（回帰なし）
+- コミット: 97dc7e5
+- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
+
 **Sprint-139 完了 — ユーザーコピペ管理機能 + !copipe マージ検索**
 
 ### Sprint-139の成果
-- TASK-357: UserCopipe CRUD バックエンド（Repository + Service + API 4本 + InMemory + 単体テスト37件）
-- TASK-358: CopipeRepository マージ検索（findByName 配列化 + 両テーブル並列検索 + CopipeHandler 3分岐）
-- TASK-359: BDDステップ定義（user_copipe.feature 全16シナリオ PASS）
-- Migration 00036: user_copipe_entries テーブル作成
-- cf-workers-logs スキル更新: デフォルトフィルタ追加 + レスポンス構造修正
-- vitest: 2131 PASS / cucumber-js: 389 passed (+16)
-- コミット: 3227525
-- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
-- PostService サブリクエスト監査レポート作成（`tmp/workers/bdd-architect_TASK-ARCH-POST-SUBREQUEST/`）
+- TASK-357〜359: UserCopipe CRUD + マージ検索 + BDD 16シナリオ
+- vitest: 2131 PASS / cucumber-js: 389 passed (+16) / 本番スモーク: 30/35 PASS
 
 **Sprint-138 完了 — Ops基盤障害修正（performDailyResetバッチ化 + ci-failureラベル + collect-topics手動確認）**
 
@@ -29,8 +33,8 @@
 | 03-22 ×2 | `POST /api/internal/bot/execute` | UUID パースエラー（"新参おるやん🤣"をUUID解析） | cebd451（チュートリアルBOT本文を改行区切りに変更） |
 | 03-21 | `POST /api/internal/bot/execute` | FK制約違反 (`incentive_logs.user_id` BOT未登録) + exceededCpu | Sprint-95 / 6225e73（BOT書き込み時インセンティブスキップ） |
 
-**未解消（次スプリント候補）:**
-- 03-27: `POST /api/threads/.../posts` — Too many subrequests (`countActiveThreads`)。独立システムレス再帰呼び出しでサブリクエスト上限到達
+**未解消（Sprint-140で緩和、要監視）:**
+- 03-27: `POST /api/threads/.../posts` — Too many subrequests (`countActiveThreads`)。独立システムレス再帰呼び出しでサブリクエスト上限到達。Sprint-140 でワーストケース約47クエリ削減済み（推定92〜114）。再発しなければ解消扱い
 
 ### 敵対的コードレビュー進捗（一時中断中）
 
@@ -286,16 +290,15 @@
 
 ## テスト状況
 
-- vitest: **2131 PASS / 13 failed**（Sprint-139後。13件は全て既存 Discord OAuth 関連）
-- cucumber-js: 410シナリオ / **389 passed / 0 failed** / 18 pending / 3 undefined（Sprint-139後）
+- vitest: **2145 PASS / 13 failed**（Sprint-140後。13件は全て既存 Discord OAuth 関連）
+- cucumber-js: 410シナリオ / **389 passed / 0 failed** / 18 pending / 3 undefined（Sprint-140後）
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 3件: 既存の未実装ステップ
-  - +16: user_copipe.feature 全16シナリオ追加（Sprint-139）
 - playwright E2E (ローカル): 16 passed, 0 fixme
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS（ローカル環境依存のため環境問題2件は除く）
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-139後):** 30/35 PASS（5件はローカル限定テストのスキップ）
+- **本番スモークテスト (Sprint-140後):** 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク（次回セッション開始時に確認）
 
@@ -377,6 +380,7 @@ HUMAN-003/004 ともに完了。BOT Strategy Step 3・4 の着手が可能。
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-140 | PostService/AttackHandler サブリクエスト最適化 | completed | `tmp/orchestrator/sprint_140_plan.md` |
 | Sprint-139 | ユーザーコピペ管理機能 + !copipe マージ検索 | completed | `tmp/orchestrator/sprint_139_plan.md` |
 | Sprint-138 | Ops基盤障害修正（performDailyResetバッチ化） | completed | `tmp/orchestrator/sprint_138_plan.md` |
 | Sprint-137 | createBotService DI 欠落ホットフィックス | completed | `tmp/orchestrator/sprint_137_plan.md` |

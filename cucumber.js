@@ -101,6 +101,9 @@ module.exports = {
 			// TASK-359: ユーザーコピペ管理（マイページからのAA登録・編集・削除） BDD シナリオ追加
 			// See: features/user_copipe.feature
 			"features/user_copipe.feature",
+			// TASK-363: 開発連絡板 BDD シナリオ追加
+			// See: features/dev_board.feature
+			"features/dev_board.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -174,6 +177,9 @@ module.exports = {
 			// TASK-359: ユーザーコピペ管理 BDD ステップ定義
 			// See: features/user_copipe.feature
 			"features/step_definitions/user_copipe.steps.ts",
+			// TASK-363: 開発連絡板 BDD ステップ定義
+			// See: features/dev_board.feature
+			"features/step_definitions/dev_board.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録
