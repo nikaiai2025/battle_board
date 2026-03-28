@@ -22,15 +22,32 @@
  * See: docs/architecture/components/bot.md §2.13.5
  */
 
+import { createClient } from "@supabase/supabase-js";
 import { botProfilesConfig } from "../../../config/bot-profiles";
 import { getJstDateString } from "../domain/rules/jst-date";
-import { supabaseAdmin } from "../infrastructure/supabase/client";
 import type {
 	BotProfile,
 	CollectedItem,
 	ICollectedTopicRepository,
 } from "../services/bot-strategies/types";
 import { resolveCollectionAdapter } from "./adapters/adapter-resolver";
+
+/**
+ * collection-job 専用の Supabase service_role クライアント。
+ * client.ts の supabaseAdmin は supabaseClient（anon key）と同一モジュールで初期化されるため、
+ * GHA 環境（SUPABASE_ANON_KEY 未設定）では import 時点でエラーになる。
+ * seed スクリプトと同様に直接 createClient() することで回避する。
+ */
+function getServiceRoleClient() {
+	const url = process.env.SUPABASE_URL;
+	const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+	if (!url || !key) {
+		throw new Error(
+			"[collection-job] 環境変数 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY が未設定です",
+		);
+	}
+	return createClient(url, key);
+}
 
 // ---------------------------------------------------------------------------
 // BotProfilesYaml 型
@@ -45,12 +62,12 @@ type BotProfilesYaml = Record<string, BotProfile>;
 
 /**
  * Supabase を使った CollectedTopicRepository の最小実装。
- * 本格実装は TASK-350 で作成される予定。
  * ここでは collection-job.ts の動作に必要な save() のみを提供する。
  *
  * See: features/curation_bot.feature @日次バッチでバズデータを収集・蓄積する
  */
 function getSupabaseCollectedTopicRepo(): ICollectedTopicRepository {
+	const supabase = getServiceRoleClient();
 	return {
 		async save(
 			items: CollectedItem[],
@@ -69,9 +86,7 @@ function getSupabaseCollectedTopicRepo(): ICollectedTopicRepository {
 			}));
 
 			// ON CONFLICT DO NOTHING: 同一 (source_bot_id, collected_date, source_url) があればスキップ
-			const { error } = await supabaseAdmin
-				.from("collected_topics")
-				.insert(rows);
+			const { error } = await supabase.from("collected_topics").insert(rows);
 
 			if (error) {
 				throw new Error(`collected_topics INSERT 失敗: ${error.message}`);
@@ -133,7 +148,7 @@ export async function runCollectionJob(overrides?: {
 			// BOT取得（テスト時は adapterOverrides のみでBOT取得をスキップ可能にするため
 			// adapterOverride が存在する場合でもBOT取得を試みる。
 			// BDDテストでは collectedTopicRepo も override されるため DB アクセスは発生しない）
-			const { data: bots } = await supabaseAdmin
+			const { data: bots } = await getServiceRoleClient()
 				.from("bots")
 				.select("id")
 				.eq("bot_profile_key", profileKey)
