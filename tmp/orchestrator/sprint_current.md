@@ -4,34 +4,30 @@
 
 ## 現在のフェーズ
 
+**Sprint-142 完了 — 管理画面BOT管理 + ユーザー語録登録**
+
+### Sprint-142の成果
+- TASK-364: BOT管理API（スレッド詳細BOT付加 + BOT一覧/詳細 + findEliminated）
+- TASK-365: BOT管理UI（BOT一覧/詳細ページ + スレッド詳細バッジ + ナビ追加 + BDD 4シナリオ）
+- TASK-366: 語録Backend（migration + repo + service + strategy改修 + API + 56単体テスト）
+- TASK-367: 語録UI + BDD（マイページ語録管理 + 16シナリオ + bot_system語録プール更新 + strategy注入）
+- ホットフィックス: マイページ語録一覧APIレスポンス展開漏れ修正（71352b9）
+- vitest: 2211 PASS / cucumber-js: 435シナリオ 414 passed (+20) / 18 pending / 3 undefined
+- コミット: 05be61c, 71352b9
+- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
+
 **Sprint-141 完了 — 開発連絡板 BDD ステップ定義**
 
 ### Sprint-141の成果
 - TASK-363: dev_board.feature 全6シナリオの BDD ステップ定義実装
-  - InMemory DevPostRepository 新規作成（register-mocks.js キャッシュ差し込み方式）
-  - VisionSection.tsx サイトビジョン文言更新（人間編集を同梱）
 - cucumber-js: 395 passed (+6) / vitest: 回帰なし
 - コミット: 857effd
-- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
+- 本番スモーク: 30/35 PASS
 
-**Sprint-140 完了 — PostService/AttackHandler サブリクエスト最適化**
-
-### Sprint-140の成果
-- TASK-360: Repository バッチメソッド追加（findByThreadIdAndPostNumbers, findByPostIds）
-- TASK-361: AttackHandler 最適化（S1: 事前検証バッチ化 / S2: 重複findById排除 / S3: ローカル残高追跡）
-- TASK-362: PostService 重複クエリ排除（S4-1: isUserBanned排除 / S4-2: findByThreadIdキャッシュ。S4-3は見送り）
-- サブリクエスト削減効果: 約47クエリ（ワーストケース 139〜161 → 推定92〜114）
-- vitest: 2145 PASS（+14新規テスト）/ cucumber-js: 389 passed（回帰なし）
-- コミット: 97dc7e5
-- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
-
-**Sprint-139 完了 — ユーザーコピペ管理機能 + !copipe マージ検索**
-
-### Sprint-139の成果
-- TASK-357〜359: UserCopipe CRUD + マージ検索 + BDD 16シナリオ
-- vitest: 2131 PASS / cucumber-js: 389 passed (+16) / 本番スモーク: 30/35 PASS
-
-**Sprint-138 完了 — Ops基盤障害修正（performDailyResetバッチ化 + ci-failureラベル + collect-topics手動確認）**
+**Sprint-138〜140 完了**
+- Sprint-140: PostService/AttackHandler サブリクエスト最適化（97dc7e5）
+- Sprint-139: ユーザーコピペ管理機能 + !copipe マージ検索（3227525）
+- Sprint-138: Ops基盤障害修正（bfae891）
 
 ### CF Observability 既知エラー（解消済み・再調査不要）
 
@@ -69,15 +65,15 @@
 
 ## テスト状況
 
-- vitest: **2145 PASS / 13 failed**（Sprint-141後。13件は全て既存 Discord OAuth 関連）
-- cucumber-js: 416シナリオ / **395 passed / 0 failed** / 18 pending / 3 undefined（Sprint-141後）
+- vitest: **2211 PASS / 14 failed**（Sprint-142後。14件は全て既存 Discord OAuth 関連）
+- cucumber-js: 435シナリオ / **414 passed / 0 failed** / 18 pending / 3 undefined（Sprint-142後）
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 3件: thread.feature FAB 関連（UI実装待ち）
 - playwright E2E (ローカル): 16 passed, 0 fixme
 - playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
 - cucumber-js integration: 7シナリオ / 全PASS（ローカル環境依存のため環境問題2件は除く）
 - schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-141後):** 30/35 PASS（5件はローカル限定テストのスキップ）
+- **本番スモークテスト (Sprint-142後):** 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -129,6 +125,7 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-142 | 管理画面BOT管理 + ユーザー語録登録 | completed | `sprint_142_plan.md` |
 | Sprint-141 | 開発連絡板 BDD ステップ定義 | completed | `sprint_141_plan.md` |
 | Sprint-111〜140 | 管理画面〜サブリクエスト最適化 | completed | `archive/sprint_111_120.md` `sprint_121_130.md` `sprint_131_140.md` |
 | Sprint-105〜110 | テーマ機能 + サイトリネーム + 認証簡素化 | completed | `archive/sprint_105_110.md` |
