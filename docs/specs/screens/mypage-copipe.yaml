@@ -1,0 +1,92 @@
+# D-06 画面要素定義書: コピペ管理
+# ステータス: 運用中
+# 作成日: 2026-03-29
+# 対象: Phase 1
+
+screen_id: SCR-003-copipe
+name: コピペ管理
+route: /mypage/copipe
+parent: SCR-003 (マイページ)
+description: >
+  ユーザー独自のコピペ(AA)を登録・編集・削除する。
+  マイページから分離した独立ページ。
+  本文の入力・プレビューには AA 表示フォント（--font-aa: MS PGothic系）を使用し、
+  !copipe コマンド実行時の表示と同じ描画で確認できる（WYSIWYG）。
+
+# See: features/user_copipe.feature
+
+api_dependencies:
+  - GET /api/mypage (認証確認)
+  - GET /api/mypage/copipe (listUserCopipe)
+  - POST /api/mypage/copipe (createUserCopipe)
+  - PUT /api/mypage/copipe/{id} (updateUserCopipe)
+  - DELETE /api/mypage/copipe/{id} (deleteUserCopipe)
+
+access_control: 認証済みユーザーのみ
+
+elements:
+  - id: back-link
+    type: link
+    label: マイページ
+    href: /mypage
+
+  - id: copipe-section
+    type: section
+    label: コピペ管理（AA）
+    children:
+      - id: copipe-help-text
+        type: text
+        content: >
+          コピペ（AA）を登録すると、!copipe コマンドで全ユーザーが検索・利用できます。
+        style: muted
+
+      - id: copipe-backslash-note
+        type: text
+        content: >
+          AA表示フォント（MS PGothic系）では半角の \ が ¥ に見えます。
+          AAでバックスラッシュを使う場合は全角の ＼ をお使いください。
+        style: muted small
+
+      - id: copipe-register-form
+        type: form
+        label: コピペ登録
+        fields:
+          - id: copipe-name-input
+            type: text-input
+            label: 名前
+            placeholder: 名前（最大50文字）
+            maxLength: 50
+          - id: copipe-content-input
+            type: textarea
+            label: 本文
+            placeholder: 本文（最大5000文字）
+            maxLength: 5000
+            style: font-aa  # AA表示フォント（WYSIWYG）
+          - id: copipe-submit-btn
+            type: button
+            label: 登録する
+            action: POST /api/mypage/copipe
+
+      - id: copipe-list
+        type: list
+        source: userCopipeEntries
+        emptyMessage: 登録済みのコピペはありません
+        itemTemplate:
+          - id: copipe-item-name
+            type: text
+            source: entry.name
+            style: bold
+          - id: copipe-item-preview
+            type: text
+            source: entry.content
+            style: font-aa muted  # AA表示フォント（WYSIWYG）
+          - id: copipe-item-edit-btn
+            type: button
+            label: 編集
+            action: PUT /api/mypage/copipe/{entry.id}
+          - id: copipe-item-delete-btn
+            type: button
+            label: 削除
+            action: DELETE /api/mypage/copipe/{entry.id}
+            style: danger
+            confirm: "「{entry.name}」を削除しますか？"

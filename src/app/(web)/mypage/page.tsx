@@ -45,7 +45,6 @@ import {
 	isTemporaryUser,
 } from "@/lib/domain/rules/mypage-display-rules";
 import type { MypageInfo } from "@/lib/services/mypage-service";
-import CopipeSection from "./_components/CopipeSection";
 import FontPickerModal from "./_components/FontPickerModal";
 import PostHistorySection from "./_components/PostHistorySection";
 
@@ -1031,14 +1030,23 @@ export default function MypagePage() {
 			</section>
 
 			{/* =============================
-          コピペ管理セクション
-          CopipeSection コンポーネントに委譲（登録・一覧表示・編集・削除）
-          See: features/user_copipe.feature @マイページからコピペを新規登録する
-          See: features/user_copipe.feature @マイページに自分の登録コピペ一覧が表示される
-          See: features/user_copipe.feature @自分の登録コピペを編集する
-          See: features/user_copipe.feature @自分の登録コピペを削除する
+          コピペ管理セクション（独立ページへのリンク）
+          See: features/user_copipe.feature
           ============================= */}
-			<CopipeSection mypageInfo={mypageInfo} />
+			<section className="bg-card border border-border rounded p-4">
+				<h2 className="text-base font-bold text-foreground">
+					コピペ管理（AA）
+				</h2>
+				<p className="text-sm text-muted-foreground mt-1">
+					コピペ（AA）の登録・編集・削除はコピペ管理ページで行えます。
+				</p>
+				<a
+					href="/mypage/copipe"
+					className="inline-block mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+				>
+					コピペ管理ページへ
+				</a>
+			</section>
 
 			{/* =============================
           書き込み履歴セクション

@@ -1343,14 +1343,15 @@ export class BotService {
 					tutorialThreadId: pending.threadId,
 				});
 
-				// Step 2b-post: チュートリアルBOTは1回きりの投稿のため next_post_at を null にリセット
-				// executeBotPost の Step 9 で next_post_at が更新されるが、定期投稿は不要。
-				// 煽りBOT（processAoriCommands）と同じ「使い切り」パターン。
-				await this.botRepository.updateNextPostAt(newBot.id, null);
-
-				// Step 2c: pending 削除
+				// Step 2c: pending 削除（投稿成功後に即削除。以降の処理失敗で重複スポーンしないように先行削除）
 				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.iii
 				await this.pendingTutorialRepository.deletePendingTutorial(pending.id);
+
+				// Step 2d: チュートリアルBOTは1回きりの投稿のため next_post_at を null にリセット
+				// executeBotPost の Step 9 で next_post_at が更新されるが、定期投稿は不要。
+				// 煽りBOT（processAoriCommands）と同じ「使い切り」パターン。
+				// この処理が失敗しても、pending は既に削除済みのため重複スポーンは起きない。
+				await this.botRepository.updateNextPostAt(newBot.id, null);
 
 				results.push({
 					pendingId: pending.id,

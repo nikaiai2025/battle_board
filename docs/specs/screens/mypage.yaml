@@ -11,7 +11,7 @@ description: >
   ユーザーの通貨残高・アカウント情報・書き込み履歴を表示する。
   有料ユーザーはユーザーネーム設定が可能。
   通知欄はPhase 2以降で本格利用。
-  コピペ管理セクションでユーザー独自のコピペ(AA)を登録・編集・削除できる。
+  コピペ管理は独立ページ（/mypage/copipe → mypage-copipe.yaml）に分離。
 
 api_dependencies:
   - GET /api/mypage (getMypage)
@@ -19,10 +19,6 @@ api_dependencies:
   - POST /api/mypage/upgrade (upgradeToPremium)
   - GET /api/mypage/history (getPostHistory)
   - GET /api/mypage/notifications (getNotifications)
-  - GET /api/mypage/copipe (listUserCopipe)
-  - POST /api/mypage/copipe (createUserCopipe)
-  - PUT /api/mypage/copipe/{id} (updateUserCopipe)
-  - DELETE /api/mypage/copipe/{id} (deleteUserCopipe)
   - GET /api/currency/balance (getCurrencyBalance)
   - POST /api/auth/logout (logout)
 
@@ -164,56 +160,18 @@ elements:
             source: notification.createdAt
             format: relative
 
-  # --- コピペ管理セクション ---
+  # --- コピペ管理セクション（独立ページへのリンク） ---
+  # UI詳細は /mypage/copipe ページ側（mypage-copipe.yaml）で定義
   # See: features/user_copipe.feature
   - id: copipe-section
     type: section
-    label: コピペ管理
+    label: コピペ管理（AA）
     children:
-      - id: copipe-register-form
-        type: form
-        label: コピペ登録
-        fields:
-          - id: copipe-name-input
-            type: text-input
-            label: 名前
-            placeholder: コピペの名前（50文字以内）
-            maxLength: 50
-          - id: copipe-content-input
-            type: textarea
-            label: 本文
-            placeholder: AA・コピペの本文を入力（5000文字以内）
-            maxLength: 5000
-            style: monospace  # AA表示前提のため等幅系フォント
-          - id: copipe-submit-btn
-            type: button
-            label: 登録する
-            action: POST /api/mypage/copipe
-
-      - id: copipe-list
-        type: list
-        source: userCopipeEntries
-        emptyMessage: 登録されたコピペはありません
-        itemTemplate:
-          - id: copipe-item-name
-            type: text
-            source: entry.name
-            style: bold
-          - id: copipe-item-preview
-            type: text
-            source: entry.content
-            truncate: 80  # 本文先頭80文字をプレビュー表示
-            style: monospace muted
-          - id: copipe-item-edit-btn
-            type: button
-            label: 編集
-            action: PUT /api/mypage/copipe/{entry.id}
-          - id: copipe-item-delete-btn
-            type: button
-            label: 削除
-            action: DELETE /api/mypage/copipe/{entry.id}
-            style: danger
-            confirm: "「{entry.name}」を削除しますか？\n{entry.content | truncate: 40}"
+      - id: copipe-link
+        type: link
+        label: コピペ管理ページへ
+        href: /mypage/copipe
+        style: button-primary
 
   # --- 書き込み履歴 ---
   - id: history-section

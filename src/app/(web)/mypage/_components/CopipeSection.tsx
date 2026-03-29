@@ -50,6 +50,19 @@ interface CopipeSectionProps {
 }
 
 // ---------------------------------------------------------------------------
+// ユーティリティ
+// ---------------------------------------------------------------------------
+
+/**
+ * 前後の空行のみ除去する（行内の先頭空白は保持）。
+ * AA の字下げを破壊しないための .trim() 代替。
+ * seed-copipe.ts の trimBlankLines と同じ方針。
+ */
+function trimBlankLines(text: string): string {
+	return text.replace(/^(\s*\n)+/, "").replace(/(\n\s*)+$/, "");
+}
+
+// ---------------------------------------------------------------------------
 // 定数
 // ---------------------------------------------------------------------------
 
@@ -149,14 +162,16 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 
 		// --- クライアントサイドバリデーション ---
 		const trimmedName = nameInput.trim();
-		const trimmedContent = contentInput.trim();
+		// AA の先頭行インデントを破壊しないよう、前後の空行のみ除去する
+		// （行内の先頭空白は保持。seed-copipe.ts の trimBlankLines と同じ方針）
+		const cleanedContent = trimBlankLines(contentInput);
 
 		if (!trimmedName) {
 			setFormError("名前は必須です");
 			setIsSubmitting(false);
 			return;
 		}
-		if (!trimmedContent) {
+		if (!cleanedContent) {
 			setFormError("本文は必須です");
 			setIsSubmitting(false);
 			return;
@@ -166,7 +181,7 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 			setIsSubmitting(false);
 			return;
 		}
-		if (trimmedContent.length > CONTENT_MAX_LENGTH) {
+		if (cleanedContent.length > CONTENT_MAX_LENGTH) {
 			setFormError(`本文は${CONTENT_MAX_LENGTH}文字以内で入力してください`);
 			setIsSubmitting(false);
 			return;
@@ -176,7 +191,7 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 			const res = await fetch("/api/mypage/copipe", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name: trimmedName, content: trimmedContent }),
+				body: JSON.stringify({ name: trimmedName, content: cleanedContent }),
 			});
 
 			if (!res.ok) {
@@ -232,14 +247,14 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 
 		// --- クライアントサイドバリデーション ---
 		const trimmedName = editNameInput.trim();
-		const trimmedContent = editContentInput.trim();
+		const cleanedContent = trimBlankLines(editContentInput);
 
 		if (!trimmedName) {
 			setEditError("名前は必須です");
 			setIsSubmittingEdit(false);
 			return;
 		}
-		if (!trimmedContent) {
+		if (!cleanedContent) {
 			setEditError("本文は必須です");
 			setIsSubmittingEdit(false);
 			return;
@@ -249,7 +264,7 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 			setIsSubmittingEdit(false);
 			return;
 		}
-		if (trimmedContent.length > CONTENT_MAX_LENGTH) {
+		if (cleanedContent.length > CONTENT_MAX_LENGTH) {
 			setEditError(`本文は${CONTENT_MAX_LENGTH}文字以内で入力してください`);
 			setIsSubmittingEdit(false);
 			return;
@@ -259,7 +274,7 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 			const res = await fetch(`/api/mypage/copipe/${id}`, {
 				method: "PUT",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name: trimmedName, content: trimmedContent }),
+				body: JSON.stringify({ name: trimmedName, content: cleanedContent }),
 			});
 
 			if (!res.ok) {
@@ -323,6 +338,12 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 				コピペ（AA）を登録すると、!copipe
 				コマンドで全ユーザーが検索・利用できます。
 			</p>
+			<p className="text-xs text-muted-foreground">
+				※ AA表示フォント（MS PGothic系）では半角の
+				<code className="font-mono">\</code> が <code>¥</code>{" "}
+				に見えます。AAでバックスラッシュを使う場合は全角の <code>＼</code>{" "}
+				をお使いください。
+			</p>
 
 			{/* 登録フォーム
 				See: features/user_copipe.feature @マイページからコピペを新規登録する */}
@@ -351,7 +372,12 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 					placeholder="本文（最大5000文字）"
 					maxLength={CONTENT_MAX_LENGTH}
 					rows={4}
-					className="w-full border border-border rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-blue-400 resize-y"
+					className="w-full border border-border rounded px-3 py-1.5 focus:outline-none focus:border-blue-400 resize-y"
+					style={{
+						fontFamily: "var(--font-aa)",
+						fontSize: "16px",
+						lineHeight: "18px",
+					}}
 				/>
 
 				{/* 登録ボタン */}
@@ -423,7 +449,12 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 											placeholder="本文（最大5000文字）"
 											maxLength={CONTENT_MAX_LENGTH}
 											rows={4}
-											className="w-full border border-border rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-blue-400 resize-y"
+											className="w-full border border-border rounded px-3 py-1.5 focus:outline-none focus:border-blue-400 resize-y"
+											style={{
+												fontFamily: "var(--font-aa)",
+												fontSize: "16px",
+												lineHeight: "18px",
+											}}
 										/>
 										{editError && (
 											<p
@@ -490,10 +521,15 @@ export default function CopipeSection({ mypageInfo }: CopipeSectionProps) {
 												</button>
 											</div>
 										</div>
-										{/* 本文プレビュー（monospace, 折りたたみ表示） */}
+										{/* 本文プレビュー（AA表示フォント, 折りたたみ表示） */}
 										<pre
 											data-testid="copipe-item-content"
-											className="mt-1 text-xs text-muted-foreground font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto bg-muted rounded p-2"
+											className="mt-1 text-muted-foreground whitespace-pre-wrap break-all max-h-32 overflow-y-auto bg-muted rounded p-2"
+											style={{
+												fontFamily: "var(--font-aa)",
+												fontSize: "16px",
+												lineHeight: "18px",
+											}}
 										>
 											{entry.content}
 										</pre>

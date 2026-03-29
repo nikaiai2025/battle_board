@@ -1307,14 +1307,14 @@ describe("BotService", () => {
 					nextPostAt: null, // 使い切りBOT: cron に拾われないよう null (LL-013)
 				}),
 			);
+			// pending削除が executeBotPost の直後に呼ばれている（updateNextPostAt より前）
+			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(
+				"pending-001",
+			);
 			// 投稿後に nextPostAt が null にリセットされている（executeBotPost Step 9 の上書き対策）
 			expect(botRepo.updateNextPostAt).toHaveBeenCalledWith(
 				"tutorial-bot-001",
 				null,
-			);
-			// pending削除が呼ばれている
-			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(
-				"pending-001",
 			);
 			// 結果が正しい
 			expect(result.processed).toBe(1);
@@ -1441,6 +1441,67 @@ describe("BotService", () => {
 			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledTimes(1);
 			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(
 				"pending-ok",
+			);
+
+			consoleSpy.mockRestore();
+		});
+
+		it("updateNextPostAt がエラーをスローしても pending は削除済みのため重複スポーンしない", async () => {
+			// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+			// バグ修正確認: pending削除を updateNextPostAt より先に行うことで重複スポーンを防止する
+			const pendingList = [
+				{
+					id: "pending-001",
+					userId: "user-001",
+					threadId: "thread-001",
+					triggerPostNumber: 5,
+					createdAt: new Date("2026-03-21T10:00:00Z"),
+				},
+			];
+			const pendingRepo = createMockPendingTutorialRepository(pendingList);
+			const tutorialBot = createLurkingBot({
+				id: "tutorial-bot-001",
+				botProfileKey: "tutorial",
+				hp: 10,
+				maxHp: 10,
+				dailyId: "TutBt01",
+				dailyIdDate: new Date(Date.now() + 9 * 3600000)
+					.toISOString()
+					.slice(0, 10),
+			});
+			const botRepo = createMockBotRepository(tutorialBot);
+			(botRepo.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+				tutorialBot,
+			);
+			// updateNextPostAt がエラーをスロー
+			(botRepo.updateNextPostAt as ReturnType<typeof vi.fn>).mockRejectedValue(
+				new Error("DB接続エラー"),
+			);
+
+			const consoleSpy = vi
+				.spyOn(console, "error")
+				.mockImplementation(() => {});
+
+			const mockCreatePost = createMockCreatePostFn();
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+				undefined,
+				createMockThreadRepository(),
+				mockCreatePost,
+				undefined,
+				pendingRepo,
+			);
+
+			const result = await service.processPendingTutorials();
+
+			// updateNextPostAt でエラーが発生しているため処理は失敗
+			expect(result.results[0].success).toBe(false);
+			// しかし pending は削除されている（executeBotPost の後に削除したため）
+			// → 次回 cron 実行時に同じ pending で再度 BOT がスポーンしない
+			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(
+				"pending-001",
 			);
 
 			consoleSpy.mockRestore();
