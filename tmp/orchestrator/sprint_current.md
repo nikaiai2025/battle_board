@@ -4,25 +4,21 @@
 
 ## 現在のフェーズ
 
-**Sprint-142 完了 — 管理画面BOT管理 + ユーザー語録登録**
+**Sprint-143 完了 — マイページ コピペ管理UI + UI改善**
 
-### Sprint-142の成果
-- TASK-364: BOT管理API（スレッド詳細BOT付加 + BOT一覧/詳細 + findEliminated）
-- TASK-365: BOT管理UI（BOT一覧/詳細ページ + スレッド詳細バッジ + ナビ追加 + BDD 4シナリオ）
-- TASK-366: 語録Backend（migration + repo + service + strategy改修 + API + 56単体テスト）
-- TASK-367: 語録UI + BDD（マイページ語録管理 + 16シナリオ + bot_system語録プール更新 + strategy注入）
-- ホットフィックス: マイページ語録一覧APIレスポンス展開漏れ修正（71352b9）
-- vitest: 2211 PASS / cucumber-js: 435シナリオ 414 passed (+20) / 18 pending / 3 undefined
-- コミット: 05be61c, 71352b9
+### Sprint-143の成果
+- TASK-368: コピペ管理UIコンポーネント（CopipeSection）新規作成 + マイページ統合
+- 語録セクション説明文改善（語録プールの仕組み説明追加）
+- ヘッダー新規登録リンク追加 + 認証画面リダイレクト対応（人間による変更）
+- オーケストレーター指示書整理（フェーズ5廃止→ステップ8品質ゲート統合）
+- インシデント報告書 + LL-016（語録APIレスポンス形状ミスマッチ）
+- vitest: 2211 PASS / cucumber-js: 435シナリオ 414 passed / 18 pending / 3 undefined
+- コミット: 9184e8d, d358d29
 - 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
 
-**Sprint-141 完了 — 開発連絡板 BDD ステップ定義**
-
-### Sprint-141の成果
-- TASK-363: dev_board.feature 全6シナリオの BDD ステップ定義実装
-- cucumber-js: 395 passed (+6) / vitest: 回帰なし
-- コミット: 857effd
-- 本番スモーク: 30/35 PASS
+**Sprint-141〜142 完了**
+- Sprint-142: 管理画面BOT管理 + ユーザー語録登録（05be61c, 71352b9）
+- Sprint-141: 開発連絡板 BDD ステップ定義（857effd）
 
 **Sprint-138〜140 完了**
 - Sprint-140: PostService/AttackHandler サブリクエスト最適化（97dc7e5）
@@ -65,15 +61,13 @@
 
 ## テスト状況
 
-- vitest: **2211 PASS / 14 failed**（Sprint-142後。14件は全て既存 Discord OAuth 関連）
-- cucumber-js: 435シナリオ / **414 passed / 0 failed** / 18 pending / 3 undefined（Sprint-142後）
+- vitest: **2211 PASS / 14 failed**（14件は全て既存 Discord OAuth 関連）
+- cucumber-js: 435シナリオ / **414 passed / 0 failed** / 18 pending / 3 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 3件: thread.feature FAB 関連（UI実装待ち）
-- playwright E2E (ローカル): 16 passed, 0 fixme
-- playwright API: 29テスト / 全PASS（専ブラ互換18 + 認証Cookie11）
-- cucumber-js integration: 7シナリオ / 全PASS（ローカル環境依存のため環境問題2件は除く）
-- schema consistency: 3テスト / 全PASS
-- **本番スモークテスト (Sprint-142後):** 30/35 PASS（5件はローカル限定テストのスキップ）
+- playwright E2E (ローカル): 11 passed / 2 failed（既存: auth-flow, inlineSystemInfo）
+- playwright API: 10テスト / 全PASS
+- **本番スモークテスト (Sprint-143後):** 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -125,6 +119,7 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-143 | マイページ コピペ管理UI + UI改善 | completed | `sprint_143_plan.md` |
 | Sprint-142 | 管理画面BOT管理 + ユーザー語録登録 | completed | `sprint_142_plan.md` |
 | Sprint-141 | 開発連絡板 BDD ステップ定義 | completed | `sprint_141_plan.md` |
 | Sprint-111〜140 | 管理画面〜サブリクエスト最適化 | completed | `archive/sprint_111_120.md` `sprint_121_130.md` `sprint_131_140.md` |

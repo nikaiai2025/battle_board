@@ -76,8 +76,7 @@ color: green
 - Githubにプッシュした後、Vercelに自動デプロイが実行される。続いてCloudflareにも自動デプロイが実施される（少し時間差がある）。
 - デプロイ見込み時間として3分間待機した後、CLIで両環境のデプロイ状況を確認する。
   - Vercel: `npx vercel ls`
-  - Cloudflare: `wrangler deployments status`
-    (使用禁止コマンド: `npx wrangler deployments list`)
+  - Cloudflare: `wrangler versions list`（最新エントリのタイムスタンプがプッシュ後であることを確認）
 - 仮にデプロイに問題があったとしても**手動デプロイは禁止**。修正コードをコミット・プッシュして、再度自動デプロイを待つ。
 
 ### ステップ9: デプロイ後検証
