@@ -7,8 +7,10 @@ screen_id: SCR-004
 name: 書き込み認証
 route: /auth/verify
 description: >
-  未認証ユーザーが書き込みを試みた際にリダイレクトされる認証画面。
-  Cloudflare Turnstile CAPTCHA のみで認証を行う。
+  未認証ユーザーが書き込みを試みた際、またはヘッダーの「新規登録」リンクから
+  遷移する認証画面。Cloudflare Turnstile CAPTCHA で認証を行う。
+  クエリパラメータ redirect が指定されている場合、認証成功後にそのパスへ遷移する
+  （オープンリダイレクト防止のため同一オリジンの相対パスのみ許可）。
 
 api_dependencies:
   - POST /api/auth/verify (verifyAuth)

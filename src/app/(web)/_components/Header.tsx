@@ -61,6 +61,17 @@ export default function Header({
 							ログイン
 						</Link>
 					)}
+					{/* nav-register: 未認証ユーザーのみ表示
+					    Turnstile認証 → マイページで本登録、の直通導線 */}
+					{!isAuthenticated && (
+						<Link
+							href="/auth/verify?redirect=/mypage"
+							className="text-gray-300 hover:text-white"
+							id="nav-register"
+						>
+							新規登録
+						</Link>
+					)}
 					{isAuthenticated && (
 						/* nav-mypage: 認証済み（仮ユーザー含む）の場合に表示 */
 						<Link

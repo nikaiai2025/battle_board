@@ -120,7 +120,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 			    See: docs/specs/screens/thread-list.yaml > auth-prompt
 			*/}
 			<p id="auth-prompt" className="text-xs text-muted-foreground mb-3">
-				書き込みするには認証が必要です（送信時に認証画面が表示されます）
+				アカウント登録なしで書き込めます（初回のみ簡単な認証）。メールアドレス・Discordで本登録すると、Cookie喪失時でも同一ユーザーとして復帰できます。
 			</p>
 
 			{/* thread-list: スレッド一覧

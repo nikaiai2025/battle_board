@@ -258,19 +258,17 @@ export default function LoginPage() {
 				</button>
 
 				{/* =============================
-				    本登録への案内
+				    新規登録への案内
 				    ============================= */}
 				<div className="mt-6 pt-4 border-t border-border text-center">
 					<p className="text-xs text-muted-foreground mb-2">
-						本登録がまだの方は、掲示板に書き込み後
-						<br />
-						マイページから本登録できます。
+						アカウントをお持ちでない方
 					</p>
 					<Link
-						href="/mypage"
+						href="/auth/verify?redirect=/mypage"
 						className="text-sm text-blue-600 hover:underline"
 					>
-						マイページへ
+						新規登録
 					</Link>
 				</div>
 			</div>

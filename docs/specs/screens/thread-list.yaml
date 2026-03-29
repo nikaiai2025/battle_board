@@ -25,6 +25,16 @@ elements:
       - id: site-title
         type: text
         content: ボットちゃんねる
+      - id: nav-login
+        type: link
+        label: ログイン
+        href: /login
+        condition: 本登録ユーザー以外に表示（未認証 + 仮ユーザー）
+      - id: nav-register
+        type: link
+        label: 新規登録
+        href: /auth/verify?redirect=/mypage
+        condition: 未認証の場合のみ表示
       - id: nav-mypage
         type: link
         label: マイページ
@@ -74,6 +84,7 @@ elements:
 
   - id: auth-prompt
     type: component
-    description: 未認証ユーザーへの認証案内
-    condition: 未認証の場合のみ表示
-    content: 書き込みするには認証が必要です
+    description: 認証案内（認証状態に関わらず常時表示）
+    content: >
+      アカウント登録なしで書き込めます（初回のみ簡単な認証）。
+      メールアドレス・Discordで本登録すると、Cookie喪失時でも同一ユーザーとして復帰できます。

@@ -92,11 +92,25 @@ export default function VerifyPage() {
 	);
 }
 
+/**
+ * リダイレクト先URLの安全性を検証する。
+ * オープンリダイレクト攻撃を防止するため、同一オリジンの相対パスのみ許可する。
+ */
+function isSafeRedirect(url: string): boolean {
+	return url.startsWith("/") && !url.startsWith("//");
+}
+
 function VerifyPageContent() {
 	const searchParams = useSearchParams();
 
 	// クエリパラメータ `token` から edge-token を取得（専ブラWebView等のCookie非共有環境向け）
 	const edgeTokenParam = searchParams.get("token") ?? "";
+
+	// クエリパラメータ `redirect` から認証成功後のリダイレクト先を取得
+	// ヘッダー「新規登録」リンク等から遷移した場合に設定される
+	const rawRedirect = searchParams.get("redirect");
+	const redirectUrl =
+		rawRedirect && isSafeRedirect(rawRedirect) ? rawRedirect : null;
 
 	const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -238,6 +252,11 @@ function VerifyPageContent() {
 			const data = (await res.json()) as AuthVerifyResponse;
 
 			if (res.ok && data.success) {
+				// リダイレクト先が指定されている場合は即遷移（新規登録フロー等）
+				if (redirectUrl) {
+					window.location.href = redirectUrl;
+					return;
+				}
 				// 認証成功: write_token を保存して表示
 				// See: tmp/auth_spec_review_report.md §3.2 write_token 方式
 				setWriteToken(data.writeToken ?? null);
@@ -342,10 +361,12 @@ function VerifyPageContent() {
 				{/* ページタイトル */}
 				<h1 className="text-lg font-bold text-foreground mb-2">書き込み認証</h1>
 
-				{/* auth-description: 説明文 */}
+				{/* auth-description: 説明文
+				    redirect パラメータがある場合は新規登録フロー向けの文言を表示 */}
 				<p id="auth-description" className="text-sm text-muted-foreground mb-4">
-					書き込みするには認証が必要です。
-					以下のボタンを押して認証を完了してください。
+					{redirectUrl
+						? "アカウント登録にはボット対策の認証が必要です。以下の認証を完了すると次の画面に進みます。"
+						: "書き込みするには認証が必要です。以下のボタンを押して認証を完了してください。"}
 				</p>
 
 				<form onSubmit={handleSubmit} id="auth-form">
