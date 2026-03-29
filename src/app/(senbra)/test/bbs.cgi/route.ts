@@ -198,15 +198,21 @@ function removeWriteToken(mail: string): string {
  *
  * @param html - UTF-8のHTMLレスポンス文字列
  * @param status - HTTPステータスコード
+ * @param extraHeaders - 追加HTTPヘッダ（任意）
  * @returns Shift_JISエンコードされたHTMLレスポンス
  */
-function buildShiftJisHtmlResponse(html: string, status = 200): Response {
+function buildShiftJisHtmlResponse(
+	html: string,
+	status = 200,
+	extraHeaders?: Record<string, string>,
+): Response {
 	const sjisBuffer = encoder.encode(html);
 	return new Response(new Uint8Array(sjisBuffer), {
 		status,
 		headers: {
 			"Content-Type": "text/html; charset=Shift_JIS",
 			"Content-Length": String(sjisBuffer.length),
+			...extraHeaders,
 		},
 	});
 }
@@ -478,8 +484,12 @@ async function handleCreateThread(
 
 	const threadKey = result.thread?.threadKey ?? "";
 	const boardId = parsed.boardId || DEFAULT_BOARD_ID;
+	const postNumber = result.firstPost?.postNumber ?? 1;
 	const successHtml = responseBuilder.buildSuccess(threadKey, boardId);
-	const response = buildShiftJisHtmlResponse(successHtml, 200);
+	// X-ResNum: 専ブラが自分の投稿のレス番号を認識するためのヘッダ
+	const response = buildShiftJisHtmlResponse(successHtml, 200, {
+		"X-ResNum": String(postNumber),
+	});
 	// 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）
 	// parsed.edgeTokenがnullの場合（authRequiredパスで先にreturnされる）、ここには到達しないためnullチェック不要
 	return parsed.edgeToken
@@ -560,7 +570,10 @@ async function handleCreatePost(
 
 	const boardId = parsed.boardId || DEFAULT_BOARD_ID;
 	const successHtml = responseBuilder.buildSuccess(parsed.threadKey, boardId);
-	const response = buildShiftJisHtmlResponse(successHtml, 200);
+	// X-ResNum: 専ブラが自分の投稿のレス番号を認識するためのヘッダ
+	const response = buildShiftJisHtmlResponse(successHtml, 200, {
+		"X-ResNum": String(result.postNumber),
+	});
 	// 認証済みユーザーのedge-tokenをSet-Cookieで更新する（eddist整合）
 	// parsed.edgeTokenがnullの場合（authRequiredパスで先にreturnされる）、ここには到達しないためnullチェック不要
 	return parsed.edgeToken

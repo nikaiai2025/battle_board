@@ -839,6 +839,36 @@ describe("bbs.cgi Route Handler", () => {
 		expect(decoded).toContain("書きこみました");
 	});
 
+	it("書き込み成功時にX-ResNumヘッダでレス番号が返される", async () => {
+		vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
+		vi.mocked(PostService.createPost).mockResolvedValue({
+			success: true,
+			postId: "post-uuid-001",
+			postNumber: 42,
+			systemMessages: [],
+		});
+
+		const body = makeShiftJisBody({
+			bbs: "livebot",
+			key: "1234567890",
+			FROM: "名無しさん",
+			mail: "",
+			MESSAGE: "テスト書き込み",
+			submit: "書き込む",
+		});
+
+		const req = new NextRequest("http://localhost/test/bbs.cgi", {
+			method: "POST",
+			body,
+			headers: {
+				"content-type": "application/x-www-form-urlencoded; charset=Shift_JIS",
+			},
+		});
+
+		const res = await POST(req);
+		expect(res.headers.get("X-ResNum")).toBe("42");
+	});
+
 	it("本文が空のとき ＥＲＲＯＲ を含む HTML を返す", async () => {
 		vi.mocked(ThreadRepository.findByThreadKey).mockResolvedValue(makeThread());
 		vi.mocked(PostService.createPost).mockResolvedValue({
@@ -966,6 +996,8 @@ describe("bbs.cgi Route Handler", () => {
 		const buffer = await res.arrayBuffer();
 		const decoded = decodeSjis(buffer);
 		expect(decoded).toContain("書きこみました");
+		// スレッド作成時の最初のレスは常にpostNumber=1
+		expect(res.headers.get("X-ResNum")).toBe("1");
 	});
 
 	it("Shift_JIS日本語文字が正しくデコードされる（文字化けなし）", async () => {
