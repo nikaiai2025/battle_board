@@ -45,6 +45,7 @@ import {
 	isTemporaryUser,
 } from "@/lib/domain/rules/mypage-display-rules";
 import type { MypageInfo } from "@/lib/services/mypage-service";
+import CopipeSection from "./_components/CopipeSection";
 import FontPickerModal from "./_components/FontPickerModal";
 import PostHistorySection from "./_components/PostHistorySection";
 
@@ -951,7 +952,9 @@ export default function MypagePage() {
 					語録管理（荒らしBOT）
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					荒らしBOTの語録を登録できます。1件20ポイント、24時間で自動失効します。
+					荒らしBOTに使わせたい語録を登録できます（1件20ポイント、24時間で自動失効）。
+					登録した語録は管理者の固定文と合わせた語録プールに追加され、荒らしBOTがランダムに選んで書き込みます。
+					必ず使用されるとは限りません。
 				</p>
 
 				{/* 語録登録フォーム
@@ -1026,6 +1029,16 @@ export default function MypagePage() {
 					)}
 				</div>
 			</section>
+
+			{/* =============================
+          コピペ管理セクション
+          CopipeSection コンポーネントに委譲（登録・一覧表示・編集・削除）
+          See: features/user_copipe.feature @マイページからコピペを新規登録する
+          See: features/user_copipe.feature @マイページに自分の登録コピペ一覧が表示される
+          See: features/user_copipe.feature @自分の登録コピペを編集する
+          See: features/user_copipe.feature @自分の登録コピペを削除する
+          ============================= */}
+			<CopipeSection mypageInfo={mypageInfo} />
 
 			{/* =============================
           書き込み履歴セクション
