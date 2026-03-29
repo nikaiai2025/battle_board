@@ -110,6 +110,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 		);
 	}
 
+	// --- IP ハッシュの取得 ---
+	// edge-token の新規発行に必要なため、先に取得する
+	const ipHash = await getIpHash(req);
+
 	// --- edge-token の取得 ---
 	// 優先順位: リクエストボディ（専ブラ向け） > Cookie（Web UI）
 	//
@@ -121,23 +125,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 	// See: docs/architecture/components/authentication.md §5 > Cookie 命名規則
 	// See: src/lib/constants/cookie-names.ts
 	const cookieStore = await cookies();
-	const edgeToken =
+	let edgeToken =
 		(typeof bodyEdgeToken === "string" && bodyEdgeToken) ||
 		cookieStore.get(EDGE_TOKEN_COOKIE)?.value;
 
+	// --- edge-token がない場合は新規発行 ---
+	// ヘッダー「新規登録」リンク（/auth/verify?redirect=/mypage）からの直接アクセスなど、
+	// 書き込み試行を経ずに認証ページに到達したケース。
+	// edge-token + ユーザー + auth_codes を一括で作成してから Turnstile 検証に進む。
 	if (!edgeToken) {
-		return NextResponse.json(
-			{
-				success: false,
-				error:
-					"edge-token が存在しません。書き込みフォームから認証を開始してください",
-			},
-			{ status: 400 },
-		);
+		try {
+			const issued = await AuthService.issueEdgeToken(ipHash);
+			await AuthService.issueAuthCode(ipHash, issued.token);
+			edgeToken = issued.token;
+		} catch (err) {
+			// IP BAN されている場合
+			const message =
+				err instanceof Error && err.message.startsWith("IP_BANNED")
+					? "このIPアドレスからの新規登録はできません"
+					: "認証の初期化に失敗しました。再度お試しください";
+			return NextResponse.json(
+				{ success: false, error: message },
+				{ status: 403 },
+			);
+		}
 	}
-
-	// --- IP ハッシュの取得 ---
-	const ipHash = await getIpHash(req);
 
 	// --- AuthService への委譲 ---
 	// ビジネスロジックは AuthService が担う

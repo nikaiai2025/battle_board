@@ -423,24 +423,33 @@ test.describe("認証 Cookie 属性の検証", () => {
 		expect(maxAgeValue).toBe(60 * 60 * 24 * 365);
 	});
 
-	test("POST /api/auth/verify — edge-token Cookie なしで 400 を返す", async ({
+	test("POST /api/auth/verify — edge-token Cookie なしでも新規発行して認証が成功する", async ({
 		request,
 	}) => {
-		// See: src/app/api/auth/verify/route.ts @POST > edge-token が存在しない場合 → 400
+		// See: src/app/api/auth/verify/route.ts @POST > edge-token が存在しない場合 → 新規発行して認証継続
+		//
+		// 実装変更(Sprint-141以降): edge-tokenなし時は 400 を返す代わりに、
+		// issueEdgeToken() + issueAuthCode() で新規発行し、認証フローをそのまま継続する。
+		// ヘッダーの「新規登録」リンク等、書き込み試行を経ずに直接 /auth/verify に来たケースを救済する。
 
 		const authResponse = await request.post(`${BASE_URL}/api/auth/verify`, {
 			headers: {
 				"Content-Type": "application/json",
-				// Cookie なし
+				// Cookie なし — 新規 edge-token が自動発行される
 			},
 			data: {
 				turnstileToken: "test-token",
 			},
 		});
 
-		expect(authResponse.status()).toBe(400);
+		// 新規発行後に認証フローが成功: 200
+		expect(authResponse.status()).toBe(200);
 
 		const body = await authResponse.json();
-		expect(body.success).toBe(false);
+		expect(body.success).toBe(true);
+
+		// 新規発行した edge-token が Cookie に設定される
+		const setCookieHeader = authResponse.headers()["set-cookie"] ?? "";
+		expect(setCookieHeader).toContain("edge-token=");
 	});
 });

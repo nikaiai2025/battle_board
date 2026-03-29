@@ -296,41 +296,25 @@ describe("RegistrationService", () => {
 	// =========================================================================
 
 	describe("registerWithDiscord", () => {
-		it("正常: Discord OAuth URL を返す", async () => {
-			mockSupabaseAuth.signInWithOAuth.mockResolvedValue({
-				data: { url: "https://discord.com/oauth/authorize?..." },
-				error: null,
-			});
-
-			const result = await RegistrationService.registerWithDiscord(
+		it("正常: Discord OAuth URL と codeVerifier を返す", () => {
+			// registerWithDiscord は同期関数（PKCE は Node.js crypto で直接生成）
+			// See: src/lib/services/registration-service.ts generatePkce()
+			const result = RegistrationService.registerWithDiscord(
 				"https://example.com/callback",
 			);
 
-			expect(result).toEqual({
-				redirectUrl: "https://discord.com/oauth/authorize?...",
-			});
+			// redirectUrl が SUPABASE_URL ベースの認可 URL であること
+			expect(result.redirectUrl).toContain("provider=discord");
+			// codeVerifier が返されること（PKCE フロー）
+			expect(typeof result.codeVerifier).toBe("string");
+			expect(result.codeVerifier.length).toBeGreaterThan(0);
 		});
 
-		it("異常系: Supabase Auth エラーはエラーをスローする", async () => {
-			mockSupabaseAuth.signInWithOAuth.mockResolvedValue({
-				data: { url: null },
-				error: { message: "oauth error" },
-			});
+		it("正常: redirectTo がURLに含まれる", () => {
+			const redirectTo = "https://example.com/callback";
+			const result = RegistrationService.registerWithDiscord(redirectTo);
 
-			await expect(
-				RegistrationService.registerWithDiscord("https://example.com/callback"),
-			).rejects.toThrow("RegistrationService.registerWithDiscord failed");
-		});
-
-		it("異常系: URL が返されない場合はエラーをスローする", async () => {
-			mockSupabaseAuth.signInWithOAuth.mockResolvedValue({
-				data: { url: null },
-				error: null,
-			});
-
-			await expect(
-				RegistrationService.registerWithDiscord("https://example.com/callback"),
-			).rejects.toThrow("URL not returned");
+			expect(result.redirectUrl).toContain(encodeURIComponent(redirectTo));
 		});
 	});
 
@@ -507,30 +491,25 @@ describe("RegistrationService", () => {
 	// =========================================================================
 
 	describe("loginWithDiscord", () => {
-		it("正常: Discord OAuth URL を返す", async () => {
-			mockSupabaseAuth.signInWithOAuth.mockResolvedValue({
-				data: { url: "https://discord.com/oauth/authorize?state=login" },
-				error: null,
-			});
-
-			const result = await RegistrationService.loginWithDiscord(
+		it("正常: Discord OAuth URL と codeVerifier を返す", () => {
+			// loginWithDiscord は同期関数（PKCE は Node.js crypto で直接生成）
+			// See: src/lib/services/registration-service.ts generatePkce()
+			const result = RegistrationService.loginWithDiscord(
 				"https://example.com/callback",
 			);
 
-			expect(result).toEqual({
-				redirectUrl: "https://discord.com/oauth/authorize?state=login",
-			});
+			// redirectUrl が SUPABASE_URL ベースの認可 URL であること
+			expect(result.redirectUrl).toContain("provider=discord");
+			// codeVerifier が返されること（PKCE フロー）
+			expect(typeof result.codeVerifier).toBe("string");
+			expect(result.codeVerifier.length).toBeGreaterThan(0);
 		});
 
-		it("異常系: Supabase Auth エラーはエラーをスローする", async () => {
-			mockSupabaseAuth.signInWithOAuth.mockResolvedValue({
-				data: { url: null },
-				error: { message: "discord oauth error" },
-			});
+		it("正常: redirectTo がURLに含まれる", () => {
+			const redirectTo = "https://example.com/callback";
+			const result = RegistrationService.loginWithDiscord(redirectTo);
 
-			await expect(
-				RegistrationService.loginWithDiscord("https://example.com/callback"),
-			).rejects.toThrow("RegistrationService.loginWithDiscord failed");
+			expect(result.redirectUrl).toContain(encodeURIComponent(redirectTo));
 		});
 	});
 

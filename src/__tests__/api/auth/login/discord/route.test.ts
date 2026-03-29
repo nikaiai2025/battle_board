@@ -75,8 +75,10 @@ describe("POST /api/auth/login/discord", () => {
 	describe("正常系", () => {
 		it("loginWithDiscord を呼び出し redirectUrl を返す", async () => {
 			// See: docs/architecture/components/user-registration.md §7.3 ログイン（新デバイス）
-			mockRegistrationService.loginWithDiscord.mockResolvedValue({
+			// loginWithDiscord は同期関数（PKCE は Node.js crypto で直接生成）
+			mockRegistrationService.loginWithDiscord.mockReturnValue({
 				redirectUrl: DISCORD_OAUTH_URL,
+				codeVerifier: "test-code-verifier",
 			});
 
 			const response = await POST(createRequest());
@@ -93,8 +95,10 @@ describe("POST /api/auth/login/discord", () => {
 		it("loginWithDiscord に正しい redirectTo が渡される", async () => {
 			// redirectTo は `${origin}/api/auth/callback?flow=login` の形式
 			// See: docs/architecture/components/user-registration.md §7.3 ログイン（新デバイス）
-			mockRegistrationService.loginWithDiscord.mockResolvedValue({
+			// loginWithDiscord は同期関数（PKCE は Node.js crypto で直接生成）
+			mockRegistrationService.loginWithDiscord.mockReturnValue({
 				redirectUrl: DISCORD_OAUTH_URL,
+				codeVerifier: "test-code-verifier",
 			});
 
 			await POST(createRequest());
@@ -108,8 +112,10 @@ describe("POST /api/auth/login/discord", () => {
 		it("認証チェックなしで呼び出せる（新デバイスからのログインのため）", async () => {
 			// ログインは edge-token なし（新デバイス）のケースが多いため認証チェック不要
 			// See: docs/architecture/components/user-registration.md §12 新規APIルート（注意）
-			mockRegistrationService.loginWithDiscord.mockResolvedValue({
+			// loginWithDiscord は同期関数（PKCE は Node.js crypto で直接生成）
+			mockRegistrationService.loginWithDiscord.mockReturnValue({
 				redirectUrl: DISCORD_OAUTH_URL,
+				codeVerifier: "test-code-verifier",
 			});
 
 			// Cookie なしでもリクエストが通ること
@@ -126,9 +132,12 @@ describe("POST /api/auth/login/discord", () => {
 	describe("異常系（Service例外）", () => {
 		it("loginWithDiscord がエラーをスローした場合は 500 を返す", async () => {
 			// Service 例外がルートハンドラの try-catch で捕捉され、500 が返ること
-			mockRegistrationService.loginWithDiscord.mockRejectedValue(
-				new Error("RegistrationService.loginWithDiscord failed: discord error"),
-			);
+			// loginWithDiscord は同期関数なので mockImplementation でスローする
+			mockRegistrationService.loginWithDiscord.mockImplementation(() => {
+				throw new Error(
+					"RegistrationService.loginWithDiscord failed: discord error",
+				);
+			});
 
 			const consoleSpy = vi
 				.spyOn(console, "error")

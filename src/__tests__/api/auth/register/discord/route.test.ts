@@ -112,14 +112,16 @@ describe("POST /api/auth/register/discord", () => {
 	describe("正常系", () => {
 		it("edge-token 認証OK → registerWithDiscord を呼び出し redirectUrl を返す", async () => {
 			// See: docs/architecture/components/user-registration.md §7.2 Discord連携
+			// registerWithDiscord は同期関数（PKCE は Node.js crypto で直接生成）
 			setupCookieWithEdgeToken(EDGE_TOKEN);
 			mockAuthService.verifyEdgeToken.mockResolvedValue({
 				valid: true,
 				userId: USER_ID,
 				authorIdSeed: "seed-001",
 			});
-			mockRegistrationService.registerWithDiscord.mockResolvedValue({
+			mockRegistrationService.registerWithDiscord.mockReturnValue({
 				redirectUrl: DISCORD_OAUTH_URL,
+				codeVerifier: "test-code-verifier",
 			});
 
 			const response = await POST(createRequest());
@@ -142,8 +144,9 @@ describe("POST /api/auth/register/discord", () => {
 				userId: USER_ID,
 				authorIdSeed: "seed-001",
 			});
-			mockRegistrationService.registerWithDiscord.mockResolvedValue({
+			mockRegistrationService.registerWithDiscord.mockReturnValue({
 				redirectUrl: DISCORD_OAUTH_URL,
+				codeVerifier: "test-code-verifier",
 			});
 
 			await POST(createRequest());
@@ -237,11 +240,12 @@ describe("POST /api/auth/register/discord", () => {
 				userId: USER_ID,
 				authorIdSeed: "seed-001",
 			});
-			mockRegistrationService.registerWithDiscord.mockRejectedValue(
-				new Error(
+			// registerWithDiscord は同期関数なので mockImplementation でスローする
+			mockRegistrationService.registerWithDiscord.mockImplementation(() => {
+				throw new Error(
 					"RegistrationService.registerWithDiscord failed: discord error",
-				),
-			);
+				);
+			});
 
 			const consoleSpy = vi
 				.spyOn(console, "error")

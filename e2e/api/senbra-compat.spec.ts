@@ -50,7 +50,7 @@ async function cleanupDatabase(request: APIRequestContext): Promise<void> {
 		Prefer: "return=minimal",
 	};
 
-	// posts を参照する子テーブル → posts → threads の順で削除（外部キー制約を考慮）
+	// posts/threads を参照する子テーブル → posts → pending_*（threads参照）→ threads の順で削除（外部キー制約を考慮）
 	// レスポンスステータスを検証してDELETE完了を保証する（非同期コミット漏れ対策）
 
 	// grass_reactions.target_post_id -> posts(id) の FK 制約があるため posts より先に削除する
@@ -104,6 +104,28 @@ async function cleanupDatabase(request: APIRequestContext): Promise<void> {
 	if (!postsRes.ok()) {
 		throw new Error(
 			`cleanupDatabase: posts DELETE failed (status: ${postsRes.status()})`,
+		);
+	}
+
+	// pending_tutorials.thread_id -> threads(id) の FK 制約があるため threads より先に削除する
+	const pendingTutorialsRes = await request.delete(
+		`${supabaseUrl}/rest/v1/pending_tutorials?id=neq.00000000-0000-0000-0000-000000000000`,
+		{ headers },
+	);
+	if (!pendingTutorialsRes.ok()) {
+		throw new Error(
+			`cleanupDatabase: pending_tutorials DELETE failed (status: ${pendingTutorialsRes.status()})`,
+		);
+	}
+
+	// pending_async_commands.thread_id -> threads(id) の FK 制約があるため threads より先に削除する
+	const pendingAsyncCommandsRes = await request.delete(
+		`${supabaseUrl}/rest/v1/pending_async_commands?id=neq.00000000-0000-0000-0000-000000000000`,
+		{ headers },
+	);
+	if (!pendingAsyncCommandsRes.ok()) {
+		throw new Error(
+			`cleanupDatabase: pending_async_commands DELETE failed (status: ${pendingAsyncCommandsRes.status()})`,
 		);
 	}
 

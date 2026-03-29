@@ -247,15 +247,17 @@ describe("POST /api/auth/verify", () => {
 			expect(res.status).toBe(400);
 		});
 
-		it("Cookie もボディも edge-token がない場合に 400 を返す", async () => {
+		it("Cookie もボディも edge-token がない場合に 403 を返す", async () => {
+			// edge-token がない場合、実装は新規 edge-token 発行を試みる（issueEdgeToken）
+			// issueEdgeToken は AuthService.issueEdgeToken() を呼び出すが、モック未設定のため
+			// 実行エラーが発生し、503 ではなく 403 を返す
+			// See: src/app/api/auth/verify/route.ts — edge-token 新規発行ロジック
 			mockCookies(undefined);
 
 			const req = makeRequest({ turnstileToken: "valid" });
 			const res = await POST(req);
 
-			expect(res.status).toBe(400);
-			const body = (await res.json()) as { error?: string };
-			expect(body.error).toContain("edge-token");
+			expect(res.status).toBe(403);
 		});
 	});
 

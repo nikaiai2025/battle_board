@@ -115,9 +115,12 @@ describe("GET /api/auth/callback", () => {
 			const response = await GET(req);
 
 			// handleOAuthCallback が code と userId で呼ばれることを確認
+			// 実装では (code, pendingUserId, registrationType, codeVerifier) の4引数で呼ぶ
 			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
 				"oauth-code-abc",
 				USER_ID,
+				"discord",
+				undefined,
 			);
 
 			// /mypage へリダイレクト
@@ -166,9 +169,13 @@ describe("GET /api/auth/callback", () => {
 
 			const response = await GET(req);
 
-			// handleOAuthCallback が code のみで呼ばれること
+			// handleOAuthCallback が code のみで呼ばれること（userId なし → フロー2に落ちる）
+			// 実装では (code, undefined, "discord", codeVerifier) の4引数で呼ぶ
 			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
 				"oauth-code-abc",
+				undefined,
+				"discord",
+				undefined,
 			);
 		});
 	});
@@ -194,8 +201,12 @@ describe("GET /api/auth/callback", () => {
 			const response = await GET(req);
 
 			// handleOAuthCallback が code のみで呼ばれること（pendingUserId なし）
+			// 実装では (code, undefined, "discord", codeVerifier) の4引数で呼ぶ
 			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
 				"oauth-code-xyz",
+				undefined,
+				"discord",
+				undefined,
 			);
 
 			expect(response.status).toBe(307);
@@ -237,8 +248,12 @@ describe("GET /api/auth/callback", () => {
 
 			const response = await GET(req);
 
+			// 実装では (code, undefined, "discord", codeVerifier) の4引数で呼ぶ
 			expect(mockRegistrationService.handleOAuthCallback).toHaveBeenCalledWith(
 				"oauth-code-noflow",
+				undefined,
+				"discord",
+				undefined,
 			);
 			expect(response.status).toBe(307);
 			expect(response.headers.get("location")).toBe(`${ORIGIN}/mypage`);
