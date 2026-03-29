@@ -26,11 +26,10 @@
 name: Bot Scheduler
 
 on:
-  # schedule は CF Cron（5分間隔）に移行したため無効化（TDR-013）
-  # 荒らし役BOT は Cloudflare Workers の scheduled ハンドラで実行される
-  # AI API BOT が追加される際（Phase 3）に schedule を復活させる
-  # schedule:
-  #   - cron: '0,30 * * * *'
+  # Phase 3 対応で復活済み（TDR-013 でいったん CF Cron に移行したが、AI API BOT 導入に伴い再有効化）
+  # 荒らし役BOT は引き続き Cloudflare Workers の scheduled ハンドラで実行される
+  schedule:
+    - cron: '0,30 * * * *'
   workflow_dispatch: {}  # 手動実行（デバッグ・緊急トリガー用）
 
 jobs:

@@ -77,6 +77,22 @@ export const botProfilesConfig: BotProfilesYaml = {
 		},
 		fixed_messages: [], // 煽り文句は aori-taunts.ts で管理（BOT プロファイルと分離）
 	},
+	// TASK-334: hiroyukiBOT（!hiroyuki コマンドで召喚される使い切りBOT）
+	// 撃破報酬固定 +10（daily_bonus=0, attack_bonus=0 により常に base_reward=10 が返る）
+	// ファーミング防止: 召喚-10 + 攻撃-5 + 報酬+10 = -5（自作自演は赤字）
+	// ひろゆき風テキストは Gemini API で動的生成（固定文なし）
+	// See: features/command_hiroyuki.feature
+	// See: config/bot_profiles.yaml (正本)
+	hiroyuki: {
+		hp: 10,
+		max_hp: 10,
+		reward: {
+			base_reward: 10,
+			daily_bonus: 0,
+			attack_bonus: 0,
+		},
+		fixed_messages: [], // ひろゆき風テキストは Gemini API で動的生成（固定文なし）
+	},
 	// コピペボット: !copipe コマンドを実行するHP:100の運営ボット
 	// See: features/bot_system.feature @コピペボット
 	// See: config/bot_profiles.yaml (正本)

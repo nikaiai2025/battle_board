@@ -4,17 +4,18 @@
 
 ## 現在のフェーズ
 
-**Sprint-143 完了 — マイページ コピペ管理UI + UI改善**
+**Sprint-144 完了 — 陳腐化テスト修正 + auth/verify edge-token新規発行対応**
 
-### Sprint-143の成果
-- TASK-368: コピペ管理UIコンポーネント（CopipeSection）新規作成 + マイページ統合
-- 語録セクション説明文改善（語録プールの仕組み説明追加）
-- ヘッダー新規登録リンク追加 + 認証画面リダイレクト対応（人間による変更）
-- オーケストレーター指示書整理（フェーズ5廃止→ステップ8品質ゲート統合）
-- インシデント報告書 + LL-016（語録APIレスポンス形状ミスマッチ）
-- vitest: 2211 PASS / cucumber-js: 435シナリオ 414 passed / 18 pending / 3 undefined
-- コミット: 9184e8d, d358d29
+### Sprint-144の成果
+- TASK-369: Discord OAuth関連テスト15件修正（モック引数・戻り値を実装シグネチャに追随）
+- TASK-370: E2Eテスト修正（auth-cookie期待値 + senbra-compat cleanupDatabase FK順序）
+- auth/verify route: edge-token未存在時に新規発行するロジック追加（人間変更）
+- vitest: 2224 PASS / cucumber-js: 414 passed / 18 pending / 3 undefined
+- E2E: 34 PASS + 1既知失敗 / API: 28 PASS
+- コミット: 9a2b98b
 - 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
+
+**Sprint-143 完了 — マイページ コピペ管理UI + UI改善**
 
 **Sprint-141〜142 完了**
 - Sprint-142: 管理画面BOT管理 + ユーザー語録登録（05be61c, 71352b9）
@@ -61,13 +62,13 @@
 
 ## テスト状況
 
-- vitest: **2211 PASS / 14 failed**（14件は全て既存 Discord OAuth 関連）
+- vitest: **2224 PASS / 0 failed**
 - cucumber-js: 435シナリオ / **414 passed / 0 failed** / 18 pending / 3 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 3件: thread.feature FAB 関連（UI実装待ち）
-- playwright E2E (ローカル): 11 passed / 2 failed（既存: auth-flow, inlineSystemInfo）
-- playwright API: 10テスト / 全PASS
-- **本番スモークテスト (Sprint-143後):** 30/35 PASS（5件はローカル限定テストのスキップ）
+- playwright E2E (ローカル): 34 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
+- playwright API: 28テスト / 全PASS
+- **本番スモークテスト (Sprint-144後):** 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -77,7 +78,8 @@
 
 | 次アクション | 内容 |
 |---|---|
-| BOT Strategy Step 4 Phase B | API統合テスト（次回スプリントで着手可能） |
+| キュレーション仕様変更 | 「本文」収集を廃止し、タイトル + 統計情報（勢い等）+ URLのみとする。curation_bot.feature の改定が必要（人間承認事項） |
+| BOT Strategy Step 4 Phase B | API統合テスト（仕様変更後に再計画） |
 
 ## BOT Strategy移行 進捗
 
@@ -119,6 +121,7 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-144 | 陳腐化テスト修正 + auth/verify edge-token新規発行 | completed | `sprint_144_plan.md` |
 | Sprint-143 | マイページ コピペ管理UI + UI改善 | completed | `sprint_143_plan.md` |
 | Sprint-142 | 管理画面BOT管理 + ユーザー語録登録 | completed | `sprint_142_plan.md` |
 | Sprint-141 | 開発連絡板 BDD ステップ定義 | completed | `sprint_141_plan.md` |
