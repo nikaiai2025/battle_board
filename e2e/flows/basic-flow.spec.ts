@@ -7,10 +7,11 @@
  * テスト構成（serial: 宣言順に実行、失敗時は後続スキップ）:
  *   1. コマンド書き込み + inlineSystemInfo 表示
  *   2. 隠しコマンド !abeshinzo + 独立レス表示
- *   3. !omikuji コマンド + 独立レス表示
- *   4. !hiroyuki コマンド（非同期BOT召喚・非ステルス）
- *   5. 専ブラAPI整合（書き込みデータが subject.txt / DAT に反映）
- *   6. 管理者テストデータ削除（削除完了 + 公開API消失確認 = クリーンアップ兼用）
+ *   3. !help コマンド + 独立レス（案内板）表示
+ *   4. !omikuji コマンド + 独立レス表示
+ *   5. !hiroyuki コマンド（非同期BOT召喚・非ステルス）
+ *   6. 専ブラAPI整合（書き込みデータが subject.txt / DAT に反映）
+ *   7. 管理者テストデータ削除（削除完了 + 公開API消失確認 = クリーンアップ兼用）
  *
  * ライフサイクル:
  *   - beforeAll: 共有スレッドを1回だけ作成
@@ -43,6 +44,7 @@ import {
 
 const TEST_GRASS_COMMAND = "!w >>1";
 const TEST_ABESHINZO_COMMAND = "!abeshinzo";
+const TEST_HELP_COMMAND = "!help";
 
 // ---------------------------------------------------------------------------
 // 環境判定（beforeAll ではカスタムフィクスチャが使えないため process.env で判定）
@@ -224,7 +226,49 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 3. !omikuji コマンド
+		// 3. !help コマンド
+		// -----------------------------------------------------------------------
+
+		/**
+		 * !help コマンドで★システム名義の独立レスに案内板が表示される。
+		 *
+		 * See: features/command_system.feature @help_command
+		 * See: src/lib/services/handlers/help-handler.ts
+		 */
+		test("!help コマンドで★システム名義の独立レスに案内板が表示される", async ({
+			page,
+			authenticate,
+		}) => {
+			await page.goto(`/livebot/${sharedThreadKey}/`);
+			await expect(page.locator("#thread-title")).toBeVisible({
+				timeout: 15_000,
+			});
+			await expect(page.locator("#post-1")).toBeVisible();
+
+			const lastPost = await getLastPostNumber(page);
+
+			// !help コマンドを書き込み
+			// FABの書き込みボタンをクリックしてパネルを開く
+			await page.locator("#fab-post-btn").click();
+			// パネル内のフォームで書き込み
+			await page.locator("#post-body-input").fill(TEST_HELP_COMMAND);
+			await page.locator("#post-submit-btn").click();
+
+			// ユーザーの書き込みが表示される
+			const myPostNum = lastPost + 1;
+			await expect(page.locator(`#post-${myPostNum}`)).toBeVisible({
+				timeout: 15_000,
+			});
+
+			// ★システム名義の独立レス（案内板テキストで検索）
+			// ウェルカムメッセージ等が間に入る場合があるため、レス番号ではなく内容で検証する
+			await expect(page.getByText("案内板")).toBeVisible({
+				timeout: 15_000,
+			});
+		});
+
+		// -----------------------------------------------------------------------
+		// 4. !omikuji コマンド  ← 旧3、!help 挿入により繰り下げ
 		// -----------------------------------------------------------------------
 
 		/**
@@ -272,7 +316,7 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 4. !hiroyuki コマンド（非同期BOT召喚・非ステルス）
+		// 5. !hiroyuki コマンド（非同期BOT召喚・非ステルス）
 		// -----------------------------------------------------------------------
 
 		/**
@@ -313,7 +357,7 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 5. 専ブラAPI整合
+		// 6. 専ブラAPI整合
 		// -----------------------------------------------------------------------
 
 		/**
@@ -353,7 +397,7 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 6. 管理者削除（最後 = クリーンアップ兼用）
+		// 7. 管理者削除（最後 = クリーンアップ兼用）
 		// -----------------------------------------------------------------------
 
 		/**

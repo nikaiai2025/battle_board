@@ -870,7 +870,7 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 		try {
 			await createPost({
 				threadId: input.threadId,
-				body: `>>${createdPost.postNumber} Welcome to Underground...\nここはBOTと人間が入り混じる対戦型掲示板です`,
+				body: `>>${createdPost.postNumber} Welcome to Underground...\nここは人間とBOTが入り混じる対戦型掲示板です。BOTが現れたら攻撃してみよう！（ !attack >>N で攻撃）\nコマンドで遊ぶこともできます。(例)コピペ再現コマンド !copipe を使ってみよう！\n使えるコマンド一覧を !help で表示可能`,
 				edgeToken: null,
 				ipHash: "system",
 				displayName: "★システム",

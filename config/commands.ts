@@ -22,6 +22,13 @@ import type { CommandsYaml } from "../src/lib/services/command-service";
  */
 export const commandsConfig: CommandsYaml = {
 	commands: {
+		help: {
+			description: "案内板の内容を表示",
+			cost: 0,
+			targetFormat: null,
+			enabled: true,
+			stealth: false,
+		},
 		tell: {
 			description: "指定レスをAIだと告発する",
 			cost: 10,

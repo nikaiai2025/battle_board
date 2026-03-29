@@ -10,6 +10,12 @@
 #   stealth      - true の場合、コマンド文字列が本文から除去される
 
 commands:
+  help:
+    description: "案内板の内容を表示"
+    cost: 0
+    targetFormat: null
+    enabled: true
+    stealth: false
   tell:
     description: "指定レスがBOTかどうか判定する。>>N 指定必須。"
     cost: 10

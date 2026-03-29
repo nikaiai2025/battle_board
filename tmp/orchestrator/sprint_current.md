@@ -4,19 +4,21 @@
 
 ## 現在のフェーズ
 
-**Sprint-146 完了 — キュレーションBOT仕様変更v3（本文収集廃止 + upsert化）**
+**Sprint-148 完了 — BOTスケジューラ障害修正**
 
-### Sprint-146の成果
-- TASK-373: curation_bot.feature v3に合わせ全面更新
-  - CollectedTopic/CollectedItem 型から content 削除
-  - SubjectTxtAdapter: DAT fetch廃止、subject.txtパースのみに簡素化
-  - collection-job: INSERT → upsert（ON CONFLICT対応）
-  - formatBody: 「勢い: {buzzScore}\n{sourceUrl}」形式に変更
-  - BDDステップ定義: 削除2シナリオ分除去 + 残シナリオ更新
-- vitest: 2215 PASS / cucumber-js: 412 passed / 18 pending / 3 undefined
-- E2E: 62 PASS + 1既知失敗 / API: 27 PASS
-- コミット: 42cb501
-- 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
+### Sprint-148の成果
+- TASK-375: チュートリアルBOTブロック + キュレーションBOT認証エラー修正
+  - findDueForPost() でtutorial BOT除外
+  - processPendingTutorials の next_post_at=null リセットを finally で堅牢化
+  - createThread に isBotWrite パラメータ追加（BOT書き込み認証スキップ）
+  - authRequired 返却時の error フィールド欠落修正
+- vitest: 2225 PASS / cucumber-js: 412 passed
+- コミット: 9c3b507
+- 本番スモーク: 30/35 PASS
+
+**Sprint-147 完了 — 管理画面BOT一覧にnextPostAt表示**（コミット: 6fae52b）
+
+**Sprint-146 完了 — キュレーションBOT仕様変更v3（本文収集廃止 + upsert化）**（コミット: 42cb501）
 
 **Sprint-145 完了 — BOTインフラ修正 + コピペ管理UI更新**
 
@@ -74,13 +76,13 @@
 
 ## テスト状況
 
-- vitest: **2215 PASS / 0 failed**（116 files）
+- vitest: **2225 PASS / 0 failed**（116 files）
 - cucumber-js: 433シナリオ / **412 passed / 0 failed** / 18 pending / 3 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 3件: thread.feature FAB 関連（UI実装待ち）
 - playwright E2E (ローカル): 62 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
 - playwright API: 27テスト / 全PASS
-- **本番スモークテスト (Sprint-146後):** 30/35 PASS（5件はローカル限定テストのスキップ）
+- **本番スモークテスト (Sprint-148後):** 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -134,6 +136,8 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-148 | BOTスケジューラ障害修正（チュートリアルBOT除外 + キュレーションBOT認証修正） | completed | `sprint_148_plan.md` |
+| Sprint-147 | 管理画面BOT一覧にnextPostAt表示 | completed | `sprint_147_plan.md` |
 | Sprint-146 | キュレーションBOT仕様変更v3（本文収集廃止 + upsert化） | completed | `sprint_146_plan.md` |
 | Sprint-145 | BOTインフラ修正（スケジューラ復活・hiroyuki同期・ウェルカム重複修正） | completed | `sprint_145_plan.md` |
 | Sprint-144 | 陳腐化テスト修正 + auth/verify edge-token新規発行 | completed | `sprint_144_plan.md` |

@@ -44,6 +44,7 @@ import {
 	type IGrassPostRepository,
 	type IGrassRepository,
 } from "./handlers/grass-handler";
+import { HelpHandler } from "./handlers/help-handler";
 // TASK-334: !hiroyuki コマンド（ひろゆき風AI BOT召喚・非ステルス）
 // See: features/command_hiroyuki.feature
 import {
@@ -761,6 +762,8 @@ export class CommandService {
 			new TellHandler(resolvedAccusationService),
 			...(resolvedAttackHandler ? [resolvedAttackHandler] : []),
 			new AbeshinzoHandler(),
+			// !help: 案内板の内容を独立システムレスで表示（隠しコマンド）
+			new HelpHandler(parsed),
 			...(resolvedHissiHandler ? [resolvedHissiHandler] : []),
 			...(resolvedKinouHandler ? [resolvedKinouHandler] : []),
 			// !omikuji: ターゲット任意パターン（PostRepository で対象レスの dailyId を取得）

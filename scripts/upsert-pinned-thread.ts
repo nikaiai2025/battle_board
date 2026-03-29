@@ -21,6 +21,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as yaml from "js-yaml";
 import { DEFAULT_BOARD_ID } from "../src/lib/domain/constants";
+import { generateAnnouncementBody } from "../src/lib/domain/rules/announcement-text";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -65,7 +66,7 @@ const PINNED_LAST_POST_AT = new Date("2099-01-01T00:00:00Z");
 const PINNED_THREAD_KEY = "4070908800";
 
 // ---------------------------------------------------------------------------
-// 案内テキスト生成
+// コマンド設定読み込み（YAML → 配列変換）
 // ---------------------------------------------------------------------------
 
 /**
@@ -84,54 +85,6 @@ function loadCommandConfigs(
 			description: config.description,
 			cost: config.cost,
 		}));
-}
-
-/**
- * コマンド一覧から案内テキストを生成する。
- * テンプレートは静的テキスト + コマンド一覧（動的）の組み合わせ。
- * See: tmp/feature_plan_pinned_thread_and_dev_board.md §2-b 生成される案内テキストのイメージ
- */
-function generateAnnouncementBody(
-	commands: Array<{ name: string; description: string; cost: number }>,
-): string {
-	const commandLines = commands.map((cmd) => {
-		const costText = cmd.cost === 0 ? "無料" : `${cmd.cost}コイン`;
-		return `  !${cmd.name.padEnd(8)}（${costText.padEnd(8)}）— ${cmd.description}`;
-	});
-
-	return [
-		"■ ボットちゃんねる 案内板",
-		"",
-		"【何かあったらこちらに】",
-		`  開発連絡板: https://battle-board.shika.workers.dev/dev/`,
-		"",
-		"【使い方】",
-		"ふつうの匿名掲示板として使えます。",
-		"「コマンド」で遊ぶこともできます（通貨消費）。",
-		"人間だけじゃなく、BOTも徘徊して書き込みしてます（見つけたら !attack してみよう！）。",
-		"登録なしでも使えます（cookie削除するとデータ消去）。メール or Discordと紐付けしたら消えなくなります。",
-		"",
-		"【コマンド使用例】",
-		"・対象を取らないコマンド。１投稿につき１コマンドのみ。文の途中でも認識される（誤検知防止のため文頭推奨）",
-		"!copipe",
-		"!livingbot",
-		"など",
-		"・対象を取るコマンド",
-		"!w >>10",
-		">>10 !w 　この順番でも可",
-		"!attack >>10",
-		"など",
-		"",
-		"【コマンド一覧】",
-		...commandLines,
-		"",
-		"【リンク】",
-		`  メイン: https://battle-board.shika.workers.dev/${DEFAULT_BOARD_ID}`,
-		"  マイページ: https://battle-board.shika.workers.dev/mypage",
-		"",
-		`  サブ（Chmate不可）: https://battle-board-uma.vercel.app/${DEFAULT_BOARD_ID}`,
-		"  マイページ: https://battle-board-uma.vercel.app/mypage",
-	].join("\n");
 }
 
 // ---------------------------------------------------------------------------

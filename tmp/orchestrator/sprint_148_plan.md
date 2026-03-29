@@ -57,3 +57,4 @@ bot-scheduler cron 実行時に発生している2件のエラーを修正する
 | TASK_ID | ステータス | 備考 |
 |---|---|---|
 | TASK-375 | completed | 修正A〜D完了。vitest 2225 / cucumber 412 PASS。新規テスト7件追加 |
+| TASK-SMOKE-148 | completed | 30/35 PASS（5件ローカル限定スキップ） |
