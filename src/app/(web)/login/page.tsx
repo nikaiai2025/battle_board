@@ -257,20 +257,11 @@ export default function LoginPage() {
 					{isDiscordLoading ? "Discord に接続中..." : "Discord でログイン"}
 				</button>
 
-				{/* =============================
-				    新規登録への案内
-				    ============================= */}
-				<div className="mt-6 pt-4 border-t border-border text-center">
-					<p className="text-xs text-muted-foreground mb-2">
-						アカウントをお持ちでない方
-					</p>
-					<Link
-						href="/auth/verify?redirect=/mypage"
-						className="text-sm text-blue-600 hover:underline"
-					>
-						新規登録
-					</Link>
-				</div>
+				{/* 新規登録リンクは設置しない。
+				    ログインページは本登録ユーザーの復帰手段であり、
+				    新規ユーザー向けの導線はヘッダーの「新規登録」リンクがカバーする。
+				    仮ユーザーがこのページに到達した場合に /auth/verify へ誘導すると、
+				    既存 edge-token との重複でエラーになる問題もある。 */}
 			</div>
 		</main>
 	);

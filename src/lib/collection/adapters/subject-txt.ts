@@ -2,7 +2,7 @@
  * SubjectTxtAdapter — 5ch 系掲示板 subject.txt 収集アダプター
  *
  * subject.txt をフェッチし、バズスコア上位6件を収集する。
- * 各スレッドの DAT ファイルから >>1 の本文を取得する（ベストエフォート）。
+ * subject.txt のパースのみで完結し、DATファイルへのアクセスは行わない（5ch負荷軽減）。
  *
  * See: features/curation_bot.feature @日次バッチでバズデータを収集・蓄積する
  * See: docs/architecture/components/bot.md §2.13.5
@@ -58,26 +58,6 @@ export function parseSubjectTxt(text: string): SubjectEntry[] {
 }
 
 // ---------------------------------------------------------------------------
-// DAT ファイル解析
-// ---------------------------------------------------------------------------
-
-/**
- * DAT ファイルの1行目から >>1 の本文を抽出する。
- * DAT フォーマット: `名前<>メール<>日付 ID<>本文<>スレタイ`
- * index 3（4番目フィールド）が本文。
- * HTML タグを除去し、空文字の場合は null を返す。
- *
- * See: docs/architecture/components/bot.md §2.13.5
- */
-export function extractFirstPostBody(datFirstLine: string): string | null {
-	const fields = datFirstLine.split("<>");
-	if (fields.length < 4) return null;
-	// 4番目（0-indexed: 3）が本文
-	const body = fields[3]?.replace(/<[^>]+>/g, "").trim();
-	return body || null;
-}
-
-// ---------------------------------------------------------------------------
 // fetch ヘルパー型定義
 // ---------------------------------------------------------------------------
 
@@ -116,18 +96,15 @@ export async function defaultFetchText(url: string): Promise<string> {
  * collect() の処理フロー:
  *   1. subject.txt を fetch してスレッド一覧を取得
  *   2. バズスコアを算出してソート
- *   3. 上位6件の DAT >>1 を並列ではなく順次取得（5ch のアクセス制限への配慮）
- *   4. CollectedItem[] を返す
+ *   3. 上位6件を CollectedItem[] に変換して返す
  *
  * エラーハンドリング:
  *   - subject.txt の fetch 失敗: 例外をスロー（collection-job.ts が隔離する）
- *   - 個別 DAT の fetch 失敗: content = null のまま処理続行（ベストエフォート）
  *
  * @param fetchTextFn - テキスト取得関数（テスト時にモックを注入する）。
  *                      省略時はデフォルトの Shift_JIS デコード実装を使用。
  *
  * See: features/curation_bot.feature @日次バッチでバズデータを収集・蓄積する
- * See: features/curation_bot.feature @投稿内容の取得に失敗した場合は元ネタURLのみ保存する
  * See: features/curation_bot.feature @ソースごとの蓄積上限は6件である
  * See: docs/architecture/components/bot.md §2.13.5
  */
@@ -151,32 +128,15 @@ export class SubjectTxtAdapter implements CollectionAdapter {
 			}))
 			.sort((a, b) => b.buzzScore - a.buzzScore);
 
-		// 3. 上位6件の DAT >>1 を取得
+		// 3. 上位6件を CollectedItem[] に変換
 		const top6 = scored.slice(0, 6);
 		const baseUrl = config.sourceUrl.replace(/\/subject\.txt$/, "");
 
-		const results: CollectedItem[] = [];
-		for (const entry of top6) {
-			let content: string | null = null;
-			try {
-				// DAT URL: {baseUrl}/dat/{threadNumber}.dat
-				const datUrl = `${baseUrl}/dat/${entry.threadNumber}.dat`;
-				const datText = await this.fetchText(datUrl);
-				const firstLine = datText.split("\n")[0];
-				content = extractFirstPostBody(firstLine);
-			} catch {
-				// ベストエフォート: DAT 取得失敗時は content = null
-			}
-
-			results.push({
-				articleTitle: entry.title,
-				content,
-				// 元ネタURL はスレッド番号から構築
-				sourceUrl: `${baseUrl}/${entry.threadNumber}`,
-				buzzScore: entry.buzzScore,
-			});
-		}
-
-		return results;
+		return top6.map((entry) => ({
+			articleTitle: entry.title,
+			// 元ネタURL はスレッド番号から構築
+			sourceUrl: `${baseUrl}/${entry.threadNumber}`,
+			buzzScore: entry.buzzScore,
+		}));
 	}
 }

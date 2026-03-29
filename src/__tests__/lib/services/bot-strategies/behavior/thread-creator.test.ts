@@ -2,7 +2,6 @@
  * ThreadCreatorBehaviorStrategy の単体テスト
  *
  * See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
- * See: features/curation_bot.feature @投稿内容がない場合は元ネタURLのみ>>1に書き込む
  * See: features/curation_bot.feature @投稿済みアイテムは選択候補から除外される
  * See: features/curation_bot.feature @当日の蓄積データが全て投稿済みの場合は前日データにフォールバックする
  * See: features/curation_bot.feature @蓄積データが存在しない場合は投稿をスキップする
@@ -25,7 +24,6 @@ function makeTopic(
 	return {
 		id: overrides.id,
 		articleTitle: overrides.articleTitle ?? "テスト記事タイトル",
-		content: overrides.content !== undefined ? overrides.content : "本文内容",
 		sourceUrl: overrides.sourceUrl ?? "https://example.com/thread/123",
 		buzzScore: overrides.buzzScore ?? 10,
 		collectedDate: overrides.collectedDate ?? "2025-03-28",
@@ -100,10 +98,10 @@ describe("ThreadCreatorBehaviorStrategy", () => {
 			}
 		});
 
-		it("content がある場合 body は '{content}\\n\\n元ネタ: {url}' 形式", async () => {
+		it("body は '勢い: {buzzScore}\\n{sourceUrl}' 形式", async () => {
 			const todayTopic = makeTopic({
 				id: "topic-1",
-				content: "本文テキスト",
+				buzzScore: 42,
 				sourceUrl: "https://example.com/thread/456",
 				collectedDate: "2025-03-28",
 			});
@@ -117,30 +115,7 @@ describe("ThreadCreatorBehaviorStrategy", () => {
 
 			expect(action.type).toBe("create_thread");
 			if (action.type === "create_thread") {
-				expect(action.body).toBe(
-					"本文テキスト\n\n元ネタ: https://example.com/thread/456",
-				);
-			}
-		});
-
-		it("content が null の場合 body は sourceUrl のみ", async () => {
-			const todayTopic = makeTopic({
-				id: "topic-1",
-				content: null,
-				sourceUrl: "https://example.com/thread/789",
-				collectedDate: "2025-03-28",
-			});
-			const repo = makeRepo(async (_botId, date) => {
-				if (date === "2025-03-28") return [todayTopic];
-				return [];
-			});
-
-			const strategy = new ThreadCreatorBehaviorStrategy(repo);
-			const action = await strategy.decideAction(BEHAVIOR_CONTEXT);
-
-			expect(action.type).toBe("create_thread");
-			if (action.type === "create_thread") {
-				expect(action.body).toBe("https://example.com/thread/789");
+				expect(action.body).toBe("勢い: 42\nhttps://example.com/thread/456");
 			}
 		});
 

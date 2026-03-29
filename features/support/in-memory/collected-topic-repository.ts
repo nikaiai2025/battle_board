@@ -101,7 +101,6 @@ export const InMemoryCollectedTopicRepo: ICollectedTopicRepository = {
 			store.push({
 				id: crypto.randomUUID(),
 				articleTitle: item.articleTitle,
-				content: item.content,
 				sourceUrl: item.sourceUrl,
 				buzzScore: item.buzzScore,
 				collectedDate,

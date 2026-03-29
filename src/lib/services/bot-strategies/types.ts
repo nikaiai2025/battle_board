@@ -21,7 +21,6 @@
 export interface CollectedTopic {
 	id: string;
 	articleTitle: string;
-	content: string | null;
 	sourceUrl: string;
 	buzzScore: number;
 	collectedDate: string; // DATE (JST)
@@ -34,7 +33,6 @@ export interface CollectedTopic {
  */
 export interface CollectedItem {
 	articleTitle: string;
-	content: string | null;
 	sourceUrl: string;
 	buzzScore: number;
 }

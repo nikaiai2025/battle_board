@@ -76,10 +76,11 @@
 
 ## AI側の次アクション
 
-| 次アクション | 内容 |
-|---|---|
-| キュレーション仕様変更 | 「本文」収集を廃止し、タイトル + 統計情報（勢い等）+ URLのみとする。curation_bot.feature の改定が必要（人間承認事項） |
-| BOT Strategy Step 4 Phase B | API統合テスト（仕様変更後に再計画） |
+| # | 次アクション | 内容 | 前提 |
+|---|---|---|---|
+| 1 | キュレーション仕様変更 + 速報ボット修正 | 「本文」収集を廃止しタイトル+統計情報+URLのみとする。curation_bot.feature改定必要（人間承認事項）。collect-topics INSERT制約違反も同時修正 | — |
+| 2 | edge-token チャネル分離 | 専ブラ(HTTP)経由トークンの権限を投稿のみに限定。課金機能のブロッカー。計画書: `tmp/edge_token_channel_separation_plan.md` | #1完了後 |
+| 3 | BOT Strategy Step 4 Phase B | API統合テスト（キュレーション仕様変更後に再計画） | #1完了後 |
 
 ## BOT Strategy移行 進捗
 

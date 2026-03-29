@@ -20,16 +20,13 @@ import type {
 
 /**
  * >>1 の本文をフォーマットする。
- * - 投稿内容あり: `{content}\n\n元ネタ: {source_url}`
- * - 投稿内容なし: `{source_url}`
+ * 形式: `勢い: {buzzScore}\n{sourceUrl}`
  *
+ * See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
  * See: docs/architecture/components/bot.md §2.13.5 >>1 の本文フォーマット
  */
 export function formatBody(topic: CollectedTopic): string {
-	if (topic.content) {
-		return `${topic.content}\n\n元ネタ: ${topic.sourceUrl}`;
-	}
-	return topic.sourceUrl;
+	return `勢い: ${topic.buzzScore}\n${topic.sourceUrl}`;
 }
 
 /**

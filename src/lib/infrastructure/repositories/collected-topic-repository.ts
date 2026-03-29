@@ -26,7 +26,6 @@ interface CollectedTopicRow {
 	id: string;
 	source_bot_id: string;
 	article_title: string;
-	content: string | null;
 	source_url: string;
 	buzz_score: number;
 	is_posted: boolean;
@@ -46,7 +45,6 @@ function rowToCollectedTopic(row: CollectedTopicRow): CollectedTopic {
 	return {
 		id: row.id,
 		articleTitle: row.article_title,
-		content: row.content,
 		sourceUrl: row.source_url,
 		buzzScore: Number(row.buzz_score),
 		collectedDate: row.collected_date,
@@ -82,7 +80,6 @@ export const collectedTopicRepository: ICollectedTopicRepository = {
 		const rows = items.map((item) => ({
 			source_bot_id: botId,
 			article_title: item.articleTitle,
-			content: item.content,
 			source_url: item.sourceUrl,
 			buzz_score: item.buzzScore,
 			collected_date: collectedDate,

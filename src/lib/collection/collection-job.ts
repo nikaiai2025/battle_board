@@ -14,7 +14,7 @@
  * エラーハンドリング:
  *   - ソース単位でのtry/catchでエラーを隔離
  *   - 1ソースの失敗が他のソースに影響しない
- *   - 前回データは save の ON CONFLICT DO NOTHING により保持される
+ *   - 前回データは save 未呼び出しにより保持される（失敗時は save が呼ばれない）
  *
  * See: features/curation_bot.feature @日次バッチでバズデータを収集・蓄積する
  * See: features/curation_bot.feature @データ取得失敗時は前回の蓄積データを保持する
@@ -79,14 +79,16 @@ function getSupabaseCollectedTopicRepo(): ICollectedTopicRepository {
 			const rows = items.map((item) => ({
 				source_bot_id: botId,
 				article_title: item.articleTitle,
-				content: item.content,
 				source_url: item.sourceUrl,
 				buzz_score: item.buzzScore,
 				collected_date: collectedDate,
 			}));
 
-			// ON CONFLICT DO NOTHING: 同一 (source_bot_id, collected_date, source_url) があればスキップ
-			const { error } = await supabase.from("collected_topics").insert(rows);
+			// upsert: 同一 (source_bot_id, collected_date, source_url) があればUPDATE
+			// See: supabase/migrations/00034_curation_bot.sql > idx_collected_topics_unique_entry
+			const { error } = await supabase.from("collected_topics").upsert(rows, {
+				onConflict: "source_bot_id,collected_date,source_url",
+			});
 
 			if (error) {
 				throw new Error(`collected_topics INSERT 失敗: ${error.message}`);

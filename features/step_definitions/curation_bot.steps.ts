@@ -1,16 +1,15 @@
 /**
- * curation_bot.feature ステップ定義
+ * curation_bot.feature v3 ステップ定義
  *
  * キュレーションBOTの収集バッチ・BOT投稿・BOTスペックに関するシナリオを実装する。
  *
- * カバーするシナリオ:
- *   - 収集バッチ（日次バッチ・月次バッチ・投稿内容失敗・上限6件・データ取得失敗保持）
- *   - BOT投稿（新規スレッド作成・URLのみ・投稿間隔・投稿済み除外・フォールバック・スキップ）
+ * カバーするシナリオ（v3: 全11シナリオ）:
+ *   - 収集バッチ（日次バッチ・月次バッチ・上限6件・データ取得失敗保持）
+ *   - BOT投稿（新規スレッド作成・投稿間隔・投稿済み除外・フォールバック・スキップ）
  *   - BOTスペック（初期HP=100）
  *
  * See: features/curation_bot.feature
  * See: docs/architecture/components/bot.md §2.13.5
- * See: tmp/workers/bdd-architect_TASK-349/design.md §1
  */
 
 import { Given, Then, When } from "@cucumber/cucumber";
@@ -209,7 +208,6 @@ async function createCurationBot(options: { nextPostAt?: Date | null } = {}) {
 function generateCollectedItems(
 	count: number,
 	options: {
-		contentNull?: boolean;
 		buzzScoreStart?: number;
 	} = {},
 ): CollectedItem[] {
@@ -218,7 +216,6 @@ function generateCollectedItems(
 	for (let i = 0; i < count; i++) {
 		items.push({
 			articleTitle: `テスト記事タイトル${i + 1}`,
-			content: options.contentNull ? null : `テスト投稿内容${i + 1}`,
 			sourceUrl: `https://example.com/article/${i + 1}`,
 			buzzScore: buzzStart - i * 10,
 		});
@@ -285,9 +282,9 @@ When(
 );
 
 Then(
-	"記事タイトル・投稿内容・元ネタURL・バズスコアをDBに保存する",
+	"記事タイトル・元ネタURL・バズスコアをDBに保存する",
 	async function (this: BattleBoardWorld) {
-		// InMemoryCollectedTopicRepo の全データを取得して4フィールドを検証する
+		// InMemoryCollectedTopicRepo の全データを取得して3フィールドを検証する
 		const stored = InMemoryCollectedTopicRepo._getAll();
 		assert(stored.length > 0, "保存されたデータが0件です");
 
@@ -296,7 +293,6 @@ Then(
 				topic.articleTitle,
 				`articleTitle が空です: ${JSON.stringify(topic)}`,
 			);
-			// content は null の場合もある（S3）のでここではチェックしない
 			assert(topic.sourceUrl, `sourceUrl が空です: ${JSON.stringify(topic)}`);
 			assert(
 				typeof topic.buzzScore === "number",
@@ -325,7 +321,6 @@ Given(
 		for (let i = 0; i < 6; i++) {
 			this.mockCollectedItems.push({
 				articleTitle: `Wikipedia記事タイトル${i + 1}`,
-				content: `冒頭段落テキスト${i + 1}`,
 				sourceUrl: `https://ja.wikipedia.org/wiki/Article_${i + 1}`,
 				buzzScore: 10000 - i * 1000, // 月次閲覧数をbuzzScoreとして格納
 			});
@@ -333,20 +328,17 @@ Given(
 	},
 );
 
-When(
-	"月次閲覧数トップ6件と冒頭段落を取得する",
-	async function (this: BattleBoardWorld) {
-		assert(this.currentBot, "currentBot が未設定です");
-		assert(this.collectedTopicRepo, "collectedTopicRepo が未設定です");
+When("月次閲覧数トップ6件を取得する", async function (this: BattleBoardWorld) {
+	assert(this.currentBot, "currentBot が未設定です");
+	assert(this.collectedTopicRepo, "collectedTopicRepo が未設定です");
 
-		const topItems = sortAndSlice(this.mockCollectedItems);
-		const todayJst = getJstDateString(new Date(Date.now()));
-		await this.collectedTopicRepo.save(topItems, this.currentBot.id, todayJst);
-	},
-);
+	const topItems = sortAndSlice(this.mockCollectedItems);
+	const todayJst = getJstDateString(new Date(Date.now()));
+	await this.collectedTopicRepo.save(topItems, this.currentBot.id, todayJst);
+});
 
 Then(
-	"記事タイトル・冒頭段落・元ネタURL・月次閲覧数をDBに保存する",
+	"記事タイトル・元ネタURL・月次閲覧数をDBに保存する",
 	async function (this: BattleBoardWorld) {
 		const stored = InMemoryCollectedTopicRepo._getAll();
 		assert.strictEqual(
@@ -357,48 +349,11 @@ Then(
 
 		for (const topic of stored) {
 			assert(topic.articleTitle, "articleTitle が空です");
-			assert(topic.content, "content (冒頭段落) が空です");
 			assert(topic.sourceUrl, "sourceUrl が空です");
 			assert(
 				typeof topic.buzzScore === "number",
 				"buzzScore (月次閲覧数) が数値ではありません",
 			);
-		}
-	},
-);
-
-// ---------------------------------------------------------------------------
-// S3: 投稿内容の取得に失敗した場合は元ネタURLのみ保存する
-// See: features/curation_bot.feature @投稿内容の取得に失敗した場合は元ネタURLのみ保存する
-// ---------------------------------------------------------------------------
-
-When(
-	"外部記事の投稿内容取得が失敗する",
-	async function (this: BattleBoardWorld) {
-		assert(this.currentBot, "currentBot が未設定です");
-		assert(this.collectedTopicRepo, "collectedTopicRepo が未設定です");
-
-		// content: null のアイテムを生成して保存する
-		const items = generateCollectedItems(6, { contentNull: true });
-		const topItems = sortAndSlice(items);
-		const todayJst = getJstDateString(new Date(Date.now()));
-		await this.collectedTopicRepo.save(topItems, this.currentBot.id, todayJst);
-	},
-);
-
-Then(
-	"投稿内容なし・元ネタURLありの状態でDBに保存する",
-	async function (this: BattleBoardWorld) {
-		const stored = InMemoryCollectedTopicRepo._getAll();
-		assert(stored.length > 0, "保存されたデータが0件です");
-
-		for (const topic of stored) {
-			assert.strictEqual(
-				topic.content,
-				null,
-				`content が null ではありません: ${topic.content}`,
-			);
-			assert(topic.sourceUrl, `sourceUrl が空です`);
 		}
 	},
 );
@@ -462,7 +417,6 @@ Given(
 			InMemoryCollectedTopicRepo._seed({
 				id: crypto.randomUUID(),
 				articleTitle: `前回記事${i + 1}`,
-				content: `前回内容${i + 1}`,
 				sourceUrl: `https://example.com/previous/${i + 1}`,
 				buzzScore: 100 - i * 10,
 				collectedDate: yesterdayJst,
@@ -553,7 +507,6 @@ Given(
 			InMemoryCollectedTopicRepo._seed({
 				id: crypto.randomUUID(),
 				articleTitle: `バズ記事タイトル${i + 1}`,
-				content: `バズ記事の投稿内容${i + 1}`,
 				sourceUrl: `https://example.com/buzz/${i + 1}`,
 				buzzScore: 100 - i * 10,
 				collectedDate: todayJst,
@@ -608,7 +561,7 @@ Then(
 );
 
 Then(
-	">>1 に投稿内容と末尾の元ネタURLを書き込む",
+	">>1 にバズスコアと元ネタURLを書き込む",
 	async function (this: BattleBoardWorld) {
 		const result = (this as any)._lastBotPostResult;
 		assert(result, "executeBotPost の結果が null です");
@@ -625,79 +578,21 @@ Then(
 
 		const postedTopic = postedTopics[0];
 
-		// content ありの場合: `{content}\n\n元ネタ: {source_url}` 形式
+		// v3 形式: `勢い: {buzzScore}\n{sourceUrl}`
 		assert(
-			post.body.includes("元ネタ:"),
-			`>>1 の本文に "元ネタ:" が含まれていません: ${post.body}`,
+			post.body.includes("勢い:"),
+			`>>1 の本文に "勢い:" が含まれていません: ${post.body}`,
 		);
 		assert(
 			post.body.includes(postedTopic.sourceUrl),
 			`>>1 の本文に元ネタURL が含まれていません: ${post.body}`,
 		);
-
-		// content がある場合は投稿内容も含まれていることを確認する
-		if (postedTopic.content) {
-			assert(
-				post.body.includes(postedTopic.content),
-				`>>1 の本文に投稿内容が含まれていません: ${post.body}`,
-			);
-		}
+		assert(
+			post.body.includes(String(postedTopic.buzzScore)),
+			`>>1 の本文にバズスコアが含まれていません: ${post.body}`,
+		);
 	},
 );
-
-// ---------------------------------------------------------------------------
-// S7: 投稿内容がない場合は元ネタURLのみ>>1に書き込む
-// See: features/curation_bot.feature @投稿内容がない場合は元ネタURLのみ>>1に書き込む
-// ---------------------------------------------------------------------------
-
-Given(
-	"選択されたバズアイテムの投稿内容が存在しない",
-	async function (this: BattleBoardWorld) {
-		assert(this.currentBot, "currentBot が未設定です");
-
-		// content: null のアイテムを1件シードする
-		const todayJst = getJstDateString(new Date(Date.now()));
-		InMemoryCollectedTopicRepo._seed({
-			id: crypto.randomUUID(),
-			articleTitle: "投稿内容なしの記事",
-			content: null,
-			sourceUrl: "https://example.com/no-content",
-			buzzScore: 50,
-			collectedDate: todayJst,
-			sourceBotId: this.currentBot.id,
-			isPosted: false,
-			postedAt: null,
-		});
-
-		// S7: "When 新規スレッドを作成する" は common.steps.ts の汎用ステップと衝突するため、
-		// BOT投稿を Given の末尾で先行実行し結果を保持する。
-		// common step（PostService.createThread 経由の一般スレッド作成）は別途実行されるが、
-		// Then ステップは _lastBotPostResult を検証するためBOT投稿結果が正しく検証される。
-		const botService = createCurationBotService();
-		const result = await botService.executeBotPost(this.currentBot.id);
-		(this as any)._lastBotPostResult = result;
-	},
-);
-
-// S7 の "When 新規スレッドを作成する" は common.steps.ts の汎用ステップを使用する。
-// executeBotPost は上記 Given ステップで先行実行済みのため、
-// common step の実行結果はBOT投稿テストに影響しない。
-
-Then(">>1 に元ネタURLのみを書き込む", async function (this: BattleBoardWorld) {
-	const result = (this as any)._lastBotPostResult;
-	assert(result, "executeBotPost の結果が null です");
-
-	const post = await InMemoryPostRepo.findById(result.postId);
-	assert(post, "投稿が見つかりません");
-
-	// content なしの場合: body は sourceUrl のみ
-	// See: src/lib/services/bot-strategies/behavior/thread-creator.ts > formatBody
-	assert.strictEqual(
-		post.body,
-		"https://example.com/no-content",
-		`>>1 の本文が元ネタURLのみではありません: "${post.body}"`,
-	);
-});
 
 // ---------------------------------------------------------------------------
 // S8: BOTの投稿間隔は240分〜360分のランダム間隔である
@@ -780,7 +675,6 @@ Given(
 			InMemoryCollectedTopicRepo._seed({
 				id: crypto.randomUUID(),
 				articleTitle: `蓄積記事${i + 1}`,
-				content: `蓄積内容${i + 1}`,
 				sourceUrl: `https://example.com/stored/${i + 1}`,
 				buzzScore: 100 - i * 10,
 				collectedDate: todayJst,
@@ -872,7 +766,6 @@ Given(
 			InMemoryCollectedTopicRepo._seed({
 				id: crypto.randomUUID(),
 				articleTitle: `当日記事${i + 1}`,
-				content: `当日内容${i + 1}`,
 				sourceUrl: `https://example.com/today/${i + 1}`,
 				buzzScore: 100 - i * 10,
 				collectedDate: todayJst,
@@ -895,7 +788,6 @@ Given(
 			InMemoryCollectedTopicRepo._seed({
 				id: crypto.randomUUID(),
 				articleTitle: `前日記事${i + 1}`,
-				content: `前日内容${i + 1}`,
 				sourceUrl: `https://example.com/yesterday/${i + 1}`,
 				buzzScore: 50 - i * 10,
 				collectedDate: yesterdayJst,
