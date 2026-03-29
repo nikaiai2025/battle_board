@@ -965,7 +965,9 @@ export async function createThread(
 	const threadKey = Math.floor(Date.now() / 1000).toString();
 
 	// createdBy の決定
-	const createdBy = authResult.userId ?? "system";
+	// BOT書き込み時は posts.author_id と同様に NULL を設定する
+	// See: supabase/migrations/00040_threads_created_by_nullable.sql
+	const createdBy = authResult.userId ?? null;
 
 	// Step 4: スレッド作成
 	const thread = await ThreadRepository.create({

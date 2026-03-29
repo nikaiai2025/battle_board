@@ -46,12 +46,17 @@ export class RandomThreadBehaviorStrategy implements BehaviorStrategy {
 	 * @throws スレッドが0件の場合
 	 */
 	async decideAction(context: BehaviorContext): Promise<BotAction> {
-		const threads = await this.threadRepository.findByBoardId(context.boardId);
+		const allThreads = await this.threadRepository.findByBoardId(
+			context.boardId,
+		);
+
+		// 固定スレッドを除外する。BOTが固定スレッドに書き込むとガードで拒否されるため
+		// See: features/thread.feature @pinned_thread
+		const threads = allThreads.filter((t) => !t.isPinned);
 
 		if (threads.length === 0) {
-			throw new Error(
-				`RandomThreadBehaviorStrategy.decideAction: 書き込み先スレッドが存在しません (boardId=${context.boardId}, botId=${context.botId})`,
-			);
+			// 投稿可能なスレッドなし（全て固定スレッド or スレッド0件）
+			return { type: "skip" };
 		}
 
 		// 均等分布でランダムに1件選択

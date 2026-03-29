@@ -784,6 +784,7 @@ describe("PostService.createThread — BOT書き込み（isBotWrite）", () => {
 		setCommandService(null);
 
 		// ThreadRepository.create のモック: スレッド作成成功を返す
+		// BOT作成スレッドは createdBy=null（Sprint-149 修正A）
 		vi.mocked(ThreadRepository.create).mockResolvedValue({
 			id: "thread-new-001",
 			threadKey: "1700000001",
@@ -791,7 +792,7 @@ describe("PostService.createThread — BOT書き込み（isBotWrite）", () => {
 			title: "キュレーションBOTスレッド",
 			postCount: 0,
 			datByteSize: 0,
-			createdBy: "system",
+			createdBy: null,
 			createdAt: new Date("2026-03-29T12:00:00Z"),
 			lastPostAt: new Date("2026-03-29T12:00:00Z"),
 			isDeleted: false,
@@ -867,6 +868,31 @@ describe("PostService.createThread — BOT書き込み（isBotWrite）", () => {
 		expect(result.authRequired).toBeDefined();
 		// 修正D: error フィールドに "認証が必要です" が含まれることを検証
 		expect(result.error).toBe("認証が必要です");
+	});
+
+	/**
+	 * BOT書き込み時（isBotWrite=true）は createdBy=null が ThreadRepository.create に渡されることを検証する。
+	 * "system" 文字列ではなく null を渡すことで UUID 制約違反を回避する。
+	 *
+	 * See: supabase/migrations/00040_threads_created_by_nullable.sql
+	 */
+	it("isBotWrite=true の場合、ThreadRepository.create に createdBy=null が渡される", async () => {
+		await createThread(
+			{
+				boardId: "livebot",
+				title: "BOTスレッド createdBy検証",
+				firstPostBody: "BOTの1レス目",
+			},
+			null,
+			"bot-curation-002",
+			true,
+		);
+
+		expect(ThreadRepository.create).toHaveBeenCalledWith(
+			expect.objectContaining({
+				createdBy: null,
+			}),
+		);
 	});
 
 	/**

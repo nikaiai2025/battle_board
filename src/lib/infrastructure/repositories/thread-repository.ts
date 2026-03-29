@@ -26,7 +26,7 @@ interface ThreadRow {
 	title: string;
 	post_count: number;
 	dat_byte_size: number;
-	created_by: string;
+	created_by: string | null;
 	created_at: string;
 	last_post_at: string;
 	is_deleted: boolean;

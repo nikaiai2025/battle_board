@@ -247,7 +247,7 @@ export interface IThreadRepository {
 	findByBoardId(
 		boardId: string,
 		options?: { limit?: number },
-	): Promise<{ id: string }[]>;
+	): Promise<{ id: string; isPinned?: boolean }[]>;
 }
 
 // ---------------------------------------------------------------------------

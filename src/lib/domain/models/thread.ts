@@ -18,8 +18,8 @@ export interface Thread {
 	postCount: number;
 	/** Shift_JIS変換後の累積バイト数（Range差分応答用） */
 	datByteSize: number;
-	/** スレッド作成者の user_id */
-	createdBy: string;
+	/** スレッド作成者の user_id。BOT作成スレッドの場合は null */
+	createdBy: string | null;
 	/** 作成日時 */
 	createdAt: Date;
 	/** 最終書き込み日時（ソート用） */

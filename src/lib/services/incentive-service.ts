@@ -793,6 +793,9 @@ async function evaluateThreadGrowthBonus(
 	skipped: IncentiveEventType[],
 ): Promise<void> {
 	const creatorId = thread.createdBy;
+	// BOT作成スレッド（createdBy=null）はスレッド成長ボーナスの対象外
+	if (creatorId === null) return;
+
 	const postCount = thread.postCount;
 	const uniqueIdCount = countUniqueIds(threadPosts);
 

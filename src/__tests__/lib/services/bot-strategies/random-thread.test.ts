@@ -22,7 +22,7 @@ import type { BehaviorContext } from "../../../../lib/services/bot-strategies/ty
 
 /** モック IThreadRepository を生成する */
 function createMockThreadRepository(
-	threads: { id: string }[] = [],
+	threads: { id: string; isPinned?: boolean }[] = [],
 ): IThreadRepository {
 	return {
 		findByBoardId: vi.fn().mockResolvedValue(threads),
@@ -122,31 +122,75 @@ describe("RandomThreadBehaviorStrategy", () => {
 	});
 
 	// =========================================================================
+	// decideAction() — 固定スレッド除外
+	// See: features/thread.feature @pinned_thread
+	// =========================================================================
+
+	describe("decideAction() — 固定スレッド除外", () => {
+		it("固定スレッド（isPinned=true）は書き込み先候補から除外される", async () => {
+			const threads = [
+				{ id: "pinned-001", isPinned: true },
+				{ id: "normal-001", isPinned: false },
+				{ id: "normal-002", isPinned: false },
+			];
+			const strategy = new RandomThreadBehaviorStrategy(
+				createMockThreadRepository(threads),
+			);
+
+			// 100回実行して、固定スレッドが選択されないことを確認
+			for (let i = 0; i < 100; i++) {
+				const result = await strategy.decideAction(createContext());
+				expect(result.type).toBe("post_to_existing");
+				if (result.type === "post_to_existing") {
+					expect(result.threadId).not.toBe("pinned-001");
+				}
+			}
+		});
+
+		it("全スレッドが固定の場合は skip アクションを返す", async () => {
+			const threads = [
+				{ id: "pinned-001", isPinned: true },
+				{ id: "pinned-002", isPinned: true },
+			];
+			const strategy = new RandomThreadBehaviorStrategy(
+				createMockThreadRepository(threads),
+			);
+
+			const result = await strategy.decideAction(createContext());
+
+			expect(result.type).toBe("skip");
+		});
+
+		it("isPinned が未定義のスレッドは非固定として扱われる（後方互換）", async () => {
+			// isPinned フィールドが省略された場合（undefined）は falsy であるため除外されない
+			const threads = [{ id: "legacy-001" }]; // isPinned なし
+			const strategy = new RandomThreadBehaviorStrategy(
+				createMockThreadRepository(threads),
+			);
+
+			const result = await strategy.decideAction(createContext());
+
+			expect(result.type).toBe("post_to_existing");
+			if (result.type === "post_to_existing") {
+				expect(result.threadId).toBe("legacy-001");
+			}
+		});
+	});
+
+	// =========================================================================
 	// decideAction() — 異常系
 	// =========================================================================
 
 	describe("decideAction() — 異常系", () => {
-		it("スレッドが0件の場合はエラーをスローする", async () => {
-			// See: docs/architecture/components/bot.md §2.11 書き込み先スレッド選択
+		it("スレッドが0件の場合は skip アクションを返す", async () => {
+			// スレッド0件はエラーではなく skip を返す（BOTスケジューラが安全に処理できる）
 			const strategy = new RandomThreadBehaviorStrategy(
 				createMockThreadRepository([]),
 			);
 
-			await expect(strategy.decideAction(createContext())).rejects.toThrow();
-		});
+			const result = await strategy.decideAction(createContext());
 
-		it("スレッドが0件の場合のエラーメッセージに boardId と botId が含まれる", async () => {
-			const strategy = new RandomThreadBehaviorStrategy(
-				createMockThreadRepository([]),
-			);
-			const context = createContext({
-				botId: "bot-test-999",
-				boardId: "testboard",
-			});
-
-			await expect(strategy.decideAction(context)).rejects.toThrow(
-				/boardId=testboard/,
-			);
+			expect(result.type).toBe("skip");
 		});
 	});
 
