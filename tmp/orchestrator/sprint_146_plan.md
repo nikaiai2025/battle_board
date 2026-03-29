@@ -40,3 +40,5 @@ curation_bot.feature v3（承認済み）に合わせて実装を更新する。
 | TASK_ID | ステータス | 備考 |
 |---|---|---|
 | TASK-373 | completed | 型/アダプター/ジョブ/Strategy/BDD全更新。vitest 2215 / cucumber 412 PASS |
+| TASK-GATE-146 | PASS | vitest 2215/BDD 412/E2E 62+1既知/API 27 全PASS |
+| TASK-SMOKE-146 | completed | 30/35 PASS（5件ローカル限定スキップ） |

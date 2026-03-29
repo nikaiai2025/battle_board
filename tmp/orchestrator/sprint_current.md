@@ -4,20 +4,32 @@
 
 ## 現在のフェーズ
 
-**Sprint-144 完了 — 陳腐化テスト修正 + auth/verify edge-token新規発行対応**
+**Sprint-146 完了 — キュレーションBOT仕様変更v3（本文収集廃止 + upsert化）**
 
-### Sprint-144の成果
-- TASK-369: Discord OAuth関連テスト15件修正（モック引数・戻り値を実装シグネチャに追随）
-- TASK-370: E2Eテスト修正（auth-cookie期待値 + senbra-compat cleanupDatabase FK順序）
-- auth/verify route: edge-token未存在時に新規発行するロジック追加（人間変更）
-- vitest: 2224 PASS / cucumber-js: 414 passed / 18 pending / 3 undefined
-- E2E: 34 PASS + 1既知失敗 / API: 28 PASS
-- コミット: 9a2b98b
+### Sprint-146の成果
+- TASK-373: curation_bot.feature v3に合わせ全面更新
+  - CollectedTopic/CollectedItem 型から content 削除
+  - SubjectTxtAdapter: DAT fetch廃止、subject.txtパースのみに簡素化
+  - collection-job: INSERT → upsert（ON CONFLICT対応）
+  - formatBody: 「勢い: {buzzScore}\n{sourceUrl}」形式に変更
+  - BDDステップ定義: 削除2シナリオ分除去 + 残シナリオ更新
+- vitest: 2215 PASS / cucumber-js: 412 passed / 18 pending / 3 undefined
+- E2E: 62 PASS + 1既知失敗 / API: 27 PASS
+- コミット: 42cb501
 - 本番スモーク: 30/35 PASS（5件はローカル限定テストのスキップ）
 
-**Sprint-143 完了 — マイページ コピペ管理UI + UI改善**
+**Sprint-145 完了 — BOTインフラ修正 + コピペ管理UI更新**
 
-**Sprint-141〜142 完了**
+### Sprint-145の成果
+- TASK-371: BOTスケジューラ復活（bot-scheduler.yml cron uncomment）+ hiroyukiプロファイルbot-profiles.ts同期
+- TASK-372: ウェルカムBOT重複スポーン修正（pending_tutorials削除順序変更 + UNIQUE制約追加）
+- login/page.tsx 微修正（人間変更）、コピペ管理UI更新（人間変更）
+- コミット: 07cc7d6, f53cdfa
+
+**Sprint-144 完了 — 陳腐化テスト修正 + auth/verify edge-token新規発行対応**（コミット: 9a2b98b）
+
+**Sprint-141〜143 完了**
+- Sprint-143: マイページ コピペ管理UI + UI改善
 - Sprint-142: 管理画面BOT管理 + ユーザー語録登録（05be61c, 71352b9）
 - Sprint-141: 開発連絡板 BDD ステップ定義（857effd）
 
@@ -62,13 +74,13 @@
 
 ## テスト状況
 
-- vitest: **2224 PASS / 0 failed**
-- cucumber-js: 435シナリオ / **414 passed / 0 failed** / 18 pending / 3 undefined
+- vitest: **2215 PASS / 0 failed**（116 files）
+- cucumber-js: 433シナリオ / **412 passed / 0 failed** / 18 pending / 3 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 3件: thread.feature FAB 関連（UI実装待ち）
-- playwright E2E (ローカル): 34 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
-- playwright API: 28テスト / 全PASS
-- **本番スモークテスト (Sprint-144後):** 30/35 PASS（5件はローカル限定テストのスキップ）
+- playwright E2E (ローカル): 62 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
+- playwright API: 27テスト / 全PASS
+- **本番スモークテスト (Sprint-146後):** 30/35 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -78,9 +90,9 @@
 
 | # | 次アクション | 内容 | 前提 |
 |---|---|---|---|
-| 1 | キュレーション仕様変更 + 速報ボット修正 | 「本文」収集を廃止しタイトル+統計情報+URLのみとする。curation_bot.feature改定必要（人間承認事項）。collect-topics INSERT制約違反も同時修正 | — |
-| 2 | edge-token チャネル分離 | 専ブラ(HTTP)経由トークンの権限を投稿のみに限定。課金機能のブロッカー。計画書: `tmp/edge_token_channel_separation_plan.md` | #1完了後 |
-| 3 | BOT Strategy Step 4 Phase B | API統合テスト（キュレーション仕様変更後に再計画） | #1完了後 |
+| 1 | ~~キュレーション仕様変更~~ | ~~Sprint-146で完了~~ | ~~完了~~ |
+| 2 | edge-token チャネル分離 | 専ブラ(HTTP)経由トークンの権限を投稿のみに限定。課金機能のブロッカー。計画書: `tmp/edge_token_channel_separation_plan.md` | **次スプリント** |
+| 3 | BOT Strategy Step 4 Phase B | API統合テスト（キュレーション仕様変更後に再計画） | #2完了後 |
 
 ## BOT Strategy移行 進捗
 
@@ -122,6 +134,8 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-146 | キュレーションBOT仕様変更v3（本文収集廃止 + upsert化） | completed | `sprint_146_plan.md` |
+| Sprint-145 | BOTインフラ修正（スケジューラ復活・hiroyuki同期・ウェルカム重複修正） | completed | `sprint_145_plan.md` |
 | Sprint-144 | 陳腐化テスト修正 + auth/verify edge-token新規発行 | completed | `sprint_144_plan.md` |
 | Sprint-143 | マイページ コピペ管理UI + UI改善 | completed | `sprint_143_plan.md` |
 | Sprint-142 | 管理画面BOT管理 + ユーザー語録登録 | completed | `sprint_142_plan.md` |

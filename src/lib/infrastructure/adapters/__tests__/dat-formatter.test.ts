@@ -51,6 +51,17 @@ describe("DatFormatter", () => {
 			expect(fields[4]).toBe("テストスレ");
 		});
 
+		it("スレッドタイトル内の < > がHTMLエンティティにエスケープされる（デリミタ<>衝突防止）", () => {
+			const formatter = new DatFormatter();
+			const post = makePost({ postNumber: 1 });
+			const result = formatter.buildDat([post], "テスト<スレ>");
+			const firstLine = result.split("\n")[0];
+			const fields = firstLine.split("<>");
+			// エスケープにより<>デリミタと衝突せずフィールド数が5のまま
+			expect(fields).toHaveLength(5);
+			expect(fields[4]).toBe("テスト&lt;スレ&gt;");
+		});
+
 		it("2行目以降の末尾フィールドは空である", () => {
 			const formatter = new DatFormatter();
 			const posts = [

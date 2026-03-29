@@ -95,12 +95,19 @@ describe("SubjectFormatter", () => {
 			expect(result).not.toContain("2222222222.dat");
 		});
 
-		it("スレッドタイトルの特殊文字はHTMLエスケープしない（DAT形式と異なりsubject.txtはプレーンテキスト）", () => {
-			// subject.txtはプレーンテキスト仕様。HTMLエスケープ不要
+		it("スレッドタイトル内の < > & がHTMLエンティティにエスケープされる（デリミタ<>衝突防止）", () => {
 			const formatter = new SubjectFormatter();
 			const thread = makeThread({ title: "テスト<スレ>" });
 			const result = formatter.buildSubjectTxt([thread]);
-			expect(result).toContain("テスト<スレ>");
+			expect(result).toContain("テスト&lt;スレ&gt;");
+			expect(result).not.toContain("テスト<スレ>");
+		});
+
+		it("スレッドタイトル内の & がエスケープされる（二重エスケープ防止の順序確認）", () => {
+			const formatter = new SubjectFormatter();
+			const thread = makeThread({ title: "A&B <C>" });
+			const result = formatter.buildSubjectTxt([thread]);
+			expect(result).toContain("A&amp;B &lt;C&gt;");
 		});
 
 		it("スレッドキーが正しく '.dat' サフィックス付きで出力される", () => {

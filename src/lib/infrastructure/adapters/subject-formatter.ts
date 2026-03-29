@@ -21,26 +21,43 @@ import type { Thread } from "../../domain/models/thread";
  * lastPostAtでソート済みのリストを渡す責任を持つ。本クラスは並び替えを行わない。
  */
 export class SubjectFormatter {
-  /**
-   * スレッド配列からsubject.txt形式テキストを構築する。
-   *
-   * フォーマット（1スレッド1行）:
-   *   {threadKey}.dat<>{title} ({postCount})\n
-   *
-   * isDeleted=trueのスレッドは出力から除外する。
-   * スレッドタイトルはHTMLエスケープしない（subject.txtはプレーンテキスト仕様）。
-   *
-   * @param threads - スレッドのリスト（呼び出し元でbump順ソート済みであること）
-   * @returns subject.txt形式のUTF-8文字列
-   */
-  buildSubjectTxt(threads: Thread[]): string {
-    const activeThreads = threads.filter((t) => !t.isDeleted);
-    if (activeThreads.length === 0) return "";
+	/**
+	 * スレッド配列からsubject.txt形式テキストを構築する。
+	 *
+	 * フォーマット（1スレッド1行）:
+	 *   {threadKey}.dat<>{title} ({postCount})\n
+	 *
+	 * isDeleted=trueのスレッドは出力から除外する。
+	 * スレッドタイトル内の `<` `>` `&` はHTMLエンティティにエスケープする。
+	 * デリミタ `<>` との衝突を防ぎ、専ブラのパースエラーを回避するため。
+	 * （実5chのsubject.txtも同じ方式）
+	 *
+	 * @param threads - スレッドのリスト（呼び出し元でbump順ソート済みであること）
+	 * @returns subject.txt形式のUTF-8文字列
+	 */
+	buildSubjectTxt(threads: Thread[]): string {
+		const activeThreads = threads.filter((t) => !t.isDeleted);
+		if (activeThreads.length === 0) return "";
 
-    return (
-      activeThreads
-        .map((thread) => `${thread.threadKey}.dat<>${thread.title} (${thread.postCount})`)
-        .join("\n") + "\n"
-    );
-  }
+		return (
+			activeThreads
+				.map(
+					(thread) =>
+						`${thread.threadKey}.dat<>${this.escapeTitle(thread.title)} (${thread.postCount})`,
+				)
+				.join("\n") + "\n"
+		);
+	}
+
+	/**
+	 * タイトル内のHTML特殊文字をエスケープする。
+	 * `<>` デリミタとの衝突を防ぐために必要。
+	 * 順序が重要: & を最初に変換しないと二重エスケープが発生する。
+	 */
+	private escapeTitle(title: string): string {
+		return title
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;");
+	}
 }

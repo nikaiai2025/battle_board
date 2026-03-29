@@ -58,7 +58,8 @@ export class DatFormatter {
 					const dateId = this.formatDateId(post.createdAt, post.dailyId);
 					const body = this.formatBody(post);
 					// スレッドタイトルは第1レス（index=0）のみに付与
-					const title = index === 0 ? threadTitle : "";
+					// `<>` デリミタ衝突防止のためHTMLエンティティエスケープする
+					const title = index === 0 ? this.escapeHtml(threadTitle) : "";
 					return `${name}<>${mail}<>${dateId}<>${body}<>${title}`;
 				})
 				.join("\n") + "\n"
