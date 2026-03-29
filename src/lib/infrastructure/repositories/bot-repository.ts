@@ -542,10 +542,14 @@ export async function updateNextPostAt(
  */
 export async function findDueForPost(): Promise<Bot[]> {
 	const now = new Date().toISOString();
+	// チュートリアルBOT（bot_profile_key="tutorial"）は1回限りの使い捨てで、
+	// 定期投稿の対象にすべきでない。findDueForPost の結果から除外する。
+	// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
 	const { data, error } = await supabaseAdmin
 		.from("bots")
 		.select("*")
 		.eq("is_active", true)
+		.neq("bot_profile_key", "tutorial")
 		.lte("next_post_at", now);
 
 	if (error) {

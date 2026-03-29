@@ -290,6 +290,7 @@ export type CreateThreadFn = (
 	input: { boardId: string; title: string; firstPostBody: string },
 	edgeToken: string | null,
 	ipHash: string,
+	isBotWrite?: boolean,
 ) => Promise<CreateThreadResult>;
 
 /**
@@ -1131,6 +1132,9 @@ export class BotService {
 					throw new Error("executeBotPost: createThreadFn が未注入です");
 				}
 
+				// BOT書き込みのため isBotWrite=true を渡し、resolveAuth をスキップする。
+				// edgeToken=null でも認証エラーにならないようにする。
+				// See: docs/architecture/components/posting.md §2.1 isBotWrite フラグの扱い
 				const threadResult = await this.createThreadFn(
 					{
 						boardId: DEFAULT_BOARD_ID,
@@ -1139,6 +1143,7 @@ export class BotService {
 					},
 					null,
 					`bot-${botId}`,
+					true,
 				);
 
 				if (!threadResult.success || !threadResult.firstPost) {
@@ -1317,6 +1322,9 @@ export class BotService {
 		const results: TutorialResult[] = [];
 
 		for (const pending of pendingList) {
+			// newBotId を try/finally で共有する。BOT作成後に executeBotPost が失敗しても
+			// next_post_at を null にリセットしてスケジューラによる再取得を防止する。
+			let newBotId: string | null = null;
 			try {
 				// Step 2a: チュートリアルBOT新規作成
 				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.i
@@ -1335,6 +1343,7 @@ export class BotService {
 					botProfileKey: "tutorial",
 					nextPostAt: null,
 				});
+				newBotId = newBot.id;
 
 				// Step 2b: executeBotPost で書き込み実行（contextOverrides 付き）
 				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.ii
@@ -1346,12 +1355,6 @@ export class BotService {
 				// Step 2c: pending 削除（投稿成功後に即削除。以降の処理失敗で重複スポーンしないように先行削除）
 				// See: tmp/workers/bdd-architect_TASK-236/design.md §3.4 > step 3.b.iii
 				await this.pendingTutorialRepository.deletePendingTutorial(pending.id);
-
-				// Step 2d: チュートリアルBOTは1回きりの投稿のため next_post_at を null にリセット
-				// executeBotPost の Step 9 で next_post_at が更新されるが、定期投稿は不要。
-				// 煽りBOT（processAoriCommands）と同じ「使い切り」パターン。
-				// この処理が失敗しても、pending は既に削除済みのため重複スポーンは起きない。
-				await this.botRepository.updateNextPostAt(newBot.id, null);
 
 				results.push({
 					pendingId: pending.id,
@@ -1372,6 +1375,22 @@ export class BotService {
 					success: false,
 					error: errorMessage,
 				});
+			} finally {
+				// Step 2d: チュートリアルBOTは1回きりの投稿のため next_post_at を null にリセット。
+				// executeBotPost の Step 9 で next_post_at が更新されるが、定期投稿は不要。
+				// 煽りBOT（processAoriCommands）と同じ「使い切り」パターン。
+				// finally ブロックに配置し、executeBotPost が失敗しても確実にリセットする。
+				// findDueForPost のチュートリアル除外と合わせた二重防御。
+				if (newBotId) {
+					try {
+						await this.botRepository.updateNextPostAt(newBotId, null);
+					} catch (resetErr) {
+						console.error(
+							`BotService.processPendingTutorials: next_post_at null リセットに失敗（botId=${newBotId}）`,
+							resetErr,
+						);
+					}
+				}
 			}
 		}
 

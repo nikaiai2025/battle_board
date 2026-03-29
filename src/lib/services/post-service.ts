@@ -912,12 +912,16 @@ export async function createPost(input: PostInput): Promise<PostResult> {
  * @param input - スレッド作成入力データ
  * @param edgeToken - edge-token（Cookie から取得。未認証時は null）
  * @param ipHash - クライアント IP の SHA-512 ハッシュ
+ * @param isBotWrite - BOT書き込みフラグ（true の場合は認証スキップ）。デフォルト false。
+ *   createPost と同じパターンで、BOT書き込み時は resolveAuth をスキップする。
+ *   See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
  * @returns CreateThreadResult
  */
 export async function createThread(
 	input: ThreadInput,
 	edgeToken: string | null,
 	ipHash: string,
+	isBotWrite = false,
 ): Promise<CreateThreadResult> {
 	// Step 1: タイトルバリデーション
 	// See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
@@ -940,13 +944,16 @@ export async function createThread(
 		};
 	}
 
-	// Step 2: 認証検証（ボット書き込みは false 固定）
-	const authResult = await resolveAuth(edgeToken, ipHash, false);
+	// Step 2: 認証検証
+	// BOT書き込み時（isBotWrite=true）は resolveAuth をスキップし、createPost と同じパターンで処理する。
+	// See: docs/architecture/components/posting.md §2.1 isBotWrite フラグの扱い
+	const authResult = await resolveAuth(edgeToken, ipHash, isBotWrite);
 
 	if (!authResult.authenticated) {
 		// 認証フロー起動
 		return {
 			success: false,
+			error: "認証が必要です",
 			authRequired: {
 				edgeToken: authResult.authRequired.edgeToken,
 			},
@@ -970,13 +977,14 @@ export async function createThread(
 	});
 
 	// Step 5: 1レス目を createPost のロジックで書き込み
+	// BOT書き込み時は isBotWrite フラグを伝播させる。
 	// See: features/thread.feature @1件目のレスとして本文が書き込まれる
 	const postResult = await createPost({
 		threadId: thread.id,
 		body: input.firstPostBody,
 		edgeToken,
 		ipHash,
-		isBotWrite: false,
+		isBotWrite,
 	});
 
 	// createPost が成功しない場合は createThread も失敗扱いとする
@@ -984,6 +992,7 @@ export async function createThread(
 		// 認証が必要（通常はスレッド作成前に検証済みのため到達しないはずだが念のため）
 		return {
 			success: false,
+			error: "認証が必要です",
 			authRequired: {
 				edgeToken: postResult.edgeToken,
 			},

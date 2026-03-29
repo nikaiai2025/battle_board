@@ -69,6 +69,7 @@ vi.mock("../../../lib/services/command-service", () => ({
 // createPost のテストに必要な追加モック
 vi.mock("../../../lib/infrastructure/repositories/thread-repository", () => ({
 	findById: vi.fn(),
+	create: vi.fn(),
 	incrementPostCount: vi.fn().mockResolvedValue(undefined),
 	updateLastPostAt: vi.fn().mockResolvedValue(undefined),
 	countActiveThreads: vi.fn().mockResolvedValue(0),
@@ -212,6 +213,7 @@ import * as AuthService from "../../../lib/services/auth-service";
 import * as IncentiveService from "../../../lib/services/incentive-service";
 import {
 	createPost,
+	createThread,
 	getPostListWithBotMark,
 } from "../../../lib/services/post-service";
 
@@ -767,5 +769,127 @@ describe("PostService.createPost — S4 重複クエリ排除", () => {
 			const deferredOptions = deferredCall[1];
 			expect(deferredOptions).not.toHaveProperty("cachedThread");
 		});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// createThread のテスト
+// See: features/thread.feature @ログイン済みユーザーがスレッドを作成する
+// See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+// ---------------------------------------------------------------------------
+
+describe("PostService.createThread — BOT書き込み（isBotWrite）", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		setCommandService(null);
+
+		// ThreadRepository.create のモック: スレッド作成成功を返す
+		vi.mocked(ThreadRepository.create).mockResolvedValue({
+			id: "thread-new-001",
+			threadKey: "1700000001",
+			boardId: "livebot",
+			title: "キュレーションBOTスレッド",
+			postCount: 0,
+			datByteSize: 0,
+			createdBy: "system",
+			createdAt: new Date("2026-03-29T12:00:00Z"),
+			lastPostAt: new Date("2026-03-29T12:00:00Z"),
+			isDeleted: false,
+			isPinned: false,
+			isDormant: false,
+		});
+
+		// ThreadRepository.findById: createPost 内で使用される（固定スレッドガード）
+		vi.mocked(ThreadRepository.findById).mockResolvedValue(
+			createTestThread({ id: "thread-new-001" }),
+		);
+
+		// PostRepository.createWithAtomicNumber: createPost 内で使用される
+		vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+			createTestCreatedPost({ threadId: "thread-new-001" }),
+		);
+
+		// スレッドのアクティブ件数
+		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
+	});
+
+	/**
+	 * BOT書き込み時（isBotWrite=true）は resolveAuth をスキップし、
+	 * edgeToken=null でも認証エラーにならないことを検証する。
+	 *
+	 * See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+	 */
+	it("isBotWrite=true の場合、edgeToken=null でもスレッド作成が成功する", async () => {
+		const result = await createThread(
+			{
+				boardId: "livebot",
+				title: "キュレーションBOTスレッド",
+				firstPostBody: "まとめ記事の内容",
+			},
+			null, // edgeToken
+			"bot-curation-001", // ipHash
+			true, // isBotWrite
+		);
+
+		expect(result.success).toBe(true);
+		expect(result.thread).toBeDefined();
+		expect(result.firstPost).toBeDefined();
+		// resolveAuth は isBotWrite=true なので認証スキップ。verifyEdgeToken は呼ばれない。
+		expect(AuthService.verifyEdgeToken).not.toHaveBeenCalled();
+	});
+
+	/**
+	 * isBotWrite=false（デフォルト）の場合、edgeToken=null は認証エラーになることを検証する。
+	 * 後方互換性の確認。
+	 */
+	it("isBotWrite=false（デフォルト）の場合、edgeToken=null は認証エラーを返す", async () => {
+		// resolveAuth が認証を要求するモック設定
+		vi.mocked(AuthService.issueEdgeToken).mockResolvedValue({
+			token: "new-edge-token",
+			userId: "new-user-id",
+		});
+		vi.mocked(AuthService.issueAuthCode).mockResolvedValue({
+			expiresAt: new Date("2026-12-31T00:00:00Z"),
+		});
+
+		const result = await createThread(
+			{
+				boardId: "livebot",
+				title: "通常ユーザースレッド",
+				firstPostBody: "通常の内容",
+			},
+			null, // edgeToken
+			"user-ip-hash",
+			// isBotWrite は省略（デフォルト false）
+		);
+
+		expect(result.success).toBe(false);
+		expect(result.authRequired).toBeDefined();
+		// 修正D: error フィールドに "認証が必要です" が含まれることを検証
+		expect(result.error).toBe("認証が必要です");
+	});
+
+	/**
+	 * BOT書き込み時の createPost 呼び出しでも isBotWrite=true が伝播することを検証する。
+	 */
+	it("isBotWrite=true の場合、内部の createPost にも isBotWrite=true が伝播する", async () => {
+		await createThread(
+			{
+				boardId: "livebot",
+				title: "BOTスレッド",
+				firstPostBody: "BOTの1レス目",
+			},
+			null,
+			"bot-123",
+			true,
+		);
+
+		// createPost が内部で呼ばれた際の引数を検証する。
+		// PostRepository.createWithAtomicNumber が呼ばれたことで createPost が実行されたことを確認。
+		expect(PostRepository.createWithAtomicNumber).toHaveBeenCalledWith(
+			expect.objectContaining({
+				authorId: null, // BOT書き込みは author_id = NULL
+			}),
+		);
 	});
 });

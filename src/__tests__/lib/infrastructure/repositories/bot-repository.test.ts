@@ -1040,4 +1040,77 @@ describe("BotRepository", () => {
 			);
 		});
 	});
+
+	// =========================================================================
+	// findDueForPost
+	// See: features/bot_system.feature
+	// See: docs/architecture/architecture.md §13 TDR-010
+	// =========================================================================
+
+	describe("findDueForPost", () => {
+		/**
+		 * findDueForPost のチェーンは:
+		 * .from("bots").select("*").eq("is_active", true).neq("bot_profile_key", "tutorial").lte("next_post_at", now)
+		 * neq / lte は既存のホイストモックに含まれないため、テストごとにローカルで構築する。
+		 */
+		function setupFindDueForPostChain(result: {
+			data: unknown;
+			error: unknown;
+		}) {
+			const mockLte = vi.fn().mockResolvedValue(result);
+			const mockNeq = vi.fn().mockReturnValue({ lte: mockLte });
+			mockSelect.mockReturnValue({ eq: mockEq });
+			mockEq.mockReturnValue({ neq: mockNeq });
+			return { mockNeq, mockLte };
+		}
+
+		it("正常: 投稿対象のボットリストを返す（チュートリアルBOT除外）", async () => {
+			const rows = [
+				createBotRow({
+					id: "curation-bot-001",
+					bot_profile_key: "curation",
+					next_post_at: "2026-03-16T11:00:00.000Z",
+				}),
+			];
+			setupFindDueForPostChain({ data: rows, error: null });
+
+			const result = await BotRepository.findDueForPost();
+
+			expect(result).toHaveLength(1);
+			expect(result[0].id).toBe("curation-bot-001");
+			expect(result[0].botProfileKey).toBe("curation");
+		});
+
+		it("正常: 投稿対象が 0 件の場合は空配列を返す", async () => {
+			setupFindDueForPostChain({ data: [], error: null });
+
+			const result = await BotRepository.findDueForPost();
+
+			expect(result).toEqual([]);
+		});
+
+		it("正常: チュートリアルBOTが neq 条件で除外されることを確認する", async () => {
+			// チェーンに .neq("bot_profile_key", "tutorial") が含まれることをモック検証
+			const { mockNeq } = setupFindDueForPostChain({
+				data: [],
+				error: null,
+			});
+
+			await BotRepository.findDueForPost();
+
+			// neq が "bot_profile_key", "tutorial" で呼ばれたことを検証
+			expect(mockNeq).toHaveBeenCalledWith("bot_profile_key", "tutorial");
+		});
+
+		it("異常系: DB エラーが発生した場合はエラーをスローする", async () => {
+			setupFindDueForPostChain({
+				data: null,
+				error: { message: "connection timeout" },
+			});
+
+			await expect(BotRepository.findDueForPost()).rejects.toThrow(
+				"BotRepository.findDueForPost failed: connection timeout",
+			);
+		});
+	});
 });

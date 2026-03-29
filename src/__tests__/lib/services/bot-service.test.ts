@@ -1448,7 +1448,9 @@ describe("BotService", () => {
 
 		it("updateNextPostAt がエラーをスローしても pending は削除済みのため重複スポーンしない", async () => {
 			// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
-			// バグ修正確認: pending削除を updateNextPostAt より先に行うことで重複スポーンを防止する
+			// バグ修正確認: updateNextPostAt は finally ブロックで実行されるため、
+			// executeBotPost + pending削除の成功結果に影響しない。
+			// next_post_at リセット失敗は console.error でログされるが結果は success のまま。
 			const pendingList = [
 				{
 					id: "pending-001",
@@ -1473,7 +1475,7 @@ describe("BotService", () => {
 			(botRepo.create as ReturnType<typeof vi.fn>).mockResolvedValue(
 				tutorialBot,
 			);
-			// updateNextPostAt がエラーをスロー
+			// updateNextPostAt がエラーをスロー（finally ブロック内で捕捉される）
 			(botRepo.updateNextPostAt as ReturnType<typeof vi.fn>).mockRejectedValue(
 				new Error("DB接続エラー"),
 			);
@@ -1496,12 +1498,22 @@ describe("BotService", () => {
 
 			const result = await service.processPendingTutorials();
 
-			// updateNextPostAt でエラーが発生しているため処理は失敗
-			expect(result.results[0].success).toBe(false);
-			// しかし pending は削除されている（executeBotPost の後に削除したため）
-			// → 次回 cron 実行時に同じ pending で再度 BOT がスポーンしない
+			// executeBotPost + pending削除は成功しているため結果は success
+			// updateNextPostAt の失敗は finally 内 try-catch で吸収される
+			expect(result.results[0].success).toBe(true);
+			// pending は削除されている → 次回 cron 実行時に重複スポーンしない
 			expect(pendingRepo.deletePendingTutorial).toHaveBeenCalledWith(
 				"pending-001",
+			);
+			// updateNextPostAt は finally ブロックで呼ばれている
+			expect(botRepo.updateNextPostAt).toHaveBeenCalledWith(
+				"tutorial-bot-001",
+				null,
+			);
+			// エラーは console.error に出力される
+			expect(consoleSpy).toHaveBeenCalledWith(
+				expect.stringContaining("next_post_at null リセットに失敗"),
+				expect.any(Error),
 			);
 
 			consoleSpy.mockRestore();
