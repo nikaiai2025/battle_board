@@ -297,8 +297,9 @@ export async function handleEmailConfirmCallback(
 	}
 
 	// edge-token 発行
+	// Sprint-150: Web UI 経由の本登録完了 → channel='web'
 	const newEdgeToken = randomUUID();
-	await EdgeTokenRepository.create(user.id, newEdgeToken);
+	await EdgeTokenRepository.create(user.id, newEdgeToken, "web");
 
 	return { success: true, userId: user.id, edgeToken: newEdgeToken };
 }
@@ -352,8 +353,9 @@ export async function loginWithEmail(
 	}
 
 	// Step 3: 新しい edge-token を生成し edge_tokens に INSERT
+	// Sprint-150: メールログインは Web UI 経由 → channel='web'
 	const newEdgeToken = randomUUID();
-	await EdgeTokenRepository.create(user.id, newEdgeToken);
+	await EdgeTokenRepository.create(user.id, newEdgeToken, "web");
 
 	return { success: true, userId: user.id, edgeToken: newEdgeToken };
 }
@@ -456,8 +458,9 @@ export async function handleOAuthCallback(
 	}
 
 	// Step 3: 新しい edge-token を発行
+	// Sprint-150: OAuth は Web UI 経由 → channel='web'
 	const newEdgeToken = randomUUID();
-	await EdgeTokenRepository.create(user.id, newEdgeToken);
+	await EdgeTokenRepository.create(user.id, newEdgeToken, "web");
 
 	return { success: true, userId: user.id, edgeToken: newEdgeToken };
 }
@@ -511,8 +514,9 @@ export async function handleRecoveryCallback(
 		return { success: false, reason: "not_registered" };
 	}
 
+	// Sprint-150: パスワード再設定は Web UI 経由 → channel='web'
 	const newEdgeToken = randomUUID();
-	await EdgeTokenRepository.create(user.id, newEdgeToken);
+	await EdgeTokenRepository.create(user.id, newEdgeToken, "web");
 
 	return { success: true, userId: user.id, edgeToken: newEdgeToken };
 }
@@ -646,8 +650,9 @@ export async function loginWithPat(
 	}
 
 	// 新しい edge-token を発行
+	// Sprint-150: PAT 認証は専ブラ経由 → channel='senbra'
 	const newEdgeToken = randomUUID();
-	await EdgeTokenRepository.create(result.userId, newEdgeToken);
+	await EdgeTokenRepository.create(result.userId, newEdgeToken, "senbra");
 
 	return { valid: true, userId: result.userId, edgeToken: newEdgeToken };
 }

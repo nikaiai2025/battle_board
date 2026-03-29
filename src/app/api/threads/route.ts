@@ -145,6 +145,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 				: DEFAULT_BOARD_ID;
 
 		// --- PostService への委譲 ---
+		// Sprint-150: Web API 経由は channel='web' を明示する
 		const result = await PostService.createThread(
 			{
 				boardId: resolvedBoardId,
@@ -153,6 +154,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 			},
 			edgeToken,
 			ipHash,
+			false,
+			"web",
 		);
 
 		// --- レスポンス整形 ---

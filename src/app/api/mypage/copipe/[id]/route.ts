@@ -67,6 +67,15 @@ export async function PUT(
 		);
 	}
 
+	// --- Sprint-150: チャネルガード（専ブラ経由トークンではコピペ編集不可） ---
+	// See: tmp/edge_token_channel_separation_plan.md §3.4
+	if (authResult.channel !== "web") {
+		return NextResponse.json(
+			{ error: "FORBIDDEN", message: "この操作にはWeb経由の認証が必要です" },
+			{ status: 403 },
+		);
+	}
+
 	// --- パスパラメータ id の検証 ---
 	const { id: idStr } = await params;
 	const entryId = parseInt(idStr, 10);
@@ -165,6 +174,15 @@ export async function DELETE(
 		return NextResponse.json(
 			{ error: "UNAUTHORIZED", message: "認証が必要です" },
 			{ status: 401 },
+		);
+	}
+
+	// --- Sprint-150: チャネルガード（専ブラ経由トークンではコピペ削除不可） ---
+	// See: tmp/edge_token_channel_separation_plan.md §3.4
+	if (authResult.channel !== "web") {
+		return NextResponse.json(
+			{ error: "FORBIDDEN", message: "この操作にはWeb経由の認証が必要です" },
+			{ status: 403 },
 		);
 	}
 

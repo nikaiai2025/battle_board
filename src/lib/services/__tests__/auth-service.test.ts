@@ -136,6 +136,7 @@ function makeEdgeToken(
 		id: string;
 		userId: string;
 		token: string;
+		channel: "web" | "senbra";
 		createdAt: Date;
 		lastUsedAt: Date;
 	}> = {},
@@ -144,6 +145,7 @@ function makeEdgeToken(
 		id: "edge-token-uuid-001",
 		userId: "user-uuid-001",
 		token: "valid-edge-token",
+		channel: "web" as const,
 		createdAt: new Date("2026-03-08T00:00:00Z"),
 		lastUsedAt: new Date("2026-03-08T00:00:00Z"),
 		...overrides,
@@ -539,9 +541,11 @@ describe("AuthService", () => {
 				const result = await issueEdgeToken("test-ip-hash");
 
 				// edge_tokens テーブルへの INSERT が行われることを検証する
+				// Sprint-150: channel のデフォルト値 "web" が第3引数として渡される
 				expect(EdgeTokenRepository.create).toHaveBeenCalledWith(
 					"user-for-edge-token",
 					result.token,
+					"web",
 				);
 				expect(EdgeTokenRepository.create).toHaveBeenCalledTimes(1);
 			});

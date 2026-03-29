@@ -41,8 +41,13 @@ import { GET } from "../../../../app/api/mypage/history/route";
 const EDGE_TOKEN = "edge-token-test-001";
 const USER_ID = "user-id-test-001";
 
-/** デフォルトの認証成功レスポンス */
-const AUTH_SUCCESS = { valid: true as const, userId: USER_ID };
+/** デフォルトの認証成功レスポンス（Sprint-150: channel 追加） */
+const AUTH_SUCCESS = {
+	valid: true as const,
+	userId: USER_ID,
+	authorIdSeed: "seed",
+	channel: "web" as const,
+};
 /** 認証失敗レスポンス */
 const AUTH_FAILURE = { valid: false as const };
 

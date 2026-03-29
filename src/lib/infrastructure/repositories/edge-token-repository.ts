@@ -28,6 +28,8 @@ interface EdgeTokenRow {
 	id: string;
 	user_id: string;
 	token: string;
+	/** トークンのチャネル（'web' | 'senbra'）。Sprint-150 で追加 */
+	channel: string;
 	created_at: string;
 	last_used_at: string;
 }
@@ -43,6 +45,13 @@ export interface EdgeToken {
 	userId: string;
 	/** edge-token 文字列 */
 	token: string;
+	/**
+	 * トークンのチャネル。発行経路に応じて権限が異なる。
+	 * - 'web': Web UI 経由（全権限: マイページ・PAT・設定変更等）
+	 * - 'senbra': 専ブラ互換経由（投稿系のみ）
+	 * See: tmp/edge_token_channel_separation_plan.md §2
+	 */
+	channel: "web" | "senbra";
 	/** 作成日時 */
 	createdAt: Date;
 	/** 最終使用日時 */
@@ -61,6 +70,7 @@ function rowToEdgeToken(row: EdgeTokenRow): EdgeToken {
 		id: row.id,
 		userId: row.user_id,
 		token: row.token,
+		channel: row.channel as "web" | "senbra",
 		createdAt: new Date(row.created_at),
 		lastUsedAt: new Date(row.last_used_at),
 	};
@@ -84,15 +94,17 @@ function rowToEdgeToken(row: EdgeTokenRow): EdgeToken {
  *
  * @param userId - 所有ユーザーの UUID
  * @param token - 生成済みの edge-token 文字列
+ * @param channel - トークンのチャネル（'web' | 'senbra'）。デフォルトは 'web'
  * @returns 作成された EdgeToken（DB デフォルト値を含む）
  */
 export async function create(
 	userId: string,
 	token: string,
+	channel: "web" | "senbra" = "web",
 ): Promise<EdgeToken> {
 	const { data, error } = await supabaseAdmin
 		.from("edge_tokens")
-		.insert({ user_id: userId, token })
+		.insert({ user_id: userId, token, channel })
 		.select()
 		.single();
 

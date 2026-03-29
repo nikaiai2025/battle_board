@@ -112,6 +112,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 		);
 	}
 
+	// --- Sprint-150: チャネルガード（専ブラ経由トークンではマイページアクセス不可） ---
+	// See: tmp/edge_token_channel_separation_plan.md §3.4
+	if (authResult.channel !== "web") {
+		return NextResponse.json(
+			{ error: "FORBIDDEN", message: "この操作にはWeb経由の認証が必要です" },
+			{ status: 403 },
+		);
+	}
+
 	// --- クエリパラメータの取得・バリデーション ---
 	// See: tmp/workers/bdd-architect_TASK-237/design.md §2.4 バリデーションルール
 	const page = parsePositiveInt(req.nextUrl.searchParams.get("page"), 1);

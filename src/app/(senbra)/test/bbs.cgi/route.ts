@@ -454,6 +454,7 @@ async function handleCreateThread(
 	subject: string,
 	ipHash: string,
 ): Promise<Response> {
+	// Sprint-150: 専ブラ経由は channel='senbra' を明示する
 	const result = await PostService.createThread(
 		{
 			boardId: parsed.boardId || DEFAULT_BOARD_ID,
@@ -462,6 +463,8 @@ async function handleCreateThread(
 		},
 		parsed.edgeToken,
 		ipHash,
+		false,
+		"senbra",
 	);
 
 	if (result.authRequired) {
@@ -542,6 +545,7 @@ async function handleCreatePost(
 	// PostServiceで書き込みを実行する
 	// NOTE: parsed.name（FROM欄）は渡さない。表示名は課金＋マイページで設定する仕様であり、
 	// 専ブラから送信された名前データを displayName として採用すると偽装が可能になる。
+	// Sprint-150: 専ブラ経由は channel='senbra' を明示する
 	const result = await PostService.createPost({
 		threadId: thread.id,
 		body: parsed.message,
@@ -549,6 +553,7 @@ async function handleCreatePost(
 		ipHash,
 		email: parsed.mail || undefined,
 		isBotWrite: false,
+		channel: "senbra",
 	});
 
 	if ("authRequired" in result) {

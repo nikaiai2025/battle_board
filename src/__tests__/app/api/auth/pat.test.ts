@@ -108,6 +108,7 @@ describe("GET /api/auth/pat", () => {
 			valid: true,
 			userId: USER_ID,
 			authorIdSeed: "seed-001",
+			channel: "web",
 		});
 		mockFindById.mockResolvedValue(createRegisteredUser());
 	});
@@ -206,6 +207,7 @@ describe("POST /api/auth/pat", () => {
 			valid: true,
 			userId: USER_ID,
 			authorIdSeed: "seed-001",
+			channel: "web",
 		});
 		mockFindById.mockResolvedValue(createRegisteredUser());
 		mockRegeneratePat.mockResolvedValue({ patToken: NEW_PAT_TOKEN });

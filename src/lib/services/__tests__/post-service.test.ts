@@ -271,6 +271,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -307,6 +308,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -339,6 +341,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
@@ -372,6 +375,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -419,6 +423,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-002",
 					authorIdSeed: "seed-xyz",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockPremiumUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -449,6 +454,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
@@ -566,7 +572,11 @@ describe("PostService", () => {
 					edgeToken: "new-edge-token",
 				});
 				expect(result).not.toHaveProperty("code");
-				expect(AuthService.issueEdgeToken).toHaveBeenCalledWith("ip-hash-xyz");
+				// Sprint-150: channel デフォルト "web" が渡される
+				expect(AuthService.issueEdgeToken).toHaveBeenCalledWith(
+					"ip-hash-xyz",
+					"web",
+				);
 				expect(AuthService.issueAuthCode).toHaveBeenCalledWith(
 					"ip-hash-xyz",
 					"new-edge-token",
@@ -645,6 +655,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -753,6 +764,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -807,6 +819,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -860,6 +873,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
@@ -902,6 +916,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
@@ -954,6 +969,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
@@ -994,6 +1010,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -1057,6 +1074,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue({
@@ -1105,6 +1123,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				const unicodePost = {
@@ -1143,6 +1162,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockRejectedValue(
@@ -1180,6 +1200,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
@@ -1409,6 +1430,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
@@ -1444,6 +1466,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
@@ -1537,6 +1560,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue({
@@ -1598,6 +1622,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
@@ -1637,6 +1662,7 @@ describe("PostService", () => {
 					valid: true,
 					userId: "user-001",
 					authorIdSeed: "seed-abc",
+					channel: "web" as const,
 				});
 				vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
@@ -1718,6 +1744,7 @@ describe("PostService", () => {
 				valid: true,
 				userId: "user-001",
 				authorIdSeed: "seed-abc",
+				channel: "web" as const,
 			});
 			vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
 			vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(

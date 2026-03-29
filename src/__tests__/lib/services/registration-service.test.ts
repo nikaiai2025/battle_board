@@ -452,9 +452,11 @@ describe("RegistrationService", () => {
 
 			await RegistrationService.loginWithEmail(EMAIL, PASSWORD);
 
+			// Sprint-150: メールログインは channel='web'
 			expect(mockEdgeTokenRepository.create).toHaveBeenCalledWith(
 				USER_ID,
 				expect.any(String),
+				"web",
 			);
 		});
 
@@ -745,9 +747,11 @@ describe("RegistrationService", () => {
 
 			await RegistrationService.handleRecoveryCallback(SUPABASE_AUTH_ID);
 
+			// Sprint-150: パスワード再設定は channel='web'
 			expect(mockEdgeTokenRepository.create).toHaveBeenCalledWith(
 				USER_ID,
 				expect.any(String),
+				"web",
 			);
 		});
 
@@ -989,9 +993,11 @@ describe("RegistrationService", () => {
 
 			await RegistrationService.loginWithPat(PAT_TOKEN);
 
+			// Sprint-150: PAT 認証は channel='senbra'
 			expect(mockEdgeTokenRepository.create).toHaveBeenCalledWith(
 				USER_ID,
 				expect.any(String),
+				"senbra",
 			);
 		});
 

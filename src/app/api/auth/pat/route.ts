@@ -31,6 +31,7 @@ import * as RegistrationService from "@/lib/services/registration-service";
 /**
  * Cookie の edge-token からユーザーを取得する。
  * 未認証・仮ユーザー・本登録済みユーザーのいずれかを返す。
+ * Sprint-150: channel を含めて返す（チャネルガード用）
  */
 async function resolveAuthenticatedUser(cookieValue: string | undefined) {
 	if (!cookieValue) {
@@ -48,7 +49,11 @@ async function resolveAuthenticatedUser(cookieValue: string | undefined) {
 		return { type: "unauthenticated" as const };
 	}
 
-	return { type: "authenticated" as const, user };
+	return {
+		type: "authenticated" as const,
+		user,
+		channel: authResult.channel,
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +81,15 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
 
 	if (resolved.type === "unauthenticated") {
 		return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+	}
+
+	// Sprint-150: チャネルガード（専ブラ経由トークンでは PAT 取得不可）
+	// See: tmp/edge_token_channel_separation_plan.md §3.4
+	if (resolved.channel !== "web") {
+		return NextResponse.json(
+			{ error: "この操作にはWeb経由の認証が必要です" },
+			{ status: 403 },
+		);
 	}
 
 	const { user } = resolved;
@@ -122,6 +136,15 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
 
 	if (resolved.type === "unauthenticated") {
 		return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+	}
+
+	// Sprint-150: チャネルガード（専ブラ経由トークンでは PAT 再発行不可）
+	// See: tmp/edge_token_channel_separation_plan.md §3.4
+	if (resolved.channel !== "web") {
+		return NextResponse.json(
+			{ error: "この操作にはWeb経由の認証が必要です" },
+			{ status: 403 },
+		);
 	}
 
 	const { user } = resolved;

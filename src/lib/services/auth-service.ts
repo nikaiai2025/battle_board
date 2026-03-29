@@ -46,7 +46,13 @@ import { initializeBalance } from "./currency-service";
  * See: features/authentication.feature @認証済みユーザーのIPアドレスが変わっても書き込みが継続できる
  */
 export type VerifyResult =
-	| { valid: true; userId: string; authorIdSeed: string }
+	| {
+			valid: true;
+			userId: string;
+			authorIdSeed: string;
+			/** トークンのチャネル。See: tmp/edge_token_channel_separation_plan.md §3.4 */
+			channel: "web" | "senbra";
+	  }
 	| { valid: false; reason: "not_found" | "not_verified" };
 
 /**
@@ -182,10 +188,12 @@ export async function verifyEdgeToken(
 
 	// IP チェックは廃止。edge-token の存在 + is_verified=true のみで認証成功とする。
 	// See: docs/research/eddist_edge_token_ip_report_2026-03-14.md §4 投稿時のトークン検証
+	// Sprint-150: channel を戻り値に含める
 	return {
 		valid: true,
 		userId: user.id,
 		authorIdSeed: user.authorIdSeed,
+		channel: edgeToken.channel,
 	};
 }
 
@@ -235,11 +243,14 @@ export async function getLayoutAuthStatus(token: string): Promise<{
  * See: tmp/feature_plan_admin_expansion.md §2-f 新規登録（認証コード発行）でも①を実行
  *
  * @param ipHash - クライアントIP の SHA-512 ハッシュ（author_id_seed として保存）
+ * @param channel - トークンのチャネル（'web' | 'senbra'）。デフォルトは 'web'
+ *   See: tmp/edge_token_channel_separation_plan.md §3.3
  * @returns 発行したトークンと新規ユーザーの ID
  * @throws IP BAN されている場合は Error をスローする
  */
 export async function issueEdgeToken(
 	ipHash: string,
+	channel: "web" | "senbra" = "web",
 ): Promise<{ token: string; userId: string }> {
 	// IP BAN チェック（新規登録ガード）
 	// BANされたIPからの新規ユーザー作成を拒否する。
@@ -264,7 +275,8 @@ export async function issueEdgeToken(
 	// edge_tokens テーブルにも同じトークンを INSERT する（Phase 3 移行）
 	// See: docs/architecture/components/user-registration.md §5.5 edge-token検証（改修）
 	// See: docs/architecture/components/user-registration.md §3.2 新テーブル: edge_tokens
-	await EdgeTokenRepository.create(user.id, token);
+	// Sprint-150: channel を書き分ける
+	await EdgeTokenRepository.create(user.id, token, channel);
 
 	// 新規ユーザーに初期通貨 50 を付与する
 	// See: features/currency.feature @新規ユーザー登録時に初期通貨 50 が付与される

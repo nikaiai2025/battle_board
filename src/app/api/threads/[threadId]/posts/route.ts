@@ -103,12 +103,14 @@ export async function POST(
 		const ipHash = getIpHash(req);
 
 		// --- PostService への委譲 ---
+		// Sprint-150: Web API 経由は channel='web' を明示する
 		const result = await PostService.createPost({
 			threadId,
 			body: postBody.trim(),
 			edgeToken,
 			ipHash,
 			isBotWrite: false,
+			channel: "web",
 		});
 
 		// --- レスポンス整形 ---

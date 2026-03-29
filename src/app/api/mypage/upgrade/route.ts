@@ -58,6 +58,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 		);
 	}
 
+	// --- Sprint-150: チャネルガード（専ブラ経由トークンではアップグレード不可） ---
+	// See: tmp/edge_token_channel_separation_plan.md §3.4
+	if (authResult.channel !== "web") {
+		return NextResponse.json(
+			{ error: "FORBIDDEN", message: "この操作にはWeb経由の認証が必要です" },
+			{ status: 403 },
+		);
+	}
+
 	// --- MypageService への委譲 ---
 	const result = await MypageService.upgradeToPremium(authResult.userId);
 

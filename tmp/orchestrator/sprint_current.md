@@ -4,17 +4,18 @@
 
 ## 現在のフェーズ
 
-**Sprint-148 完了 — BOTスケジューラ障害修正**
+**Sprint-149 完了 — BOT createThread UUID制約違反 + 固定スレッド除外**
 
-### Sprint-148の成果
-- TASK-375: チュートリアルBOTブロック + キュレーションBOT認証エラー修正
-  - findDueForPost() でtutorial BOT除外
-  - processPendingTutorials の next_post_at=null リセットを finally で堅牢化
-  - createThread に isBotWrite パラメータ追加（BOT書き込み認証スキップ）
-  - authRequired 返却時の error フィールド欠落修正
-- vitest: 2225 PASS / cucumber-js: 412 passed
-- コミット: 9c3b507
-- 本番スモーク: 30/35 PASS
+### Sprint-149の成果
+- TASK-377: BOT実行エラー2件修正
+  - threads.created_by NULLABLE化（マイグレーション 00040）+ createThread isBotWrite時 createdBy=null
+  - RandomThreadBehaviorStrategy で isPinned スレッド除外フィルタ追加
+  - incentive-service: BOT作成スレッドの成長ボーナスをスキップ（null guard）
+- vitest: 2234 PASS / cucumber-js: 411 passed (1 failed は既存のwelcome文言差異)
+- コミット: af7a08a
+- 本番スモーク: 31/36 PASS（5件はローカル限定スキップ）
+
+**Sprint-148 完了 — BOTスケジューラ障害修正**（コミット: 9c3b507, c82af6b）
 
 **Sprint-147 完了 — 管理画面BOT一覧にnextPostAt表示**（コミット: 6fae52b）
 
@@ -76,13 +77,14 @@
 
 ## テスト状況
 
-- vitest: **2225 PASS / 0 failed**（116 files）
-- cucumber-js: 433シナリオ / **412 passed / 0 failed** / 18 pending / 3 undefined
+- vitest: **2234 PASS / 0 failed**（117 files）
+- cucumber-js: 434シナリオ / **411 passed / 1 failed** / 18 pending / 4 undefined
+  - failed 1件: welcome.feature ウェルカムメッセージ文言差異（既存の問題）
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
-  - undefined 3件: thread.feature FAB 関連（UI実装待ち）
+  - undefined 4件: thread.feature FAB 関連（UI実装待ち） + 1
 - playwright E2E (ローカル): 62 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
 - playwright API: 27テスト / 全PASS
-- **本番スモークテスト (Sprint-148後):** 30/35 PASS（5件はローカル限定テストのスキップ）
+- **本番スモークテスト (Sprint-149後):** 31/36 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -136,6 +138,7 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-149 | BOT createThread UUID制約違反 + 固定スレッド除外 | completed | `sprint_149_plan.md` |
 | Sprint-148 | BOTスケジューラ障害修正（チュートリアルBOT除外 + キュレーションBOT認証修正） | completed | `sprint_148_plan.md` |
 | Sprint-147 | 管理画面BOT一覧にnextPostAt表示 | completed | `sprint_147_plan.md` |
 | Sprint-146 | キュレーションBOT仕様変更v3（本文収集廃止 + upsert化） | completed | `sprint_146_plan.md` |

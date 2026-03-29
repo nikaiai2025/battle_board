@@ -77,6 +77,12 @@ export interface PostInput {
 	/** ボット書き込みフラグ（true の場合は認証スキップ） */
 	isBotWrite: boolean;
 	/**
+	 * トークンのチャネル。Web UI 経由は 'web'、専ブラ経由は 'senbra'。
+	 * 省略時は 'web'（デフォルト）。
+	 * See: tmp/edge_token_channel_separation_plan.md §3.3
+	 */
+	channel?: "web" | "senbra";
+	/**
 	 * BOT書き込み時のコマンドパイプライン用ユーザーID（bots.id をそのまま使用）。
 	 * isBotWrite=true かつ botUserId が指定された場合、コマンドパイプラインの userId にこの値を使用する。
 	 * posts.author_id への代入は行わない（FK制約: posts.author_id は REFERENCES users(id)）。
@@ -240,6 +246,7 @@ async function resolveAuth(
 	edgeToken: string | null,
 	ipHash: string,
 	isBotWrite: boolean,
+	channel: "web" | "senbra" = "web",
 ): Promise<
 	| { authenticated: true; userId: string | null; authorIdSeed: string }
 	| { authenticated: false; authRequired: { edgeToken: string } }
@@ -251,8 +258,12 @@ async function resolveAuth(
 	}
 
 	// edge-token が null → 新規ユーザーとして edge-token と認証レコードを発行
+	// Sprint-150: channel を issueEdgeToken に伝播する
 	if (edgeToken === null) {
-		const { token: newToken } = await AuthService.issueEdgeToken(ipHash);
+		const { token: newToken } = await AuthService.issueEdgeToken(
+			ipHash,
+			channel,
+		);
 		await AuthService.issueAuthCode(ipHash, newToken);
 		return {
 			authenticated: false,
@@ -274,7 +285,11 @@ async function resolveAuth(
 		}
 
 		// not_found: 新規ユーザーとして認証フロー起動
-		const { token: newToken } = await AuthService.issueEdgeToken(ipHash);
+		// Sprint-150: channel を issueEdgeToken に伝播する
+		const { token: newToken } = await AuthService.issueEdgeToken(
+			ipHash,
+			channel,
+		);
 		await AuthService.issueAuthCode(ipHash, newToken);
 		return {
 			authenticated: false,
@@ -363,10 +378,12 @@ export async function createPost(input: PostInput): Promise<PostResult> {
 	}
 
 	// Step 2: 認証検証
+	// Sprint-150: channel を resolveAuth に伝播する
 	const authResult = await resolveAuth(
 		input.edgeToken,
 		input.ipHash,
 		input.isBotWrite,
+		input.channel ?? "web",
 	);
 
 	if (!authResult.authenticated) {
@@ -915,6 +932,8 @@ export async function createPost(input: PostInput): Promise<PostResult> {
  * @param isBotWrite - BOT書き込みフラグ（true の場合は認証スキップ）。デフォルト false。
  *   createPost と同じパターンで、BOT書き込み時は resolveAuth をスキップする。
  *   See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+ * @param channel - トークンのチャネル（'web' | 'senbra'）。デフォルトは 'web'。
+ *   See: tmp/edge_token_channel_separation_plan.md §3.3
  * @returns CreateThreadResult
  */
 export async function createThread(
@@ -922,6 +941,7 @@ export async function createThread(
 	edgeToken: string | null,
 	ipHash: string,
 	isBotWrite = false,
+	channel: "web" | "senbra" = "web",
 ): Promise<CreateThreadResult> {
 	// Step 1: タイトルバリデーション
 	// See: features/thread.feature @スレッドタイトルが空の場合はスレッドが作成されない
@@ -947,7 +967,8 @@ export async function createThread(
 	// Step 2: 認証検証
 	// BOT書き込み時（isBotWrite=true）は resolveAuth をスキップし、createPost と同じパターンで処理する。
 	// See: docs/architecture/components/posting.md §2.1 isBotWrite フラグの扱い
-	const authResult = await resolveAuth(edgeToken, ipHash, isBotWrite);
+	// Sprint-150: channel を resolveAuth に伝播する
+	const authResult = await resolveAuth(edgeToken, ipHash, isBotWrite, channel);
 
 	if (!authResult.authenticated) {
 		// 認証フロー起動

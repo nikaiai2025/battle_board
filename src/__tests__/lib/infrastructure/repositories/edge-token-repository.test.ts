@@ -11,7 +11,7 @@
  *   - 振る舞い（Behavior）を検証し、実装詳細に依存しない
  *
  * カバレッジ対象:
- *   - create: 正常作成・DB エラー
+ *   - create: 正常作成・channel 指定・channel デフォルト・DB エラー
  *   - findByToken: 見つかる・見つからない・DB エラー
  *   - findByUserId: 複数件・0件・DB エラー
  *   - deleteByToken: 正常削除・DB エラー
@@ -72,6 +72,7 @@ function createEdgeTokenRow(
 		id: string;
 		user_id: string;
 		token: string;
+		channel: string;
 		created_at: string;
 		last_used_at: string;
 	}> = {},
@@ -80,6 +81,7 @@ function createEdgeTokenRow(
 		id: "edge-token-id-001",
 		user_id: "user-id-001",
 		token: "abc123def456abc123def456abc123de",
+		channel: "web",
 		created_at: NOW_ISO,
 		last_used_at: NOW_ISO,
 		...overrides,
@@ -94,6 +96,7 @@ function createExpectedEdgeToken(
 		id: "edge-token-id-001",
 		userId: "user-id-001",
 		token: "abc123def456abc123def456abc123de",
+		channel: "web",
 		createdAt: NOW,
 		lastUsedAt: NOW,
 		...overrides,
@@ -203,6 +206,62 @@ describe("EdgeTokenRepository", () => {
 			expect(result.lastUsedAt).toEqual(new Date("2026-02-15T10:30:00Z"));
 		});
 
+		it("正常: channel='web' を指定して作成すると channel='web' の EdgeToken が返される", async () => {
+			// See: tmp/edge_token_channel_separation_plan.md §2
+			const row = createEdgeTokenRow({ channel: "web" });
+			setupInsertChain({ data: row, error: null });
+
+			const result = await EdgeTokenRepository.create(
+				"user-id-001",
+				"abc123def456abc123def456abc123de",
+				"web",
+			);
+
+			expect(result.channel).toBe("web");
+		});
+
+		it("正常: channel='senbra' を指定して作成すると channel='senbra' の EdgeToken が返される", async () => {
+			// See: tmp/edge_token_channel_separation_plan.md §2
+			const row = createEdgeTokenRow({ channel: "senbra" });
+			setupInsertChain({ data: row, error: null });
+
+			const result = await EdgeTokenRepository.create(
+				"user-id-001",
+				"abc123def456abc123def456abc123de",
+				"senbra",
+			);
+
+			expect(result.channel).toBe("senbra");
+		});
+
+		it("正常: channel 省略時はデフォルト 'web' で作成される", async () => {
+			// See: tmp/edge_token_channel_separation_plan.md §2
+			const row = createEdgeTokenRow({ channel: "web" });
+			setupInsertChain({ data: row, error: null });
+
+			const result = await EdgeTokenRepository.create(
+				"user-id-001",
+				"abc123def456abc123def456abc123de",
+			);
+
+			expect(result.channel).toBe("web");
+		});
+
+		it("正常: INSERT に channel が含まれる", async () => {
+			// See: tmp/edge_token_channel_separation_plan.md §3.2
+			const row = createEdgeTokenRow({ channel: "senbra" });
+			setupInsertChain({ data: row, error: null });
+
+			await EdgeTokenRepository.create("user-id-001", "test-token", "senbra");
+
+			// insert が { user_id, token, channel } で呼ばれたことを確認
+			expect(mockInsert).toHaveBeenCalledWith({
+				user_id: "user-id-001",
+				token: "test-token",
+				channel: "senbra",
+			});
+		});
+
 		it("異常系: DB エラーが発生した場合はエラーをスローする", async () => {
 			setupInsertChain({
 				data: null,
@@ -222,7 +281,7 @@ describe("EdgeTokenRepository", () => {
 	// =========================================================================
 
 	describe("findByToken", () => {
-		it("正常: 存在する token で EdgeToken が返される", async () => {
+		it("正常: 存在する token で EdgeToken が返される（channel 含む）", async () => {
 			// See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
 			const row = createEdgeTokenRow();
 			setupSelectEqSingleChain({ data: row, error: null });
@@ -232,6 +291,17 @@ describe("EdgeTokenRepository", () => {
 			);
 
 			expect(result).toEqual(createExpectedEdgeToken());
+			expect(result?.channel).toBe("web");
+		});
+
+		it("正常: senbra チャネルの token で channel='senbra' が返される", async () => {
+			// See: tmp/edge_token_channel_separation_plan.md §3.4
+			const row = createEdgeTokenRow({ channel: "senbra" });
+			setupSelectEqSingleChain({ data: row, error: null });
+
+			const result = await EdgeTokenRepository.findByToken("senbra-token");
+
+			expect(result?.channel).toBe("senbra");
 		});
 
 		it("正常: 存在しない token の場合は null を返す", async () => {

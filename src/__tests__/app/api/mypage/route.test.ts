@@ -107,6 +107,8 @@ describe("GET /api/mypage", () => {
 		mockVerifyEdgeToken.mockResolvedValue({
 			valid: true,
 			userId: VALID_USER_ID,
+			authorIdSeed: "seed",
+			channel: "web",
 		});
 		mockGetMypage.mockResolvedValue(null);
 		const req = createRequest(VALID_TOKEN);
@@ -125,6 +127,8 @@ describe("GET /api/mypage", () => {
 		mockVerifyEdgeToken.mockResolvedValue({
 			valid: true,
 			userId: VALID_USER_ID,
+			authorIdSeed: "seed",
+			channel: "web",
 		});
 		mockGetMypage.mockResolvedValue(MOCK_MYPAGE_INFO);
 		const req = createRequest(VALID_TOKEN);
@@ -140,6 +144,8 @@ describe("GET /api/mypage", () => {
 		mockVerifyEdgeToken.mockResolvedValue({
 			valid: true,
 			userId: VALID_USER_ID,
+			authorIdSeed: "seed",
+			channel: "web",
 		});
 		mockGetMypage.mockResolvedValue(MOCK_MYPAGE_INFO);
 		const req = createRequest(VALID_TOKEN);
@@ -159,6 +165,8 @@ describe("GET /api/mypage", () => {
 		mockVerifyEdgeToken.mockResolvedValue({
 			valid: true,
 			userId: VALID_USER_ID,
+			authorIdSeed: "seed",
+			channel: "web",
 		});
 		mockGetMypage.mockResolvedValue(MOCK_MYPAGE_INFO);
 		const req = createRequest(VALID_TOKEN);
@@ -182,6 +190,8 @@ describe("GET /api/mypage", () => {
 		mockVerifyEdgeToken.mockResolvedValue({
 			valid: true,
 			userId: VALID_USER_ID,
+			authorIdSeed: "seed",
+			channel: "web",
 		});
 		mockGetMypage.mockResolvedValue(downgradeInfo);
 		const req = createRequest(VALID_TOKEN);
@@ -205,6 +215,8 @@ describe("GET /api/mypage", () => {
 		mockVerifyEdgeToken.mockResolvedValue({
 			valid: true,
 			userId: VALID_USER_ID,
+			authorIdSeed: "seed",
+			channel: "web",
 		});
 		mockGetMypage.mockResolvedValue(premiumInfo);
 		const req = createRequest(VALID_TOKEN);
