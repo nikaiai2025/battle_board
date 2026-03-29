@@ -41,7 +41,7 @@ import { verifyAdminSession } from "@/lib/services/auth-service";
  *
  * レスポンス:
  *   200: { bots: Bot[] }
- *     - active: id, name, botProfileKey, hp, maxHp, survivalDays, totalPosts, accusedCount
+ *     - active: id, name, botProfileKey, hp, maxHp, survivalDays, totalPosts, accusedCount, nextPostAt
  *     - eliminated: id, name, botProfileKey, survivalDays, eliminatedAt, eliminatedBy
  *   400: status パラメータが未指定または不正
  *   403: 管理者権限なし
@@ -90,6 +90,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 			survivalDays: bot.survivalDays,
 			totalPosts: bot.totalPosts,
 			accusedCount: bot.accusedCount,
+			nextPostAt: bot.nextPostAt?.toISOString() ?? null,
 		}));
 		return NextResponse.json({ bots: response }, { status: 200 });
 	}

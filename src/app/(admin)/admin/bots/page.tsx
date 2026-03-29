@@ -8,7 +8,7 @@
  *
  * 提供機能:
  *   - 「活動中」「撃破済み」の切り替えタブ
- *   - 活動中: 名前、HP/最大HP、生存日数、投稿数、告発回数
+ *   - 活動中: 名前、HP/最大HP、生存日数、投稿数、告発回数、次回投稿予定
  *   - 撃破済み: 名前、生存日数、撃破日時、撃破者（ID短縮表示）
  *   - 各行からBOT詳細（/admin/bots/[botId]）へのリンク
  *
@@ -35,6 +35,7 @@ interface ActiveBot {
 	survivalDays: number;
 	totalPosts: number;
 	accusedCount: number;
+	nextPostAt: string | null;
 }
 
 /** 撃破済みBOTのAPIレスポンス型 */
@@ -189,6 +190,9 @@ export default function AdminBotsPage() {
 									告発回数
 								</th>
 								<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
+									次回投稿予定
+								</th>
+								<th className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
 									操作
 								</th>
 							</tr>
@@ -197,7 +201,7 @@ export default function AdminBotsPage() {
 							{isLoading ? (
 								<tr>
 									<td
-										colSpan={7}
+										colSpan={8}
 										className="px-3 py-6 text-center text-muted-foreground text-sm"
 									>
 										読み込み中...
@@ -206,7 +210,7 @@ export default function AdminBotsPage() {
 							) : activeBots.length === 0 ? (
 								<tr>
 									<td
-										colSpan={7}
+										colSpan={8}
 										className="px-3 py-6 text-center text-muted-foreground text-sm"
 									>
 										活動中のBOTがありません
@@ -253,6 +257,18 @@ export default function AdminBotsPage() {
 										{/* 告発回数 */}
 										<td className="px-3 py-2 text-right text-xs">
 											{bot.accusedCount}
+										</td>
+										{/* 次回投稿予定: 過去日時は投稿待ち状態のためアンバー色で表示 */}
+										<td className="px-3 py-2 text-xs whitespace-nowrap">
+											{bot.nextPostAt === null ? (
+												<span className="text-muted-foreground">-</span>
+											) : new Date(bot.nextPostAt) < new Date() ? (
+												<span className="text-amber-600 font-medium">
+													{formatDateTime(bot.nextPostAt)}
+												</span>
+											) : (
+												<span>{formatDateTime(bot.nextPostAt)}</span>
+											)}
 										</td>
 										{/* 詳細リンク */}
 										<td className="px-3 py-2">
