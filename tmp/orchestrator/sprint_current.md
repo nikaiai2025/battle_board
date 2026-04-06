@@ -4,16 +4,19 @@
 
 ## 現在のフェーズ
 
-**Sprint-149 完了 — BOT createThread UUID制約違反 + 固定スレッド除外**
+**Sprint-150 完了 — edge-token チャネル分離**
 
-### Sprint-149の成果
-- TASK-377: BOT実行エラー2件修正
-  - threads.created_by NULLABLE化（マイグレーション 00040）+ createThread isBotWrite時 createdBy=null
-  - RandomThreadBehaviorStrategy で isPinned スレッド除外フィルタ追加
-  - incentive-service: BOT作成スレッドの成長ボーナスをスキップ（null guard）
-- vitest: 2234 PASS / cucumber-js: 411 passed (1 failed は既存のwelcome文言差異)
-- コミット: af7a08a
+### Sprint-150の成果
+- TASK-378: edge-tokenチャネル分離 全実装
+  - edge_tokens に channel カラム追加（マイグレーション 00041）
+  - トークン発行: Web UI → web、専ブラ/PAT認証 → senbra で書き分け
+  - mypage系 + auth/pat APIルートに channel=web ガード追加（senbra → 403）
+  - 課金機能のセキュリティ前提条件を充足
+- vitest: 2249 PASS / cucumber-js: 412 passed
+- コミット: 8eead6f
 - 本番スモーク: 31/36 PASS（5件はローカル限定スキップ）
+
+**Sprint-149 完了 — BOT createThread UUID制約違反 + 固定スレッド除外**（コミット: af7a08a）
 
 **Sprint-148 完了 — BOTスケジューラ障害修正**（コミット: 9c3b507, c82af6b）
 
@@ -77,14 +80,13 @@
 
 ## テスト状況
 
-- vitest: **2234 PASS / 0 failed**（117 files）
-- cucumber-js: 434シナリオ / **411 passed / 1 failed** / 18 pending / 4 undefined
-  - failed 1件: welcome.feature ウェルカムメッセージ文言差異（既存の問題）
+- vitest: **2249 PASS / 0 failed**（119 files）
+- cucumber-js: 434シナリオ / **412 passed / 0 failed** / 18 pending / 4 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
-  - undefined 4件: thread.feature FAB 関連（UI実装待ち） + 1
+  - undefined 4件: thread.feature FAB 関連（UI実装待ち）
 - playwright E2E (ローカル): 62 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
 - playwright API: 27テスト / 全PASS
-- **本番スモークテスト (Sprint-149後):** 31/36 PASS（5件はローカル限定テストのスキップ）
+- **本番スモークテスト (Sprint-150後):** 31/36 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -95,8 +97,8 @@
 | # | 次アクション | 内容 | 前提 |
 |---|---|---|---|
 | 1 | ~~キュレーション仕様変更~~ | ~~Sprint-146で完了~~ | ~~完了~~ |
-| 2 | edge-token チャネル分離 | 専ブラ(HTTP)経由トークンの権限を投稿のみに限定。課金機能のブロッカー。計画書: `tmp/edge_token_channel_separation_plan.md` | **次スプリント** |
-| 3 | BOT Strategy Step 4 Phase B | API統合テスト（キュレーション仕様変更後に再計画） | #2完了後 |
+| 2 | ~~edge-token チャネル分離~~ | ~~Sprint-150で完了~~ | ~~完了~~ |
+| 3 | BOT Strategy Step 4 Phase B | API統合テスト（キュレーション仕様変更後に再計画） | 人間判断待ち |
 
 ## BOT Strategy移行 進捗
 
@@ -138,6 +140,7 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-150 | edge-token チャネル分離 | completed | `sprint_150_plan.md` |
 | Sprint-149 | BOT createThread UUID制約違反 + 固定スレッド除外 | completed | `sprint_149_plan.md` |
 | Sprint-148 | BOTスケジューラ障害修正（チュートリアルBOT除外 + キュレーションBOT認証修正） | completed | `sprint_148_plan.md` |
 | Sprint-147 | 管理画面BOT一覧にnextPostAt表示 | completed | `sprint_147_plan.md` |
