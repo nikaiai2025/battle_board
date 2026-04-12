@@ -39,6 +39,7 @@ interface BotDetail {
 	timesAttacked: number;
 	grassCount: number;
 	botProfileKey: string | null;
+	nextPostAt: string | null;
 	eliminatedAt: string | null;
 	eliminatedBy: string | null;
 	createdAt: string;
@@ -205,6 +206,13 @@ export default function AdminBotDetailPage({
 				</div>
 
 				<div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+					{/* id(uuid) */}
+					<div className="col-span-2 md:col-span-3">
+						<span className="text-muted-foreground text-xs">id(uuid)</span>
+						<p className="font-mono text-xs text-foreground break-all">
+							{botDetail.id}
+						</p>
+					</div>
 					{/* プロファイル */}
 					<div>
 						<span className="text-muted-foreground text-xs">プロファイル</span>
@@ -253,11 +261,20 @@ export default function AdminBotDetailPage({
 						<span className="text-muted-foreground text-xs">草カウント</span>
 						<p className="text-foreground">{botDetail.grassCount}</p>
 					</div>
-					{/* 作成日時 */}
+					{/* created_at */}
 					<div>
-						<span className="text-muted-foreground text-xs">作成日時</span>
+						<span className="text-muted-foreground text-xs">created_at</span>
 						<p className="text-foreground">
 							{formatDateTime(botDetail.createdAt)}
+						</p>
+					</div>
+					{/* next_post_at */}
+					<div>
+						<span className="text-muted-foreground text-xs">next_post_at</span>
+						<p className="text-foreground">
+							{botDetail.nextPostAt
+								? formatDateTime(botDetail.nextPostAt)
+								: "-"}
 						</p>
 					</div>
 					{/* 撃破情報（撃破済みの場合のみ） */}

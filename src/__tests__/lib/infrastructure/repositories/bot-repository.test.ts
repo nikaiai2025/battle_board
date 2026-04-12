@@ -701,9 +701,9 @@ describe("BotRepository", () => {
 			expect(result[0].id).toBe("bot-id-001-new");
 			expect(result[0].isActive).toBe(true);
 			expect(result[0].hp).toBe(10);
-			// tutorial・aori 除外フィルタが正しく渡されていることを確認
+			// tutorial・aori・hiroyuki 除外フィルタが正しく渡されていることを確認
 			expect(mockOrInner).toHaveBeenCalledWith(
-				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)",
+				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori,hiroyuki)",
 			);
 			// UPDATE は呼ばれない（INSERT のみ）
 			expect(mockUpdate).not.toHaveBeenCalled();
@@ -734,10 +734,27 @@ describe("BotRepository", () => {
 			const result = await BotRepository.bulkReviveEliminated();
 
 			expect(result).toEqual([]);
-			// tutorial・aori 除外フィルタが渡されていることを確認
+			// tutorial・aori・hiroyuki 除外フィルタが渡されていることを確認
 			expect(mockEqInner).toHaveBeenCalledWith("is_active", false);
 			expect(mockOrInner).toHaveBeenCalledWith(
-				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)",
+				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori,hiroyuki)",
+			);
+		});
+
+		it("正常: hiroyuki プロファイルの eliminated ボットは復活対象から除外される", async () => {
+			const mockOrInner = vi.fn().mockResolvedValue({
+				data: [],
+				error: null,
+			});
+			const mockEqInner = vi.fn().mockReturnValue({ or: mockOrInner });
+			mockSelect.mockReturnValue({ eq: mockEqInner });
+
+			const result = await BotRepository.bulkReviveEliminated();
+
+			expect(result).toEqual([]);
+			expect(mockEqInner).toHaveBeenCalledWith("is_active", false);
+			expect(mockOrInner).toHaveBeenCalledWith(
+				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori,hiroyuki)",
 			);
 		});
 

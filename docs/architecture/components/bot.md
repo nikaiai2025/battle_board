@@ -165,8 +165,10 @@ DailyResetResult {
    - 旧レコード: `is_active = false` のまま凍結保持（`bot_posts` 紐付けも維持）
    - 新レコード: 同一 `bot_profile_key`・`name` で INSERT。HP=max_hp, is_active=true, is_revealed=false, survival_days=0, times_attacked=0, `next_post_at` を再設定（TDR-010）
    - `BotRepository.bulkReviveEliminated()` は UPDATE → INSERT に変更する
-   - **チュートリアルBOT（`bot_profile_key = 'tutorial'`）は復活対象から除外する。** チュートリアルBOTは1回限りの消耗品であり、日次リセットで復活しない設計。
+   - **チュートリアルBOT（`tutorial`）・煽りBOT（`aori`）・ひろゆきBOT（`hiroyuki`）は復活対象から除外する。** いずれも1回限りの使い切りBOTであり、日次リセットで復活しない設計。
    - See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
+   - See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+   - See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
 5. attacks テーブルの前日分レコードをクリーンアップ
 6. 撃破済みチュートリアルBOTのクリーンアップ（`BotRepository.deleteEliminatedTutorialBots()`）
    - 削除対象1: `bot_profile_key = 'tutorial' AND is_active = false`（撃破済み）
@@ -836,7 +838,7 @@ Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, An
 - 投稿 cron: `WHERE is_active = true` → 新レコードのみ対象
 - `canAttackToday`: 新 botId に対する攻撃記録なし → 全員攻撃可能
 
-**適用対象**: 日次リセットで復活する全運営ボット。チュートリアルBOTは復活しないため対象外。
+**適用対象**: 日次リセットで復活する全運営ボット。チュートリアルBOT・煽りBOT・ひろゆきBOTは復活しないため対象外。
 
 **DB増加量**: 1日最大10レコード（荒らし役10体）。問題にならない規模。
 

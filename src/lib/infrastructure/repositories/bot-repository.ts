@@ -588,7 +588,8 @@ export async function bulkResetRevealed(): Promise<number> {
  * 同一 name/persona/bot_profile_key/max_hp で新レコードを INSERT する。
  * 新世代ボットは新しい UUID・偽装ID を持ち、旧日の書き込みとは無関係になる。
  *
- * チュートリアルBOT（bot_profile_key = 'tutorial'）・煽りBOT（'aori'）は
+ * チュートリアルBOT（bot_profile_key = 'tutorial'）・煽りBOT（'aori'）・
+ * ひろゆきBOT（'hiroyuki'）は
  * 復活対象から除外する。
  *
  * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
@@ -596,17 +597,18 @@ export async function bulkResetRevealed(): Promise<number> {
  * See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
  * See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
  * See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+ * See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
  *
  * @returns 新規作成された Bot レコードの配列
  */
 export async function bulkReviveEliminated(): Promise<Bot[]> {
 	// eliminated 状態（is_active=false）かつ復活対象のボットを取得する。
-	// チュートリアルBOT・煽りBOT（使い切りBOT）は復活させない。
+	// チュートリアルBOT・煽りBOT・ひろゆきBOT（使い切りBOT）は復活させない。
 	const { data: eliminated, error: fetchError } = await supabaseAdmin
 		.from("bots")
 		.select("*")
 		.eq("is_active", false)
-		.or("bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori)");
+		.or("bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori,hiroyuki)");
 
 	if (fetchError) {
 		throw new Error(

@@ -116,7 +116,7 @@ function makeBot(overrides: Record<string, unknown> = {}) {
 		timesAttacked: 1,
 		grassCount: 0,
 		botProfileKey: "arashi",
-		nextPostAt: null,
+		nextPostAt: new Date("2026-03-30T08:15:00Z"),
 		eliminatedAt: null,
 		eliminatedBy: null,
 		createdAt: new Date("2026-03-20"),
@@ -248,6 +248,8 @@ describe("GET /api/admin/bots/[botId] — BOT詳細", () => {
 		// BOT基本情報
 		expect(body.bot.id).toBe(BOT_ID);
 		expect(body.bot.name).toBe("荒らしBOT");
+		expect(body.bot.createdAt).toBe("2026-03-20T00:00:00.000Z");
+		expect(body.bot.nextPostAt).toBe("2026-03-30T08:15:00.000Z");
 
 		// 投稿履歴
 		expect(body.posts).toHaveLength(1);
