@@ -54,15 +54,24 @@ $$;
 
 | TASK_ID | 担当 | 内容 | 依存 | 状態 |
 |---|---|---|---|---|
-| TASK-382 | bdd-coding | migration 00043 作成（RPC 再定義）+ 既存テスト整合性確認 | - | assigned |
+| TASK-382 | bdd-coding | migration 00043 作成（RPC 再定義）+ 既存テスト整合性確認 | - | completed |
+| TASK-383 | bdd-coding | migration 00044 作成（`bot_posts.bot_id` に `ON DELETE CASCADE` 追加）+ 既存テスト整合性確認 | TASK-382 | assigned |
 
-単一タスクで完結。設計は調査レポートに含まれるため別途 bdd-architect は不要。
+### スコープ拡張の経緯（2026-04-15）
+
+TASK-382 デプロイ後の手動 `gh workflow run daily-maintenance.yml` 検証で、Step 6 (`deleteEliminatedTutorialBots`) が `bot_posts_bot_id_fkey` FK 制約違反で 500。
+Sprint-84 以来の潜在バグ（`bulk_update_daily_ids` 型エラーで Step 6 が17日間未実行だったため表面化せず）。
+
+人間承認 (2026-04-15): 案A採用（schema レベル FK CASCADE）。
+- **物理削除対象はチュートリアルBOTのみ**（`bot_profile_key = 'tutorial'`）。他BOTはインカーネーションモデル (§6.11) で削除されない
+- CASCADE 発動対象がチュートリアル限定のため、他BOT種別への副作用なし
 
 ## locked_files 管理
 
 | TASK_ID | locked_files |
 |---|---|
 | TASK-382 | `[NEW] supabase/migrations/00043_fix_bulk_update_daily_ids_cast.sql` |
+| TASK-383 | `[NEW] supabase/migrations/00044_bot_posts_cascade_on_bot_delete.sql` |
 
 ## 完了条件
 
