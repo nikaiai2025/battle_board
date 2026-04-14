@@ -615,3 +615,97 @@ APIレスポンスの型定義がサーバー（route.ts）とクライアント
 全ての fetch -> json() -> as パターン。copipe API (`GET /api/mypage/copipe`) も `{ entries }` ラッパーで返す同一パターンであり、将来UI実装時に要注意。
 
 See: `docs/operations/incidents/2026-03-29_mypage_vocab_response_mismatch.md`
+
+---
+
+## LL-017: FK の `ON DELETE` 指定は必須。`NO ACTION`（デフォルト）は設計意図を見落とすトラップ
+
+- **発見日:** 2026-04-15
+- **発見契機:** Daily Maintenance ワークフロー17日連続500障害（インシデント `2026-04-15_daily_maintenance_500_17day_outage.md`）
+
+### 事象
+
+`deleteEliminatedTutorialBots()` が撃破済みチュートリアルBOTの物理削除を試みた際、`bot_posts.bot_id` の FK 制約 `bot_posts_bot_id_fkey` に違反し 500 エラー。調査の結果、`bots` を参照する4テーブル（`bot_posts` / `attacks` / `grass_reactions` / `collected_topics`）すべてが `NO ACTION`（デフォルト）で、設計意図「撃破後に翌日クリーンアップ」と schema 制約が整合していなかった。さらに、この bug は2026-03-29 から17日間発現していたが、別の bug（LL: `bulk_update_daily_ids` 型キャスト漏れ）が先にワークフローを停止させていたため表面化が遅れた。
+
+### 根本原因
+
+PostgreSQL の FK 制約は、`ON DELETE` 句を省略すると暗黙的に `NO ACTION`（= 参照が存在すれば削除失敗）となる。設計者が「物理削除されうるテーブル」を想定していても、それを schema で表明する仕組みがなかった。
+
+`REFERENCES bots(id)` という宣言は「参照する」ことしか示しておらず、「削除時にどう振る舞うか」は明文化されない。レビュー時にも「FK があること」は確認するが「FK の削除時動作」は見落とされがちだった。
+
+### 教訓
+
+**`REFERENCES` を書く際は `ON DELETE` 句を必ず明示する。** `NO ACTION` を選ぶ場合も明示することで、「この参照はあえて削除を禁止している」という設計意図を schema 上に残せる。
+
+```sql
+-- ✗ 暗黙的 NO ACTION（設計意図が不明）
+bot_id UUID NOT NULL REFERENCES bots(id)
+
+-- ○ 明示的 CASCADE（親削除時に連動削除）
+bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE
+
+-- ○ 明示的 NO ACTION（削除を意図的に禁止）
+bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE NO ACTION
+```
+
+加えて、**物理削除を行う関数は、その親テーブルを参照する全子テーブルの FK 動作を一覧で確認する**。本件では `bots` の DELETE は `deleteEliminatedTutorialBots()` 1関数のみだったが、参照テーブルは4つあり、3つが見落とされていた。
+
+### 本プロジェクトでの対処
+
+- migration 00044 (`bot_posts`) / 00045 (`attacks` / `grass_reactions` / `collected_topics`) で該当4テーブルを `ON DELETE CASCADE` に変更
+- 新規 migration での FK 宣言時は `ON DELETE` 句を明示することをレビュー時に確認する
+
+### 適用範囲
+
+物理削除が発生しうる全ての親テーブルと、それを参照する全ての子テーブル。特に「運営系データはインカーネーションモデルで削除されない」が「ユーザー起因データは物理削除されうる」というプロジェクトの原則は、schema に反映されるべき設計意図である。
+
+See: `docs/operations/incidents/2026-04-15_daily_maintenance_500_17day_outage.md`
+
+---
+
+## LL-018: 自動通知は「送達」を保証するが「認知・対応」は保証しない
+
+- **発見日:** 2026-04-15
+- **発見契機:** Daily Maintenance 500障害が17日間放置された（インシデント `2026-04-15_daily_maintenance_500_17day_outage.md`）
+
+### 事象
+
+GitHub Actions `ci-failure-notifier.yml` は daily-maintenance ワークフロー失敗時に自動で Issue を起票していた（Issue #2, 2026-03-29T15:23:45Z 作成）。しかし17日間、誰もこの Issue に気付かず、17回の連続失敗がすべて同一 Issue にコメントとして蓄積された。障害は当該ワークフローとは別系統の調査中に偶然発見された。
+
+通知の deduplication（タイトル一致による重複排除）は正常に機能しており、通知機構そのものに欠陥はなかった。欠陥は「通知を受け取って対応する側」のフローにあった。
+
+### 根本原因
+
+自動通知の設計時に「送達」までしか保証されていなかった。GitHub Issue は永続化と重複排除の仕組みは備えるが、**受信者の認知を強制する仕組みではない**。プロジェクトには「Open の CI失敗 Issue を誰が・いつ確認するか」という運用プロセスが定義されていなかった。
+
+AI オーケストレーター主導の開発体制では、人間の注意は AI の出力レビューに集中しがちで、GitHub Issue ダッシュボードが主要な監視チャネルになっていなかった。
+
+### 教訓
+
+**通知システムは「送達」「認知」「対応」の3段階に分解して設計する。**
+
+| 段階 | 責務 | 本件の状態 |
+|---|---|---|
+| 送達 | 通知が然るべき場所に届く | ✓ `ci-failure-notifier.yml` で Issue 作成 |
+| 認知 | 誰かが通知の存在を知る | ✗ 17日間ゼロ |
+| 対応 | 通知内容に基づき行動する | ✗ 17日間ゼロ |
+
+送達だけを自動化しても、認知・対応のプロセスが無ければ検知システムは実質的に機能しない。**「通知が届く」と「問題が解決に向かう」は別の問題である。**
+
+### 本プロジェクトでの対処
+
+AI オーケストレーターのスプリント開始手順に以下を追加する方針:
+1. スプリント開始時に `gh issue list --label ci-failure --state open` を確認
+2. Open の CI失敗 Issue があれば、該当スプリントで優先対応するか人間に判断を仰ぐ
+
+これにより、認知が AI セッションのルーチンに組み込まれ、17日間ゼロの状態を構造的に防げる。
+
+### 適用範囲
+
+全ての自動通知機構（CI失敗 Issue、Slack通知、メール通知、監視アラート等）。通知を追加する際は「誰が・いつ・どのように認知するか」を併せて設計する。認知フローが無い通知は、ログ出力と変わらない価値しか持たない。
+
+### 関連教訓
+
+LL-008（テスト実行枠組み変更時のトレーサビリティ）と類似の構造。自動化された仕組みの「送信側」は正しく動作していても、「受信側」が追随していなければ価値が生まれない。
+
+See: `docs/operations/incidents/2026-04-15_daily_maintenance_500_17day_outage.md`
