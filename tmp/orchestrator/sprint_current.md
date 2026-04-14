@@ -1,25 +1,62 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-04-14
+> 最終更新: 2026-04-15
 
 ## 現在のフェーズ
+
+**Sprint-152 完了 — Daily Maintenance 500 障害修正（bulk_update_daily_ids 型キャスト）**
+
+### Sprint-152の成果
+- TASK-382: migration 00043_fix_bulk_update_daily_ids_cast.sql 作成
+  - RPC `bulk_update_daily_ids` の `daily_id_date = p_daily_id_date::date` 明示キャスト追加
+  - 17日連続 HTTP 500（2026-03-27 〜 2026-04-14）の根本原因（PostgreSQL text→date 暗黙キャスト禁止）を解消
+- 調査レポート: `tmp/reports/daily_maintenance_500_investigation.md`（auto-debugger）
+- 人間判断で遡及対応は不要（過去17日の daily-stats 欠損・BOT 状態復旧は実施しない）
+- vitest: 2296 PASS / cucumber-js: 411 PASS / integration: 3 pending（pre-existing、Sprint-152 起因なし）
+- スコープ外: integration test 拡充（InMemoryBotRepository では検知不可な型エラーの再発防止は次回 BOT スプリントで検討）
+
+### Sprint-152 残タスク（本スプリント内で継続）
+- [ ] 本番 Vercel/CF デプロイ（自動、push後3分）
+- [ ] bdd-smoke（31/36 維持確認）
+- [ ] 手動 `gh workflow run daily-maintenance.yml` で daily-reset PASS 確認
+- [ ] GitHub Issue #2 クローズ
+
+---
 
 **Sprint-151 完了 — キュレーションBOT Phase B: Wikipedia日次急上昇 API統合**（コミット: `ec11f98`）
 
 ### Sprint-151の成果
 - TASK-379: Wikipedia API統合設計書（4成果物、9論点決着、ESC-TASK-379-1 自律解決）
-- TASK-380: BOT投稿間隔 240-360分 → 720-1440分（全curation系）
+  - 投稿間隔変更の適用範囲判断: **curation系（topic_driven 方式）のみ** 12-24時間化。荒らし役BOT(60-120分) やコピペBOT は対象外（feature 別シナリオで既定のため）
+- TASK-380: BOT投稿間隔（curation系） 240-360分 → 720-1440分
 - TASK-381: WikipediaAdapter 実装 + curation_wikipedia プロファイル + formatBody 拡張（Phase A 波及あり、feature v4 準拠）
 - BDD変更: `features/curation_bot.feature` v3→v4（月次・定番記事除去 + 12-24時間投稿間隔）
 - vitest: 2296 PASS（+45）/ cucumber-js: 411 PASS
 - 本番スモーク: 31/36 PASS（Sprint-150 基準維持）
 - Cloudflare Version: `92faa009`
 
-### Sprint-151 人間作業（残置）
-BOT実働にあたり以下は人間作業:
-1. GitHub Secret `WIKIMEDIA_CONTACT` 設定（連絡先メールアドレス）
-2. 本番 Supabase への migration 00042 適用（`curation_wikipedia` seed INSERT）
-3. 実働確認（翌日以降、GitHub Actions cron 起動後に `collected_topics` への INSERT 確認）
+### Sprint-151 テスト設計判断（確認済み）
+
+D-10 §7.2・§8・§9・§10 と照合し、以下の判断を採用:
+
+| レイヤ | 実装有無 | 根拠 |
+|---|---|---|
+| 単体テスト (Vitest) | ✅ 43件実装 | WikipediaAdapter の主力検証層。純粋関数6個 + `collect()` 11ケース（正常系・404フォールバック・429/503・空レス・6件未満・メタページ除外等）。`fetchJson` DI でモック化 |
+| BDDサービス層 (Cucumber) | ✅ 既存9シナリオ流用 | feature v4 は抽象記述のため Wikipedia 固有ステップは追加せず、adapter 差し替えで共通カバー |
+| 統合テスト (Supabase Local) | ❌ 対象外 | D-10 §8「統合テストは SQL/RLS/マイグレーション/リポジトリ層向け」。Adapter は対象外 |
+| API テスト | ❌ 対象外 | D-10 §9.2「専ブラ互換/認証/エラーレスポンス」に限定。バッチ経路は対象外 |
+| E2E テスト | ❌ 対象外 | バッチ経路（GitHub Actions cron）のため UI 非依存 |
+| 実API契約テスト | ❌ 不採用 | ESC-TASK-379-1 論点A「CI 不安定化リスク回避」で明示的に却下。`collection-job.ts` のソース単位隔離でリスク受容 |
+
+**フィクスチャ:** `src/__tests__/lib/collection/adapters/fixtures/wikipedia_top_ja_2026_04_12.json`（Wikimedia API 実レスポンスの Top50 スナップショット）
+
+### Sprint-151 人間作業（完了状況）
+| # | 作業 | 状況 |
+|---|---|---|
+| 1 | GitHub Secret `WIKIMEDIA_CONTACT` 設定 | ✅ 完了（2026-04-15、人間作業） |
+| 2 | 本番 Supabase への migration 00042 適用 | ✅ **自動適用完了**（`migrate.yml` by push trigger、2026-04-14T10:50:59Z、21秒で success） |
+| 3 | 実働確認（GitHub Actions cron 起動後の `collected_topics` INSERT 確認） | ⏳ 翌日以降（cron トリガ待ち） |
+| 4 | ローカル Supabase への migration 00042 適用 | ⏭️ 不要（BOT seed INSERT のみ、テストは DB 非依存で完結） |
 
 **人間直接修正 (2026-04-13) — hiroyuki除外 + 管理画面BOTメタデータ表示**（コミット: `e479099`）
 - BOT reviveから `hiroyuki` を除外（`src/lib/infrastructure/repositories/bot-repository.ts`）
@@ -166,6 +203,7 @@ BOT実働にあたり以下は人間作業:
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-152 | Daily Maintenance 500 障害修正（bulk_update_daily_ids 型キャスト） | completed | `sprint_152_plan.md` |
 | Sprint-151 | キュレーションBOT Phase B: Wikipedia日次急上昇 API統合 | completed | `sprint_151_plan.md` |
 | Sprint-150 | edge-token チャネル分離 | completed | `sprint_150_plan.md` |
 | Sprint-149 | BOT createThread UUID制約違反 + 固定スレッド除外 | completed | `sprint_149_plan.md` |
