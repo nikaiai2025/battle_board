@@ -17,6 +17,8 @@
 # リポジトリの Settings > Secrets and variables > Actions > New repository secret から以下を確認:
 #   SUPABASE_URL             - Supabase プロジェクト URL（既存の secret を使用）
 #   SUPABASE_SERVICE_ROLE_KEY - service_role キー（既存の secret を使用）
+#   WIKIMEDIA_CONTACT         - Wikipedia API 用 User-Agent 連絡先メール（Phase B で追加）
+#                               未設定時は汎用フォールバック値（bot-ops@example.com）が使われる
 
 name: Collect Buzz Topics (Daily Cron)
 
@@ -50,3 +52,4 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WIKIMEDIA_CONTACT: ${{ secrets.WIKIMEDIA_CONTACT }}

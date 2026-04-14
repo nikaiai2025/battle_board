@@ -386,19 +386,29 @@ interface CollectedItem {
 
 **アダプター実装一覧:**
 
-| アダプター | 対象ソース | 収集方式 |
-|---|---|---|
-| `SubjectTxtAdapter` | 5ch系5板 | subject.txt解析 → バズスコア算出 → 上位DATの>>1取得 |
-| `FutabaCatalogAdapter` | ふたば2板 | カタログHTML解析 → 上位スレの>>1取得（ベストエフォート） |
-| `HackerNewsAdapter` | HackerNews | REST API `/v0/topstories` → story詳細 |
-| `HatenaBookmarkAdapter` | はてブ | RSS + API → エントリ詳細 |
-| `RedditAdapter` | Reddit | `/top.json` → 投稿詳細 |
-| `WikipediaAdapter` | Wikipedia | pageviews API（日次:急上昇 / 月次:定番） → 記事概要 |
-| `YouTubeAdapter` | YouTube | Data API v3 → 動画詳細 |
+| アダプター | 対象ソース | 収集方式 | 実装状況 |
+|---|---|---|---|
+| `SubjectTxtAdapter` | 5ch系5板 | subject.txt解析 → バズスコア算出 → 上位DATの>>1取得 | Phase A 済 |
+| `FutabaCatalogAdapter` | ふたば2板 | カタログHTML解析 → 上位スレの>>1取得（ベストエフォート） | Phase C |
+| `HackerNewsAdapter` | HackerNews | REST API `/v0/topstories` → story詳細 | Phase C |
+| `HatenaBookmarkAdapter` | はてブ | RSS + API → エントリ詳細 | Phase C |
+| `RedditAdapter` | Reddit | `/top.json` → 投稿詳細 | Phase C |
+| `WikipediaAdapter` | ja.wikipedia | pageviews top API（日次急上昇） → 記事名・views | **Phase B 済** |
+| `YouTubeAdapter` | YouTube | Data API v3 → 動画詳細 | Phase C |
 
-バズスコア算出式: `engagement / (elapsed_hours + 2) ^ 1.5`
+バズスコア算出式（掲示板系・Web系の多くで共通）: `engagement / (elapsed_hours + 2) ^ 1.5`
 - 掲示板系: engagement = レス数
 - Web系: 各プラットフォーム固有の指標（HN points, はてブ数, Reddit score 等）
+
+**Wikipedia の特例**: 日次の pageviews は既に「当日集計」であるため、`views` をそのまま `buzz_score` に格納する（経過時間補正は適用しない）。詳細は `tmp/workers/bdd-architect_TASK-379/design.md` §3 参照。
+
+**WikipediaAdapter 固有の挙動（Phase B 実装）:**
+- **対象言語**: `ja.wikipedia` 単独（`en` 等は対象外）
+- **取得日**: UTC 現在時刻から 2日前（pageviews 生成遅延対応）。404 の場合のみ 3日前にフォールバック
+- **メタページ除外**: `メインページ` / `Main_Page` の完全一致、および `特別:`, `Wikipedia:`, `Help:`, `Category:`, `File:`, `Template:`, `Portal:`, `User:`, `Talk:` などのプレフィックス一致で除外
+- **User-Agent**: Wikimedia User-Agent Policy に準拠。環境変数 `WIKIMEDIA_CONTACT` から連絡先メールを取得（未設定時は汎用フォールバック）
+- **リトライ**: しない（429/5xx は即座に例外スロー。翌日の cron で自然にリトライされる）
+- **タイムアウト**: 10秒（`AbortController`）
 
 ##### 投稿フロー（CF Cron 5分間隔ポーリング）
 
@@ -427,12 +437,16 @@ BotService.executeBotPost(botId)
   +-- PostService.createThread(title, body, isBotWrite=true)
   +-- collected_topics: SET is_posted=true, posted_at=NOW()
   +-- bot_posts: INSERT(postId, botId)
-  +-- next_post_at = NOW() + scheduling.getNextPostDelay()  // 240〜360分
+  +-- next_post_at = NOW() + scheduling.getNextPostDelay()  // 720〜1440分（12〜24時間）
 ```
 
-**>>1 の本文フォーマット:**
-- 投稿内容あり: `{content}\n\n元ネタ: {source_url}`
-- 投稿内容なし: `{source_url}`
+**>>1 の本文フォーマット（Phase B 拡張後）:**
+- 投稿内容あり:                   `{content}\n\n元ネタ: {source_url}`
+- 投稿内容なし / buzz_score > 0:  `{source_url}\n\nバズスコア: {localized_buzz_score}`
+- 投稿内容なし / buzz_score = 0:  `{source_url}`
+
+`localized_buzz_score` は `Math.round(buzz_score).toLocaleString("ja-JP")` による 3桁区切り整数（例: `102,175`）。
+feature v4「>>1 にバズスコアと元ネタURLを書き込む」に厳密準拠するため、Phase A（curation_newsplus）の投稿もこの新フォーマットで出力される。
 
 **設計ポイント:**
 - 収集と投稿の完全分離: 外部API障害が投稿に波及しない
@@ -519,13 +533,20 @@ curation_hackernews:
   behavior_type: create_thread
   scheduling:
     type: topic_driven
-    min_interval_minutes: 240
-    max_interval_minutes: 360
+    min_interval_minutes: 720
+    max_interval_minutes: 1440
   collection:
     adapter: hackernews
     source_url: "https://hacker-news.firebaseio.com/v0"
   fixed_messages: []
 ```
+
+**実装済みキュレーションBOT一覧:**
+
+| プロファイルキー | BOT名 | 実装フェーズ | collection.adapter | 備考 |
+|---|---|---|---|---|
+| `curation_newsplus` | 速報+速報ボット | Phase A | `subject_txt` | 5chニュース速報+ subject.txt |
+| `curation_wikipedia` | Wikipedia速報ボット | Phase B | `wikipedia` | ja.wikipedia 日次急上昇（Wikimedia pageviews top API） |
 
 #### 2.13.8 ファイル配置計画
 

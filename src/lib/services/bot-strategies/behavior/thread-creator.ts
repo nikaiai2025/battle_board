@@ -20,13 +20,34 @@ import type {
 
 /**
  * >>1 の本文をフォーマットする。
- * 形式: `勢い: {buzzScore}\n{sourceUrl}`
+ *
+ * feature v4「>>1 にバズスコアと元ネタURLを書き込む」準拠。
+ * content の有無と buzzScore の値で分岐する:
+ *   1. content あり:        `{content}\n\n元ネタ: {sourceUrl}`（従来挙動）
+ *   2. buzzScore > 0:        `{sourceUrl}\n\nバズスコア: {localizedScore}`
+ *   3. それ以外（0 等）:      `{sourceUrl}`（URL単体）
+ *
+ * バズスコアは `Math.round(...).toLocaleString("ja-JP")` で 3桁区切り整数化する
+ * （Wikipedia views 等 7〜8桁の可読性向上のため）。
  *
  * See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
  * See: docs/architecture/components/bot.md §2.13.5 >>1 の本文フォーマット
+ * See: tmp/workers/bdd-architect_TASK-379/design.md §3.5
  */
-export function formatBody(topic: CollectedTopic): string {
-	return `勢い: ${topic.buzzScore}\n${topic.sourceUrl}`;
+export function formatBody(
+	topic: CollectedTopic & { content?: string | null },
+): string {
+	// 1. content あり → 従来の「content + 元ネタURL」形式
+	if (topic.content) {
+		return `${topic.content}\n\n元ネタ: ${topic.sourceUrl}`;
+	}
+	// 2. buzzScore > 0 → URL + バズスコア 3桁区切り
+	if (topic.buzzScore > 0) {
+		const localizedScore = Math.round(topic.buzzScore).toLocaleString("ja-JP");
+		return `${topic.sourceUrl}\n\nバズスコア: ${localizedScore}`;
+	}
+	// 3. URL 単体（buzzScore === 0 等）
+	return topic.sourceUrl;
 }
 
 /**

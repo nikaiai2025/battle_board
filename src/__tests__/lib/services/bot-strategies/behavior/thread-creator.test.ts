@@ -98,7 +98,9 @@ describe("ThreadCreatorBehaviorStrategy", () => {
 			}
 		});
 
-		it("body は '勢い: {buzzScore}\\n{sourceUrl}' 形式", async () => {
+		it("body は buzzScore > 0 のとき '{sourceUrl}\\n\\nバズスコア: {score}' 形式（feature v4 準拠）", async () => {
+			// See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+			// See: tmp/workers/bdd-architect_TASK-379/design.md §3.5 formatBody 拡張
 			const todayTopic = makeTopic({
 				id: "topic-1",
 				buzzScore: 42,
@@ -115,7 +117,60 @@ describe("ThreadCreatorBehaviorStrategy", () => {
 
 			expect(action.type).toBe("create_thread");
 			if (action.type === "create_thread") {
-				expect(action.body).toBe("勢い: 42\nhttps://example.com/thread/456");
+				expect(action.body).toBe(
+					"https://example.com/thread/456\n\nバズスコア: 42",
+				);
+			}
+		});
+
+		it("buzzScore が 7桁以上の場合は 3桁区切りで表示する（ja-JP ロケール）", async () => {
+			// See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+			// See: tmp/workers/bdd-architect_TASK-379/design.md §3.5
+			const todayTopic = makeTopic({
+				id: "topic-wiki",
+				buzzScore: 102175, // Wikipedia の views 値想定
+				sourceUrl:
+					"https://ja.wikipedia.org/wiki/%E7%94%B0%E4%B8%AD%E6%95%A6%E5%AD%90_(%E5%A3%B0%E5%84%AA)",
+				collectedDate: "2025-03-28",
+			});
+			const repo = makeRepo(async (_botId, date) => {
+				if (date === "2025-03-28") return [todayTopic];
+				return [];
+			});
+
+			const strategy = new ThreadCreatorBehaviorStrategy(repo);
+			const action = await strategy.decideAction(BEHAVIOR_CONTEXT);
+
+			expect(action.type).toBe("create_thread");
+			if (action.type === "create_thread") {
+				// 102,175 のように 3桁区切り
+				expect(action.body).toContain("バズスコア: 102,175");
+				expect(action.body).toContain(
+					"https://ja.wikipedia.org/wiki/%E7%94%B0%E4%B8%AD%E6%95%A6%E5%AD%90_(%E5%A3%B0%E5%84%AA)",
+				);
+			}
+		});
+
+		it("buzzScore が 0 の場合は URL 単体を返す（バズスコア行なし）", async () => {
+			// See: tmp/workers/bdd-architect_TASK-379/design.md §3.5
+			const todayTopic = makeTopic({
+				id: "topic-zero",
+				buzzScore: 0,
+				sourceUrl: "https://example.com/thread/zero",
+				collectedDate: "2025-03-28",
+			});
+			const repo = makeRepo(async (_botId, date) => {
+				if (date === "2025-03-28") return [todayTopic];
+				return [];
+			});
+
+			const strategy = new ThreadCreatorBehaviorStrategy(repo);
+			const action = await strategy.decideAction(BEHAVIOR_CONTEXT);
+
+			expect(action.type).toBe("create_thread");
+			if (action.type === "create_thread") {
+				expect(action.body).toBe("https://example.com/thread/zero");
+				expect(action.body).not.toContain("バズスコア");
 			}
 		});
 

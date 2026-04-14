@@ -1,0 +1,82 @@
+# ==============================================================================
+# bot_profile_proposal.yaml — curation_wikipedia プロファイル提案
+# ==============================================================================
+#
+# 本ファイルは TASK-379 設計成果物であり、そのまま config/bot_profiles.yaml に
+# 追記することを想定している。config/bot-profiles.ts（TS 定数）への手動同期も忘れずに。
+#
+# 配置先: config/bot_profiles.yaml の末尾（既存 curation_newsplus の下）に追加
+# 同期先: config/bot-profiles.ts の botProfilesConfig 定数にも同内容を追加
+#
+# See: tmp/workers/bdd-architect_TASK-379/design.md §8
+# See: features/curation_bot.feature v4
+# See: docs/architecture/components/bot.md §2.13.5, §2.13.7
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Phase B: Wikipedia速報ボット（キュレーションBOT Phase B）
+# ------------------------------------------------------------------------------
+# 日本語 Wikipedia の日次急上昇記事をキュレーションして転載する運営ボット。
+#
+# データソース:
+#   Wikimedia REST API (pageviews top)
+#   https://wikimedia.org/api/rest_v1/metrics/pageviews/top/ja.wikipedia/all-access/{YYYY}/{MM}/{DD}
+#
+# 設計上の差分（curation_newsplus との比較）:
+#   - collection.adapter:    wikipedia  （←  subject_txt）
+#   - collection.source_url: Wikimedia API  （← 5ch subject.txt）
+#   - その他（HP・報酬・スケジューリング）は同一
+#
+# バズスコア: Wikimedia API の views（整数）をそのまま buzz_score 列に保存
+#             → >>1 表示で「バズスコア: 102,175」といった可読形式で表示される
+#
+# メタページ（メインページ / 特別:検索 / Wikipedia: 等）は WikipediaAdapter 内で除外
+#
+# 投稿間隔 12〜24時間 は feature v4 「BOTの投稿間隔は12時間〜24時間のランダム間隔である」準拠
+#
+# 注意:
+#   - 本プロファイルは GitHub Secrets `WIKIMEDIA_CONTACT` の設定を前提とする
+#     （未設定時は User-Agent に汎用フォールバック値が使われるが、運用上は必ず設定すること）
+#   - 本番投入手順は design.md §10.4 参照
+#
+# See: features/curation_bot.feature
+# See: config/bot_profiles.yaml (正本)
+# See: tmp/workers/bdd-architect_TASK-379/design.md
+# ------------------------------------------------------------------------------
+
+curation_wikipedia:
+  hp: 100
+  max_hp: 100
+  reward:
+    base_reward: 50
+    daily_bonus: 20
+    attack_bonus: 3
+  behavior_type: create_thread
+  scheduling:
+    type: topic_driven
+    min_interval_minutes: 720    # 12時間（feature v4 準拠）
+    max_interval_minutes: 1440   # 24時間（feature v4 準拠）
+  collection:
+    adapter: wikipedia
+    # source_url は API ベースURL。日付以下（/YYYY/MM/DD）は WikipediaAdapter が動的構築する
+    source_url: "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/ja.wikipedia/all-access"
+  fixed_messages: []             # create_thread 型は ThreadCreatorBehaviorStrategy が body を包括
+
+# ==============================================================================
+# 次のステップ（TASK-381 bdd-coding 担当）:
+#
+# 1. 上記エントリを config/bot_profiles.yaml の末尾（curation_newsplus の下）に追加
+# 2. 同じ内容を config/bot-profiles.ts の botProfilesConfig 定数にも追加
+#    （TypeScript 型: BotProfile を満たすこと。behavior_type は "create_thread" リテラル）
+# 3. src/lib/collection/adapters/wikipedia.ts を wikipedia_adapter_interface.md の
+#    設計通りに実装
+# 4. src/lib/collection/adapters/adapter-resolver.ts に
+#    `case "wikipedia": return new WikipediaAdapter();` を追加
+# 5. supabase/migrations/000XX_curation_wikipedia_bot.sql に BOT seed INSERT を追加
+#    （000XX は最新マイグレーション番号 + 1、実装時点で採番）
+# 6. .github/workflows/collect-topics.yml の env に
+#    `WIKIMEDIA_CONTACT: ${{ secrets.WIKIMEDIA_CONTACT }}` を追加
+# 7. 単体テスト実装（test_strategy.md 参照）
+# 8. features/curation_bot.feature v4 の既存シナリオで BDD 検証
+#    （シナリオ追加は不要。シナリオ自体を編集することは CLAUDE.md 禁止事項）
+# ==============================================================================

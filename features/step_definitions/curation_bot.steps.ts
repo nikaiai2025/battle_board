@@ -578,25 +578,32 @@ Then(
 
 		const postedTopic = postedTopics[0];
 
-		// v3 形式: `勢い: {buzzScore}\n{sourceUrl}`
-		assert(
-			post.body.includes("勢い:"),
-			`>>1 の本文に "勢い:" が含まれていません: ${post.body}`,
-		);
+		// v4 形式: content あり → `{content}\n\n元ネタ: {sourceUrl}`
+		//          content なし & buzzScore > 0 → `{sourceUrl}\n\nバズスコア: {localizedScore}`
+		//          content なし & buzzScore = 0 → `{sourceUrl}`
+		// See: tmp/workers/bdd-architect_TASK-379/design.md §3.5 formatBody 拡張
 		assert(
 			post.body.includes(postedTopic.sourceUrl),
 			`>>1 の本文に元ネタURL が含まれていません: ${post.body}`,
 		);
-		assert(
-			post.body.includes(String(postedTopic.buzzScore)),
-			`>>1 の本文にバズスコアが含まれていません: ${post.body}`,
-		);
+		// buzzScore が 0 超の場合は本文に数値が含まれる
+		// （toLocaleString("ja-JP") での 3桁区切りも許容するため Math.round 済み値の
+		//  先頭桁で判定）
+		if (postedTopic.buzzScore > 0) {
+			const scoreStr = Math.round(postedTopic.buzzScore).toLocaleString(
+				"ja-JP",
+			);
+			assert(
+				post.body.includes(scoreStr) || post.body.includes("バズスコア:"),
+				`>>1 の本文にバズスコアが含まれていません: ${post.body}`,
+			);
+		}
 	},
 );
 
 // ---------------------------------------------------------------------------
-// S8: BOTの投稿間隔は240分〜360分のランダム間隔である
-// See: features/curation_bot.feature @BOTの投稿間隔は240分〜360分のランダム間隔である
+// S8: BOTの投稿間隔は12時間〜24時間のランダム間隔である
+// See: features/curation_bot.feature @BOTの投稿間隔は12時間〜24時間のランダム間隔である
 // ---------------------------------------------------------------------------
 
 Given(
@@ -630,15 +637,15 @@ When("次回投稿タイミングを決定する", async function (this: BattleB
 });
 
 Then(
-	"240分以上360分以内のランダムな間隔が設定される",
+	"12時間以上24時間以内のランダムな間隔が設定される",
 	async function (this: BattleBoardWorld) {
 		const delays: number[] = (this as any)._schedulingDelays;
 		assert(delays, "スケジューリング結果が未設定です");
 
 		for (const delay of delays) {
 			assert(
-				delay >= 240 && delay <= 360,
-				`投稿間隔が範囲外です: ${delay}分（240〜360分を期待）`,
+				delay >= 720 && delay <= 1440,
+				`投稿間隔が範囲外です: ${delay}分（720〜1440分を期待。12〜24時間）`,
 			);
 		}
 

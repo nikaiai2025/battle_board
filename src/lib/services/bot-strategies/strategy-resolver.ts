@@ -93,11 +93,11 @@ export function resolveStrategies(
 		const minMinutes =
 			_profile.scheduling?.min_interval_minutes ??
 			_profile.scheduling?.min ??
-			240;
+			720;
 		const maxMinutes =
 			_profile.scheduling?.max_interval_minutes ??
 			_profile.scheduling?.max ??
-			360;
+			1440;
 
 		return {
 			content: new NoOpContentStrategy(),

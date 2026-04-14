@@ -1,8 +1,20 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-03-29
+> 最終更新: 2026-04-14
 
 ## 現在のフェーズ
+
+**Sprint-151 進行中 — キュレーションBOT Phase B: Wikipedia日次急上昇 API統合**
+- スコープ: 本番投入まで
+- BDD変更: `features/curation_bot.feature` v3→v4（月次・定番記事除去 + BOT投稿間隔 240〜360分→12〜24時間）
+- 実装: WikipediaAdapter + curation_wikipedia プロファイル + API統合テスト
+
+**人間直接修正 (2026-04-13) — hiroyuki除外 + 管理画面BOTメタデータ表示**（コミット: `e479099`）
+- BOT reviveから `hiroyuki` を除外（`src/lib/infrastructure/repositories/bot-repository.ts`）
+- 管理画面BOT詳細ページでメタデータ表示追加（`src/app/(admin)/admin/bots/[botId]/page.tsx`）
+- 関連単体テスト更新（`bot-repository.test.ts` / `admin/bots/[botId]/route.test.ts`）
+- D-08 `docs/architecture/components/bot.md` 同期更新
+- ※ Sprint番号なし（人間による直接修正）
 
 **Sprint-150 完了 — edge-token チャネル分離**
 
@@ -140,6 +152,7 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-151 | キュレーションBOT Phase B: Wikipedia日次急上昇 API統合 | in_progress | `sprint_151_plan.md` |
 | Sprint-150 | edge-token チャネル分離 | completed | `sprint_150_plan.md` |
 | Sprint-149 | BOT createThread UUID制約違反 + 固定スレッド除外 | completed | `sprint_149_plan.md` |
 | Sprint-148 | BOTスケジューラ障害修正（チュートリアルBOT除外 + キュレーションBOT認証修正） | completed | `sprint_148_plan.md` |

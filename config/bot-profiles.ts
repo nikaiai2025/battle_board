@@ -122,12 +122,44 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "create_thread",
 		scheduling: {
 			type: "topic_driven",
-			min_interval_minutes: 240,
-			max_interval_minutes: 360,
+			min_interval_minutes: 720,
+			max_interval_minutes: 1440,
 		},
 		collection: {
 			adapter: "subject_txt",
 			source_url: "https://asahi.5ch.io/newsplus/subject.txt",
+		},
+		fixed_messages: [],
+	},
+	// Phase B: Wikipedia速報ボット（キュレーションBOT Phase B）
+	// 日本語Wikipedia の日次急上昇記事をキュレーションして転載する運営ボット。
+	// データソース: Wikimedia REST API (pageviews top)
+	//   https://wikimedia.org/api/rest_v1/metrics/pageviews/top/ja.wikipedia/all-access/{YYYY}/{MM}/{DD}
+	// 報酬パラメータはコピペBOT（同HP:100）と同等。
+	// 投稿間隔: 720〜1440分（12〜24時間、ランダム）
+	// メタページ（メインページ / 特別:検索 等）は WikipediaAdapter 内で除外
+	// See: features/curation_bot.feature
+	// See: config/bot_profiles.yaml (正本)
+	// See: tmp/workers/bdd-architect_TASK-379/design.md
+	curation_wikipedia: {
+		hp: 100,
+		max_hp: 100,
+		reward: {
+			base_reward: 50,
+			daily_bonus: 20,
+			attack_bonus: 3,
+		},
+		behavior_type: "create_thread",
+		scheduling: {
+			type: "topic_driven",
+			min_interval_minutes: 720,
+			max_interval_minutes: 1440,
+		},
+		collection: {
+			adapter: "wikipedia",
+			// source_url は API ベースURL。日付以下（/YYYY/MM/DD）は WikipediaAdapter が動的構築する
+			source_url:
+				"https://wikimedia.org/api/rest_v1/metrics/pageviews/top/ja.wikipedia/all-access",
 		},
 		fixed_messages: [],
 	},
