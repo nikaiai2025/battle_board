@@ -4,22 +4,30 @@
 
 ## 現在のフェーズ
 
-**Sprint-152 完了 — Daily Maintenance 500 障害修正（bulk_update_daily_ids 型キャスト）**
+**Sprint-152 完了 — Daily Maintenance 500 障害修正（2層バグ: RPC型キャスト + FK CASCADE）**（コミット: `8e1706f` / `423e246` / `b362a0a`）
 
 ### Sprint-152の成果
-- TASK-382: migration 00043_fix_bulk_update_daily_ids_cast.sql 作成
-  - RPC `bulk_update_daily_ids` の `daily_id_date = p_daily_id_date::date` 明示キャスト追加
-  - 17日連続 HTTP 500（2026-03-27 〜 2026-04-14）の根本原因（PostgreSQL text→date 暗黙キャスト禁止）を解消
-- 調査レポート: `tmp/reports/daily_maintenance_500_investigation.md`（auto-debugger）
-- 人間判断で遡及対応は不要（過去17日の daily-stats 欠損・BOT 状態復旧は実施しない）
-- vitest: 2296 PASS / cucumber-js: 411 PASS / integration: 3 pending（pre-existing、Sprint-152 起因なし）
-- スコープ外: integration test 拡充（InMemoryBotRepository では検知不可な型エラーの再発防止は次回 BOT スプリントで検討）
+- **TASK-382:** migration 00043 — RPC `bulk_update_daily_ids` の `p_daily_id_date::date` 明示キャスト
+- **TASK-383:** migration 00044 — `bot_posts.bot_id` FK を `ON DELETE CASCADE` 化
+- **TASK-384:** migration 00045 — `attacks.bot_id` / `grass_reactions.receiver_bot_id` / `collected_topics.source_bot_id` の3 FK を `ON DELETE CASCADE` 化
+- **17日障害解消:** 2026-03-27 〜 2026-04-14 の連続 HTTP 500 を修正
+  - 原因1: PostgreSQL text→date 暗黙キャスト禁止で RPC 失敗（2026-03-29 混入）
+  - 原因2: `bots` 参照FK 4テーブルが `NO ACTION` で `deleteEliminatedTutorialBots` が FK違反（Sprint-84 以来の潜在バグ）
+- **主検証:** daily-maintenance run #24427737023: daily-reset 5s PASS / daily-stats 4s PASS
+- **品質ゲート:** vitest 2296 PASS / cucumber-js 411 PASS / 統合 3 PASS / E2E 63/64（1件 pre-existing Sprint-108 由来タイトル検証漏れ）
+- **本番スモーク:** 31/36 PASS 維持（Sprint-151 基準）
+- **GitHub Issue #2:** closed（修正内容 + インシデント報告書リンクをコメント添付）
+- **Cloudflare Version:** `bae61917`
 
-### Sprint-152 残タスク（本スプリント内で継続）
-- [ ] 本番 Vercel/CF デプロイ（自動、push後3分）
-- [ ] bdd-smoke（31/36 維持確認）
-- [ ] 手動 `gh workflow run daily-maintenance.yml` で daily-reset PASS 確認
-- [ ] GitHub Issue #2 クローズ
+### Sprint-152 で追加された知見
+- インシデント報告書: `docs/operations/incidents/2026-04-15_daily_maintenance_500_17day_outage.md`（9項目フレームワーク）
+- 教訓 LL-017: FK の `ON DELETE` 指定は必須（`NO ACTION` デフォルトは設計意図を見落とすトラップ）
+- 教訓 LL-018: 自動通知は「送達」「認知」「対応」の3段階で設計する（Issue #2 17日放置問題の構造的教訓）
+
+### Sprint-152 で発見されたフォローアップ検討項目
+- **AIセッション開始時の CI失敗 Issue チェック導入**（LL-018 対応）: `gh issue list --label ci-failure --state open` をスプリント開始手順に組み込む
+- **integration test 拡充**（Sprint-151/152 継続課題）: InMemoryBotRepository では検知不可な PostgreSQL 型エラー・FK制約違反の再発防止。次回 BOT 関連スプリントで検討
+- **schema 規約明文化**: 新規 FK 宣言時の `ON DELETE` 明示をレビュー観点として文書化
 
 ---
 
@@ -141,13 +149,13 @@ D-10 §7.2・§8・§9・§10 と照合し、以下の判断を採用:
 
 ## テスト状況
 
-- vitest: **2296 PASS / 0 failed**（120 files、Sprint-151 で +45: wikipedia 43 + thread-creator 2）
+- vitest: **2296 PASS / 0 failed**（120 files）
 - cucumber-js: 433シナリオ / **411 passed / 0 failed** / 18 pending / 4 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 4件: thread.feature FAB 関連（UI実装待ち）
-- playwright E2E (ローカル): 62 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
+- playwright E2E (ローカル): 63 passed / 1 failed（既知: auth-flow サイトタイトル不一致 — Sprint-108 由来の pre-existing）
 - playwright API: 27テスト / 全PASS
-- **本番スモークテスト (Sprint-151後):** 31/36 PASS（5件はローカル限定テストのスキップ）
+- **本番スモークテスト (Sprint-152後):** 31/36 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
