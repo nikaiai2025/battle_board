@@ -22,12 +22,13 @@
 ### Sprint-152 で追加された知見
 - インシデント報告書: `docs/operations/incidents/2026-04-15_daily_maintenance_500_17day_outage.md`（9項目フレームワーク）
 - 教訓 LL-017: FK の `ON DELETE` 指定は必須（`NO ACTION` デフォルトは設計意図を見落とすトラップ）
-- 教訓 LL-018: 自動通知は「送達」「認知」「対応」の3段階で設計する（Issue #2 17日放置問題の構造的教訓）
 
-### Sprint-152 で発見されたフォローアップ検討項目
-- **AIセッション開始時の CI失敗 Issue チェック導入**（LL-018 対応）: `gh issue list --label ci-failure --state open` をスプリント開始手順に組み込む
-- **integration test 拡充**（Sprint-151/152 継続課題）: InMemoryBotRepository では検知不可な PostgreSQL 型エラー・FK制約違反の再発防止。次回 BOT 関連スプリントで検討
-- **schema 規約明文化**: 新規 FK 宣言時の `ON DELETE` 明示をレビュー観点として文書化
+### 対応見送りとした項目（人間判断 2026-04-15）
+- **AIセッション開始時の CI失敗 Issue チェック**: 本件は認知が即日成立しており（別件優先で対応保留）、構造的問題ではないため対応不要
+- **integration test 拡充**: 類似事象が再発しても Issue 起票経路で即座に検知可能なため、費用対効果が見合わず見送り
+- **schema 規約明文化**: 同上
+
+※ LL-018（初稿で書いた「通知の認知フロー断絶」教訓）は事実誤認に基づくため取り下げ。lessons_learned.md に取り下げ記録のみ残置
 
 ---
 

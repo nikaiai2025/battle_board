@@ -76,7 +76,8 @@ TASK-383 デプロイ後、daily-maintenance.yml で再度 500。
 
 インシデント分析実施（`/incident-analysis` コマンド）:
 - 報告書: `docs/operations/incidents/2026-04-15_daily_maintenance_500_17day_outage.md`
-- 教訓追加: `docs/architecture/lessons_learned.md` LL-017（FK `ON DELETE` 明示義務化）/ LL-018（通知送達と認知の非対称性）
+- 教訓追加: `docs/architecture/lessons_learned.md` LL-017（FK `ON DELETE` 明示義務化）
+- ※ LL-018（通知送達と認知の非対称性）は初稿で書いたが、人間証言（2026-04-15）により事実誤認と判明したため取り下げ。17日遅延は認知フロー断絶ではなく人間判断による別件優先の意図的保留であった
 
 人間承認 (2026-04-15): TASK-384 として残り3テーブルを一括 CASCADE 化（同 migration 00045）。
 
