@@ -1,7 +1,8 @@
 ---
 sprint_id: Sprint-151
-status: in_progress
+status: completed
 created_at: 2026-04-14
+completed_at: 2026-04-14
 ---
 
 # Sprint-151 計画書 — キュレーションBOT Phase B: Wikipedia日次急上昇 API統合
@@ -88,4 +89,19 @@ created_at: 2026-04-14
 | TASK-380 | completed | vitest 2251 PASS / cucumber 411 PASS（月次削除で 412→411） / 7ファイル変更（locked_files 5 + 追加 2） / 2026-04-14 |
 | TASK-381 | completed | vitest 2296 PASS（+45: wikipedia 43 + thread-creator 2） / cucumber 411 PASS維持 / tsc noEmitエラーなし / 11ファイル変更（新規4 + 変更7）/ formatBody 拡張で Phase A への波及あり（feature v4 準拠）/ BDDステップ定義の「勢い:」→「バズスコア:」値整合修正（locked_files外→権限移譲ルールで承認） / 2026-04-14 |
 | TASK-GATE-151 | completed | 総合PASS / vitest 2296/2296 / cucumber 411 PASS（18 pending + 4 undefined は既存仕様）/ tsc エラーなし / lint Sprint-151 差分エラー0件（既存495 problems は据置）/ 統合・E2Eは Docker停止のため実施対象外 |
-| TASK-SMOKE-151 | — | デプロイ後に起動 |
+| TASK-SMOKE-151 | completed | 本番Playwright 31/36 PASS（Sprint-150 基準維持、5 skipped はローカル限定） / Cloudflare Version 92faa009 で検証 / 新規FAIL なし |
+
+## デプロイ結果
+
+- **コミット:** `ec11f98 feat: キュレーションBOT Phase B — Wikipedia日次急上昇BOT実装（Sprint-151）`（2026-04-14 19:50:44 JST）
+- **Vercel:** `battle-board-99k03kn3m` Ready（46s duration、Production）
+- **Cloudflare:** Version `92faa009` 2026-04-14T10:52:47Z（コミット後 約2分で反映）
+- **本番スモーク:** 31/36 PASS（Sprint-150 基準維持）
+
+## 残存人間作業
+
+Sprint 完結後も以下は人間作業として残置する（BOT実働に必要）:
+
+1. **GitHub Secret `WIKIMEDIA_CONTACT` の設定** — User-Agent に連絡先を埋め込むため（Wikimedia API ベストプラクティス遵守）。未設定でも動作はするがフォールバック値になるため運用上推奨
+2. **本番 Supabase への migration 00042 適用** — `curation_wikipedia` BOT の seed INSERT（`00042_seed_curation_wikipedia_bot.sql`）
+3. **実働確認（翌日以降）** — GitHub Actions cron 起動後、`collected_topics` テーブルに Wikipedia 由来データが入り、BOT がスレッドを立てているか確認

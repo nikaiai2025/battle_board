@@ -4,10 +4,22 @@
 
 ## 現在のフェーズ
 
-**Sprint-151 進行中 — キュレーションBOT Phase B: Wikipedia日次急上昇 API統合**
-- スコープ: 本番投入まで
-- BDD変更: `features/curation_bot.feature` v3→v4（月次・定番記事除去 + BOT投稿間隔 240〜360分→12〜24時間）
-- 実装: WikipediaAdapter + curation_wikipedia プロファイル + API統合テスト
+**Sprint-151 完了 — キュレーションBOT Phase B: Wikipedia日次急上昇 API統合**（コミット: `ec11f98`）
+
+### Sprint-151の成果
+- TASK-379: Wikipedia API統合設計書（4成果物、9論点決着、ESC-TASK-379-1 自律解決）
+- TASK-380: BOT投稿間隔 240-360分 → 720-1440分（全curation系）
+- TASK-381: WikipediaAdapter 実装 + curation_wikipedia プロファイル + formatBody 拡張（Phase A 波及あり、feature v4 準拠）
+- BDD変更: `features/curation_bot.feature` v3→v4（月次・定番記事除去 + 12-24時間投稿間隔）
+- vitest: 2296 PASS（+45）/ cucumber-js: 411 PASS
+- 本番スモーク: 31/36 PASS（Sprint-150 基準維持）
+- Cloudflare Version: `92faa009`
+
+### Sprint-151 人間作業（残置）
+BOT実働にあたり以下は人間作業:
+1. GitHub Secret `WIKIMEDIA_CONTACT` 設定（連絡先メールアドレス）
+2. 本番 Supabase への migration 00042 適用（`curation_wikipedia` seed INSERT）
+3. 実働確認（翌日以降、GitHub Actions cron 起動後に `collected_topics` への INSERT 確認）
 
 **人間直接修正 (2026-04-13) — hiroyuki除外 + 管理画面BOTメタデータ表示**（コミット: `e479099`）
 - BOT reviveから `hiroyuki` を除外（`src/lib/infrastructure/repositories/bot-repository.ts`）
@@ -92,13 +104,13 @@
 
 ## テスト状況
 
-- vitest: **2249 PASS / 0 failed**（119 files）
-- cucumber-js: 434シナリオ / **412 passed / 0 failed** / 18 pending / 4 undefined
+- vitest: **2296 PASS / 0 failed**（120 files、Sprint-151 で +45: wikipedia 43 + thread-creator 2）
+- cucumber-js: 433シナリオ / **411 passed / 0 failed** / 18 pending / 4 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 4件: thread.feature FAB 関連（UI実装待ち）
 - playwright E2E (ローカル): 62 passed / 1 failed（既知: auth-flow サイトタイトル不一致）
 - playwright API: 27テスト / 全PASS
-- **本番スモークテスト (Sprint-150後):** 31/36 PASS（5件はローカル限定テストのスキップ）
+- **本番スモークテスト (Sprint-151後):** 31/36 PASS（5件はローカル限定テストのスキップ）
 
 ## 人間タスク
 
@@ -110,7 +122,9 @@
 |---|---|---|---|
 | 1 | ~~キュレーション仕様変更~~ | ~~Sprint-146で完了~~ | ~~完了~~ |
 | 2 | ~~edge-token チャネル分離~~ | ~~Sprint-150で完了~~ | ~~完了~~ |
-| 3 | BOT Strategy Step 4 Phase B | API統合テスト（キュレーション仕様変更後に再計画） | 人間判断待ち |
+| 3 | ~~BOT Strategy Step 4 Phase B~~ | ~~Wikipedia日次急上昇で完了（Sprint-151）~~ | ~~完了~~ |
+| 4 | BOT Strategy Step 4 Phase C | 残り11ソース一括実装（Phase B 実績活用） | Wikipedia BOT 実働確認後 |
+| 5 | 定番記事BOT | 固定リスト型（別featureで管理） | 人間判断待ち |
 
 ## BOT Strategy移行 進捗
 
@@ -119,8 +133,8 @@
 | Step 1〜2.5 | Strategy定義 + BotService委譲リファクタ + Phase 5検証 | **完了（Sprint-43〜45）** |
 | Step 3 | bot_profiles.yaml スキーマ拡張 + collected_topics マイグレーション | **完了（Sprint-136）** |
 | Step 4 Phase A | 速報+速報ボット: SubjectTxtAdapter + ThreadCreatorBehaviorStrategy + 収集ジョブ | **完了（Sprint-136）** |
-| Step 4 Phase B | API統合テスト | Phase A 完了後 |
-| Step 4 Phase C | 残り11ソースの一括実装 | Phase B 完了後 |
+| Step 4 Phase B | Wikipedia日次急上昇 API統合 | **完了（Sprint-151）** |
+| Step 4 Phase C | 残り11ソースの一括実装 | Phase B 実働確認後 |
 
 ## 技術負債リスト
 
@@ -152,7 +166,7 @@
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
-| Sprint-151 | キュレーションBOT Phase B: Wikipedia日次急上昇 API統合 | in_progress | `sprint_151_plan.md` |
+| Sprint-151 | キュレーションBOT Phase B: Wikipedia日次急上昇 API統合 | completed | `sprint_151_plan.md` |
 | Sprint-150 | edge-token チャネル分離 | completed | `sprint_150_plan.md` |
 | Sprint-149 | BOT createThread UUID制約違反 + 固定スレッド除外 | completed | `sprint_149_plan.md` |
 | Sprint-148 | BOTスケジューラ障害修正（チュートリアルBOT除外 + キュレーションBOT認証修正） | completed | `sprint_148_plan.md` |
