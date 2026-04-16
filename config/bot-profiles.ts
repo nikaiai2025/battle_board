@@ -163,4 +163,104 @@ export const botProfilesConfig: BotProfilesYaml = {
 		},
 		fixed_messages: [],
 	},
+	// Phase C Step 1: 嫌儲速報ボット（キュレーションBOT Phase C Step 1）
+	// 5ch嫌儲（poverty）のバズスレッドをキュレーションして転載する運営ボット。
+	// subject_txt 方式（SubjectTxtAdapter）を流用する。
+	// 報酬パラメータ・スケジューリングは curation_newsplus と同等。
+	// See: features/curation_bot.feature
+	curation_poverty: {
+		hp: 100,
+		max_hp: 100,
+		reward: {
+			base_reward: 50,
+			daily_bonus: 20,
+			attack_bonus: 3,
+		},
+		behavior_type: "create_thread",
+		scheduling: {
+			type: "topic_driven",
+			min_interval_minutes: 720,
+			max_interval_minutes: 1440,
+		},
+		collection: {
+			adapter: "subject_txt",
+			source_url: "https://greta.5ch.io/poverty/subject.txt",
+		},
+		fixed_messages: [],
+	},
+	// Phase C Step 1: 芸スポ速報ボット（キュレーションBOT Phase C Step 1）
+	// 5ch芸スポ速報+（mnewsplus）のバズスレッドをキュレーションして転載する運営ボット。
+	// subject_txt 方式（SubjectTxtAdapter）を流用する。
+	// 報酬パラメータ・スケジューリングは curation_newsplus と同等。
+	// See: features/curation_bot.feature
+	curation_mnewsplus: {
+		hp: 100,
+		max_hp: 100,
+		reward: {
+			base_reward: 50,
+			daily_bonus: 20,
+			attack_bonus: 3,
+		},
+		behavior_type: "create_thread",
+		scheduling: {
+			type: "topic_driven",
+			min_interval_minutes: 720,
+			max_interval_minutes: 1440,
+		},
+		collection: {
+			adapter: "subject_txt",
+			source_url: "https://hayabusa9.5ch.io/mnewsplus/subject.txt",
+		},
+		fixed_messages: [],
+	},
+	// Phase C Step 1: VIP速報ボット（キュレーションBOT Phase C Step 1）
+	// 5ch VIP（news4vip）のバズスレッドをキュレーションして転載する運営ボット。
+	// subject_txt 方式（SubjectTxtAdapter）を流用する。
+	// 報酬パラメータ・スケジューリングは curation_newsplus と同等。
+	// See: features/curation_bot.feature
+	curation_news4vip: {
+		hp: 100,
+		max_hp: 100,
+		reward: {
+			base_reward: 50,
+			daily_bonus: 20,
+			attack_bonus: 3,
+		},
+		behavior_type: "create_thread",
+		scheduling: {
+			type: "topic_driven",
+			min_interval_minutes: 720,
+			max_interval_minutes: 1440,
+		},
+		collection: {
+			adapter: "subject_txt",
+			source_url: "https://mi.5ch.io/news4vip/subject.txt",
+		},
+		fixed_messages: [],
+	},
+	// Phase C Step 1: liveedge速報ボット（キュレーションBOT Phase C Step 1）
+	// liveedge（eddibb.cc/liveedge）のバズスレッドをキュレーションして転載する運営ボット。
+	// subject_txt 方式（SubjectTxtAdapter）を流用する。
+	// 報酬パラメータ・スケジューリングは curation_newsplus と同等。
+	// See: features/curation_bot.feature
+	curation_liveedge: {
+		hp: 100,
+		max_hp: 100,
+		reward: {
+			base_reward: 50,
+			daily_bonus: 20,
+			attack_bonus: 3,
+		},
+		behavior_type: "create_thread",
+		scheduling: {
+			type: "topic_driven",
+			min_interval_minutes: 720,
+			max_interval_minutes: 1440,
+		},
+		collection: {
+			adapter: "subject_txt",
+			source_url: "https://bbs.eddibb.cc/liveedge/subject.txt",
+		},
+		fixed_messages: [],
+	},
 };
