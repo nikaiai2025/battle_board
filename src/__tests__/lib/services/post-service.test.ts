@@ -160,6 +160,7 @@ function createEliminatedBot(botId: string): Bot {
 		isActive: false, // 撃破済み
 		isRevealed: false,
 		revealedAt: null,
+		revivedAt: null,
 		survivalDays: 5,
 		totalPosts: 42,
 		accusedCount: 3,
@@ -186,6 +187,7 @@ function createActiveBot(botId: string): Bot {
 		isActive: true, // 活動中（潜伏中 or 暴露済み）
 		isRevealed: false,
 		revealedAt: null,
+		revivedAt: null,
 		survivalDays: 2,
 		totalPosts: 15,
 		accusedCount: 0,

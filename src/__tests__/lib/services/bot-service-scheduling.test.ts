@@ -43,6 +43,7 @@ function createLurkingBot(overrides: Partial<Bot> = {}): Bot {
 		isActive: true,
 		isRevealed: false,
 		revealedAt: null,
+		revivedAt: null,
 		survivalDays: 0,
 		totalPosts: 0,
 		accusedCount: 0,
@@ -84,8 +85,9 @@ function createMockBotRepository(
 		bulkIncrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
 		bulkReviveEliminated: vi.fn().mockResolvedValue([]),
-		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
-		deleteEliminatedTutorialBots: vi.fn().mockResolvedValue(0),
+		// Sprint-154 TASK-387: deleteEliminatedTutorialBots から汎化
+		// See: docs/architecture/components/bot.md §2.10 Step 6 使い切りBOTクリーンアップ
+		deleteEliminatedSingleUseBots: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		// See: features/bot_system.feature @BOTの書き込みで総書き込み数がインクリメントされる
 		incrementTotalPosts: vi.fn().mockResolvedValue(undefined),

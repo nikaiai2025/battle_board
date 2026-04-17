@@ -41,6 +41,7 @@ function createBot(overrides: Partial<Bot> = {}): Bot {
 		isActive: true,
 		isRevealed: false,
 		revealedAt: null,
+		revivedAt: null,
 		survivalDays: 0,
 		totalPosts: 0,
 		accusedCount: 0,

@@ -1,8 +1,46 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-04-15
+> 最終更新: 2026-04-17
 
 ## 現在のフェーズ
+
+**Sprint-154 フェーズ1 完了 — 荒らし役BOT増殖バグ ロジック修正完了、フェーズ2（データ訂正）の人間承認待ち**
+
+### Sprint-154 フェーズ1 成果（ロジック修正）
+
+- **TASK-386 (bdd-architect)**: 設計検証完了。オーケストレーター Q3 案を否定し **`revived_at TIMESTAMPTZ`** 方式を推奨。Q2 は aori も含めて拡張。BDD 変更不要と結論
+- **TASK-387 (bdd-coding)**: 実装完了
+  - migration 00047: `bots.revived_at TIMESTAMPTZ NULL` + 部分 INDEX
+  - `BotRepository.bulkReviveEliminated()` 冪等化（SELECT に `revived_at IS NULL`、INSERT 後に UPDATE）
+  - `deleteEliminatedSingleUseBots()` 新設（tutorial/aori/hiroyuki 撃破済み + 7日経過未撃破）
+  - `BotService.performDailyReset()` Step 6 更新
+  - docs 更新（bot.md §2.10 / §5.1 / §6.11, state_transitions.yaml #daily_reset）
+  - 新規単体テスト 10件
+- **品質ゲート**: vitest 2306 PASS / cucumber 411 PASS（変更スコープ内）。統合3件・E2E1件 FAIL は Sprint-153 切り戻しで再現確認済みの既存障害のためスプリント外
+
+### 自律判断実績（権限移譲ルール適用）
+- **ESC-TASK-387-1**: インターフェース名変更に伴うモック同期 → locked_files 機械的拡張
+- **ESC-TASK-387-2**: aori cleanup 拡張に伴う step assertion 緩和 → step 実装のみ修正（feature ファイル不変）
+
+### Sprint-154 フェーズ2（未着手）
+- **TASK-388**: 本番データ訂正 migration（107→10ソフト削除、hiroyuki/aori 7日経過物理削除）
+- **人間承認ゲート必要**: 本番データ操作のため、フェーズ1デプロイ検証完了後に人間承認を得て起票
+
+---
+
+**Sprint-153 完了 — キュレーションBOT Phase C Step 1（subject_txt 流用 × 4体）**（コミット: `368f129`）
+
+### Sprint-153 の成果
+- TASK-385: config/bot-profiles.ts に 4 プロファイル追加（`curation_poverty` / `curation_mnewsplus` / `curation_news4vip` / `curation_liveedge`）
+- migration 00046: 4 BOT 冪等 seed
+- 既存 `SubjectTxtAdapter` 流用（Adapter 変更なし）、adapter-resolver 変更なし
+- **vitest: 2296/2296 PASS / cucumber: 411/411 PASS**（既存件数維持）
+- 本番スモーク: 省略（人間判断）
+
+### Sprint-153 で発覚した次スプリント送り事項
+- 荒らし役BOT 107体増殖バグ → Sprint-154 へ分離
+
+---
 
 **Sprint-152 完了 — Daily Maintenance 500 障害修正（2層バグ: RPC型キャスト + FK CASCADE）**（コミット: `8e1706f` / `423e246` / `b362a0a`）
 

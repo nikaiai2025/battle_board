@@ -42,6 +42,13 @@ interface BotRow {
 	created_at: string;
 	/** TASK-307追加: ボットへの草カウント（通算）。See: supabase/migrations/00029_bot_grass_count.sql */
 	grass_count: number;
+	/**
+	 * Sprint-154 TASK-387 追加: 復活済みマーカー。
+	 * bulkReviveEliminated で次世代を生成済みであることを示すタイムスタンプ。
+	 * NULL = 未復活（次回復活対象）、NON-NULL = 復活済み（SELECT 対象外）。
+	 * See: supabase/migrations/00047_add_revived_at_for_idempotency.sql
+	 */
+	revived_at: string | null;
 }
 
 /**
@@ -99,6 +106,9 @@ function rowToBot(row: BotRow): Bot {
 		// TASK-307: ボット草カウント。00029マイグレーションで追加。DEFAULT 0 のため undefined 時は 0 にフォールバック
 		// See: features/reactions.feature @ボットへの草でも正しい草カウントが表示される
 		grassCount: row.grass_count ?? 0,
+		// Sprint-154 TASK-387: 復活済みマーカー。undefined（旧マイグレーション前のフェッチ）に備えて null にフォールバック。
+		// See: supabase/migrations/00047_add_revived_at_for_idempotency.sql
+		revivedAt: row.revived_at ? new Date(row.revived_at) : null,
 	};
 }
 
@@ -285,6 +295,7 @@ export async function create(
 		| "timesAttacked"
 		| "eliminatedAt"
 		| "eliminatedBy"
+		| "revivedAt"
 	>,
 ): Promise<Bot> {
 	const { data, error } = await supabaseAdmin
@@ -592,8 +603,20 @@ export async function bulkResetRevealed(): Promise<number> {
  * ひろゆきBOT（'hiroyuki'）は
  * 復活対象から除外する。
  *
+ * 冪等性保証（Sprint-154 TASK-387）:
+ *   - SELECT 条件に `revived_at IS NULL` を追加することで、既に次世代を生成
+ *     済みの旧レコードを対象外にする。
+ *   - 新レコード INSERT 成功直後に旧レコードへ `UPDATE SET revived_at = NOW()`
+ *     を発行し、次回以降の呼び出しでヒットさせない。
+ *   - 「INSERT成功→UPDATE」の順序を厳守することで、UPDATE 失敗時でも
+ *     「旧レコード未マーク・新レコード生成済み」の中間状態に留まり、
+ *     次回呼び出しで再度同じ旧レコードから INSERT が発生する（＝重複復活）
+ *     リスクを最小化する。真の原子性は将来 Supabase Function 化で対応。
+ *
  * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
  * See: docs/specs/bot_state_transitions.yaml #transitions > eliminated -> lurking
+ * See: supabase/migrations/00047_add_revived_at_for_idempotency.sql
+ * See: tmp/workers/bdd-architect_TASK-386/design.md §2.3
  * See: features/bot_system.feature @撃破済みボットは翌日にHP初期値で復活する
  * See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
  * See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
@@ -604,11 +627,15 @@ export async function bulkResetRevealed(): Promise<number> {
 export async function bulkReviveEliminated(): Promise<Bot[]> {
 	// eliminated 状態（is_active=false）かつ復活対象のボットを取得する。
 	// チュートリアルBOT・煽りBOT・ひろゆきBOT（使い切りBOT）は復活させない。
+	// revived_at IS NULL は冪等化のため必須（既に復活済みの旧レコードを除外）。
 	const { data: eliminated, error: fetchError } = await supabaseAdmin
 		.from("bots")
 		.select("*")
 		.eq("is_active", false)
-		.or("bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori,hiroyuki)");
+		.is("revived_at", null)
+		.or(
+			"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori,hiroyuki)",
+		);
 
 	if (fetchError) {
 		throw new Error(
@@ -638,6 +665,7 @@ export async function bulkReviveEliminated(): Promise<Bot[]> {
 	}
 
 	// 旧レコードは UPDATE せず凍結保持。新レコードを INSERT して新世代ボットを作成する。
+	// INSERT 成功後に旧レコードへ revived_at = NOW() を設定し、次回 SELECT から除外する。
 	const revivedBots: Bot[] = [];
 	for (const row of rows) {
 		const { data: newRow, error: insertError } = await supabaseAdmin
@@ -668,6 +696,22 @@ export async function bulkReviveEliminated(): Promise<Bot[]> {
 		if (insertError) {
 			throw new Error(
 				`BotRepository.bulkReviveEliminated insert failed for bot "${row.name}": ${insertError.message}`,
+			);
+		}
+
+		// 旧レコードに復活済みマーカーを設定する（冪等化のキモ）。
+		// INSERT が成功している時点で旧世代→新世代の引き継ぎは完了しているため、
+		// 仮に UPDATE が失敗しても新レコードは有効。ただし次回呼び出しで
+		// 旧レコードが再ヒットする可能性があるので、UPDATE 失敗時はログを残し
+		// Error を throw してバッチを停止する（運用側で復旧判断する）。
+		const { error: updateError } = await supabaseAdmin
+			.from("bots")
+			.update({ revived_at: new Date(Date.now()).toISOString() })
+			.eq("id", row.id);
+
+		if (updateError) {
+			throw new Error(
+				`BotRepository.bulkReviveEliminated mark-revived failed for bot "${row.name}" (id=${row.id}): ${updateError.message}`,
 			);
 		}
 
@@ -852,49 +896,58 @@ export async function countLivingBotsInThread(
 }
 
 /**
- * 撃破済みチュートリアルBOT および古い未撃破チュートリアルBOTを削除する。
- * daily-maintenance（performDailyReset 末尾）で呼び出す。
+ * 使い切りBOT（tutorial / aori / hiroyuki）の撃破済み・7日経過の未撃破を削除する。
+ * daily-maintenance（performDailyReset Step 6）で呼び出す。
  *
- * 削除対象:
- *   - 撃破済みチュートリアルBOT: bot_profile_key = 'tutorial' AND is_active = false
- *   - 7日経過の未撃破チュートリアルBOT: bot_profile_key = 'tutorial' AND created_at < NOW() - INTERVAL '7 days'
+ * Sprint-154 TASK-387 で deleteEliminatedTutorialBots を汎化したもの。
+ * tutorial だけでなく aori / hiroyuki も同じ「使い切り」性質を持ち、日次リセットで
+ * 復活しないため、蓄積防止を目的に同一ルールでクリーンアップする。
  *
- * See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
- * See: tmp/workers/bdd-architect_TASK-236/design.md §3.8 撃破済みチュートリアルBOTクリーンアップ
+ * 削除対象（OR 条件）:
+ *   - 撃破済み使い切りBOT: bot_profile_key IN ('tutorial','aori','hiroyuki') AND is_active = false
+ *   - 7日経過の未撃破使い切りBOT: bot_profile_key IN ('tutorial','aori','hiroyuki') AND created_at < NOW() - 7日
+ *
+ * See: docs/architecture/components/bot.md §2.10 Step 6 使い切りBOTクリーンアップ
+ * See: tmp/workers/bdd-architect_TASK-386/design.md §2.2
+ * See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+ * See: features/command_hiroyuki.feature L40 コメント「使い切り」仕様
  *
  * @returns 削除したボット数
  */
-export async function deleteEliminatedTutorialBots(): Promise<number> {
-	// 撃破済みチュートリアルBOTを削除（is_active = false）
+export async function deleteEliminatedSingleUseBots(): Promise<number> {
+	const SINGLE_USE_PROFILE_KEYS = ["tutorial", "aori", "hiroyuki"];
+
+	// 1. 撃破済みの使い切りBOT（is_active = false）を一括削除する。
 	const { data: eliminated, error: eliminatedError } = await supabaseAdmin
 		.from("bots")
 		.delete()
-		.eq("bot_profile_key", "tutorial")
+		.in("bot_profile_key", SINGLE_USE_PROFILE_KEYS)
 		.eq("is_active", false)
 		.select("id");
 
 	if (eliminatedError) {
 		throw new Error(
-			`BotRepository.deleteEliminatedTutorialBots (eliminated) failed: ${eliminatedError.message}`,
+			`BotRepository.deleteEliminatedSingleUseBots (eliminated) failed: ${eliminatedError.message}`,
 		);
 	}
 
 	const eliminatedCount = ((eliminated as { id: string }[]) ?? []).length;
 
-	// 7日経過の未撃破チュートリアルBOTを削除
+	// 2. 7日経過の未撃破使い切りBOTを削除する。
+	// ユーザーが召喚直後に攻撃する時間的猶予を確保するため7日を閾値とする。
 	const sevenDaysAgo = new Date(
 		Date.now() - 7 * 24 * 60 * 60 * 1000,
 	).toISOString();
 	const { data: stale, error: staleError } = await supabaseAdmin
 		.from("bots")
 		.delete()
-		.eq("bot_profile_key", "tutorial")
+		.in("bot_profile_key", SINGLE_USE_PROFILE_KEYS)
 		.lt("created_at", sevenDaysAgo)
 		.select("id");
 
 	if (staleError) {
 		throw new Error(
-			`BotRepository.deleteEliminatedTutorialBots (stale) failed: ${staleError.message}`,
+			`BotRepository.deleteEliminatedSingleUseBots (stale) failed: ${staleError.message}`,
 		);
 	}
 

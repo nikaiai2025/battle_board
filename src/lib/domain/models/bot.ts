@@ -75,4 +75,14 @@ export interface Bot {
 	eliminatedBy: string | null;
 	/** 作成日時 */
 	createdAt: Date;
+	/**
+	 * 復活済みマーカータイムスタンプ（Sprint-154 TASK-387 追加）。
+	 * 撃破された旧レコードが `bulkReviveEliminated` によって次世代を生成済みで
+	 * あることを示す。NULL は未復活（次回復活対象）、NON-NULL は復活済み
+	 * （SELECT 対象外）。復活処理の冪等性を保証する述語として使う。
+	 *
+	 * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
+	 * See: supabase/migrations/00047_add_revived_at_for_idempotency.sql
+	 */
+	revivedAt: Date | null;
 }

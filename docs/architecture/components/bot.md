@@ -165,15 +165,19 @@ DailyResetResult {
    - 旧レコード: `is_active = false` のまま凍結保持（`bot_posts` 紐付けも維持）
    - 新レコード: 同一 `bot_profile_key`・`name` で INSERT。HP=max_hp, is_active=true, is_revealed=false, survival_days=0, times_attacked=0, `next_post_at` を再設定（TDR-010）
    - `BotRepository.bulkReviveEliminated()` は UPDATE → INSERT に変更する
+   - **冪等化（Sprint-154 TASK-387）**: SELECT 条件に `revived_at IS NULL` を追加し、既に次世代を生成済みの旧レコードを対象外にする。新レコード INSERT 成功直後に旧レコードを `UPDATE SET revived_at = NOW()` して次回以降の再復活を防ぐ。詳細は §6.11 の「冪等性保証」節を参照。
    - **チュートリアルBOT（`tutorial`）・煽りBOT（`aori`）・ひろゆきBOT（`hiroyuki`）は復活対象から除外する。** いずれも1回限りの使い切りBOTであり、日次リセットで復活しない設計。
    - See: features/welcome.feature @チュートリアルBOTは日次リセットで復活しない
    - See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
    - See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
 5. attacks テーブルの前日分レコードをクリーンアップ
-6. 撃破済みチュートリアルBOTのクリーンアップ（`BotRepository.deleteEliminatedTutorialBots()`）
-   - 削除対象1: `bot_profile_key = 'tutorial' AND is_active = false`（撃破済み）
-   - 削除対象2: `bot_profile_key = 'tutorial' AND created_at < NOW() - 7日`（7日経過の未撃破）
-   - See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+6. **使い切りBOTクリーンアップ**（`BotRepository.deleteEliminatedSingleUseBots()`。Sprint-154 TASK-387 で tutorial 専用 → tutorial/aori/hiroyuki 3種に汎化）
+   - 削除対象1: `bot_profile_key IN ('tutorial','aori','hiroyuki') AND is_active = false`（撃破済み使い切りBOT）
+   - 削除対象2: `bot_profile_key IN ('tutorial','aori','hiroyuki') AND created_at < NOW() - 7日`（7日経過の未撃破使い切りBOT）
+   - 背景: tutorial / aori / hiroyuki はいずれも「使い切り」仕様で日次リセットで復活しないため、未クリーンアップだと DB 蓄積・cron 負荷増の原因となる。7日は召喚〜放置期間の UX 許容猶予として設定。
+   - See: tmp/workers/bdd-architect_TASK-386/design.md §2.2
+   - See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+   - See: features/command_hiroyuki.feature L40 コメント「使い切り」仕様
 
 ### 2.11 チュートリアルBOTスポーン（processPendingTutorials — Sprint-84新設）
 
@@ -687,6 +691,7 @@ v5で以下のカラムを追加・変更する。
 | hp | 変更 | - | 荒らし役の初期値を 30 -> 10 に変更 |
 | max_hp | 変更 | - | 荒らし役の初期値を 30 -> 10 に変更 |
 | next_post_at | 追加 | TIMESTAMPTZ | 次回投稿予定時刻。投稿完了時に `NOW() + SchedulingStrategy.getNextPostDelay()` で設定する。cron起動時は `WHERE is_active = true AND next_post_at <= NOW()` で投稿対象を判定する（TDR-010） |
+| revived_at | 追加 (Sprint-154 TASK-387) | TIMESTAMPTZ NULL | 撃破された旧レコードが `bulkReviveEliminated` で次世代を生成済みであることを示すタイムスタンプ。NULL = 未復活（復活対象）、NON-NULL = 復活済み（SELECT 対象外）。`idx_bots_pending_revival` 部分 INDEX（`WHERE revived_at IS NULL`）とセットで冪等性を担保する。See: supabase/migrations/00047_add_revived_at_for_idempotency.sql |
 
 ### 5.2 attacks テーブル（新規）
 
@@ -831,7 +836,7 @@ Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, An
 
 - **1回限りの消耗品**: 初回書き込みを検出した時点で `pending_tutorials` テーブルにキューイングし、次の CF Cron 実行時にスポーン・即時書き込み実行する。書き込み後は再投稿しない（`ImmediateSchedulingStrategy`, delay=0）。
 - **日次リセット除外**: 撃破されても翌日の `bulkReviveEliminated` で復活させない。チュートリアルBOTが毎日再出現するとゲームバランスが崩れるため。
-- **自動クリーンアップ**: 撃破後は翌日の `deleteEliminatedTutorialBots` で DB から削除する。7日経過した未撃破チュートリアルBOTも削除する（チュートリアル放置ユーザーへの配慮）。
+- **自動クリーンアップ**: 撃破後は翌日の `deleteEliminatedSingleUseBots`（Sprint-154 TASK-387 で `deleteEliminatedTutorialBots` から汎化）で DB から削除する。7日経過した未撃破チュートリアルBOTも削除する（チュートリアル放置ユーザーへの配慮）。
 - **botUserId の追加**: チュートリアルBOTの書き込み `>>N !w\n新参おるやん🤣` には `!w` コマンドが含まれる。BOT書き込み時の `resolvedAuthorId` は通常 null だが、`PostInput.botUserId` フィールドを追加することでコマンドパイプラインが BOT 自身の ID で実行される。GrassHandler の voter_id に FK 制約がないため、botId をそのまま利用できる。
 
 ### 6.11 インカーネーションモデル — ボット復活方式
@@ -862,6 +867,18 @@ Phase 3 以降、複数の AI API プロバイダー（Google Gemini, OpenAI, An
 **適用対象**: 日次リセットで復活する全運営ボット。チュートリアルBOT・煽りBOT・ひろゆきBOTは復活しないため対象外。
 
 **DB増加量**: 1日最大10レコード（荒らし役10体）。問題にならない規模。
+
+**冪等性保証（Sprint-154 TASK-387）**:
+
+Sprint-152 の17日障害解消時に日次リセットが複数回走行し、同一の撃破済み旧レコードから新世代 BOT が N 回 INSERT されて荒らし役 active=107 体まで増殖したインシデントを受け、復活処理を冪等化する。
+
+- **述語**: `bulkReviveEliminated()` の SELECT 条件に `revived_at IS NULL` を追加し、既に次世代を生成済みの旧レコードを対象外にする。
+- **マーカー設定**: 新レコード INSERT 成功直後に `UPDATE bots SET revived_at = NOW() WHERE id = :old_id` を発行する。順序は厳密に「INSERT → UPDATE」とする。
+- **中間状態リスク**: PostgREST は単一 RPC によるトランザクション境界を持たないため、INSERT 成功後に UPDATE が失敗するとその旧レコードは次回も再ヒットする。現実装では UPDATE 失敗時に明示的にエラーを throw してバッチを停止し、運用側の復旧判断に委ねる。真の原子性は Supabase Function 化で将来対応する。
+- **INDEX**: 部分 INDEX `idx_bots_pending_revival ON bots (bot_profile_key, is_active) WHERE revived_at IS NULL` により未復活レコードだけを高速 SELECT する。
+
+See: supabase/migrations/00047_add_revived_at_for_idempotency.sql
+See: tmp/workers/bdd-architect_TASK-386/design.md §2.3
 
 ### 6.12 収集と投稿の分離（v6 → v7 更新）
 

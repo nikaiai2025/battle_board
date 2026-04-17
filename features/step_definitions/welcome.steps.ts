@@ -1204,8 +1204,9 @@ Then(
 
 		// チュートリアルBOTの状態を確認する
 		// performDailyReset は bulkReviveEliminated で通常BOTを復活させるが、
-		// チュートリアルBOTは deleteEliminatedTutorialBots で削除される設計。
-		// → チュートリアルBOTは削除されるか、is_active=false のままであること。
+		// 使い切りBOT（tutorial / aori / hiroyuki）は bulkReviveEliminated の除外対象。
+		// さらに Step 6 の deleteEliminatedSingleUseBots で撃破済み使い切りBOTが物理削除される。
+		// See: docs/architecture/components/bot.md §2.10 Step 6 使い切りBOTクリーンアップ
 		assert.ok(this.currentBot, "currentBot が設定されていること");
 		const bot = await InMemoryBotRepo.findById(this.currentBot!.id);
 
@@ -1217,7 +1218,7 @@ Then(
 				"チュートリアルBOTが復活せず is_active=false のままであること",
 			);
 		}
-		// bot === null の場合は削除済み（これも正常: deleteEliminatedTutorialBots が削除した）
+		// bot === null の場合は削除済み（これも正常: deleteEliminatedSingleUseBots が削除した）
 	},
 );
 

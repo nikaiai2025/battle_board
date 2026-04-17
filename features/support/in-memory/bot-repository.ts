@@ -190,6 +190,7 @@ export async function create(
 		| "timesAttacked"
 		| "eliminatedAt"
 		| "eliminatedBy"
+		| "revivedAt"
 	>,
 ): Promise<Bot> {
 	const newBot: Bot = {
@@ -202,6 +203,9 @@ export async function create(
 		timesAttacked: 0,
 		eliminatedAt: null,
 		eliminatedBy: null,
+		// Sprint-154 TASK-387: revivedAt は新規作成時は必ず null（復活済みではない）。
+		// See: src/lib/domain/models/bot.ts > Bot.revivedAt
+		revivedAt: null,
 	};
 	store.push(newBot);
 	return newBot;
@@ -427,18 +431,25 @@ export async function bulkResetRevealed(): Promise<number> {
 }
 
 /**
- * 撃破済みチュートリアルBOTおよび7日経過の未撃破チュートリアルBOTを削除する。
+ * 使い切りBOT（tutorial / aori / hiroyuki）のうち、撃破済みまたは7日経過の未撃破を削除する。
  *
- * 削除対象:
- *   - 撃破済みチュートリアルBOT: botProfileKey = 'tutorial' AND isActive = false
- *   - 7日経過の未撃破チュートリアルBOT: botProfileKey = 'tutorial' AND createdAt < NOW() - 7日
+ * Sprint-154 TASK-387 で deleteEliminatedTutorialBots を汎化。
+ * tutorial のみの対象だったクリーンアップを aori / hiroyuki にも拡張。
  *
- * See: src/lib/infrastructure/repositories/bot-repository.ts > deleteEliminatedTutorialBots
- * See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
+ * 削除対象（OR 条件）:
+ *   - 撃破済み使い切りBOT: botProfileKey ∈ {'tutorial','aori','hiroyuki'} AND isActive = false
+ *   - 7日経過の未撃破使い切りBOT: botProfileKey ∈ {'tutorial','aori','hiroyuki'} AND createdAt < NOW() - 7日
+ *
+ * See: src/lib/infrastructure/repositories/bot-repository.ts > deleteEliminatedSingleUseBots
+ * See: docs/architecture/components/bot.md §2.10 Step 6 使い切りBOTクリーンアップ
+ * See: tmp/workers/bdd-architect_TASK-386/design.md §2.2
+ * See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+ * See: features/command_hiroyuki.feature L40 コメント「使い切り」仕様
  *
  * @returns 削除したボット数
  */
-export async function deleteEliminatedTutorialBots(): Promise<number> {
+export async function deleteEliminatedSingleUseBots(): Promise<number> {
+	const SINGLE_USE_PROFILE_KEYS = new Set(["tutorial", "aori", "hiroyuki"]);
 	const now = Date.now();
 	const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
 
@@ -446,7 +457,7 @@ export async function deleteEliminatedTutorialBots(): Promise<number> {
 	let count = 0;
 	for (let i = store.length - 1; i >= 0; i--) {
 		const bot = store[i];
-		if (bot.botProfileKey !== "tutorial") continue;
+		if (!SINGLE_USE_PROFILE_KEYS.has(bot.botProfileKey ?? "")) continue;
 
 		const isEliminated = !bot.isActive;
 		const isStale = bot.createdAt.getTime() < now - sevenDaysMs;
@@ -507,7 +518,11 @@ export async function countLivingBotsInThread(
  * 新 UUID を生成し、同一 name/persona/bot_profile_key/max_hp で新レコードを push する。
  * 本番実装（BotRepository.bulkReviveEliminated）と同一の振る舞いを持つ。
  *
- * チュートリアルBOT（botProfileKey = 'tutorial'）・煽りBOT（'aori'）は復活対象外。
+ * 使い切りBOT（tutorial / aori / hiroyuki）は復活対象外。
+ *
+ * Sprint-154 TASK-387 冪等化:
+ *   - SELECT 相当のフィルタに revivedAt === null を追加（復活済みを除外）
+ *   - 新レコード生成後、旧レコードに revivedAt = NOW() を設定
  *
  * See: src/lib/infrastructure/repositories/bot-repository.ts
  * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
@@ -516,8 +531,8 @@ export async function countLivingBotsInThread(
  * See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
  */
 export async function bulkReviveEliminated(): Promise<Bot[]> {
-	// チュートリアルBOT・煽りBOT（使い切りBOT）は復活させない
-	const NON_REVIVABLE_PROFILE_KEYS = ["tutorial", "aori"];
+	// 使い切りBOT（tutorial / aori / hiroyuki）は復活させない
+	const NON_REVIVABLE_PROFILE_KEYS = ["tutorial", "aori", "hiroyuki"];
 
 	// 当日 JST 日付を取得する（daily_id_date に使用）
 	const jstOffset = 9 * 60 * 60 * 1000;
@@ -538,15 +553,19 @@ export async function bulkReviveEliminated(): Promise<Bot[]> {
 	}
 
 	// store のスナップショットを取る（ループ中に push しても対象外になるよう先に絞り込む）
+	// Sprint-154 TASK-387: revivedAt IS NULL を冪等化のため追加
+	// ステップ定義のテストヘルパー（例: createTrollBot）が Bot 構築時に revivedAt を省略する可能性があるため、
+	// undefined も「未復活」として扱う（== null は null / undefined の両方に真）。
+	// 本番 DB では revived_at TIMESTAMPTZ NULL のため値は必ず Date | null であり、挙動差は発生しない。
 	const eliminated = store.filter(
 		(bot) =>
 			!bot.isActive &&
+			bot.revivedAt == null &&
 			!NON_REVIVABLE_PROFILE_KEYS.includes(bot.botProfileKey ?? ""),
 	);
 
 	const revivedBots: Bot[] = [];
 	for (const oldBot of eliminated) {
-		// 旧レコードは store 内に変更せず残す（凍結保持）
 		// 新世代ボットを別 UUID で作成して push する
 		const newBot: Bot = {
 			id: crypto.randomUUID(),
@@ -569,8 +588,13 @@ export async function bulkReviveEliminated(): Promise<Bot[]> {
 			eliminatedBy: null,
 			nextPostAt: null,
 			createdAt: new Date(Date.now()),
+			revivedAt: null,
 		};
 		store.push(newBot);
+
+		// 旧レコードに復活済みマーカーを設定する（冪等化のキモ）
+		oldBot.revivedAt = new Date(Date.now());
+
 		revivedBots.push({ ...newBot });
 	}
 

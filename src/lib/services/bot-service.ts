@@ -192,12 +192,16 @@ export interface IBotRepository {
 	 */
 	bulkReviveEliminated(): Promise<Bot[]>;
 	/**
-	 * 撃破済みチュートリアルBOT および7日経過の未撃破チュートリアルBOTを削除する。
-	 * performDailyReset() の末尾で呼び出す。
-	 * See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
-	 * See: tmp/workers/bdd-architect_TASK-236/design.md §3.8
+	 * 使い切りBOT（tutorial / aori / hiroyuki）のうち、撃破済みまたは7日経過の未撃破を削除する。
+	 * performDailyReset() Step 6 で呼び出す。
+	 *
+	 * Sprint-154 TASK-387 で deleteEliminatedTutorialBots から汎化。
+	 * tutorial のみの対象だったクリーンアップを aori / hiroyuki にも拡張。
+	 *
+	 * See: docs/architecture/components/bot.md §2.10 Step 6
+	 * See: tmp/workers/bdd-architect_TASK-386/design.md §2.2
 	 */
-	deleteEliminatedTutorialBots(): Promise<number>;
+	deleteEliminatedSingleUseBots(): Promise<number>;
 	/**
 	 * 掲示板全体の生存BOT数をカウントする。
 	 * See: features/command_livingbot.feature
@@ -231,6 +235,7 @@ export interface IBotRepository {
 			| "timesAttacked"
 			| "eliminatedAt"
 			| "eliminatedBy"
+			| "revivedAt"
 		>,
 	): Promise<Bot>;
 }
@@ -1001,11 +1006,14 @@ export class BotService {
 		// See: docs/specs/bot_state_transitions.yaml #daily_reset > attacks テーブル
 		await this.attackRepository.deleteByDateBefore(today);
 
-		// Step 6: 撃破済みチュートリアルBOTのクリーンアップ
-		// 撃破済みチュートリアルBOTおよび7日経過の未撃破チュートリアルBOTを削除する。
-		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
-		// See: tmp/workers/bdd-architect_TASK-236/design.md §3.8
-		await this.botRepository.deleteEliminatedTutorialBots();
+		// Step 6: 使い切りBOTクリーンアップ（Sprint-154 TASK-387 で拡張）
+		// tutorial / aori / hiroyuki いずれも「使い切り」仕様で日次リセット復活しない。
+		// 撃破済み・または7日経過した未撃破レコードを物理削除して累積を防ぐ。
+		// See: docs/architecture/components/bot.md §2.10 Step 6
+		// See: tmp/workers/bdd-architect_TASK-386/design.md §2.2
+		// See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+		// See: features/command_hiroyuki.feature L40 コメント「使い切り」仕様
+		await this.botRepository.deleteEliminatedSingleUseBots();
 
 		return {
 			botsRevealed,
@@ -1754,6 +1762,7 @@ export class BotService {
 			isActive: true,
 			isRevealed: false,
 			revealedAt: null,
+			revivedAt: null,
 			survivalDays: 0,
 			totalPosts: 0,
 			accusedCount: 0,

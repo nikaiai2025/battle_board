@@ -717,14 +717,20 @@ Then(
 		assert(this.currentBot, "現在のBOTが設定されていません");
 
 		const bot = await InMemoryBotRepo.findById(this.currentBot.id);
-		assert(bot, "煽りBOTが見つかりません");
 
-		// is_active=false のまま（復活していない）
-		assert.strictEqual(
-			bot.isActive,
-			false,
-			"煽りBOTが復活しています（is_active が true になっています）",
-		);
+		// Sprint-154 TASK-387: deleteEliminatedSingleUseBots により aori は物理削除される
+		// ケースと、他テストで is_active=false 残留するケースの両方に対応する。
+		// 「復活しない」の semantic は isActive=true にならないこと。
+		// レコードが削除されている場合も「復活していない」に該当するため pass 扱いとする。
+		// See: docs/architecture/components/bot.md §2.10 Step 6 使い切りBOTクリーンアップ
+		// See: features/command_aori.feature @煽りBOTは日次リセットで復活しない
+		if (bot !== null) {
+			assert.strictEqual(
+				bot.isActive,
+				false,
+				"煽りBOTが復活しています（is_active が true になっています）",
+			);
+		}
 	},
 );
 

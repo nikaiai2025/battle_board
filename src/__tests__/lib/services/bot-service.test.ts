@@ -41,6 +41,7 @@ function createLurkingBot(overrides: Partial<Bot> = {}): Bot {
 		isActive: true,
 		isRevealed: false,
 		revealedAt: null,
+		revivedAt: null,
 		survivalDays: 0,
 		totalPosts: 0,
 		accusedCount: 0,
@@ -90,8 +91,9 @@ function createMockBotRepository(
 		bulkIncrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		bulkResetRevealed: vi.fn().mockResolvedValue(0),
 		bulkReviveEliminated: vi.fn().mockResolvedValue([]),
-		// See: features/welcome.feature @撃破済みチュートリアルBOTは翌日クリーンアップされる
-		deleteEliminatedTutorialBots: vi.fn().mockResolvedValue(0),
+		// Sprint-154 TASK-387: deleteEliminatedTutorialBots から汎化
+		// See: docs/architecture/components/bot.md §2.10 Step 6 使い切りBOTクリーンアップ
+		deleteEliminatedSingleUseBots: vi.fn().mockResolvedValue(0),
 		incrementSurvivalDays: vi.fn().mockResolvedValue(undefined),
 		incrementTotalPosts: vi.fn().mockResolvedValue(undefined),
 		// See: features/bot_system.feature @AI告発成功でBOTの被告発回数がインクリメントされる
@@ -1219,8 +1221,79 @@ describe("BotService", () => {
 
 			await service.performDailyReset();
 
-			// deleteEliminatedTutorialBots が呼ばれていることを確認
-			expect(botRepo.deleteEliminatedTutorialBots).toHaveBeenCalled();
+			// Sprint-154 TASK-387: deleteEliminatedSingleUseBots（旧 deleteEliminatedTutorialBots）が呼ばれていることを確認
+			expect(botRepo.deleteEliminatedSingleUseBots).toHaveBeenCalled();
+		});
+
+		// =====================================================================
+		// Sprint-154 TASK-387: performDailyReset 冪等性 / Step 6 クリーンアップ
+		// See: tmp/workers/bdd-architect_TASK-386/design.md §7.2 §7.3
+		// See: docs/architecture/components/bot.md §2.10 Step 4/6
+		// =====================================================================
+
+		it("冪等性: 同日に performDailyReset を 2回実行しても bulkReviveEliminated は再ヒット 0件に収束する", async () => {
+			// design.md §7.2: 1回目で新世代 INSERT → 旧レコード revived_at が設定される。
+			// 2回目は Repository 側の SELECT で revived_at IS NULL 条件により 0件となり、
+			// Service 層からは「空配列が返る」振る舞いとして観測される。
+			const revived = createLurkingBot({
+				id: "bot-new-001",
+				botProfileKey: "荒らし役",
+			});
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			// 1 回目: 1 体復活、2 回目以降: 0 体（Repository 層の冪等化により）
+			const reviveMock = botRepo.bulkReviveEliminated as ReturnType<
+				typeof vi.fn
+			>;
+			reviveMock.mockResolvedValueOnce([revived]).mockResolvedValueOnce([]);
+
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			// 1回目
+			const first = await service.performDailyReset();
+			// 2回目
+			const second = await service.performDailyReset();
+
+			// bulkReviveEliminated が 2回呼ばれること
+			expect(reviveMock).toHaveBeenCalledTimes(2);
+			// 1回目は復活 1体、2回目は 0体（冪等）
+			expect(first.botsRevived).toBe(1);
+			expect(second.botsRevived).toBe(0);
+		});
+
+		it("Step 6: 使い切りBOTクリーンアップ（deleteEliminatedSingleUseBots）が 1回だけ呼ばれる", async () => {
+			// design.md §7.3: Step 6 が tutorial / aori / hiroyuki 3種を削除対象に含む。
+			// Service 層では「委譲呼び出し」の事実を検証し、対象プロファイル範囲は Repository 側単体テストで担保。
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue([]);
+			const cleanupMock = botRepo.deleteEliminatedSingleUseBots as ReturnType<
+				typeof vi.fn
+			>;
+			cleanupMock.mockResolvedValue(3);
+
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			await service.performDailyReset();
+
+			// Step 6 の 1回のみ（多重呼び出しや削除漏れを防ぐ）
+			expect(cleanupMock).toHaveBeenCalledTimes(1);
 		});
 	});
 

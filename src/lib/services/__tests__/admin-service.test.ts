@@ -100,7 +100,7 @@ vi.mock("@/lib/infrastructure/repositories/bot-repository", () => ({
 	bulkReviveEliminated: vi.fn().mockResolvedValue([]),
 	countLivingBots: vi.fn(),
 	countLivingBotsInThread: vi.fn(),
-	deleteEliminatedTutorialBots: vi.fn(),
+	deleteEliminatedSingleUseBots: vi.fn(),
 	findByIds: vi.fn(),
 }));
 

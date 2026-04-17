@@ -169,11 +169,12 @@ transitions:
     trigger: 日次リセット（JST 0:00）— 撃破済みボット復活
     description: >
       撃破済みボットが翌日にHP初期値で復活し、新しい偽装IDで再び潜伏する。
-      チュートリアルBOTは復活せず、daily-maintenanceでクリーンアップされる。
+      使い切りBOT（tutorial / aori / hiroyuki）は復活せず、daily-maintenanceでクリーンアップされる。
       インカーネーションモデル（§6.11）により、旧レコードは凍結し新規レコードを作成する。
     guard:
       - ボットの状態が eliminated である
-      - bot_profile_key != 'tutorial'（チュートリアルBOTは復活対象外）
+      - "bot_profile_key NOT IN ('tutorial','aori','hiroyuki')（使い切りBOTは復活対象外）"
+      - "revived_at IS NULL（冪等化: 既に次世代を生成済みの旧レコードは対象外）"
     action:
       - 旧レコード: is_active = false のまま凍結保持（bot_posts 紐付けも維持）
       - "新レコード INSERT: 同一 bot_profile_key・name で新世代を作成"
@@ -187,9 +188,12 @@ transitions:
       - daily_id_date = 当日
       - survival_days = 0
       - times_attacked = 0
+      - "旧レコードに revived_at = NOW() を設定（Sprint-154 TASK-387: 冪等化マーカー）"
     implementation_note: >
       旧レコードの UPDATE ではなく新規 INSERT。旧レスへの攻撃は旧 botId 経由で
       is_active=false（撃破済み）と判定される。詳細は D-08 bot.md §6.11 参照。
+      Sprint-154 TASK-387 で冪等化: INSERT 成功直後に旧レコードへ revived_at = NOW() を発行し、
+      日次リセット複数走行時の多重復活を防ぐ。
     feature_ref: bot_system.feature#撃破済みボットは翌日にHP初期値で復活する
 
   # --- lurking -> lurking (日次リセット) ---
@@ -359,14 +363,22 @@ daily_reset:
       action: BOTマーク解除（is_revealed=false, revealed_at=NULL）→ lurking
     - target: lurking/revealed状態のボット
       action: survival_days を +1
-    - target: "eliminated状態のボット（bot_profile_key != 'tutorial'）"
+    - target: "eliminated状態のボット（bot_profile_key NOT IN ('tutorial','aori','hiroyuki') AND revived_at IS NULL）"
       action: >
         復活処理（is_active=true, is_revealed=false, hp=max_hp,
         survival_days=0, times_attacked=0, eliminated_at=NULL,
-        eliminated_by=NULL）→ lurking
-    - target: "eliminated状態のチュートリアルBOT（bot_profile_key = 'tutorial'）"
+        eliminated_by=NULL）→ lurking。
+        新レコード INSERT 成功直後に旧レコードへ revived_at = NOW() を設定し、
+        次回以降の日次リセット走行で再度ヒットしないように冪等化する（Sprint-154 TASK-387）。
+    - target: "eliminated状態または7日経過の未撃破使い切りBOT（bot_profile_key IN ('tutorial','aori','hiroyuki')）"
       action: >
-        復活せずクリーンアップ（レコード削除）。See: welcome.feature @チュートリアルBOTは日次リセットで復活しない
+        復活せず物理削除（deleteEliminatedSingleUseBots）。
+        対象1: is_active=false（撃破済み使い切りBOT）
+        対象2: created_at < NOW() - 7日（7日経過の未撃破使い切りBOT。召喚〜放置の UX 許容猶予を確保）
+        Sprint-154 TASK-387 で tutorial 専用から tutorial/aori/hiroyuki 3種に汎化。
+        See: welcome.feature @チュートリアルBOTは日次リセットで復活しない
+        See: command_aori.feature @煽りBOTは日次リセットで復活しない
+        See: command_hiroyuki.feature L40 コメント「使い切り」仕様
     - target: attacks テーブル
       action: 同一ユーザー同一ボット攻撃制限のリセット（前日分レコードの処理）
   feature_ref: bot_system.feature#翌日になるとBOTマークが解除され新しい偽装IDで再潜伏する

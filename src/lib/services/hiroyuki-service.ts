@@ -222,6 +222,7 @@ export async function completeHiroyukiCommand(
 			isActive: true,
 			isRevealed: false,
 			revealedAt: null,
+			revivedAt: null,
 			grassCount: 0,
 			botProfileKey: "hiroyuki",
 			nextPostAt: null,
