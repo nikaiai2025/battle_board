@@ -4,11 +4,11 @@
 
 ## 現在のフェーズ
 
-**Sprint-154 フェーズ1 完了 — 荒らし役BOT増殖バグ ロジック修正完了、フェーズ2（データ訂正）の人間承認待ち**
+**Sprint-154 完了 — 荒らし役BOT増殖バグ修正（ロジック + データ訂正の2段階）**（コミット: フェーズ1 `6a24df2` / フェーズ2 未プッシュ）
 
 ### Sprint-154 フェーズ1 成果（ロジック修正）
 
-- **TASK-386 (bdd-architect)**: 設計検証完了。オーケストレーター Q3 案を否定し **`revived_at TIMESTAMPTZ`** 方式を推奨。Q2 は aori も含めて拡張。BDD 変更不要と結論
+- **TASK-386 (bdd-architect)**: 設計検証完了。オーケストレーター Q3 案を否定し **`revived_at TIMESTAMPTZ`** 方式を推奨。Q2 は aori も含めて拡張
 - **TASK-387 (bdd-coding)**: 実装完了
   - migration 00047: `bots.revived_at TIMESTAMPTZ NULL` + 部分 INDEX
   - `BotRepository.bulkReviveEliminated()` 冪等化（SELECT に `revived_at IS NULL`、INSERT 後に UPDATE）
@@ -16,15 +16,22 @@
   - `BotService.performDailyReset()` Step 6 更新
   - docs 更新（bot.md §2.10 / §5.1 / §6.11, state_transitions.yaml #daily_reset）
   - 新規単体テスト 10件
-- **品質ゲート**: vitest 2306 PASS / cucumber 411 PASS（変更スコープ内）。統合3件・E2E1件 FAIL は Sprint-153 切り戻しで再現確認済みの既存障害のためスプリント外
+
+### Sprint-154 フェーズ2 成果（データ訂正）
+
+- **TASK-388 (bdd-coding)**: migration 00048 作成完了
+  - Step 1: 荒らし役 active 107→10（最新 created_at 10 体残し、他 97 体を `is_active=false` + `revived_at=NOW()` でソフト削除）
+  - Step 2: tutorial/aori/hiroyuki の 7 日経過レコードを物理削除
+  - Step 3: tutorial/aori/hiroyuki の撃破済みを物理削除
+  - `BEGIN;...COMMIT;` でアトミック実行。ローカル適用は 0 rows affected で安全
+
+### 品質ゲート
+vitest 2306 PASS / cucumber 411 PASS（変更スコープ内）。統合3件・E2E1件 FAIL は Sprint-153 切り戻しで再現確認済みの既存障害のためスプリント外
 
 ### 自律判断実績（権限移譲ルール適用）
 - **ESC-TASK-387-1**: インターフェース名変更に伴うモック同期 → locked_files 機械的拡張
 - **ESC-TASK-387-2**: aori cleanup 拡張に伴う step assertion 緩和 → step 実装のみ修正（feature ファイル不変）
-
-### Sprint-154 フェーズ2（未着手）
-- **TASK-388**: 本番データ訂正 migration（107→10ソフト削除、hiroyuki/aori 7日経過物理削除）
-- **人間承認ゲート必要**: 本番データ操作のため、フェーズ1デプロイ検証完了後に人間承認を得て起票
+- **ESC-TASK-387-3**: `Bot` 型必須プロパティ追加に伴うフィクスチャ網羅漏れ（pre-commit TS エラー）→ `revivedAt: null` 機械的追加
 
 ---
 
