@@ -625,12 +625,13 @@ AttackHandler       ->  BotService.isBot()
 AccusationService   ->  BotService.isBot()
                         BotService.revealBot()
 CF Cron             ->  POST /api/internal/bot/execute
-                          -> BotService.executeBotPost()  （荒らし役BOTの定期書き込み）
+                          -> BotService.executeBotPost()  （定期投稿BOTの書き込み）
                           -> processPendingTutorials()     （チュートリアルBOTスポーン）
-                        ※ GitHub Actions bot-scheduler は Sprint-84 で無効化。
-                           荒らし役は CF Cron（5分間隔）に移行済み（TDR-013）。
-GitHub Actions      ->  BotService.executeBotPost()      （AI API BOT用、Phase 3以降）
-                        BotService.selectTargetThread()  // 後方互換ラッパー
+                          -> processAoriCommands()        （!aori pending 処理）
+GitHub Actions      ->  POST /api/internal/bot/execute   （bot-scheduler の補助トリガー）
+                          -> BotService.executeBotPost()  （現時点では AI API BOT専用ではない）
+                          -> processPendingTutorials()
+                          -> processAoriCommands()
 daily-maintenance   ->  BotService.performDailyReset()
 ```
 

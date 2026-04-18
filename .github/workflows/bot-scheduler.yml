@@ -1,12 +1,14 @@
 # BOT投稿定期実行ワークフロー
 #
-# 目的: 運営ボットの書き込みを定期的にトリガーし、BOT投稿が停止しない状態を維持する。
+# 目的: `/api/internal/bot/execute` を補助的に定期起動し、BOT投稿系処理の停止を避ける。
 # 仕様: docs/architecture/architecture.md §12.2（定期ジョブ一覧）, TDR-010（cron間隔と投稿タイミング制御）
 #
 # 投稿タイミング制御:
 #   cron は毎時 :00, :30 に起動するが、実際に投稿するBOTの選択はAPIサーバー側で
 #   `bots.next_post_at <= NOW()` の条件で判定する（DB予定時刻方式, TDR-010）。
 #   これにより、cronの固定起動タイミングとは独立してBOT投稿間隔のランダム性を実現する。
+#   現行実装では AI API 使用BOT専用の絞り込みはなく、Cloudflare Cron と同じ
+#   `/api/internal/bot/execute` を呼ぶ補助トリガーとして機能する。
 #
 # GitHub Actions 無料枠との整合性:
 #   30分間隔 = 2回/時 × 24時間 × 30日 = 1,440分/月（無料枠2,000分以内）
@@ -26,8 +28,7 @@
 name: Bot Scheduler
 
 on:
-  # Phase 3 対応で復活済み（TDR-013 でいったん CF Cron に移行したが、AI API BOT 導入に伴い再有効化）
-  # 荒らし役BOT は引き続き Cloudflare Workers の scheduled ハンドラで実行される
+  # Cloudflare Workers の scheduled ハンドラと並行して /api/internal/bot/execute を補助起動する
   schedule:
     - cron: '0,30 * * * *'
   workflow_dispatch: {}  # 手動実行（デバッグ・緊急トリガー用）

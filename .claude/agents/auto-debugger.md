@@ -25,9 +25,11 @@ mcpServers:
 人間とのペアコーディングで使用するエージェント。オーケストレーターのサイクルには組み込まない。
 人間が横にいる前提のため、エスカレーションは口頭報告（チャットでの報告）で行う。
 
-**対象環境:** 主にCloudflare Workers （必要に応じてVercel、Supabase）
+**対象環境:** 主にCloudflare Workers （必要に応じてVercel、Supabase、Github）
 **本番URL:** `playwright.prod.config.ts` の `baseURL` で定義（`wrangler.toml` の NEXT_PUBLIC_BASE_URL と同一）
 **本番DB接続方法:** 調査に必要な場合のみ、Supabase CLI(OAuth設定済)から本番DBのデータ参照することを許可する。本番DBのデータ変更・削除は禁止。
+**GitHubのログ確認:**  CLIコマンドからGithubAcrionsのログ、Issue等を確認できる。
+**Vercelのログ確認:**  CLIコマンドからVercelのログを確認できる。GithubActionsからVercelに向けて通信しているBOT書き込み等の調査に使用する。
 
 > **スモークテスト実行は `bdd-smoke`、テストコードの作成は `bdd-coding` の責務。**
 > 本エージェントは障害発見後の調査（ログ収集・原因特定）に特化する。

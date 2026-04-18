@@ -83,7 +83,7 @@
 | **Supabase Auth** | 管理者認証（メール+パスワード） | 一般ユーザー認証には使わない |
 | **Cloudflare Turnstile** | 一般ユーザーの CAPTCHA 検証 | `/auth/verify` 認証時のみ |
 | **Cloudflare Cron Triggers** | 高頻度BOTの定期実行（5分間隔） | Workers の scheduled イベント。短時間完了BOTを担当（TDR-013） |
-| **GitHub Actions** | AI API使用BOT・AIコマンドの非同期実行、期限切れデータ掃除 | cron / workflow_dispatch。長時間実行ジョブを担当（TDR-013） |
+| **GitHub Actions** | AIコマンドの非同期実行、BOT定期実行の補助トリガー、期限切れデータ掃除 | cron / workflow_dispatch。長時間実行ジョブと補助トリガーを担当（TDR-013, TDR-017） |
 | **AI API** | 運営ボット・AIコマンドの生成処理 | GitHub Actions から呼び出し。AiApiClient を通じて Google Gemini / OpenAI / Anthropic を使い分け（v6） |
 | **Litterbox** | 音声ファイルの一時配布 | GitHub Actions から軽量化済みWAVを投稿し、取得したDL URLのみをVercelへ送る |
 
@@ -1007,14 +1007,16 @@ supabase/
 
 | ジョブ | スケジュール | 内容 |
 |---|---|---|
-| bot-scheduler-fast | 5分間隔（`*/5 * * * *`） | 短時間BOT（テンプレート応答・チュートリアルBOT等）の書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
+| bot-scheduler-fast | 5分間隔（`*/5 * * * *`） | `POST /api/internal/bot/execute` を起動し、定期投稿BOT・チュートリアルBOT pending・`!aori` pending を処理する。`next_post_at` 方式で投稿判定（TDR-010, TDR-013） |
 
 #### GitHub Actions
 
 | ジョブ | スケジュール | 内容 |
 |---|---|---|
-| bot-scheduler | 毎時 :00, :30（`0,30 * * * *`） | AI API使用BOTの書き込み実行。`next_post_at` 方式で投稿判定（TDR-010） |
-| newspaper-scheduler | 毎時 :05, :35（`5,35 * * * *`） | !newspaper pending の非同期処理（AI API使用） |
+| bot-scheduler | 毎時 :00, :30（`0,30 * * * *`） | `POST /api/internal/bot/execute` の補助トリガー。現行実装では AI API 使用BOT専用の絞り込みは未実装で、Cloudflare Cron と同じ Internal API を呼ぶ |
+| newspaper-scheduler | `workflow_dispatch` | `!newspaper` pending の非同期処理（AI API使用） |
+| hiroyuki-scheduler | `workflow_dispatch` | `!hiroyuki` pending の非同期処理（AI API使用） |
+| yomiage-scheduler | `workflow_dispatch` | `!yomiage` pending の非同期処理（AI API使用） |
 | daily-maintenance | 毎日 JST 0:00 | 日次リセットID・BOTマークリセット・生存日数加算 |
 | cleanup | 毎日 JST 3:00（初期値） | 期限切れ認証レコード削除・不要データ掃除 |
 
@@ -1028,10 +1030,11 @@ supabase/
 |---|---|---|---|---|---|
 | テンプレートBOT投稿 | CF Cron (5分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: CF変数 |
 | チュートリアルBOT処理 | CF Cron (5分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: CF変数 |
-| 煽りBOT処理 (!aori) | GH Actions (30分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
-| 新聞配達 (!newspaper) | GH Actions (30分) | **あり** (Gemini) | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: **GH Secrets** |
+| 煽りBOT処理 (!aori) | CF Cron (5分) / GH Actions bot-scheduler (30分, 補助) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: CF変数 / GH Secrets |
+| 新聞配達 (!newspaper) | GH Actions (`workflow_dispatch`) | **あり** (Gemini) | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: **GH Secrets** |
+| ひろゆきBOT召喚 (!hiroyuki) | GH Actions (`workflow_dispatch`) | **あり** (Gemini) | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: **GH Secrets** |
 | レス読み上げ (!yomiage) | GH Actions (workflow_dispatch) | **あり** (Gemini) | **GH Actions 内** | DEPLOY_URL → Vercel (URL書込のみ) | GEMINI_API_KEYS: **GH Secrets** |
-| AI BOT投稿 (将来) | GH Actions (30分) | **あり** | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: GH Secrets |
+| AI BOT投稿（将来構想・未実装） | 未定 | **あり** | 未定 | DEPLOY_URL → Vercel (結果書込のみ) | 未定 |
 | daily-maintenance | GH Actions (日次) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
 | cleanup | GH Actions (日次) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
 
@@ -1152,7 +1155,8 @@ supabase/
   - 常駐プロセス（別インフラ）: 秒単位精度が可能だが、CLAUDE.md 横断的制約によりインフラ追加はエスカレーション必須。Phase 2 では不要
 - **撃破との整合性**: 撃破時（`is_active = false`）は cron クエリの `is_active = true` 条件で自動除外される。`next_post_at` の変更は不要。日次リセットでの復活時に `next_post_at` を再設定する
 - **DEPLOY_URL の向き先**: Vercel を選択。Cloudflare Workers は通常ユーザー（専ブラ含む）のリクエストに専念させ、BOT cronの負荷を分離する。GitHub Secrets の `DEPLOY_URL` を変更するだけでCloudflareに切り替え可能
-- **補足（2026-03-21）**: TDR-013 により、高頻度BOT（5分間隔）は Cloudflare Cron Triggers に移行。本TDRの30分間隔は AI API 使用BOTに限定して維持する
+- **補足（2026-03-21）**: TDR-013 により、高頻度BOT（5分間隔）は Cloudflare Cron Triggers に移行した
+- **実装注記（2026-04-19）**: 30分間隔の `bot-scheduler` は現時点では `POST /api/internal/bot/execute` の補助トリガーとして残存している。AI API 使用BOTの定期実行は未実装であり、AI API を伴う処理は `workflow_dispatch` ベースの `!newspaper` / `!hiroyuki` / `!yomiage` に限られる
 - **議論経緯**: `tmp/archive/discussion_bot_cron_design.md`
 - **影響範囲**: `bots` テーブル（`next_post_at` カラム追加）、D-08 bot.md §5（データモデル）、`.github/workflows/bot-scheduler.yml`
 
@@ -1201,8 +1205,9 @@ supabase/
   2. GitHub Actions 無料枠（月2,000分）を cron ジョブが圧迫し、AI API 使用ジョブや CI/CD の実行余地が縮小する
 - **決定**: Cloudflare Cron Triggers を導入し、BOTの実行時間特性に応じて GitHub Actions と使い分ける
   - **Cloudflare Cron Triggers（5分間隔）**: 短時間で完了するBOT（テンプレート応答・チュートリアルBOT等。AI API を使用しないもの）
-  - **GitHub Actions（30分間隔、TDR-010維持）**: 実行に長時間かかるBOT（AI API 呼び出しを含むもの）
+  - **GitHub Actions（30分間隔、TDR-010維持）**: `bot-scheduler` による補助トリガーと、`workflow_dispatch` による AI コマンド非同期実行を担当する
 - **振り分け根拠**: AI API 呼び出しは応答待ち時間が長く（数秒〜十数秒）、Cloudflare Workers の実行時間制限（Free: 10ms CPU / Paid: 30s CPU）に収まるか未検証。GitHub Actions は実行時間制限が緩く（6時間）、AI API の応答待ちを安全に処理できる
+- **実装注記（2026-04-19）**: 当初想定していた「AI API 呼び出しを含む定期BOT」は未実装である。現行の `bot-scheduler` は AI API 使用BOT専用ではなく、Cloudflare Cron と同じ `POST /api/internal/bot/execute` を補助的に起動する
 - **将来方針**: AI API 呼び出しが Cloudflare Workers の実行時間制限内で完了することが検証できた場合、GitHub Actions cron を廃止し Cloudflare Cron Triggers に一本化する。AI API の処理は I/O バウンド（CPU 時間は短い）であり、Paid プランの wall clock 制限（15分）内に収まる可能性は高い
 - **実装方針**: Cloudflare Cron Triggers は Workers の `scheduled` イベントハンドラで受け、既存の BOT 実行ロジック（BotService.executeBotPost）を内部呼び出しする。投稿判定ロジック（`next_post_at` 方式）は GitHub Actions と共通
 - **GitHub Actions 無料枠の改善効果**: 高頻度BOTを CF Cron に移行することで、GitHub Actions の cron 消費を削減し、AI API 使用ジョブへの枠配分を確保する

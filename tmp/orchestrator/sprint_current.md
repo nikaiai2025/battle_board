@@ -1,14 +1,14 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-04-18
+> 最終更新: 2026-04-19
 
 ## 現在のフェーズ
 
-**Sprint-155 完了 — !yomiage コマンド実装（全9シナリオ）**（コミット・デプロイ待ち）
+**Sprint-155 完了 — !yomiage コマンド実装（全9シナリオ）+ 本番障害対応ホットフィックス**（コミット `d406cc3` + ホットフィックス `bb33ba8` / `f1a3ac6` / `b2ae4d0`）
 
 ### Sprint-155 進捗
 
-- **フェーズ**: 全タスク完了・bdd-gate PASS / コミット・プッシュ実行中
+- **フェーズ**: 全タスク完了・ホットフィックス適用済み・本番稼働中
 - **タスク状況**:
 
 | TASK_ID | 状態 | 担当 | 内容 |
@@ -23,7 +23,22 @@
 | TASK-397 | ✅ 完了 | bdd-coding | cucumber.js の paths/require に command_yomiage 登録（bdd-gate 指摘修正） |
 
 - **計画書**: `tmp/orchestrator/sprint_155_plan.md`
-- **未コミット作業**: TASK-389（preValidate フック）を Sprint-155 コミット時に同梱
+
+### Sprint-155 本番障害 & ホットフィックス（2026-04-19）
+
+本番テスト実行時に !yomiage が処理失敗（通貨返却）する障害が発覚。調査・修正を実施。
+
+**根本原因**: `ubuntu-latest` GH Actions ランナーに ffmpeg が同梱されていなかった（設計書 yomiage.md §5.5 の「同梱済み」記述が誤り）。compress ステップが try-catch で例外を捕捉してもログ出力がなく、`/complete(success:false)` 呼び出しで通貨返却された。
+
+**ホットフィックスコミット（人間実施）:**
+| コミット | 内容 |
+|---|---|
+| `bb33ba8` | chore: add yomiage operational logs（ワーカーログ追加） |
+| `f1a3ac6` | fix: install ffmpeg in yomiage workflow（ffmpeg 明示インストール — **根本原因修正**） |
+| `b2ae4d0` | feat: switch yomiage output to mp4 embed（WAV→MP4/AAC変換 + PostItem.tsx 音声プレーヤー埋め込み + url-detector.ts 追加 + feature WAV→MP4 更新） |
+
+**ドキュメント更新（2026-04-19）:**
+- `docs/architecture/components/yomiage.md`: ステータス更新・ffmpeg 明示インストール記述修正・WAV→MP4 全体更新・PostItem.tsx / url-detector.ts ファイルリスト追加・feature 参照 `ドラフト_実装禁止/` → `features/` 直下へ更新
 
 ---
 
@@ -254,6 +269,7 @@ D-10 §7.2・§8・§9・§10 と照合し、以下の判断を採用:
 
 | ID | 内容 | 優先度 | 推奨時期 |
 |---|---|---|---|
+| TD-GHA-001 | `actions/checkout@v4` / `actions/setup-node@v4` を v5 に更新（Node.js 20→24対応）。2026-06-02 に GitHub Actions が Node.js 24 を強制適用予定。GH Actions のみの変更でアプリへの影響なし。全 `.github/workflows/*.yml` が対象 | 中 | 2026-06-02 前に実施 |
 | TD-ARCH-002 | `use cache` ディレクティブのキャッシュ戦略反映 | 中 | 次の最適化スプリント |
 | TD-ARCH-003 | React Compiler 有効化検討 | 中 | Phase 3 |
 | TD-ARCH-004 | Vitest Visual Regression でpendingシナリオ解消 | 低 | UI安定後 |

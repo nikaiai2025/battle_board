@@ -1,9 +1,10 @@
 /**
  * POST /api/internal/bot/execute — BOT投稿実行 Internal API
  *
- * GitHub Actions cron ジョブ（bot-scheduler）から呼ばれる。
+ * Cloudflare Workers の scheduled ハンドラと GitHub Actions bot-scheduler から呼ばれる。
  * 投稿対象のBOT（is_active=true AND next_post_at <= NOW()）を取得し、
- * 各BOTに対して executeBotPost() を実行する。
+ * 各BOTに対して executeBotPost() を実行する。あわせてチュートリアルBOT pending と
+ * `!aori` pending も処理する。
  *
  * See: docs/architecture/architecture.md §13 TDR-010
  * See: docs/architecture/components/bot.md §2.1 書き込み実行
