@@ -67,7 +67,7 @@ describe("AudioCompressor", () => {
 		vi.useRealTimers();
 	});
 
-	it("正常系: ffmpeg で圧縮した WAV を返す", async () => {
+	it("正常系: ffmpeg で圧縮した MP4(AAC) を返す", async () => {
 		const processMock = createChildProcessMock();
 		mockSpawn.mockReturnValue(processMock.child);
 
@@ -90,13 +90,14 @@ describe("AudioCompressor", () => {
 			"-y",
 			"-i",
 			expect.stringMatching(/pending-1\.input\.wav$/),
-			"-ar",
-			"16000",
-			"-ac",
-			"1",
-			"-acodec",
-			"pcm_s16le",
-			expect.stringMatching(/pending-1\.output\.wav$/),
+			"-vn",
+			"-c:a",
+			"aac",
+			"-b:a",
+			"96k",
+			"-movflags",
+			"+faststart",
+			expect.stringMatching(/pending-1\.output\.mp4$/),
 		]);
 		expect(spawnArgs[2]).toEqual({ stdio: ["ignore", "ignore", "pipe"] });
 		expect(mockRm).toHaveBeenCalledWith("/tmp/battle-board-yomiage-123", {

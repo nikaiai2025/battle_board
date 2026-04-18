@@ -22,6 +22,8 @@
 
 import { Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
+import { commandsConfig } from "../../config/commands";
+import { generateAnnouncementBody } from "../../src/lib/domain/rules/announcement-text";
 import {
 	InMemoryAdminRepo,
 	InMemoryCurrencyRepo,
@@ -1904,5 +1906,53 @@ Then(
 			matchingPost,
 			`「★システム」名義のレスに "${expectedBody}" が見つかりません。実際: ${systemPosts.map((p) => `"${p.body}"`).join(", ")}`,
 		);
+	},
+);
+
+/**
+ * 「★システム」名義の独立レスで案内板と同一の内容が表示される。
+ * !help は案内板と同じ生成ロジックを使うが、BDD では本文完全一致ではなく
+ * 案内板の主要行と公開コマンド一覧が含まれていることを検証する。
+ */
+Then(
+	"「★システム」名義の独立レスで案内板と同一の内容が表示される",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+
+		const systemPosts = posts.filter(
+			(p) => p.displayName === "★システム" && p.isSystemMessage === true,
+		);
+		assert(
+			systemPosts.length > 0,
+			"「★システム」名義の独立レスが追加されていません",
+		);
+
+		const latestSystemPost = systemPosts[systemPosts.length - 1];
+		const visibleCommands = Object.entries(commandsConfig.commands)
+			.filter(([, config]) => config.enabled && !config.hidden)
+			.map(([name, config]) => ({
+				name,
+				description: config.description,
+				cost: config.cost,
+			}));
+		const announcementBody = generateAnnouncementBody(visibleCommands);
+		const expectedSnippets = announcementBody
+			.split("\n")
+			.filter(
+				(line) =>
+					line.startsWith("■ ボットちゃんねる 案内板") ||
+					line.startsWith("【コマンド一覧】") ||
+					line.startsWith("  !") ||
+					line.includes("開発連絡板:") ||
+					line.includes("メイン: https://battle-board.shika.workers.dev/"),
+			);
+
+		for (const snippet of expectedSnippets) {
+			assert(
+				latestSystemPost.body.includes(snippet),
+				`!help のシステムレスに案内板の内容 "${snippet}" が含まれていません`,
+			);
+		}
 	},
 );

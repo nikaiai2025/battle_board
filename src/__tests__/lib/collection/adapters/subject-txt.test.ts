@@ -233,10 +233,26 @@ describe("SubjectTxtAdapter.collect()", () => {
 
 		expect(result[0].articleTitle).toBe("テスト記事タイトル");
 		expect(result[0].sourceUrl).toBe(
-			`https://test.5ch.io/board/${threadNumber}`,
+			`https://test.5ch.io/test/read.cgi/board/${threadNumber}`,
 		);
 		expect(typeof result[0].buzzScore).toBe("number");
 		expect(result[0].buzzScore).toBeGreaterThan(0);
+	});
+
+	it("5ch系 subject.txt からスレッドURLを /test/read.cgi/ 形式で構築する", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const threadNumber = `${now - 7200}`;
+		const subjectTxt = `${threadNumber}.dat<>ニュース速報スレ (80)`;
+
+		const adapter = new SubjectTxtAdapter(createMockFetchText(subjectTxt));
+		const result = await adapter.collect({
+			sourceUrl: "https://asahi.5ch.io/newsplus/subject.txt",
+			monthly: false,
+		});
+
+		expect(result[0].sourceUrl).toBe(
+			`https://asahi.5ch.io/test/read.cgi/newsplus/${threadNumber}`,
+		);
 	});
 
 	it("subject.txt が空の場合は空配列を返す", async () => {

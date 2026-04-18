@@ -2403,3 +2403,75 @@ When("ボトムシートの外側をタップする", async function (this: Batt
 Then("ボトムシートが閉じる", async function (this: BattleBoardWorld) {
 	return "pending";
 });
+
+/**
+ * フローティングメニューの検索ボタンをタップする（When）。
+ *
+ * See: features/thread.feature @fab
+ */
+When(
+	"フローティングメニューの検索ボタンをタップする",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * ボトムシートで検索フォームが表示される（Then）。
+ *
+ * See: features/thread.feature @fab
+ */
+Then(
+	"ボトムシートで検索フォームが表示される",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * フローティングメニューの画像ボタンをタップする（When）。
+ *
+ * See: features/thread.feature @fab
+ */
+When(
+	"フローティングメニューの画像ボタンをタップする",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * ボトムシートで画像アップロードフォームが表示される（Then）。
+ *
+ * See: features/thread.feature @fab
+ */
+Then(
+	"ボトムシートで画像アップロードフォームが表示される",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * フローティングメニューの設定ボタンをタップする（When）。
+ *
+ * See: features/thread.feature @fab
+ */
+When(
+	"フローティングメニューの設定ボタンをタップする",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);
+
+/**
+ * ボトムシートで設定パネルが表示される（Then）。
+ *
+ * See: features/thread.feature @fab
+ */
+Then(
+	"ボトムシートで設定パネルが表示される",
+	async function (this: BattleBoardWorld) {
+		return "pending";
+	},
+);

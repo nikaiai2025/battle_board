@@ -86,6 +86,24 @@ export async function defaultFetchText(url: string): Promise<string> {
 	return decoder.decode(buffer);
 }
 
+/**
+ * 5ch系 subject.txt のURLからスレッドURLを構築する。
+ * 例: https://asahi.5ch.io/newsplus/subject.txt
+ *   → https://asahi.5ch.io/test/read.cgi/newsplus/{threadNumber}
+ *
+ * See: features/curation_bot.feature @日次バッチでバズデータを収集・蓄積する
+ * See: docs/architecture/components/bot.md §2.13.5
+ */
+function buildThreadSourceUrl(
+	subjectUrl: string,
+	threadNumber: string,
+): string {
+	const url = new URL(subjectUrl);
+	const boardPath = url.pathname.replace(/\/subject\.txt$/, "").replace(/^\/+/, "");
+
+	return `${url.origin}/test/read.cgi/${boardPath}/${threadNumber}`;
+}
+
 // ---------------------------------------------------------------------------
 // SubjectTxtAdapter
 // ---------------------------------------------------------------------------
@@ -130,12 +148,11 @@ export class SubjectTxtAdapter implements CollectionAdapter {
 
 		// 3. 上位6件を CollectedItem[] に変換
 		const top6 = scored.slice(0, 6);
-		const baseUrl = config.sourceUrl.replace(/\/subject\.txt$/, "");
 
 		return top6.map((entry) => ({
 			articleTitle: entry.title,
-			// 元ネタURL はスレッド番号から構築
-			sourceUrl: `${baseUrl}/${entry.threadNumber}`,
+			// 元ネタURL は 5ch 互換の read.cgi URL として構築する
+			sourceUrl: buildThreadSourceUrl(config.sourceUrl, entry.threadNumber),
 			buzzScore: entry.buzzScore,
 		}));
 	}
