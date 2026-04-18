@@ -1,0 +1,34 @@
+# Yomiage Scheduler -- !yomiage コマンドの非同期処理
+#
+# Vercel 側で !yomiage コマンド受理時に workflow_dispatch で即時起動される。
+# GH Actions 内で Gemini TTS -> WAV 軽量化 -> アップロードを行い、
+# 結果を Vercel の /api/internal/yomiage/complete に送信する。
+#
+# 認証: BOT_API_KEY（既存の bot-scheduler と共用）
+# See: features/command_yomiage.feature
+# See: docs/architecture/components/yomiage.md §5.1
+
+name: Yomiage Scheduler
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  process-yomiage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Process yomiage commands
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          BOT_API_KEY: ${{ secrets.BOT_API_KEY }}
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+        run: npx tsx scripts/yomiage-worker.ts

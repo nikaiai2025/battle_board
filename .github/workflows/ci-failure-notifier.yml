@@ -18,6 +18,7 @@ on:
       - "Seed Copipe Entries"
       - "Newspaper Scheduler"
       - "Hiroyuki Scheduler"
+      - "Yomiage Scheduler"
       - "Collect Buzz Topics (Daily Cron)"
     types: [completed]
 

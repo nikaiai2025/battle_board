@@ -141,5 +141,15 @@ export const commandsConfig: CommandsYaml = {
 			enabled: true,
 			stealth: false,
 		},
+		// TASK-392: !yomiage コマンド追加（指定レス音声化・非ステルス）
+		// See: features/command_yomiage.feature
+		yomiage: {
+			description: "指定レスを音声化する",
+			cost: 30,
+			targetFormat: ">>postNumber" as const,
+			responseType: "independent" as const,
+			enabled: true,
+			stealth: false,
+		},
 	},
 };

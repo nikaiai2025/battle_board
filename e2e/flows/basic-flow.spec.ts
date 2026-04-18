@@ -10,8 +10,9 @@
  *   3. !help コマンド + 独立レス（案内板）表示
  *   4. !omikuji コマンド + 独立レス表示
  *   5. !hiroyuki コマンド（非同期BOT召喚・非ステルス）
- *   6. 専ブラAPI整合（書き込みデータが subject.txt / DAT に反映）
- *   7. 管理者テストデータ削除（削除完了 + 公開API消失確認 = クリーンアップ兼用）
+ *   6. !yomiage コマンド（非同期音声化・非ステルス）
+ *   7. 専ブラAPI整合（書き込みデータが subject.txt / DAT に反映）
+ *   8. 管理者テストデータ削除（削除完了 + 公開API消失確認 = クリーンアップ兼用）
  *
  * ライフサイクル:
  *   - beforeAll: 共有スレッドを1回だけ作成
@@ -45,6 +46,7 @@ import {
 const TEST_GRASS_COMMAND = "!w >>1";
 const TEST_ABESHINZO_COMMAND = "!abeshinzo";
 const TEST_HELP_COMMAND = "!help";
+const TEST_YOMIAGE_COMMAND = "!yomiage >>1";
 
 // ---------------------------------------------------------------------------
 // 環境判定（beforeAll ではカスタムフィクスチャが使えないため process.env で判定）
@@ -357,7 +359,44 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 6. 専ブラAPI整合
+		// 6. !yomiage コマンド（非同期音声化・非ステルス）
+		// -----------------------------------------------------------------------
+
+		/**
+		 * !yomiage コマンドが非ステルスで投稿され、コマンド文字列が本文に残る。
+		 * 音声URL配布は非同期（GH Actions）のため E2E では検証しない。
+		 * 同期フェーズとして、投稿が受理されることだけを確認する。
+		 *
+		 * See: features/command_yomiage.feature @コマンド実行後、非同期処理で★システムレスに音声URLが表示される
+		 * See: src/lib/services/handlers/yomiage-handler.ts
+		 */
+		test("!yomiage コマンドが非ステルスで投稿されコマンド文字列が本文に残る", async ({
+			page,
+			authenticate,
+		}) => {
+			await page.goto(`/livebot/${sharedThreadKey}/`);
+			await expect(page.locator("#thread-title")).toBeVisible({
+				timeout: 15_000,
+			});
+			await expect(page.locator("#post-1")).toBeVisible();
+
+			const lastPost = await getLastPostNumber(page);
+
+			await page.locator("#fab-post-btn").click();
+			await page.locator("#post-body-input").fill(TEST_YOMIAGE_COMMAND);
+			await page.locator("#post-submit-btn").click();
+
+			const myPostNum = lastPost + 1;
+			await expect(page.locator(`#post-${myPostNum}`)).toBeVisible({
+				timeout: 15_000,
+			});
+			await expect(page.locator(`#post-${myPostNum}`)).toContainText(
+				TEST_YOMIAGE_COMMAND,
+			);
+		});
+
+		// -----------------------------------------------------------------------
+		// 7. 専ブラAPI整合
 		// -----------------------------------------------------------------------
 
 		/**
@@ -397,7 +436,7 @@ test.describe
 		});
 
 		// -----------------------------------------------------------------------
-		// 7. 管理者削除（最後 = クリーンアップ兼用）
+		// 8. 管理者削除（最後 = クリーンアップ兼用）
 		// -----------------------------------------------------------------------
 
 		/**

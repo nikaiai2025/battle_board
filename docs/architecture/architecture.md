@@ -83,8 +83,9 @@
 | **Supabase Auth** | 管理者認証（メール+パスワード） | 一般ユーザー認証には使わない |
 | **Cloudflare Turnstile** | 一般ユーザーの CAPTCHA 検証 | `/auth/verify` 認証時のみ |
 | **Cloudflare Cron Triggers** | 高頻度BOTの定期実行（5分間隔） | Workers の scheduled イベント。短時間完了BOTを担当（TDR-013） |
-| **GitHub Actions** | AI API使用BOTの定期実行、期限切れデータ掃除 | cron スケジュール。長時間実行ジョブを担当（TDR-013） |
-| **AI API** | 運営ボットの書き込み文章生成 | GitHub Actions から呼び出し。AiApiClient を通じて Google Gemini / OpenAI / Anthropic を使い分け（v6） |
+| **GitHub Actions** | AI API使用BOT・AIコマンドの非同期実行、期限切れデータ掃除 | cron / workflow_dispatch。長時間実行ジョブを担当（TDR-013） |
+| **AI API** | 運営ボット・AIコマンドの生成処理 | GitHub Actions から呼び出し。AiApiClient を通じて Google Gemini / OpenAI / Anthropic を使い分け（v6） |
+| **Litterbox** | 音声ファイルの一時配布 | GitHub Actions から軽量化済みWAVを投稿し、取得したDL URLのみをVercelへ送る |
 
 ### 2.3 横断的制約
 
@@ -1021,7 +1022,7 @@ supabase/
 
 非同期コマンド・定期ジョブにおいて、**AI API 呼び出しがどこで実行されるか**を定義する。
 
-**原則（TDR-013 準拠）:** AI API 呼び出しを伴う処理は Vercel/CF Workers 内で実行しない。GitHub Actions 内で完結させる（Vercel Hobby 10秒 / CF Workers 30秒のタイムアウトに収まらないため）。Vercel への API 呼び出しは生成済みテキストの DB 書き込み等の軽量処理に限定する。
+**原則（TDR-013 準拠）:** AI API 呼び出しを伴う処理は Vercel/CF Workers 内で実行しない。GitHub Actions 内で完結させる（Vercel Hobby 10秒 / CF Workers 30秒のタイムアウトに収まらないため）。Vercel への API 呼び出しは生成済みテキストや生成済み音声URLの DB 書き込み等の軽量処理に限定する。
 
 | 処理 | トリガー | AI API | 実行場所 | API向き先 | 秘密情報の配置 |
 |---|---|---|---|---|---|
@@ -1029,6 +1030,7 @@ supabase/
 | チュートリアルBOT処理 | CF Cron (5分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: CF変数 |
 | 煽りBOT処理 (!aori) | GH Actions (30分) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
 | 新聞配達 (!newspaper) | GH Actions (30分) | **あり** (Gemini) | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: **GH Secrets** |
+| レス読み上げ (!yomiage) | GH Actions (workflow_dispatch) | **あり** (Gemini) | **GH Actions 内** | DEPLOY_URL → Vercel (URL書込のみ) | GEMINI_API_KEYS: **GH Secrets** |
 | AI BOT投稿 (将来) | GH Actions (30分) | **あり** | **GH Actions 内** | DEPLOY_URL → Vercel (結果書込のみ) | GEMINI_API_KEYS: GH Secrets |
 | daily-maintenance | GH Actions (日次) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
 | cleanup | GH Actions (日次) | なし | Vercel API Route 内 | DEPLOY_URL → Vercel | BOT_API_KEY: GH Secrets |
@@ -1277,6 +1279,34 @@ supabase/
   - 定期 cron（`5 */4 * * *`）を併用していたが、GitHub 側の cron 実行が不安定（4時間ごとの設定に対し実測で30〜90分間隔で過剰実行）かつ dispatch との同時実行でレースコンディション（2重投稿）のリスクがあったため廃止した
 - **影響範囲**: `.github/workflows/newspaper-scheduler.yml`、`scripts/newspaper-worker.ts`、`src/lib/infrastructure/adapters/github-workflow-trigger.ts`、`src/app/api/internal/newspaper/`
 - **関連**: TDR-010（BOT定期実行）、TDR-015（Gemini 採用）、features/command_newspaper.feature
+
+### TDR-018: !yomiage 音声配信ストレージに Litterbox を暫定採用（Cloudflare R2 への移行前提）
+
+- **ステータス**: 暫定決定
+- **決定日**: 2026-04-18
+- **背景**: !yomiage コマンド（指定レス読み上げ）が生成する音声ファイル（WAV）を配布する外部ストレージが必要。掲示板本体に音声バイナリを保持せず、URL のみを ★システムレス本文で配布する方針（features/command_yomiage.feature 参照）
+- **検討した選択肢**:
+  1. **Supabase Storage**: 既存インフラだが、Egress が DB 読み取り帯域と共用のため、バズ時に掲示板本体のレスポンス劣化 + 従量課金 $0.09/GB のリスクあり。中規模バズ（500 DL × 100音声/日、WAV 480KB）で月 720GB に到達しうる
+  2. **Cloudflare R2**: 既存インフラ（Cloudflare）の一部で Egress 完全無料。技術的には最適だが、**有効化にクレジットカード登録が必要**。本プロジェクトの「完全無料縛り」運用方針に抵触する
+  3. **Litterbox**: 非公式・小規模サービスだが、CC 登録不要・API Key 不要・72時間保持で匿名アップロード可能
+- **決定**: 暫定的に **Litterbox** を採用する。以下の条件を一つでも満たした時点で **Cloudflare R2** へ移行する：
+  - プロジェクトのクレジットカード登録ポリシーが変更されたとき
+  - Litterbox がサービス停止・レート制限強化により運用継続困難になったとき
+  - 有料代替サービスを許容する判断が下されたとき
+- **移行容易性の担保（設計要件）**:
+  1. **アダプタ抽象化**: `IAudioStorageAdapter` インターフェースを GH Actions worker 内に定義し、`LitterboxAdapter` / 将来の `R2StorageAdapter` を実装層として差し替え可能にする
+  2. **feature のベンダー中立化**: BDD シナリオから「litterbox」の直接記述を排除し、「音声配信ストレージ」等の抽象語で記述する。振る舞い（公開URL取得・WAV配布・一時的保持）のみを記述する
+  3. **DB スキーマはベンダー非依存**: `posts.body` に URL 文字列を保存するのみ。`storage_provider` 等のカラムを追加しない
+  4. **API 契約のベンダー非依存**: `/api/internal/yomiage/complete` は URL 文字列を受け取るだけ。URL 構造を検証・パースしない
+  5. **切替時の影響範囲を GH Actions 側に閉じる**: 移行時に変更するのは `scripts/yomiage-worker.ts`（アダプタ差し替え）、`.github/workflows/yomiage-scheduler.yml`（env vars）、GH Secrets のみ
+- **データ移行方針**: 既存音声データは最大 72h で自然消滅するため、切替時の移行処理は不要。切替日時以降の新規音声から R2 に書き込む
+- **リスクと対処**:
+  - **Litterbox の突発停止**: アダプタ内でアップロード失敗時に通貨返却 + ★システム通知（既存エラーパターン）。障害継続時は `config/commands.yaml` で `yomiage.enabled: false` に切替えて機能停止可能
+  - **レート制限・ToS違反リスク**: 軽量化（ffmpeg）で1ファイル 1MB 以下を目標とし、過度な負荷をかけない運用とする
+  - **保持期間 72h の UX**: ★システムレス本文に「音声は一定期間後に取得不可」を明示し、ユーザーに期待値を揃える
+- **CLAUDE.md 横断的制約との整合**: 本暫定採用を受けて CLAUDE.md の横断的制約に Litterbox を追記済み（2026-04-18）。正式エスカレーションは `tmp/escalations/escalation_LITTERBOX_ADOPTION.md` に記録
+- **影響範囲**: `scripts/yomiage-worker.ts`（新規）、`.github/workflows/yomiage-scheduler.yml`（新規）、D-07 §2.2（外部サービス表）、D-07 §12.2（非同期処理トポロジ）、D-08 `components/yomiage.md`（新規作成済み。yomiage の境界設計）、features/ドラフト_実装禁止/command_yomiage.feature（ベンダー中立化済み v2）
+- **関連**: TDR-015（Gemini 採用）、TDR-017（workflow_dispatch パターン）
 
 ---
 

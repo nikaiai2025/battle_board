@@ -1,10 +1,33 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-04-17
+> 最終更新: 2026-04-18
 
 ## 現在のフェーズ
 
-**Sprint-154 完了 — 荒らし役BOT増殖バグ修正（ロジック + データ訂正の2段階）**（コミット: フェーズ1 `6a24df2` / フェーズ2 未プッシュ）
+**Sprint-155 完了 — !yomiage コマンド実装（全9シナリオ）**（コミット・デプロイ待ち）
+
+### Sprint-155 進捗
+
+- **フェーズ**: 全タスク完了・bdd-gate PASS / コミット・プッシュ実行中
+- **タスク状況**:
+
+| TASK_ID | 状態 | 担当 | 内容 |
+|---|---|---|---|
+| TASK-390 | ✅ 完了 | bdd-coding | 基盤層（config/yomiage.ts + wav-encoder + yomiage-voice-picker） |
+| TASK-391 | ✅ 完了 | bdd-coding | インフラアダプタ（GeminiTtsAdapter + LitterboxAdapter + AudioCompressor） |
+| TASK-392 | ✅ 完了 | bdd-coding | 同期フェーズ（YomiageHandler + CommandService DI 登録 + commands.yaml） |
+| TASK-393 | ✅ 完了 | bdd-coding | 完了反映フェーズ（YomiageService + Internal API 3ルート） |
+| TASK-394 | ✅ 完了 | bdd-coding | 非同期ワーカー（yomiage-worker.ts + yomiage-scheduler.yml + runbook） |
+| TASK-395 | ✅ 完了 | bdd-coding | BDD ステップ定義（全9シナリオ） |
+| TASK-396 | ✅ 完了 | bdd-coding | config/commands.ts に yomiage エントリ追加（CF Workers 修正） |
+| TASK-397 | ✅ 完了 | bdd-coding | cucumber.js の paths/require に command_yomiage 登録（bdd-gate 指摘修正） |
+
+- **計画書**: `tmp/orchestrator/sprint_155_plan.md`
+- **未コミット作業**: TASK-389（preValidate フック）を Sprint-155 コミット時に同梱
+
+---
+
+**Sprint-154 完了 — 荒らし役BOT増殖バグ修正（ロジック + データ訂正の2段階）**（コミット: フェーズ1 `6a24df2` / フェーズ2 `e3db7c2`）
 
 ### Sprint-154 フェーズ1 成果（ロジック修正）
 
@@ -195,8 +218,8 @@ D-10 §7.2・§8・§9・§10 と照合し、以下の判断を採用:
 
 ## テスト状況
 
-- vitest: **2296 PASS / 0 failed**（120 files）
-- cucumber-js: 433シナリオ / **411 passed / 0 failed** / 18 pending / 4 undefined
+- vitest: **2344 PASS / 0 failed**（129 files）
+- cucumber-js: 442シナリオ / **420 passed / 0 failed** / 18 pending / 4 undefined
   - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
   - undefined 4件: thread.feature FAB 関連（UI実装待ち）
 - playwright E2E (ローカル): 63 passed / 1 failed（既知: auth-flow サイトタイトル不一致 — Sprint-108 由来の pre-existing）
@@ -257,6 +280,9 @@ D-10 §7.2・§8・§9・§10 と照合し、以下の判断を採用:
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-155 | !yomiage コマンド実装（全9シナリオ + CF Workers 修正） | completed | `sprint_155_plan.md` |
+| Sprint-154 | 荒らし役BOT増殖バグ修正（bulkReviveEliminated 冪等化 + データ訂正） | completed | `sprint_154_plan.md` |
+| Sprint-153 | キュレーションBOT Phase C Step 1（subject_txt 流用 × 4体） | completed | `sprint_153_plan.md` |
 | Sprint-152 | Daily Maintenance 500 障害修正（bulk_update_daily_ids 型キャスト） | completed | `sprint_152_plan.md` |
 | Sprint-151 | キュレーションBOT Phase B: Wikipedia日次急上昇 API統合 | completed | `sprint_151_plan.md` |
 | Sprint-150 | edge-token チャネル分離 | completed | `sprint_150_plan.md` |
@@ -275,7 +301,7 @@ D-10 §7.2・§8・§9・§10 と照合し、以下の判断を採用:
 
 ## 未解決エスカレーション
 
-なし
+なし（全エスカレーション archive 済み）
 
 ## アーカイブインデックス
 

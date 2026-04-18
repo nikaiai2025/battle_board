@@ -78,7 +78,7 @@ export interface HiroyukiTargetPost {
  * !hiroyuki ハンドラ。
  * ターゲット指定あり/なし両対応。pending_async_commands に INSERT し、非ステルス成功を返す。
  * 通貨チェックは CommandService の共通処理（Step 3-4）で完了済みのため、
- * ハンドラは pending INSERT とバリデーションのみを担当する。
+ * ハンドラは preValidate で事前検証、execute で pending INSERT を担当する。
  *
  * See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
  * See: features/command_hiroyuki.feature @ターゲット指定なしではBOTがスレッド全体への感想を投稿する
@@ -92,70 +92,87 @@ export class HiroyukiHandler implements CommandHandler {
 	) {}
 
 	/**
+	 * !hiroyuki の事前検証を行う。
+	 *
+	 * 処理フロー:
+	 *   1. 引数から target_post_number を取得
+	 *   2. 無効なレス番号を弾く
+	 *   3. ターゲット指定ありの場合、削除済み・システムメッセージを検証する
+	 *
+	 * See: features/command_hiroyuki.feature @削除済みレスを対象に指定するとエラーになる
+	 * See: features/command_hiroyuki.feature @システムメッセージを対象に指定するとエラーになる
+	 * See: docs/architecture/components/command.md §5 通貨引き落としの順序と事前検証（preValidate）
+	 */
+	async preValidate(ctx: CommandContext): Promise<{
+		success: false;
+		systemMessage: string;
+	} | null> {
+		const targetArg = (ctx.rawArgs ?? ctx.args)[0];
+
+		// ターゲット任意のため、引数なしは OK
+		if (!targetArg) {
+			return null;
+		}
+
+		const postNumber = parseInt(targetArg.replace(">>", ""), 10);
+		if (isNaN(postNumber) || postNumber <= 0) {
+			return {
+				success: false,
+				systemMessage: "無効なレス番号です",
+			};
+		}
+
+		if (this.postRepository) {
+			const targetPost = await this.postRepository.findPostByNumber(
+				ctx.threadId,
+				postNumber,
+			);
+			if (targetPost) {
+				if (targetPost.isDeleted) {
+					return {
+						success: false,
+						systemMessage: "削除されたレスは対象にできません",
+					};
+				}
+				if (targetPost.isSystemMessage) {
+					return {
+						success: false,
+						systemMessage: "システムメッセージは対象にできません",
+					};
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * !hiroyuki コマンドを実行する。
 	 *
 	 * 処理フロー:
 	 *   1. 引数から target_post_number を取得（引数なしは 0）
-	 *   2. ターゲット指定ありの場合、ターゲットバリデーション（削除済み・システムメッセージ）
-	 *   3. pending_async_commands に INSERT（payload に model_id と targetPostNumber）
-	 *   4. 非ステルス成功を返す（systemMessage: null でインライン出力なし）
+	 *   2. pending_async_commands に INSERT（payload に model_id と targetPostNumber）
+	 *   3. 非ステルス成功を返す（systemMessage: null でインライン出力なし）
 	 *
 	 * ターゲット番号 0 は「引数なし」を表す（!hiroyuki の場合）。
 	 * >>N 指定の場合はそのポスト番号を使用する。
 	 *
 	 * See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
-	 * See: features/command_hiroyuki.feature @削除済みレスを対象に指定するとエラーになる
-	 * See: features/command_hiroyuki.feature @システムメッセージを対象に指定するとエラーになる
+	 * See: features/command_hiroyuki.feature @ターゲット指定なしではBOTがスレッド全体への感想を投稿する
 	 */
 	async execute(ctx: CommandContext): Promise<CommandHandlerResult> {
-		// Step 1: 引数から target_post_number を取得
 		// rawArgs を使用する（PostNumberResolver 解決前の元の >>N 形式）。
 		// args は UUID に解決されるが、pending_async_commands には postNumber が必要。
-		// See: features/command_hiroyuki.feature @ターゲット指定ありではBOTが対象ユーザーの投稿を踏まえた返信を投稿する
-		const targetArg = (ctx.rawArgs ?? ctx.args)[0]; // ">>5" 形式（解決前）、undefined なら引数なし
+		const targetArg = (ctx.rawArgs ?? ctx.args)[0];
+		const parsedPostNumber = targetArg
+			? parseInt(targetArg.replace(">>", ""), 10)
+			: 0;
+		const targetPostNumber =
+			Number.isNaN(parsedPostNumber) || parsedPostNumber <= 0
+				? 0
+				: parsedPostNumber;
 
-		let targetPostNumber = 0; // 0 = 引数なし（スレッド全体モード）
-
-		if (targetArg) {
-			// 引数あり: >>N 形式からポスト番号を取得
-			const postNumber = parseInt(targetArg.replace(">>", ""), 10);
-			if (isNaN(postNumber) || postNumber <= 0) {
-				return {
-					success: false,
-					systemMessage: "無効なレス番号です",
-				};
-			}
-
-			// Step 2: ターゲットバリデーション（削除済み・システムメッセージ）
-			// See: features/command_hiroyuki.feature @削除済みレスを対象に指定するとエラーになる
-			// See: features/command_hiroyuki.feature @システムメッセージを対象に指定するとエラーになる
-			if (this.postRepository) {
-				const targetPost = await this.postRepository.findPostByNumber(
-					ctx.threadId,
-					postNumber,
-				);
-
-				if (targetPost) {
-					if (targetPost.isDeleted) {
-						return {
-							success: false,
-							systemMessage: "削除されたレスは対象にできません",
-						};
-					}
-
-					if (targetPost.isSystemMessage) {
-						return {
-							success: false,
-							systemMessage: "システムメッセージは対象にできません",
-						};
-					}
-				}
-			}
-
-			targetPostNumber = postNumber;
-		}
-
-		// Step 3: pending_async_commands に INSERT
+		// Step 2: pending_async_commands に INSERT
 		// targetPostNumber: 0 = スレッド全体モード、N = 対象ユーザーの全レスモード
 		// payload.model_id: 使用するGeminiモデルID
 		// payload.targetPostNumber: Cron処理でターゲットユーザーのIDを取得するために使用
@@ -170,7 +187,7 @@ export class HiroyukiHandler implements CommandHandler {
 			},
 		});
 
-		// Step 4: 非ステルス成功を返す（systemMessage: null でインライン出力なし）
+		// Step 3: 非ステルス成功を返す（systemMessage: null でインライン出力なし）
 		// 非ステルスのため、コマンド文字列はそのまま本文に残る。
 		// 結果は Cron フェーズでBOT書き込みとして投稿される。
 		return {

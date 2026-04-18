@@ -12,8 +12,9 @@
  *   - システムメッセージの文字列を返す（DB挿入はしない。PostService が担当）
  *
  * 通貨引き落としの順序（D-08 command.md §5 準拠）:
- *   通貨引き落とし → コマンド実行
+ *   事前検証 → 通貨引き落とし → コマンド実行
  *   残高不足時はコマンド実行をスキップし、エラーメッセージを返す。
+ *   事前検証失敗時は通貨を消費せず、エラーメッセージを返す。
  *   コマンド実行失敗時の補償処理（通貨の返金）は行わない。
  */
 
@@ -52,6 +53,11 @@ import {
 	type IHiroyukiPendingRepository,
 	type IHiroyukiPostRepository,
 } from "./handlers/hiroyuki-handler";
+import {
+	type IYomiagePendingRepository,
+	type IYomiagePostRepository,
+	YomiageHandler,
+} from "./handlers/yomiage-handler";
 // eslint-disable-next-line no-restricted-imports
 import {
 	HissiHandler,
@@ -265,6 +271,26 @@ export interface CommandHandler {
 	/** コマンド名（! を除いた名前。例: "tell", "w"） */
 	readonly commandName: string;
 	/**
+	 * 事前検証フック（オプショナル）。
+	 * CommandService が通貨消費前に呼び出す。失敗を返した場合は通貨消費せずエラー結果を返す。
+	 *
+	 * 責務範囲:
+	 *   - ハンドラ実行前に検出可能な、ユーザー操作ミスに起因する失敗の検出
+	 *   - 例: 対象レスが存在しない・削除済み・システムメッセージ、引数フォーマット不正
+	 *
+	 * 非責務:
+	 *   - AI API・外部サービス呼び出しの失敗（execute 内 or 非同期フェーズ側の責務）
+	 *   - DB 整合性制約違反（execute 内の通常処理で検出）
+	 *
+	 * @returns null: 検証OK（通貨消費へ進む） / { success: false, systemMessage }: 検証NG（通貨消費せず返却）
+	 *
+	 * See: docs/architecture/components/command.md §5 通貨引き落としの順序と事前検証（preValidate）
+	 */
+	preValidate?(ctx: CommandContext): Promise<{
+		success: false;
+		systemMessage: string;
+	} | null>;
+	/**
 	 * コマンドを実行する。
 	 * @param ctx - コマンド実行コンテキスト
 	 * @returns コマンド実行結果
@@ -420,6 +446,8 @@ export class CommandService {
 	 * @param copipeRepository - CopipeRepository（DI。テスト時はモックを注入する。省略時は本番用を動的 require）
 	 * @param hiroyukiPendingRepository - HiroyukiHandler 用 PendingAsyncCommandRepository（DI。省略時は本番用を動的 require）
 	 * @param hiroyukiPostRepository - HiroyukiHandler 用 PostRepository（DI。ターゲットバリデーション用）
+	 * @param yomiagePendingRepository - YomiageHandler 用 PendingAsyncCommandRepository（DI。省略時は本番用を動的 require）
+	 * @param yomiagePostRepository - YomiageHandler 用 PostRepository（DI。ターゲットバリデーション用）
 	 *
 	 * Note: attackHandler を省略する場合、BotService と PostRepository の本番実装を
 	 *   動的 require で読み込む。テスト時は attackHandler を明示的に null 渡しするか、
@@ -444,6 +472,8 @@ export class CommandService {
 		copipeRepository?: ICopipeRepository | null,
 		hiroyukiPendingRepository?: IHiroyukiPendingRepository | null,
 		hiroyukiPostRepository?: IHiroyukiPostRepository | null,
+		yomiagePendingRepository?: IYomiagePendingRepository | null,
+		yomiagePostRepository?: IYomiagePostRepository | null,
 	) {
 		// config/commands.ts からコマンド設定を読み込み、Registry を構築する
 		// Cloudflare Workers 環境では fs.readFileSync が動作しないため、
@@ -616,7 +646,8 @@ export class CommandService {
 			resolvedPendingRepo = pendingAsyncCommandRepository ?? null;
 		} else if (
 			parsed.commands.aori?.enabled ||
-			parsed.commands.newspaper?.enabled
+			parsed.commands.newspaper?.enabled ||
+			parsed.commands.yomiage?.enabled
 		) {
 			// YAML でいずれかが有効化されており、DI がない場合のみ本番用生成
 			// eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -648,6 +679,13 @@ export class CommandService {
 				resolvedPendingRepo,
 				new Set(["hiroyuki"]),
 				() => triggerWorkflow("hiroyuki-scheduler.yml"),
+			);
+			// yomiage コマンドのトリガー
+			// See: features/command_yomiage.feature
+			resolvedPendingRepo = withWorkflowTrigger(
+				resolvedPendingRepo,
+				new Set(["yomiage"]),
+				() => triggerWorkflow("yomiage-scheduler.yml"),
 			);
 		}
 
@@ -734,6 +772,43 @@ export class CommandService {
 			}
 		}
 
+		// YomiageHandler の解決
+		// DI で提供される場合はそれを使用する。
+		// YAML に yomiage コマンドが有効化されている場合のみ本番用ファクトリで生成する。
+		// AoriHandler/NewspaperHandler/HiroyukiHandler と同一リポジトリを共用する。
+		// See: features/command_yomiage.feature
+		let resolvedYomiageHandler: YomiageHandler | null = null;
+		if (yomiagePendingRepository !== undefined) {
+			if (yomiagePendingRepository) {
+				resolvedYomiageHandler = new YomiageHandler(
+					yomiagePendingRepository,
+					yomiagePostRepository ?? null,
+				);
+			}
+		} else if (parsed.commands.yomiage?.enabled) {
+			if (resolvedPendingRepo) {
+				// eslint-disable-next-line @typescript-eslint/no-require-imports
+				const PostRepo = require("../infrastructure/repositories/post-repository");
+				const postRepository: IYomiagePostRepository = {
+					findPostByNumber: async (threadId: string, postNumber: number) => {
+						const post = await PostRepo.findByThreadIdAndPostNumber(
+							threadId,
+							postNumber,
+						);
+						if (!post) return null;
+						return {
+							isDeleted: post.isDeleted ?? false,
+							isSystemMessage: post.isSystemMessage ?? false,
+						};
+					},
+				};
+				resolvedYomiageHandler = new YomiageHandler(
+					resolvedPendingRepo as IYomiagePendingRepository,
+					postRepository,
+				);
+			}
+		}
+
 		// !omikuji: 対象レスの dailyId 取得用 PostRepository を解決する
 		// PostNumberResolver と同一の post-repository を使用する
 		// See: features/command_omikuji.feature @ターゲット指定時は対象レスの日替わりIDの運勢として表示される
@@ -787,6 +862,9 @@ export class CommandService {
 			// !hiroyuki: ひろゆき風AI BOT召喚（PendingAsyncCommandRepository の DI が必要）
 			// See: features/command_hiroyuki.feature
 			...(resolvedHiroyukiHandler ? [resolvedHiroyukiHandler] : []),
+			// !yomiage: 指定レス音声化（PendingAsyncCommandRepository の DI が必要）
+			// See: features/command_yomiage.feature
+			...(resolvedYomiageHandler ? [resolvedYomiageHandler] : []),
 		];
 
 		const handlerMap = new Map<string, CommandHandler>();
@@ -833,6 +911,7 @@ export class CommandService {
 	 *   1. rawCommand を parseCommand で解析する
 	 *   1.5. args 内の `>>N` パターンを UUID に解決する（PostNumberResolver）
 	 *   2. コマンドが登録済みか確認する（未登録なら null を返す）
+	 *   2.5. ハンドラの事前検証（preValidate。失敗時は通貨未消費でエラー結果を返す）
 	 *   3. 通貨残高チェック（不足時はエラー結果を返す）
 	 *   4. 通貨消費（CurrencyService.deduct）
 	 *   5. ハンドラ実行
@@ -907,6 +986,33 @@ export class CommandService {
 		// See: task_TASK-095.md §補足・制約 > D-08 attack.md §3.1
 		const shouldSkipDebit = this.skipDebitCommands.has(parsed.name);
 
+		// Step 2.5 / Step 5 で共用するコンテキストを組み立てる
+		// isBotGiver: BOT書き込み時のFK制約違反回避フラグを伝播する
+		// See: tmp/reports/debug_TASK-DEBUG-119.md
+		const ctx: CommandContext = {
+			args: parsed.args,
+			rawArgs,
+			postId: input.postId,
+			threadId: input.threadId,
+			userId: input.userId,
+			dailyId: input.dailyId,
+			...(input.isBotGiver ? { isBotGiver: true } : {}),
+		};
+
+		// Step 2.5: 事前検証（preValidate）— 通貨消費前のバリデーション
+		// See: docs/architecture/components/command.md §5 通貨引き落としの順序と事前検証（preValidate）
+		// isBotGiver は運営ボットの強制実行パスのため preValidate も常時実行する（ユーザー保護ではなく契約のため）
+		if (handler.preValidate) {
+			const preValidateResult = await handler.preValidate(ctx);
+			if (preValidateResult) {
+				return {
+					success: false,
+					systemMessage: preValidateResult.systemMessage,
+					currencyCost: 0,
+				};
+			}
+		}
+
 		// Step 3: 通貨残高チェック（cost > 0 のコマンドのみ）
 		// 運営ボット（isBotGiver=true）は currencies レコードを持たないため通貨チェック・消費をスキップする。
 		// See: features/bot_system.feature @運営ボットはコスト付きコマンドを通貨免除で実行できる
@@ -943,18 +1049,6 @@ export class CommandService {
 		}
 
 		// Step 5: ハンドラ実行
-		// isBotGiver: BOT書き込み時のFK制約違反回避フラグを伝播する
-		// See: tmp/reports/debug_TASK-DEBUG-119.md
-		const ctx: CommandContext = {
-			args: parsed.args,
-			rawArgs,
-			postId: input.postId,
-			threadId: input.threadId,
-			userId: input.userId,
-			dailyId: input.dailyId,
-			...(input.isBotGiver ? { isBotGiver: true } : {}),
-		};
-
 		const result = await handler.execute(ctx);
 
 		// 通貨引き落とし済みの場合は、ハンドラの成否にかかわらず currencyCost に実際の消費額を返す。

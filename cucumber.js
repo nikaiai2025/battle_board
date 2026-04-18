@@ -107,6 +107,9 @@ module.exports = {
 			// TASK-367: ユーザー語録登録 BDD シナリオ追加
 			// See: features/user_bot_vocabulary.feature
 			"features/user_bot_vocabulary.feature",
+			// TASK-392: !yomiage コマンド（指定レス音声化） BDD シナリオ追加
+			// See: features/command_yomiage.feature
+			"features/command_yomiage.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -186,6 +189,9 @@ module.exports = {
 			// TASK-367: ユーザー語録登録 BDD ステップ定義
 			// See: features/user_bot_vocabulary.feature
 			"features/step_definitions/user_bot_vocabulary.steps.ts",
+			// TASK-395: !yomiage コマンド BDD ステップ定義
+			// See: features/command_yomiage.feature
+			"features/step_definitions/command_yomiage.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

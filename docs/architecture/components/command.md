@@ -82,6 +82,13 @@ commands:
     responseType: independent
     enabled: true
     stealth: false
+  yomiage:
+    description: "指定レスを音声化する"
+    cost: 10
+    targetFormat: ">>postNumber"
+    responseType: independent
+    enabled: true
+    stealth: false
 ```
 
 | フィールド | 型 | 説明 |
@@ -177,9 +184,47 @@ PostService  →  CommandService
 
 ## 5. 設計上の判断
 
-### 通貨引き落としの順序
+### 通貨引き落としの順序と事前検証（preValidate）
 
-通貨引き落とし → コマンド実行の順とする。コマンド失敗時に通貨を戻す「補償処理」は行わない（UX上「失敗してもコストはかかる」として要件確認済みか要確認）。残高不足の場合はコマンド実行自体をスキップし、システムメッセージで通知する。
+処理順: **事前検証 → 残高チェック → 通貨引き落とし → コマンド実行**
+
+#### 事前検証（preValidate）
+
+CommandHandler は**オプショナル**の `preValidate(ctx)` を実装できる。CommandService は通貨消費前にこれを呼び出し、失敗時は**通貨を消費せず**エラー結果を返す。
+
+```
+CommandHandler {
+  commandName: string
+  preValidate?(ctx): Promise<{ success: false, systemMessage: string } | null>
+  execute(ctx): Promise<CommandHandlerResult>
+}
+```
+
+- `null` を返す: 検証OK（処理続行、通貨消費へ進む）
+- `{ success: false, systemMessage }` を返す: 検証NG（通貨消費せず即エラー返却）
+
+**preValidate の責務範囲**: ハンドラ実行前に検出可能な、**ユーザー操作ミスに起因する失敗**のみを対象とする。
+
+| preValidate 対象（通貨消費しない） | execute 対象（失敗しても通貨消費する） |
+|---|---|
+| 対象レスが存在しない | AI API 呼び出しの失敗 |
+| 対象レスが削除済み | 音声配信ストレージの失敗 |
+| 対象レスがシステムメッセージ | DB 整合性制約違反 |
+| 引数フォーマット不正 | 外部サービス一時障害 |
+
+非同期コマンド（!newspaper / !hiroyuki / !yomiage 等）の非同期フェーズで発生する失敗は `execute` の責務範囲を超えるため、**完了通知API側で通貨返却（credit）を行う**（§5 非同期副作用のキューイングパターン参照）。
+
+#### 通貨引き落とし
+
+残高不足の場合はコマンド実行自体をスキップし、システムメッセージで通知する（消費されない）。
+
+#### コマンド実行失敗時
+
+通貨引き落とし後に `execute` が失敗した場合、通貨を戻す「補償処理」は**ハンドラ単体では行わない**。ただし非同期コマンドの非同期フェーズ失敗は、完了通知API側で明示的に返却する（!newspaper / !hiroyuki / !yomiage）。
+
+#### preValidate を持たないハンドラ
+
+オプショナルのため、既存ハンドラ（`!tell`, `!attack`, `!w`, `!hissi`, `!kinou`, `!omikuji`, `!iamsystem`, `!aori`, `!newspaper`, `!copipe`, `!livingbot`, `!help`, `!abeshinzo`）は無改修で動作する。ターゲットバリデーションを通貨消費前に行いたいコマンドが追加される場合のみ `preValidate` を実装する。
 
 ### CommandServiceはシステムメッセージをINSERTしない
 
@@ -231,7 +276,7 @@ PostService（同期）: コマンド解析 → 通貨消費 → pending INSERT 
 Cron（非同期）:       pending 読み取り → 副作用実行（AI API等）→ 結果反映 → pending 削除
 ```
 
-これにより Cloudflare Workers の実行時間制限（30〜50秒）を回避し、ユーザーの書き込みレスポンスを即座に返せる。pending テーブルはコマンド種別ごとに作らず、`command_type` カラムで区別する汎用テーブル（`pending_async_commands`）とする。結果の反映形式はコマンドにより異なる（BOTスポーン、★システムレス投稿等）。チュートリアルBOT用の `pending_tutorials` は既存のまま分離を維持する（処理量・処理内容が異なるため）。
+これにより Cloudflare Workers の実行時間制限（30〜50秒）を回避し、ユーザーの書き込みレスポンスを即座に返せる。pending テーブルはコマンド種別ごとに作らず、`command_type` カラムで区別する汎用テーブル（`pending_async_commands`）とする。結果の反映形式はコマンドにより異なる（BOTスポーン、★システムレス投稿、音声URL付きシステムレス投稿等）。チュートリアルBOT用の `pending_tutorials` は既存のまま分離を維持する（処理量・処理内容が異なるため）。
 
 ---
 

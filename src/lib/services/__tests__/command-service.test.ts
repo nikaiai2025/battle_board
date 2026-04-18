@@ -38,6 +38,11 @@ import type {
 	IPostNumberResolver,
 } from "../command-service";
 import { CommandService } from "../command-service";
+import {
+	HiroyukiHandler,
+	type IHiroyukiPendingRepository,
+	type IHiroyukiPostRepository,
+} from "../handlers/hiroyuki-handler";
 
 // ---------------------------------------------------------------------------
 // テスト用コマンド設定オブジェクト（YAML の代替）
@@ -96,6 +101,19 @@ const COMMANDS_CONFIG_TELL_ONLY: CommandsYaml = {
 	},
 };
 
+/** テスト用: !hiroyuki のみ有効化（preValidate フック検証用） */
+const COMMANDS_CONFIG_HIROYUKI_ONLY: CommandsYaml = {
+	commands: {
+		hiroyuki: {
+			description: "ひろゆき風AI BOTを召喚する",
+			cost: 10,
+			targetFormat: ">>postNumber",
+			enabled: true,
+			stealth: false,
+		},
+	},
+};
+
 // ---------------------------------------------------------------------------
 // テスト用ヘルパー
 // ---------------------------------------------------------------------------
@@ -103,7 +121,10 @@ const COMMANDS_CONFIG_TELL_ONLY: CommandsYaml = {
 /** CurrencyService のモックを生成する */
 function createMockCurrencyService(
 	initialBalance: number = 100,
-): ICurrencyService & { deductMock: ReturnType<typeof vi.fn> } {
+): ICurrencyService & {
+	deductMock: ReturnType<typeof vi.fn>;
+	getBalanceMock: ReturnType<typeof vi.fn>;
+} {
 	let balance = initialBalance;
 
 	const deductMock = vi
@@ -118,11 +139,13 @@ function createMockCurrencyService(
 			balance -= amount;
 			return { success: true as const, newBalance: balance };
 		});
+	const getBalanceMock = vi.fn().mockImplementation(async () => balance);
 
 	return {
 		deduct: deductMock,
-		getBalance: vi.fn().mockImplementation(async () => balance),
+		getBalance: getBalanceMock,
 		deductMock,
+		getBalanceMock,
 	};
 }
 
@@ -166,6 +189,27 @@ function createMockPostNumberResolver(
 	};
 }
 
+/** HiroyukiHandler 用 PendingRepository モックを生成する */
+function createMockHiroyukiPendingRepository(): IHiroyukiPendingRepository {
+	return {
+		create: vi.fn().mockResolvedValue(undefined),
+	};
+}
+
+/** HiroyukiHandler 用 PostRepository モックを生成する */
+function createMockHiroyukiPostRepository(
+	post:
+		| {
+				isDeleted: boolean;
+				isSystemMessage: boolean;
+		  }
+		| null = null,
+): IHiroyukiPostRepository {
+	return {
+		findPostByNumber: vi.fn().mockResolvedValue(post),
+	};
+}
+
 /**
  * テスト用の Post を生成する。
  */
@@ -204,6 +248,7 @@ describe("CommandService", () => {
 	let accusationService: AccusationService;
 
 	beforeEach(() => {
+		vi.restoreAllMocks();
 		vi.clearAllMocks();
 		// AccusationService モックを毎テスト生成する
 		accusationService = createMockAccusationService();
@@ -439,6 +484,105 @@ describe("CommandService", () => {
 			// モック AccusationService は hit 結果を返すので success=true
 			expect(result!.success).toBe(true);
 			expect(result!.systemMessage).toContain("AI告発");
+		});
+	});
+
+	// =========================================================================
+	// preValidate フック
+	// =========================================================================
+
+	describe("preValidate フック", () => {
+		it("preValidate が失敗した場合、通貨消費と execute を行わない", async () => {
+			const currencyService = createMockCurrencyService(100);
+			const pendingRepo = createMockHiroyukiPendingRepository();
+			const postRepo = createMockHiroyukiPostRepository({
+				isDeleted: true,
+				isSystemMessage: false,
+			});
+			const preValidateSpy = vi.spyOn(HiroyukiHandler.prototype, "preValidate");
+			const executeSpy = vi.spyOn(HiroyukiHandler.prototype, "execute");
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_HIROYUKI_ONLY,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				pendingRepo,
+				postRepo,
+			);
+
+			const result = await service.executeCommand(createInput("!hiroyuki >>8"));
+
+			expect(result).toEqual({
+				success: false,
+				systemMessage: "削除されたレスは対象にできません",
+				currencyCost: 0,
+			});
+			expect(preValidateSpy).toHaveBeenCalledTimes(1);
+			expect(currencyService.getBalance).not.toHaveBeenCalled();
+			expect(currencyService.deduct).not.toHaveBeenCalled();
+			expect(executeSpy).not.toHaveBeenCalled();
+			expect(pendingRepo.create).not.toHaveBeenCalled();
+		});
+
+		it("preValidate が null を返した場合、残高チェック→通貨消費→execute が実行される", async () => {
+			const currencyService = createMockCurrencyService(100);
+			const pendingRepo = createMockHiroyukiPendingRepository();
+			const postRepo = createMockHiroyukiPostRepository({
+				isDeleted: false,
+				isSystemMessage: false,
+			});
+			const preValidateSpy = vi.spyOn(HiroyukiHandler.prototype, "preValidate");
+			const executeSpy = vi.spyOn(HiroyukiHandler.prototype, "execute");
+			const service = new CommandService(
+				currencyService,
+				accusationService,
+				COMMANDS_CONFIG_HIROYUKI_ONLY,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				pendingRepo,
+				postRepo,
+			);
+
+			const result = await service.executeCommand(createInput("!hiroyuki >>5"));
+
+			expect(result).not.toBeNull();
+			expect(result!.success).toBe(true);
+			expect(result!.currencyCost).toBe(10);
+			expect(preValidateSpy).toHaveBeenCalledTimes(1);
+			expect(currencyService.getBalance).toHaveBeenCalledWith("user-uuid-001");
+			expect(currencyService.deduct).toHaveBeenCalledWith(
+				"user-uuid-001",
+				10,
+				"command_other",
+			);
+			expect(executeSpy).toHaveBeenCalledTimes(1);
+			expect(pendingRepo.create).toHaveBeenCalledTimes(1);
+			expect(preValidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+				currencyService.getBalanceMock.mock.invocationCallOrder[0],
+			);
+			expect(
+				currencyService.getBalanceMock.mock.invocationCallOrder[0],
+			).toBeLessThan(currencyService.deductMock.mock.invocationCallOrder[0]);
+			expect(currencyService.deductMock.mock.invocationCallOrder[0]).toBeLessThan(
+				executeSpy.mock.invocationCallOrder[0],
+			);
 		});
 	});
 
