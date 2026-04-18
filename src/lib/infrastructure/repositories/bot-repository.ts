@@ -75,6 +75,48 @@ interface PostWithThread {
 	threads: { is_dormant: boolean } | Array<{ is_dormant: boolean }> | null;
 }
 
+const SINGLE_USE_PROFILE_KEYS = ["tutorial", "aori", "hiroyuki"] as const;
+const TARGET_ACTIVE_BOT_COUNT_BY_PROFILE: Record<string, number> = {
+	荒らし役: 10,
+};
+
+function hasTargetActiveBotCount(profileKey: string | null): profileKey is string {
+	return (
+		typeof profileKey === "string" &&
+		Object.prototype.hasOwnProperty.call(
+			TARGET_ACTIVE_BOT_COUNT_BY_PROFILE,
+			profileKey,
+		)
+	);
+}
+
+function compareRevivalPriority(left: BotRow, right: BotRow): number {
+	const leftTimestamp = left.eliminated_at ?? left.created_at;
+	const rightTimestamp = right.eliminated_at ?? right.created_at;
+
+	if (leftTimestamp === rightTimestamp) {
+		return right.id.localeCompare(left.id);
+	}
+
+	return rightTimestamp.localeCompare(leftTimestamp);
+}
+
+async function countActiveBotsByProfile(profileKey: string): Promise<number> {
+	const { count, error } = await supabaseAdmin
+		.from("bots")
+		.select("*", { count: "exact", head: true })
+		.eq("is_active", true)
+		.eq("bot_profile_key", profileKey);
+
+	if (error) {
+		throw new Error(
+			`BotRepository.bulkReviveEliminated count failed for profile "${profileKey}": ${error.message}`,
+		);
+	}
+
+	return count ?? 0;
+}
+
 // ---------------------------------------------------------------------------
 // DB → ドメインモデル 変換
 // ---------------------------------------------------------------------------
@@ -646,6 +688,37 @@ export async function bulkReviveEliminated(): Promise<Bot[]> {
 	const rows = eliminated as BotRow[];
 	if (rows.length === 0) return [];
 
+	const revivalCandidates = [...rows].sort(compareRevivalPriority);
+	const targetProfiles = [
+		...new Set(
+			revivalCandidates
+				.map((row) => row.bot_profile_key)
+				.filter(hasTargetActiveBotCount),
+		),
+	];
+	const deficitsByProfile = new Map<string, number>();
+
+	for (const profileKey of targetProfiles) {
+		const activeCount = await countActiveBotsByProfile(profileKey);
+		const targetCount = TARGET_ACTIVE_BOT_COUNT_BY_PROFILE[profileKey];
+		deficitsByProfile.set(profileKey, Math.max(targetCount - activeCount, 0));
+	}
+
+	const rowsToRevive = revivalCandidates.filter((row) => {
+		if (!hasTargetActiveBotCount(row.bot_profile_key)) {
+			return true;
+		}
+
+		const remainingDeficit = deficitsByProfile.get(row.bot_profile_key) ?? 0;
+		if (remainingDeficit <= 0) {
+			return false;
+		}
+
+		deficitsByProfile.set(row.bot_profile_key, remainingDeficit - 1);
+		return true;
+	});
+	if (rowsToRevive.length === 0) return [];
+
 	// 当日 JST 日付を取得する（daily_id_date に使用）
 	const jstOffset = 9 * 60 * 60 * 1000;
 	const jstDate = new Date(Date.now() + jstOffset);
@@ -667,7 +740,7 @@ export async function bulkReviveEliminated(): Promise<Bot[]> {
 	// 旧レコードは UPDATE せず凍結保持。新レコードを INSERT して新世代ボットを作成する。
 	// INSERT 成功後に旧レコードへ revived_at = NOW() を設定し、次回 SELECT から除外する。
 	const revivedBots: Bot[] = [];
-	for (const row of rows) {
+	for (const row of rowsToRevive) {
 		const { data: newRow, error: insertError } = await supabaseAdmin
 			.from("bots")
 			.insert({
@@ -915,8 +988,6 @@ export async function countLivingBotsInThread(
  * @returns 削除したボット数
  */
 export async function deleteEliminatedSingleUseBots(): Promise<number> {
-	const SINGLE_USE_PROFILE_KEYS = ["tutorial", "aori", "hiroyuki"];
-
 	// 1. 撃破済みの使い切りBOT（is_active = false）を一括削除する。
 	const { data: eliminated, error: eliminatedError } = await supabaseAdmin
 		.from("bots")

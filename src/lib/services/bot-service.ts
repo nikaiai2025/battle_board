@@ -186,6 +186,7 @@ export interface IBotRepository {
 	/**
 	 * 撃破済みボットを復活させる（インカーネーションモデル）。
 	 * 旧レコードは is_active=false のまま凍結保持し、新レコードを INSERT して返す。
+	 * 荒らし役のように目標 active 件数を持つプロファイルは、不足分だけ新世代を補充する。
 	 * チュートリアルBOT・煽りBOTは復活対象外。
 	 * See: docs/architecture/components/bot.md §6.11 インカーネーションモデル
 	 * See: docs/specs/bot_state_transitions.yaml #transitions > eliminated -> lurking

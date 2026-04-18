@@ -1029,6 +1029,47 @@ describe("BotService", () => {
 			expect(typeof result.idsRegenerated).toBe("number");
 		});
 
+		it("日次リセット後の next_post_at 設定は不足分として復活した荒らし役だけに行われる", async () => {
+			const revivedBots = [
+				createLurkingBot({ id: "bot-003-new", botProfileKey: "荒らし役" }),
+				createLurkingBot({ id: "bot-004-new", botProfileKey: "荒らし役" }),
+				createLurkingBot({ id: "bot-005-new", botProfileKey: "荒らし役" }),
+			];
+			const botRepo = createMockBotRepository();
+			(botRepo.findAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+			(botRepo.bulkResetRevealed as ReturnType<typeof vi.fn>).mockResolvedValue(
+				0,
+			);
+			(
+				botRepo.bulkReviveEliminated as ReturnType<typeof vi.fn>
+			).mockResolvedValue(revivedBots);
+			const service = new BotService(
+				botRepo,
+				createMockBotPostRepository(),
+				createMockAttackRepository(),
+			);
+
+			const result = await service.performDailyReset();
+
+			expect(result.botsRevived).toBe(3);
+			expect(botRepo.updateNextPostAt).toHaveBeenCalledTimes(3);
+			expect(botRepo.updateNextPostAt).toHaveBeenNthCalledWith(
+				1,
+				"bot-003-new",
+				expect.any(Date),
+			);
+			expect(botRepo.updateNextPostAt).toHaveBeenNthCalledWith(
+				2,
+				"bot-004-new",
+				expect.any(Date),
+			);
+			expect(botRepo.updateNextPostAt).toHaveBeenNthCalledWith(
+				3,
+				"bot-005-new",
+				expect.any(Date),
+			);
+		});
+
 		it("日次リセット後に attacks テーブルのクリーンアップが実行される", async () => {
 			// See: docs/architecture/components/bot.md §2.10 step 5
 			const botRepo = createMockBotRepository();

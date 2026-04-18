@@ -688,8 +688,18 @@ describe("BotRepository", () => {
 			const mockOrInner = vi.fn().mockResolvedValue(result);
 			const mockIsInner = vi.fn().mockReturnValue({ or: mockOrInner });
 			const mockEqInner = vi.fn().mockReturnValue({ is: mockIsInner });
-			mockSelect.mockReturnValue({ eq: mockEqInner });
+			mockSelect.mockReturnValueOnce({ eq: mockEqInner });
 			return { mockEqInner, mockIsInner, mockOrInner };
+		}
+
+		/**
+		 * 目標 active 件数を持つプロファイルの active 数カウントチェーンをセットアップする。
+		 */
+		function setupActiveCountChain(result: { count: number | null; error: unknown }) {
+			const mockEqProfile = vi.fn().mockResolvedValue(result);
+			const mockEqIsActive = vi.fn().mockReturnValue({ eq: mockEqProfile });
+			mockSelect.mockReturnValueOnce({ eq: mockEqIsActive });
+			return { mockEqIsActive, mockEqProfile };
 		}
 
 		/**
@@ -700,6 +710,16 @@ describe("BotRepository", () => {
 			const mockUpdateEq = vi.fn().mockResolvedValue(result);
 			mockUpdate.mockReturnValue({ eq: mockUpdateEq });
 			return { mockUpdateEq };
+		}
+
+		function setupSequentialInsertSelectSingleChain(
+			results: Array<{ data: unknown; error: unknown }>,
+		) {
+			const mockSelect2 = vi.fn().mockReturnValue({ single: mockSingle });
+			mockInsert.mockReturnValue({ select: mockSelect2 });
+			for (const result of results) {
+				mockSingle.mockResolvedValueOnce(result);
+			}
 		}
 
 		it("正常: eliminated ボットを復活させ新世代 Bot[] を返す", async () => {
@@ -715,6 +735,7 @@ describe("BotRepository", () => {
 				data: [eliminatedRow],
 				error: null,
 			});
+			setupActiveCountChain({ count: 9, error: null });
 
 			// INSERT ... select().single(): 新世代ボットの行を返す
 			const newBotRow = createBotRow({
@@ -747,6 +768,126 @@ describe("BotRepository", () => {
 			expect(mockUpdate).toHaveBeenCalledWith(
 				expect.objectContaining({ revived_at: expect.any(String) }),
 			);
+		});
+
+		it("正常: active=10 の荒らし役は eliminated が残っていても追加生成しない", async () => {
+			const eliminatedRows = [
+				createBotRow({
+					id: "bot-id-old-001",
+					is_active: false,
+					hp: 0,
+					max_hp: 10,
+					bot_profile_key: "荒らし役",
+				}),
+				createBotRow({
+					id: "bot-id-old-002",
+					is_active: false,
+					hp: 0,
+					max_hp: 10,
+					bot_profile_key: "荒らし役",
+					created_at: "2026-03-17T00:00:00.000Z",
+				}),
+			];
+			const { mockOrInner } = setupBulkReviveSelectChain({
+				data: eliminatedRows,
+				error: null,
+			});
+			const { mockEqIsActive, mockEqProfile } = setupActiveCountChain({
+				count: 10,
+				error: null,
+			});
+
+			const result = await BotRepository.bulkReviveEliminated();
+
+			expect(result).toEqual([]);
+			expect(mockInsert).not.toHaveBeenCalled();
+			expect(mockUpdate).not.toHaveBeenCalled();
+			expect(mockOrInner).toHaveBeenCalledWith(
+				"bot_profile_key.is.null,bot_profile_key.not.in.(tutorial,aori,hiroyuki)",
+			);
+			expect(mockEqIsActive).toHaveBeenCalledWith("is_active", true);
+			expect(mockEqProfile).toHaveBeenCalledWith("bot_profile_key", "荒らし役");
+		});
+
+		it("正常: active=7 の荒らし役は deficit 分の 3 体だけ生成する", async () => {
+			const eliminatedRows = Array.from({ length: 5 }, (_, index) =>
+				createBotRow({
+					id: `bot-id-old-${index + 1}`,
+					is_active: false,
+					hp: 0,
+					max_hp: 10,
+					bot_profile_key: "荒らし役",
+					eliminated_at: `2026-03-1${index + 1}T12:00:00.000Z`,
+					created_at: `2026-03-1${index + 1}T00:00:00.000Z`,
+				}),
+			);
+			setupBulkReviveSelectChain({
+				data: eliminatedRows,
+				error: null,
+			});
+			setupActiveCountChain({ count: 7, error: null });
+			setupSequentialInsertSelectSingleChain([
+				{
+					data: createBotRow({ id: "bot-id-new-001", is_active: true, hp: 10 }),
+					error: null,
+				},
+				{
+					data: createBotRow({ id: "bot-id-new-002", is_active: true, hp: 10 }),
+					error: null,
+				},
+				{
+					data: createBotRow({ id: "bot-id-new-003", is_active: true, hp: 10 }),
+					error: null,
+				},
+			]);
+			setupReviveUpdateChain({ error: null });
+
+			const result = await BotRepository.bulkReviveEliminated();
+
+			expect(result).toHaveLength(3);
+			expect(result.map((bot) => bot.id)).toEqual([
+				"bot-id-new-001",
+				"bot-id-new-002",
+				"bot-id-new-003",
+			]);
+			expect(mockInsert).toHaveBeenCalledTimes(3);
+			expect(mockUpdate).toHaveBeenCalledTimes(3);
+		});
+
+		it("正常: active=0 の荒らし役は eliminated 多数でも 10 体だけ生成する", async () => {
+			const eliminatedRows = Array.from({ length: 12 }, (_, index) =>
+				createBotRow({
+					id: `bot-id-old-${index + 1}`,
+					is_active: false,
+					hp: 0,
+					max_hp: 10,
+					bot_profile_key: "荒らし役",
+					eliminated_at: `2026-03-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
+					created_at: `2026-03-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
+				}),
+			);
+			setupBulkReviveSelectChain({
+				data: eliminatedRows,
+				error: null,
+			});
+			setupActiveCountChain({ count: 0, error: null });
+			setupSequentialInsertSelectSingleChain(
+				Array.from({ length: 10 }, (_, index) => ({
+					data: createBotRow({
+						id: `bot-id-new-${index + 1}`,
+						is_active: true,
+						hp: 10,
+					}),
+					error: null,
+				})),
+			);
+			setupReviveUpdateChain({ error: null });
+
+			const result = await BotRepository.bulkReviveEliminated();
+
+			expect(result).toHaveLength(10);
+			expect(mockInsert).toHaveBeenCalledTimes(10);
+			expect(mockUpdate).toHaveBeenCalledTimes(10);
 		});
 
 		it("正常: eliminated ボットが 0 件の場合は空配列を返す（INSERT なし）", async () => {
@@ -820,6 +961,7 @@ describe("BotRepository", () => {
 				data: [eliminatedRow],
 				error: null,
 			});
+			setupActiveCountChain({ count: 9, error: null });
 
 			// INSERT エラーをシミュレート
 			setupInsertSelectSingleChain({
@@ -829,6 +971,26 @@ describe("BotRepository", () => {
 
 			await expect(BotRepository.bulkReviveEliminated()).rejects.toThrow(
 				'BotRepository.bulkReviveEliminated insert failed for bot "荒らし役": insert error',
+			);
+		});
+
+		it("異常系: active 件数取得時の DB エラーはエラーをスローする", async () => {
+			setupBulkReviveSelectChain({
+				data: [
+					createBotRow({
+						id: "bot-id-001",
+						is_active: false,
+						hp: 0,
+						max_hp: 10,
+						bot_profile_key: "荒らし役",
+					}),
+				],
+				error: null,
+			});
+			setupActiveCountChain({ count: null, error: { message: "count error" } });
+
+			await expect(BotRepository.bulkReviveEliminated()).rejects.toThrow(
+				'BotRepository.bulkReviveEliminated count failed for profile "荒らし役": count error',
 			);
 		});
 
@@ -866,6 +1028,7 @@ describe("BotRepository", () => {
 					data: [eliminatedRow],
 					error: null,
 				});
+				setupActiveCountChain({ count: 9, error: null });
 				const newBotRow = createBotRow({
 					id: "bot-id-new",
 					is_active: true,
@@ -897,6 +1060,7 @@ describe("BotRepository", () => {
 					data: [eliminatedRow],
 					error: null,
 				});
+				setupActiveCountChain({ count: 9, error: null });
 				setupInsertSelectSingleChain({
 					data: null,
 					error: { message: "insert failed" },
@@ -922,6 +1086,7 @@ describe("BotRepository", () => {
 					data: [eliminatedRow],
 					error: null,
 				});
+				setupActiveCountChain({ count: 9, error: null });
 				setupInsertSelectSingleChain({
 					data: createBotRow({ id: "bot-id-new", is_active: true }),
 					error: null,
