@@ -98,9 +98,30 @@ export async function completeYomiageCommand(
 		amount,
 	} = params;
 
+	console.info("[YomiageService] Completing pending command", {
+		pendingId,
+		threadId,
+		invokerUserId,
+		targetPostNumber,
+		success,
+		stage: params.stage ?? null,
+		hasAudioUrl: typeof audioUrl === "string" && audioUrl.length > 0,
+		amount,
+	});
+
 	await deps.pendingAsyncCommandRepository.deletePendingAsyncCommand(pendingId);
+	console.info("[YomiageService] Pending command deleted", {
+		pendingId,
+		threadId,
+	});
 
 	if (success && audioUrl) {
+		console.info("[YomiageService] Posting success system message", {
+			pendingId,
+			threadId,
+			targetPostNumber,
+			audioUrlHost: new URL(audioUrl).host,
+		});
 		await deps.createPostFn(
 			buildSystemPostParams(
 				threadId,
@@ -114,11 +135,30 @@ export async function completeYomiageCommand(
 		return;
 	}
 
+	console.error("[YomiageService] Processing failure path", {
+		pendingId,
+		threadId,
+		invokerUserId,
+		targetPostNumber,
+		stage: params.stage ?? null,
+		error: params.error ?? null,
+		amount,
+	});
 	await deps.creditFn(invokerUserId, amount, "yomiage_async_failure");
+	console.info("[YomiageService] Currency refunded", {
+		pendingId,
+		invokerUserId,
+		amount,
+	});
 	await deps.createPostFn(
 		buildSystemPostParams(
 			threadId,
 			`>>${targetPostNumber} の読み上げに失敗しました。通貨は返却されました。`,
 		),
 	);
+	console.info("[YomiageService] Failure system message posted", {
+		pendingId,
+		threadId,
+		targetPostNumber,
+	});
 }

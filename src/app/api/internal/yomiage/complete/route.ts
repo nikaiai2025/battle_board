@@ -53,6 +53,17 @@ export async function POST(request: Request): Promise<NextResponse> {
 			amount: number;
 		};
 
+		console.info("[POST /api/internal/yomiage/complete] Request received", {
+			pendingId,
+			threadId,
+			invokerUserId,
+			targetPostNumber,
+			success,
+			stage: stage ?? null,
+			hasAudioUrl: typeof audioUrl === "string" && audioUrl.length > 0,
+			amount,
+		});
+
 		await completeYomiageCommand(
 			{
 				pendingAsyncCommandRepository: PendingAsyncCommandRepo,
@@ -89,6 +100,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 				amount,
 			},
 		);
+
+		console.info("[POST /api/internal/yomiage/complete] Request processed", {
+			pendingId,
+			threadId,
+			invokerUserId,
+			targetPostNumber,
+			success,
+			stage: stage ?? null,
+		});
 
 		return NextResponse.json({ success: true });
 	} catch (err) {

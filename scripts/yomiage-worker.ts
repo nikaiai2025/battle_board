@@ -134,6 +134,20 @@ interface WorkerAdapters {
 	storageAdapter: LitterboxAdapter;
 }
 
+type WorkerLogLevel = "info" | "error";
+
+function logWorkerEvent(
+	level: WorkerLogLevel,
+	event: string,
+	details: Record<string, unknown>,
+): void {
+	const logger = level === "error" ? console.error : console.info;
+	logger("[yomiage-worker]", {
+		event,
+		...details,
+	});
+}
+
 /**
  * workflow 側のコマンド設定と返金額を一致させるため、commands.yaml から cost を読む。
  *
@@ -235,6 +249,14 @@ async function fetchTargetPostBody(
  * See: features/command_yomiage.feature @軽量化またはアップロード処理が失敗した場合はURLを投稿せず通貨返却される
  */
 async function postComplete(body: CompleteRequestBody): Promise<void> {
+	logWorkerEvent("info", "complete_notify_started", {
+		pendingId: body.pendingId,
+		threadId: body.threadId,
+		targetPostNumber: body.targetPostNumber,
+		success: body.success,
+		stage: "stage" in body ? body.stage ?? null : null,
+	});
+
 	const response = await fetch(buildInternalApiUrl("/api/internal/yomiage/complete"), {
 		method: "POST",
 		headers: {
@@ -245,10 +267,27 @@ async function postComplete(body: CompleteRequestBody): Promise<void> {
 	});
 
 	if (!response.ok) {
+		logWorkerEvent("error", "complete_notify_failed", {
+			pendingId: body.pendingId,
+			threadId: body.threadId,
+			targetPostNumber: body.targetPostNumber,
+			success: body.success,
+			stage: "stage" in body ? body.stage ?? null : null,
+			status: response.status,
+			statusText: response.statusText,
+		});
 		throw new Error(
 			`POST /api/internal/yomiage/complete failed: ${response.status} ${response.statusText}`,
 		);
 	}
+
+	logWorkerEvent("info", "complete_notify_succeeded", {
+		pendingId: body.pendingId,
+		threadId: body.threadId,
+		targetPostNumber: body.targetPostNumber,
+		success: body.success,
+		stage: "stage" in body ? body.stage ?? null : null,
+	});
 }
 
 /**
@@ -293,9 +332,14 @@ async function processPendingCommand(
 		const text = `${voiceTag} ${targetPostBody}`;
 		const modelId = pending.payload?.model_id ?? YOMIAGE_MODEL_ID;
 
-		console.log(
-			`[yomiage-worker] pending=${pending.id} target=${targetPostNumber} voice=${voiceName}`,
-		);
+		logWorkerEvent("info", "pending_processing_started", {
+			pendingId: pending.id,
+			threadId: pending.threadId,
+			targetPostNumber,
+			invokerUserId: pending.invokerUserId,
+			voiceName,
+			modelId,
+		});
 
 		let wavBuffer: Uint8Array;
 		try {
@@ -305,7 +349,21 @@ async function processPendingCommand(
 				modelId,
 			});
 			wavBuffer = normalizeGeminiAudioToWav(synthesized.pcmBuffer);
+			logWorkerEvent("info", "tts_succeeded", {
+				pendingId: pending.id,
+				threadId: pending.threadId,
+				targetPostNumber,
+				voiceName: synthesized.voiceName,
+				rawAudioBytes: synthesized.pcmBuffer.byteLength,
+				normalizedWavBytes: wavBuffer.byteLength,
+			});
 		} catch (error) {
+			logWorkerEvent("error", "tts_failed", {
+				pendingId: pending.id,
+				threadId: pending.threadId,
+				targetPostNumber,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			await postComplete({
 				...baseBody,
 				success: false,
@@ -322,7 +380,21 @@ async function processPendingCommand(
 				filename: `yomiage-${pending.id}.wav`,
 			});
 			compressed = result.output;
+			logWorkerEvent("info", "compress_succeeded", {
+				pendingId: pending.id,
+				threadId: pending.threadId,
+				targetPostNumber,
+				inputBytes: wavBuffer.byteLength,
+				outputBytes: compressed.byteLength,
+			});
 		} catch (error) {
+			logWorkerEvent("error", "compress_failed", {
+				pendingId: pending.id,
+				threadId: pending.threadId,
+				targetPostNumber,
+				inputBytes: wavBuffer.byteLength,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			await postComplete({
 				...baseBody,
 				success: false,
@@ -340,7 +412,21 @@ async function processPendingCommand(
 				mimeType: "audio/wav",
 			});
 			audioUrl = uploadResult.url;
+			logWorkerEvent("info", "upload_succeeded", {
+				pendingId: pending.id,
+				threadId: pending.threadId,
+				targetPostNumber,
+				uploadedBytes: compressed.byteLength,
+				audioUrlHost: new URL(audioUrl).host,
+			});
 		} catch (error) {
+			logWorkerEvent("error", "upload_failed", {
+				pendingId: pending.id,
+				threadId: pending.threadId,
+				targetPostNumber,
+				uploadedBytes: compressed.byteLength,
+				error: error instanceof Error ? error.message : String(error),
+			});
 			await postComplete({
 				...baseBody,
 				success: false,
@@ -355,7 +441,18 @@ async function processPendingCommand(
 			success: true,
 			audioUrl,
 		});
+		logWorkerEvent("info", "pending_processing_succeeded", {
+			pendingId: pending.id,
+			threadId: pending.threadId,
+			targetPostNumber,
+		});
 	} catch (error) {
+		logWorkerEvent("error", "pending_processing_failed", {
+			pendingId: pending.id,
+			threadId: pending.threadId,
+			targetPostNumber,
+			error: error instanceof Error ? error.message : String(error),
+		});
 		await postComplete({
 			...baseBody,
 			success: false,
