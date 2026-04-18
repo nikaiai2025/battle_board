@@ -103,7 +103,8 @@ export function parseAnchorLinks(
  *   2. 本文を「URL部分」と「テキスト部分」に分割
  *   3. テキスト部分 → parseAnchorLinks でアンカー変換
  *   4. 画像URL部分 → ImageThumbnail コンポーネント
- *   5. 非画像URL部分 → <a> リンク
+ *   5. 音声URL部分 → <audio controls>
+ *   6. その他URL部分 → <a> リンク
  *
  * See: features/thread.feature @image_preview
  * See: tmp/workers/bdd-architect_TASK-212/design.md §3.1 設計方針
@@ -135,6 +136,25 @@ export function parsePostBody(body: string): (string | React.ReactElement)[] {
 			// See: features/thread.feature @画像URLがサムネイルとして展開表示される
 			parts.push(
 				<ImageThumbnail key={`img-${match.startIndex}`} url={match.url} />,
+			);
+		} else if (match.isAudio) {
+			parts.push(
+				<audio
+					key={`audio-${match.startIndex}`}
+					controls
+					preload="none"
+					className="block my-2 max-w-full"
+				>
+					<source src={match.url} type="audio/mp4" />
+					<a
+						href={match.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+					>
+						{match.url}
+					</a>
+				</audio>,
 			);
 		} else {
 			// 非画像URL → <a> リンク

@@ -36,18 +36,18 @@ describe("LitterboxAdapter", () => {
 		fetchMock.mockResolvedValue(
 			createFetchResponse({
 				status: 200,
-				body: "https://litter.catbox.moe/example.wav",
+				body: "https://litter.catbox.moe/example.mp4",
 			}),
 		);
 
 		const result = await adapter.upload({
 			data: new Uint8Array([0x01, 0x02, 0x03]),
-			filename: "yomiage-1.wav",
-			mimeType: "audio/wav",
+			filename: "yomiage-1.mp4",
+			mimeType: "audio/mp4",
 		});
 
 		expect(result).toEqual({
-			url: "https://litter.catbox.moe/example.wav",
+			url: "https://litter.catbox.moe/example.mp4",
 		});
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -61,8 +61,8 @@ describe("LitterboxAdapter", () => {
 
 		const file = formData.get("fileToUpload");
 		expect(file).toBeInstanceOf(File);
-		expect((file as File).name).toBe("yomiage-1.wav");
-		expect((file as File).type).toBe("audio/wav");
+		expect((file as File).name).toBe("yomiage-1.mp4");
+		expect((file as File).type).toBe("audio/mp4");
 	});
 
 	it("HTTP 200 でも本文が https:// で始まらない場合はエラーにする", async () => {
@@ -73,8 +73,8 @@ describe("LitterboxAdapter", () => {
 		await expect(
 			adapter.upload({
 				data: new Uint8Array([0x01]),
-				filename: "yomiage-2.wav",
-				mimeType: "audio/wav",
+				filename: "yomiage-2.mp4",
+				mimeType: "audio/mp4",
 			}),
 		).rejects.toThrow("Litterbox upload rejected: upload failed");
 
@@ -90,8 +90,8 @@ describe("LitterboxAdapter", () => {
 		await expect(
 			adapter.upload({
 				data: new Uint8Array([0x01]),
-				filename: "yomiage-3.wav",
-				mimeType: "audio/wav",
+				filename: "yomiage-3.mp4",
+				mimeType: "audio/mp4",
 			}),
 		).rejects.toThrow("Litterbox upload failed: HTTP 500");
 
@@ -107,8 +107,8 @@ describe("LitterboxAdapter", () => {
 		await expect(
 			adapter.upload({
 				data: new Uint8Array([0x01]),
-				filename: "yomiage-4.wav",
-				mimeType: "audio/wav",
+				filename: "yomiage-4.mp4",
+				mimeType: "audio/mp4",
 			}),
 		).rejects.toThrow("Litterbox upload failed: HTTP 400");
 

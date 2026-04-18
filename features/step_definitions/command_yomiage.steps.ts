@@ -44,6 +44,7 @@ import {
 	YOMIAGE_VOICE_NAMES,
 	YOMIAGE_VOICE_TAGS,
 } from "../../config/yomiage";
+import { parsePostBody } from "../../src/app/(web)/_components/PostItem";
 import { wrapPcmAsWav } from "../../src/lib/domain/rules/wav-encoder";
 import type { IAudioCompressor } from "../../src/lib/infrastructure/adapters/audio-compressor";
 import type { IAudioStorageAdapter } from "../../src/lib/infrastructure/adapters/audio-storage-adapter";
@@ -62,7 +63,7 @@ import type { BattleBoardWorld } from "../support/world";
 
 const YOMIAGE_COMMAND_COST = 30;
 const DEFAULT_TEST_BALANCE = 100;
-const FIXED_AUDIO_URL = "https://example.com/yomiage-test.wav";
+const FIXED_AUDIO_URL = "https://example.com/yomiage-test.mp4";
 const GEMINI_FAILURE_SCENARIO =
 	"Gemini API呼び出しが失敗した場合は通貨返却・システム通知";
 const PIPELINE_FAILURE_SCENARIO =
@@ -89,7 +90,7 @@ function getCurrencyService() {
 /**
  * Gemini TTS モック。
  *
- * See: features/command_yomiage.feature @GitHub Actions上でWAV生成・軽量化・アップロードが順に行われる
+ * See: features/command_yomiage.feature @GitHub Actions上でMP4生成・軽量化・アップロードが順に行われる
  * See: features/command_yomiage.feature @Gemini API呼び出しが失敗した場合は通貨返却・システム通知
  */
 class InMemoryGeminiTtsAdapter implements IGeminiTtsAdapter {
@@ -173,7 +174,7 @@ class InMemoryAudioStorageAdapter implements IAudioStorageAdapter {
 /**
  * 音声軽量化モック。
  *
- * See: features/command_yomiage.feature @GitHub Actions上でWAV生成・軽量化・アップロードが順に行われる
+ * See: features/command_yomiage.feature @GitHub Actions上でMP4生成・軽量化・アップロードが順に行われる
  * See: features/command_yomiage.feature @軽量化またはアップロード処理が失敗した場合はURLを投稿せず通貨返却される
  */
 class InMemoryAudioCompressor implements IAudioCompressor {
@@ -247,7 +248,7 @@ Before(function (
 /**
  * 初回スレッド参加ボーナスをブロックする。
  *
- * See: features/command_yomiage.feature @GitHub Actions上でWAV生成・軽量化・アップロードが順に行われる
+ * See: features/command_yomiage.feature @GitHub Actions上でMP4生成・軽量化・アップロードが順に行われる
  */
 function blockNewThreadJoinBonus(userId: string, threadId: string): void {
 	const jstOffset = 9 * 60 * 60 * 1000;
@@ -306,7 +307,7 @@ async function ensureTargetPost(
 /**
  * yomiage コマンド本文を投稿し、pending を作成する。
  *
- * See: features/command_yomiage.feature @GitHub Actions上でWAV生成・軽量化・アップロードが順に行われる
+ * See: features/command_yomiage.feature @GitHub Actions上でMP4生成・軽量化・アップロードが順に行われる
  */
 async function executeYomiageCommand(
 	world: BattleBoardWorld,
@@ -407,7 +408,7 @@ async function provisionImplicitTargetIfNeeded(
 /**
  * yomiage worker 相当の非同期フローを 1 度だけ実行する。
  *
- * See: features/command_yomiage.feature @GitHub Actions上でWAV生成・軽量化・アップロードが順に行われる
+ * See: features/command_yomiage.feature @GitHub Actions上でMP4生成・軽量化・アップロードが順に行われる
  * See: docs/architecture/components/yomiage.md §5.1
  */
 async function runYomiageAsyncIfNeeded(world: BattleBoardWorld): Promise<void> {
@@ -505,7 +506,7 @@ async function runYomiageAsyncIfNeeded(world: BattleBoardWorld): Promise<void> {
 	try {
 		const compressed = await mockCompressor.compress({
 			input: wavBuffer,
-			filename: `yomiage-${pending.id}.wav`,
+			filename: `yomiage-${pending.id}.mp4`,
 		});
 		compressedBuffer = compressed.output;
 	} catch (error) {
@@ -524,8 +525,8 @@ async function runYomiageAsyncIfNeeded(world: BattleBoardWorld): Promise<void> {
 	try {
 		const uploaded = await mockStorageAdapter.upload({
 			data: compressedBuffer,
-			filename: `yomiage-${pending.id}.wav`,
-			mimeType: "audio/wav",
+			filename: `yomiage-${pending.id}.mp4`,
+			mimeType: "audio/mp4",
 		});
 		audioUrl = uploaded.url;
 	} catch (error) {
@@ -614,12 +615,9 @@ Given(
 	},
 );
 
-Given(
-	"Gemini APIによる元の WAV 生成は成功している",
-	function (this: BattleBoardWorld) {
-		mockTtsAdapter.setFail(false);
-	},
-);
+Given("Gemini APIによる元の音声生成は成功している", function () {
+	mockTtsAdapter.setFail(false);
+});
 
 Given(
 	"軽量化または音声配信ストレージへのアップロード処理が失敗している",
@@ -657,14 +655,30 @@ Then(
 	},
 );
 
-Then("URLが指すファイルは WAV 形式である", async function (this: BattleBoardWorld) {
+Then("URLが指すファイルは MP4 形式である", async function (this: BattleBoardWorld) {
 		await runYomiageAsyncIfNeeded(this);
 		assert(lastCompletionParams?.success, "完了通知が成功していません");
 		assert(
-			lastCompletionParams.audioUrl.endsWith(".wav"),
-			`URL が .wav で終わるべきですが ${lastCompletionParams.audioUrl} です`,
+			lastCompletionParams.audioUrl.endsWith(".mp4"),
+			`URL が .mp4 で終わるべきですが ${lastCompletionParams.audioUrl} です`,
 		);
 });
+
+Then(
+	"Webブラウザでは音声プレーヤーとして埋め込み再生できる",
+	async function (this: BattleBoardWorld) {
+		await runYomiageAsyncIfNeeded(this);
+		const systemPost = await getLatestSystemPost(this);
+		const rendered = parsePostBody(systemPost.body);
+		const audioElement = rendered.find(
+			(part) =>
+				typeof part !== "string" &&
+				part.type === "audio" &&
+				part.props.controls === true,
+		);
+		assert(audioElement, "音声プレーヤーの埋め込み要素が生成されていません");
+	},
+);
 
 Then(
 	"システムレス本文に対象レス >>5 が分かる情報が含まれる",
@@ -692,7 +706,7 @@ Then(
 );
 
 Then(
-	"Gemini APIに音声設定と WAV 出力指示が渡される",
+	"Gemini APIに音声設定と MP4 出力指示が渡される",
 	async function (this: BattleBoardWorld) {
 		await runYomiageAsyncIfNeeded(this);
 		const params = mockTtsAdapter.getLastParams();
@@ -705,7 +719,7 @@ Then(
 	},
 );
 
-Then("Gemini APIから WAV ファイルが取得される", async function (this: BattleBoardWorld) {
+Then("Gemini APIから音声データが取得される", async function (this: BattleBoardWorld) {
 		await runYomiageAsyncIfNeeded(this);
 		assert(
 			mockTtsAdapter.getCallCount() > 0,
@@ -713,7 +727,7 @@ Then("Gemini APIから WAV ファイルが取得される", async function (this
 		);
 });
 
-Then("軽量化された WAV ファイルが生成される", async function (this: BattleBoardWorld) {
+Then("軽量化された MP4 音声ファイルが生成される", async function (this: BattleBoardWorld) {
 		await runYomiageAsyncIfNeeded(this);
 		assert(
 			mockCompressor.getCallCount() > 0,
@@ -723,7 +737,7 @@ Then("軽量化された WAV ファイルが生成される", async function (th
 });
 
 Then(
-	"軽量化後の WAV ファイルが音声配信ストレージにアップロードされる",
+	"軽量化後の MP4 音声ファイルが音声配信ストレージにアップロードされる",
 	async function (this: BattleBoardWorld) {
 		await runYomiageAsyncIfNeeded(this);
 		assert(

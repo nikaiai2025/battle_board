@@ -28,7 +28,7 @@ export interface IAudioCompressor {
 }
 
 /**
- * ffmpeg によって WAV を 16kHz / mono / PCM 16bit へ再エンコードする。
+ * ffmpeg によって WAV を MP4(AAC) へ再エンコードする。
  *
  * See: features/command_yomiage.feature
  * See: docs/architecture/components/yomiage.md §5.5
@@ -47,7 +47,7 @@ export class AudioCompressor implements IAudioCompressor {
 		const tempDir = await mkdtemp(join(tmpdir(), "battle-board-yomiage-"));
 		const safeFileBase = this._sanitizeFilename(params.filename);
 		const inputPath = join(tempDir, `${safeFileBase}.input.wav`);
-		const outputPath = join(tempDir, `${safeFileBase}.output.wav`);
+		const outputPath = join(tempDir, `${safeFileBase}.output.mp4`);
 
 		try {
 			await writeFile(inputPath, params.input);
@@ -69,12 +69,13 @@ export class AudioCompressor implements IAudioCompressor {
 					"-y",
 					"-i",
 					inputPath,
-					"-ar",
-					"16000",
-					"-ac",
-					"1",
-					"-acodec",
-					"pcm_s16le",
+					"-vn",
+					"-c:a",
+					"aac",
+					"-b:a",
+					"96k",
+					"-movflags",
+					"+faststart",
 					outputPath,
 				],
 				{

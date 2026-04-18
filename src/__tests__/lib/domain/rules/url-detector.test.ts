@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import {
 	detectUrls,
 	IMAGE_EXTENSIONS,
+	isAudioUrl,
 	isImageUrl,
 } from "../../../../lib/domain/rules/url-detector";
 
@@ -108,6 +109,20 @@ describe("isImageUrl: 非画像URLの判定", () => {
 	});
 });
 
+describe("isAudioUrl: 音声URLの判定", () => {
+	it(".mp4 URLを音声と判定する", () => {
+		expect(isAudioUrl("https://example.com/audio.mp4")).toBe(true);
+	});
+
+	it("クエリ付き .mp4 URLを音声と判定する", () => {
+		expect(isAudioUrl("https://example.com/audio.mp4?dl=1")).toBe(true);
+	});
+
+	it(".wav URLは音声埋め込み対象と判定しない", () => {
+		expect(isAudioUrl("https://example.com/audio.wav")).toBe(false);
+	});
+});
+
 // ===========================================================================
 // detectUrls: 本文中のURL検出
 // See: design.md §7.4 の 13 テストケース
@@ -122,6 +137,7 @@ describe("detectUrls: 設計書§7.4の13テストケース", () => {
 		expect(result).toHaveLength(1);
 		expect(result[0].url).toBe("https://i.imgur.com/a.jpg");
 		expect(result[0].isImage).toBe(true);
+		expect(result[0].isAudio).toBe(false);
 	});
 
 	it("2: .png URLを検出し isImage=true を返す", () => {
@@ -163,6 +179,15 @@ describe("detectUrls: 設計書§7.4の13テストケース", () => {
 		expect(result).toHaveLength(1);
 		expect(result[0].url).toBe("https://example.com/page");
 		expect(result[0].isImage).toBe(false);
+		expect(result[0].isAudio).toBe(false);
+	});
+
+	it("7b: .mp4 URLを検出し isAudio=true を返す", () => {
+		const result = detectUrls("https://example.com/audio.mp4");
+		expect(result).toHaveLength(1);
+		expect(result[0].url).toBe("https://example.com/audio.mp4");
+		expect(result[0].isImage).toBe(false);
+		expect(result[0].isAudio).toBe(true);
 	});
 
 	it("8: 画像拡張子なし（/image）のURLを検出し isImage=false を返す", () => {

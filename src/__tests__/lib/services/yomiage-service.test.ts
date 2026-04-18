@@ -56,7 +56,7 @@ describe("completeYomiageCommand", () => {
 			invokerUserId: "user-001",
 			targetPostNumber: 5,
 			success: true,
-			audioUrl: "https://example.com/audio.wav",
+			audioUrl: "https://example.com/audio.mp4",
 			amount: 30,
 		});
 
@@ -65,7 +65,7 @@ describe("completeYomiageCommand", () => {
 			threadId: "thread-001",
 			body: [
 				">>5 の読み上げ音声ができたよ",
-				"https://example.com/audio.wav",
+				"https://example.com/audio.mp4",
 				"※ 音声は一定期間（約72時間）後に取得不可になります",
 			].join("\n"),
 			edgeToken: null,
@@ -130,7 +130,7 @@ describe("completeYomiageCommand", () => {
 				invokerUserId: "user-003",
 				targetPostNumber: 3,
 				success: true,
-				audioUrl: "https://example.com/audio.wav",
+				audioUrl: "https://example.com/audio.mp4",
 				amount: 30,
 			}),
 		).rejects.toThrow("createPost failed");

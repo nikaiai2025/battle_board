@@ -377,7 +377,7 @@ async function processPendingCommand(
 		try {
 			const result = await adapters.compressor.compress({
 				input: wavBuffer,
-				filename: `yomiage-${pending.id}.wav`,
+				filename: `yomiage-${pending.id}.mp4`,
 			});
 			compressed = result.output;
 			logWorkerEvent("info", "compress_succeeded", {
@@ -408,8 +408,8 @@ async function processPendingCommand(
 		try {
 			const uploadResult = await adapters.storageAdapter.upload({
 				data: compressed,
-				filename: `yomiage-${pending.id}.wav`,
-				mimeType: "audio/wav",
+				filename: `yomiage-${pending.id}.mp4`,
+				mimeType: "audio/mp4",
 			});
 			audioUrl = uploadResult.url;
 			logWorkerEvent("info", "upload_succeeded", {

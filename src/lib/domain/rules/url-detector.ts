@@ -35,6 +35,8 @@ export interface UrlMatch {
 	endIndex: number;
 	/** 画像URLかどうか */
 	isImage: boolean;
+	/** 音声URLかどうか */
+	isAudio: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,27 @@ export function isImageUrl(url: string): boolean {
 }
 
 /**
+ * URLが埋め込み再生対象の音声URLかどうかを判定する。
+ *
+ * 現状は !yomiage が配布する MP4 コンテナのみを対象にする。
+ */
+export function isAudioUrl(url: string): boolean {
+	if (!url) return false;
+
+	let path = url;
+	const queryIndex = path.indexOf("?");
+	if (queryIndex !== -1) {
+		path = path.slice(0, queryIndex);
+	}
+	const fragmentIndex = path.indexOf("#");
+	if (fragmentIndex !== -1) {
+		path = path.slice(0, fragmentIndex);
+	}
+
+	return path.toLowerCase().endsWith(".mp4");
+}
+
+/**
  * 本文中の全URLを検出し、画像かどうかを判定する純粋関数。
  *
  * 本文中の https:// または http:// で始まるURLを正規表現で検出し、
@@ -114,6 +137,7 @@ export function detectUrls(body: string): UrlMatch[] {
 			startIndex,
 			endIndex,
 			isImage: isImageUrl(url),
+			isAudio: isAudioUrl(url),
 		});
 	}
 

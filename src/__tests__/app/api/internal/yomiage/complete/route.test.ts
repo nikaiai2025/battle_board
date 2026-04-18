@@ -74,7 +74,7 @@ describe("POST /api/internal/yomiage/complete", () => {
 				invokerUserId: "user-001",
 				targetPostNumber: 7,
 				success: true,
-				audioUrl: "https://example.com/audio.wav",
+				audioUrl: "https://example.com/audio.mp4",
 				amount: 30,
 			}),
 		);
@@ -92,7 +92,7 @@ describe("POST /api/internal/yomiage/complete", () => {
 				invokerUserId: "user-001",
 				targetPostNumber: 7,
 				success: true,
-				audioUrl: "https://example.com/audio.wav",
+				audioUrl: "https://example.com/audio.mp4",
 				amount: 30,
 				error: undefined,
 				stage: undefined,
@@ -145,7 +145,7 @@ describe("POST /api/internal/yomiage/complete", () => {
 				invokerUserId: "user-003",
 				targetPostNumber: 1,
 				success: true,
-				audioUrl: "https://example.com/audio.wav",
+				audioUrl: "https://example.com/audio.mp4",
 				amount: 30,
 			}),
 		);
