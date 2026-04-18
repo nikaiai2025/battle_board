@@ -1,7 +1,7 @@
 ---
 task_id: TASK-GATE-144
 sprint_id: Sprint-144
-status: assigned
+status: completed
 assigned_to: bdd-gate
 depends_on: [TASK-369]
 created_at: 2026-03-29T11:30:00+09:00

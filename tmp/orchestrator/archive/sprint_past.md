@@ -256,6 +256,158 @@
 ### Sprint-53〜44の成果
 - PostListLiveWrapper修正、CommandService本番修正、subject.txt 304修正、UUID修正、command-parser改善、固定スレッド自動デプロイ、統合テスト拡充、Phase 5検証+修正
 
+## 完了済みスプリント成果（Sprint-138〜153）
+
+**Sprint-153 完了 — キュレーションBOT Phase C Step 1（subject_txt 流用 × 4体）**（コミット: `368f129`）
+
+### Sprint-153 の成果
+- TASK-385: config/bot-profiles.ts に 4 プロファイル追加（`curation_poverty` / `curation_mnewsplus` / `curation_news4vip` / `curation_liveedge`）
+- migration 00046: 4 BOT 冪等 seed
+- 既存 `SubjectTxtAdapter` 流用（Adapter 変更なし）、adapter-resolver 変更なし
+- **vitest: 2296/2296 PASS / cucumber: 411/411 PASS**（既存件数維持）
+- 本番スモーク: 省略（人間判断）
+
+### Sprint-153 で発覚した次スプリント送り事項
+- 荒らし役BOT 107体増殖バグ → Sprint-154 へ分離
+
+---
+
+**Sprint-152 完了 — Daily Maintenance 500 障害修正（2層バグ: RPC型キャスト + FK CASCADE）**（コミット: `8e1706f` / `423e246` / `b362a0a`）
+
+### Sprint-152の成果
+- **TASK-382:** migration 00043 — RPC `bulk_update_daily_ids` の `p_daily_id_date::date` 明示キャスト
+- **TASK-383:** migration 00044 — `bot_posts.bot_id` FK を `ON DELETE CASCADE` 化
+- **TASK-384:** migration 00045 — `attacks.bot_id` / `grass_reactions.receiver_bot_id` / `collected_topics.source_bot_id` の3 FK を `ON DELETE CASCADE` 化
+- **17日障害解消:** 2026-03-27 〜 2026-04-14 の連続 HTTP 500 を修正
+  - 原因1: PostgreSQL text→date 暗黙キャスト禁止で RPC 失敗（2026-03-29 混入）
+  - 原因2: `bots` 参照FK 4テーブルが `NO ACTION` で `deleteEliminatedTutorialBots` が FK違反（Sprint-84 以来の潜在バグ）
+- **主検証:** daily-maintenance run #24427737023: daily-reset 5s PASS / daily-stats 4s PASS
+- **品質ゲート:** vitest 2296 PASS / cucumber-js 411 PASS / 統合 3 PASS / E2E 63/64（1件 pre-existing Sprint-108 由来タイトル検証漏れ）
+- **本番スモーク:** 31/36 PASS 維持（Sprint-151 基準）
+- **GitHub Issue #2:** closed（修正内容 + インシデント報告書リンクをコメント添付）
+- **Cloudflare Version:** `bae61917`
+
+### Sprint-152 で追加された知見
+- インシデント報告書: `docs/operations/incidents/2026-04-15_daily_maintenance_500_17day_outage.md`（9項目フレームワーク）
+- 教訓 LL-017: FK の `ON DELETE` 指定は必須（`NO ACTION` デフォルトは設計意図を見落とすトラップ）
+
+### 対応見送りとした項目（人間判断 2026-04-15）
+- **AIセッション開始時の CI失敗 Issue チェック**: 本件は認知が即日成立しており（別件優先で対応保留）、構造的問題ではないため対応不要
+- **integration test 拡充**: 類似事象が再発しても Issue 起票経路で即座に検知可能なため、費用対効果が見合わず見送り
+- **schema 規約明文化**: 同上
+
+※ LL-018（初稿で書いた「通知の認知フロー断絶」教訓）は事実誤認に基づくため取り下げ。lessons_learned.md に取り下げ記録のみ残置
+
+---
+
+**Sprint-151 完了 — キュレーションBOT Phase B: Wikipedia日次急上昇 API統合**（コミット: `ec11f98`）
+
+### Sprint-151の成果
+- TASK-379: Wikipedia API統合設計書（4成果物、9論点決着、ESC-TASK-379-1 自律解決）
+  - 投稿間隔変更の適用範囲判断: **curation系（topic_driven 方式）のみ** 12-24時間化。荒らし役BOT(60-120分) やコピペBOT は対象外（feature 別シナリオで既定のため）
+- TASK-380: BOT投稿間隔（curation系） 240-360分 → 720-1440分
+- TASK-381: WikipediaAdapter 実装 + curation_wikipedia プロファイル + formatBody 拡張（Phase A 波及あり、feature v4 準拠）
+- BDD変更: `features/curation_bot.feature` v3→v4（月次・定番記事除去 + 12-24時間投稿間隔）
+- vitest: 2296 PASS（+45）/ cucumber-js: 411 PASS
+- 本番スモーク: 31/36 PASS（Sprint-150 基準維持）
+- Cloudflare Version: `92faa009`
+
+### Sprint-151 テスト設計判断（確認済み）
+
+D-10 §7.2・§8・§9・§10 と照合し、以下の判断を採用:
+
+| レイヤ | 実装有無 | 根拠 |
+|---|---|---|
+| 単体テスト (Vitest) | ✅ 43件実装 | WikipediaAdapter の主力検証層。純粋関数6個 + `collect()` 11ケース（正常系・404フォールバック・429/503・空レス・6件未満・メタページ除外等）。`fetchJson` DI でモック化 |
+| BDDサービス層 (Cucumber) | ✅ 既存9シナリオ流用 | feature v4 は抽象記述のため Wikipedia 固有ステップは追加せず、adapter 差し替えで共通カバー |
+| 統合テスト (Supabase Local) | ❌ 対象外 | D-10 §8「統合テストは SQL/RLS/マイグレーション/リポジトリ層向け」。Adapter は対象外 |
+| API テスト | ❌ 対象外 | D-10 §9.2「専ブラ互換/認証/エラーレスポンス」に限定。バッチ経路は対象外 |
+| E2E テスト | ❌ 対象外 | バッチ経路（GitHub Actions cron）のため UI 非依存 |
+| 実API契約テスト | ❌ 不採用 | ESC-TASK-379-1 論点A「CI 不安定化リスク回避」で明示的に却下。`collection-job.ts` のソース単位隔離でリスク受容 |
+
+**フィクスチャ:** `src/__tests__/lib/collection/adapters/fixtures/wikipedia_top_ja_2026_04_12.json`（Wikimedia API 実レスポンスの Top50 スナップショット）
+
+### Sprint-151 人間作業（完了状況）
+| # | 作業 | 状況 |
+|---|---|---|
+| 1 | GitHub Secret `WIKIMEDIA_CONTACT` 設定 | ✅ 完了（2026-04-15、人間作業） |
+| 2 | 本番 Supabase への migration 00042 適用 | ✅ **自動適用完了**（`migrate.yml` by push trigger、2026-04-14T10:50:59Z、21秒で success） |
+| 3 | 実働確認（GitHub Actions cron 起動後の `collected_topics` INSERT 確認） | ⏳ 翌日以降（cron トリガ待ち） |
+| 4 | ローカル Supabase への migration 00042 適用 | ⏭️ 不要（BOT seed INSERT のみ、テストは DB 非依存で完結） |
+
+**人間直接修正 (2026-04-13) — hiroyuki除外 + 管理画面BOTメタデータ表示**（コミット: `e479099`）
+- BOT reviveから `hiroyuki` を除外（`src/lib/infrastructure/repositories/bot-repository.ts`）
+- 管理画面BOT詳細ページでメタデータ表示追加（`src/app/(admin)/admin/bots/[botId]/page.tsx`）
+- 関連単体テスト更新（`bot-repository.test.ts` / `admin/bots/[botId]/route.test.ts`）
+- D-08 `docs/architecture/components/bot.md` 同期更新
+- ※ Sprint番号なし（人間による直接修正）
+
+**Sprint-150 完了 — edge-token チャネル分離**
+
+### Sprint-150の成果
+- TASK-378: edge-tokenチャネル分離 全実装
+  - edge_tokens に channel カラム追加（マイグレーション 00041）
+  - トークン発行: Web UI → web、専ブラ/PAT認証 → senbra で書き分け
+  - mypage系 + auth/pat APIルートに channel=web ガード追加（senbra → 403）
+  - 課金機能のセキュリティ前提条件を充足
+- vitest: 2249 PASS / cucumber-js: 412 passed
+- コミット: 8eead6f
+- 本番スモーク: 31/36 PASS（5件はローカル限定スキップ）
+
+**Sprint-149 完了 — BOT createThread UUID制約違反 + 固定スレッド除外**（コミット: af7a08a）
+
+**Sprint-148 完了 — BOTスケジューラ障害修正**（コミット: 9c3b507, c82af6b）
+
+**Sprint-147 完了 — 管理画面BOT一覧にnextPostAt表示**（コミット: 6fae52b）
+
+**Sprint-146 完了 — キュレーションBOT仕様変更v3（本文収集廃止 + upsert化）**（コミット: 42cb501）
+
+**Sprint-145 完了 — BOTインフラ修正 + コピペ管理UI更新**
+
+### Sprint-145の成果
+- TASK-371: BOTスケジューラ復活（bot-scheduler.yml cron uncomment）+ hiroyukiプロファイルbot-profiles.ts同期
+- TASK-372: ウェルカムBOT重複スポーン修正（pending_tutorials削除順序変更 + UNIQUE制約追加）
+- login/page.tsx 微修正（人間変更）、コピペ管理UI更新（人間変更）
+- コミット: 07cc7d6, f53cdfa
+
+**Sprint-144 完了 — 陳腐化テスト修正 + auth/verify edge-token新規発行対応**（コミット: 9a2b98b）
+
+**Sprint-141〜143 完了**
+- Sprint-143: マイページ コピペ管理UI + UI改善
+- Sprint-142: 管理画面BOT管理 + ユーザー語録登録（05be61c, 71352b9）
+- Sprint-141: 開発連絡板 BDD ステップ定義（857effd）
+
+**Sprint-138〜140 完了**
+- Sprint-140: PostService/AttackHandler サブリクエスト最適化（97dc7e5）
+- Sprint-139: ユーザーコピペ管理機能 + !copipe マージ検索（3227525）
+- Sprint-138: Ops基盤障害修正（bfae891）
+
+### CF Observability 既知エラー（解消済み・再調査不要）
+
+2026-03-29 に CF Observability の実エラーを調査し、以下は解消済みと判定。ログに残存するが対応不要。
+
+| 検出日 | エンドポイント | エラー概要 | 修正Sprint/コミット |
+|---|---|---|---|
+| 03-24 | `GET /api/admin/users` | Too many subrequests (`getBalance` N+1) | Sprint-118 / 237ef50 |
+| 03-22 ×2 | `POST /api/internal/bot/execute` | UUID パースエラー（"新参おるやん🤣"をUUID解析） | cebd451（チュートリアルBOT本文を改行区切りに変更） |
+| 03-21 | `POST /api/internal/bot/execute` | FK制約違反 (`incentive_logs.user_id` BOT未登録) + exceededCpu | Sprint-95 / 6225e73（BOT書き込み時インセンティブスキップ） |
+
+**未解消（Sprint-140で緩和、要監視）:**
+- 03-27: `POST /api/threads/.../posts` — Too many subrequests (`countActiveThreads`)。独立システムレス再帰呼び出しでサブリクエスト上限到達。Sprint-140 でワーストケース約47クエリ削減済み（推定92〜114）。再発しなければ解消扱い
+
+### 敵対的コードレビュー進捗（一時中断中）
+
+| # | Feature | ステータス | 指摘/採用 | セッション |
+|---|---------|-----------|----------|-----------|
+| 1 | admin.feature | 完了 | 36/19 | `20260325_admin_auth` |
+| 2 | authentication.feature | 完了 | (上と合算) | `20260325_admin_auth` |
+| 3 | posting.feature | **完了** | 9/3 (CRITICAL:1, HIGH:2) | `20260326_posting` |
+| 4 | thread.feature | **完了** | 18/11 (CRITICAL:1, HIGH:10) | `20260326_thread` |
+| 5 | user_registration.feature | **完了** | 12/8 (CRITICAL:4, HIGH:2) | `20260326_user_registration` |
+| 6〜22 | （残17件）| 未着手 | | |
+
+**Sprint-134〜137 完了**
+
 ## 完了済み人間タスク
 
 ### HUMAN-005: 本番管理者登録 + .env.prod.smoke 設定 → 完了（2026-03-20）
