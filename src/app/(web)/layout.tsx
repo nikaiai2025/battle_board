@@ -40,11 +40,13 @@ export default async function WebLayout({ children }: WebLayoutProps) {
 	// Cookie あり → 軽量 DB 問い合わせで認証状態 + 本登録状態を取得
 	let isAuthenticated = false;
 	let isRegistered = false;
+	let authChannel: "web" | "senbra" | null = null;
 
 	if (edgeToken) {
 		const status = await getLayoutAuthStatus(edgeToken);
 		isAuthenticated = status.isAuthenticated;
 		isRegistered = status.isRegistered;
+		authChannel = status.channel;
 	}
 
 	// テーマ/フォントをCookieから取得し解決する
@@ -70,7 +72,11 @@ export default async function WebLayout({ children }: WebLayoutProps) {
           isRegistered: 本登録済み（ログインリンク非表示）
           See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
       */}
-			<Header isAuthenticated={isAuthenticated} isRegistered={isRegistered} />
+			<Header
+				isAuthenticated={isAuthenticated}
+				isRegistered={isRegistered}
+				channel={authChannel}
+			/>
 
 			{/* ページコンテンツ */}
 			{children}

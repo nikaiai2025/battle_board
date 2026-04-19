@@ -43,12 +43,14 @@ export function _insert(edgeToken: EdgeToken): void {
 export async function create(
 	userId: string,
 	token: string,
+	channel: "web" | "senbra" = "web",
 ): Promise<EdgeToken> {
 	const now = new Date(Date.now());
 	const newEdgeToken: EdgeToken = {
 		id: crypto.randomUUID(),
 		userId,
 		token,
+		channel,
 		createdAt: now,
 		lastUsedAt: now,
 	};

@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AuthModal from "./AuthModal";
 import { usePostFormRegister } from "./PostFormContext";
+import { insertPostReference } from "./thread-ui-logic";
 
 // ---------------------------------------------------------------------------
 // コンポーネント
@@ -180,10 +181,7 @@ export default function PostForm({ threadId, onTextInserted }: PostFormProps) {
 	 */
 	const insertText = useCallback(
 		(text: string) => {
-			setBody((prev) => {
-				if (prev.trim() === "") return text;
-				return `${prev}\n${text}`;
-			});
+			setBody((prev) => insertPostReference(prev, text));
 			onTextInserted?.();
 		},
 		[onTextInserted],

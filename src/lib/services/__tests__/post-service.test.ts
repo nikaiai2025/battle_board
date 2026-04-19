@@ -1492,6 +1492,67 @@ describe("PostService", () => {
 
 				expect(result.firstPost?.postNumber).toBe(1);
 			});
+
+			it("同一秒の threadKey 衝突時は未使用の次秒を採番する", async () => {
+				const fixedNow = new Date("2026-03-09T00:00:00Z");
+				const baseThreadKey = Math.floor(fixedNow.getTime() / 1000).toString();
+				const nextThreadKey = (Math.floor(fixedNow.getTime() / 1000) + 1).toString();
+
+				vi.useFakeTimers();
+				vi.setSystemTime(fixedNow);
+
+				try {
+					vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+						valid: true,
+						userId: "user-001",
+						authorIdSeed: "seed-abc",
+						channel: "web" as const,
+					});
+					vi.mocked(UserRepository.findById).mockResolvedValue(mockUser);
+					vi.mocked(ThreadRepository.findByThreadKey)
+						.mockResolvedValueOnce(mockThread)
+						.mockResolvedValueOnce(null);
+					vi.mocked(ThreadRepository.create).mockResolvedValue({
+						...mockThread,
+						threadKey: nextThreadKey,
+					});
+					vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+						mockPost,
+					);
+					vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
+						undefined,
+					);
+					vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(
+						undefined,
+					);
+
+					await createThread(
+						{
+							boardId: "livebot",
+							title: "今日の雑談",
+							firstPostBody: "自由に話しましょう",
+						},
+						"token-abc",
+						"seed-abc",
+					);
+
+					expect(ThreadRepository.findByThreadKey).toHaveBeenNthCalledWith(
+						1,
+						baseThreadKey,
+					);
+					expect(ThreadRepository.findByThreadKey).toHaveBeenNthCalledWith(
+						2,
+						nextThreadKey,
+					);
+					expect(ThreadRepository.create).toHaveBeenCalledWith(
+						expect.objectContaining({
+							threadKey: nextThreadKey,
+						}),
+					);
+				} finally {
+					vi.useRealTimers();
+				}
+			});
 		});
 
 		// -----------------------------------------------------------------------

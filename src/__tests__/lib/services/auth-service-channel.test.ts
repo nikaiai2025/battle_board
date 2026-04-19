@@ -81,6 +81,7 @@ vi.mock(
 // ---------------------------------------------------------------------------
 
 import {
+	getLayoutAuthStatus,
 	issueEdgeToken,
 	verifyEdgeToken,
 } from "../../../lib/services/auth-service";
@@ -271,6 +272,48 @@ describe("AuthService -- channel separation", () => {
 				expect.any(String),
 				"web",
 			);
+		});
+	});
+
+	// =========================================================================
+	// getLayoutAuthStatus -- channel-aware layout state
+	// =========================================================================
+
+	describe("getLayoutAuthStatus", () => {
+		it("senbra channel token でも channel を含めて返し、layout 側で判定できる", async () => {
+			mockFindByToken.mockResolvedValue({
+				id: "et-layout-001",
+				userId: "user-layout-001",
+				token: "layout-token",
+				channel: "senbra",
+				createdAt: new Date(),
+				lastUsedAt: new Date(),
+			});
+			mockFindById.mockResolvedValue({
+				id: "user-layout-001",
+				isVerified: true,
+				supabaseAuthId: "supabase-auth-001",
+			});
+
+			const result = await getLayoutAuthStatus("layout-token");
+
+			expect(result).toEqual({
+				isAuthenticated: true,
+				isRegistered: true,
+				channel: "senbra",
+			});
+		});
+
+		it("token が見つからない場合は channel=null の未認証を返す", async () => {
+			mockFindByToken.mockResolvedValue(null);
+
+			const result = await getLayoutAuthStatus("missing-token");
+
+			expect(result).toEqual({
+				isAuthenticated: false,
+				isRegistered: false,
+				channel: null,
+			});
 		});
 	});
 });

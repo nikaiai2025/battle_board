@@ -629,19 +629,28 @@ export async function regeneratePat(
  *
  * 処理:
  *   1. verifyPat() で PAT を検証
- *   2. 有効な場合は新しい edge-token を生成し edge_tokens に INSERT
- *   3. edge-token を返却（呼び出し元が Cookie に設定）
+ *   2. currentEdgeToken が同一ユーザーなら既存 token を再利用する
+ *   3. 欠落・失効・別ユーザーなら新しい edge-token を生成し edge_tokens に INSERT
+ *   4. edge-token を返却（呼び出し元が Cookie に設定）
  *
  * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
  * See: docs/architecture/components/user-registration.md §6 認証判定フロー
  *
  * @param patToken - 照合対象の PAT
- * @returns 検証成功時 { valid: true, userId, edgeToken }、失敗時 { valid: false }
+ * @param currentEdgeToken - 現在の Cookie 上の edge-token（同一ユーザーなら再利用する）
+ * @returns 検証成功時 { valid: true, userId, edgeToken, reusedCurrentToken }、失敗時 { valid: false }
  */
 export async function loginWithPat(
 	patToken: string,
+	currentEdgeToken?: string,
 ): Promise<
-	{ valid: true; userId: string; edgeToken: string } | { valid: false }
+	| {
+			valid: true;
+			userId: string;
+			edgeToken: string;
+			reusedCurrentToken: boolean;
+	  }
+	| { valid: false }
 > {
 	const result = await verifyPat(patToken);
 
@@ -649,10 +658,28 @@ export async function loginWithPat(
 		return { valid: false };
 	}
 
+	if (currentEdgeToken) {
+		const currentTokenRecord =
+			await EdgeTokenRepository.findByToken(currentEdgeToken);
+		if (currentTokenRecord?.userId === result.userId) {
+			return {
+				valid: true,
+				userId: result.userId,
+				edgeToken: currentEdgeToken,
+				reusedCurrentToken: true,
+			};
+		}
+	}
+
 	// 新しい edge-token を発行
 	// Sprint-150: PAT 認証は専ブラ経由 → channel='senbra'
 	const newEdgeToken = randomUUID();
 	await EdgeTokenRepository.create(result.userId, newEdgeToken, "senbra");
 
-	return { valid: true, userId: result.userId, edgeToken: newEdgeToken };
+	return {
+		valid: true,
+		userId: result.userId,
+		edgeToken: newEdgeToken,
+		reusedCurrentToken: false,
+	};
 }

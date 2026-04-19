@@ -10,8 +10,16 @@
  * See: tmp/orchestrator/sprint_8_bdd_guide.md §4 thread.feature
  */
 
-import { Given, Then, When } from "@cucumber/cucumber";
+import { Before, Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
+import type { Post as WebPost } from "../../src/app/(web)/_components/PostItem";
+import {
+	closeTopAnchorPopup,
+	getFreshItemsAfterPostNumber,
+	insertPostReference,
+	openAnchorPopup,
+	type PopupEntry,
+} from "../../src/app/(web)/_components/thread-ui-logic";
 // See: features/authentication.feature @認証フロー是正 (TASK-041)
 // issueEdgeToken は isVerified=false でユーザーを作成するため、
 // 書き込みを行うステップでは必ず updateIsVerified(userId, true) を呼ぶ必要がある。
@@ -45,6 +53,105 @@ const DEFAULT_IP_HASH = "bdd-test-ip-hash-default-sha512-placeholder";
 
 /** BDD テストで使用する板 ID */
 const TEST_BOARD_ID = "livebot";
+
+let popupStackState: PopupEntry[] = [];
+let popupPostsByNumber = new Map<number, WebPost>();
+let simulatedPostFormBody = "";
+let pollingEnabledForCurrentView = false;
+let pollingLastPostNumber = 0;
+let polledFreshPosts: import("../../src/lib/domain/models/post").Post[] = [];
+let activeFabPanel: "post" | "search" | "image" | "settings" | null = null;
+
+Before(() => {
+	popupStackState = [];
+	popupPostsByNumber = new Map<number, WebPost>();
+	simulatedPostFormBody = "";
+	pollingEnabledForCurrentView = false;
+	pollingLastPostNumber = 0;
+	polledFreshPosts = [];
+	activeFabPanel = null;
+});
+
+async function ensureVerifiedEdgeToken(world: BattleBoardWorld) {
+	const AuthService = getAuthService();
+
+	if (world.currentEdgeToken && world.currentUserId) {
+		return;
+	}
+
+	const { token, userId } = await AuthService.issueEdgeToken(DEFAULT_IP_HASH);
+	world.currentEdgeToken = token;
+	world.currentUserId = userId;
+	world.currentIpHash = DEFAULT_IP_HASH;
+	await InMemoryUserRepo.updateIsVerified(userId, true);
+}
+
+function toWebPost(
+	post: import("../../src/lib/domain/models/post").Post,
+): WebPost {
+	return {
+		id: post.id,
+		threadId: post.threadId,
+		postNumber: post.postNumber,
+		displayName: post.displayName,
+		dailyId: post.dailyId,
+		body: post.body,
+		inlineSystemInfo: post.inlineSystemInfo,
+		isSystemMessage: post.isSystemMessage,
+		isDeleted: post.isDeleted,
+		botMark: null,
+		createdAt: post.createdAt.toISOString(),
+	};
+}
+
+async function loadCurrentThreadWebPosts(world: BattleBoardWorld) {
+	assert(world.currentThreadId, "スレッドが設定されていません");
+	const posts = await InMemoryPostRepo.findByThreadId(world.currentThreadId);
+	const webPosts = posts.map(toWebPost);
+	popupPostsByNumber = new Map(webPosts.map((post) => [post.postNumber, post]));
+	return webPosts;
+}
+
+async function createThreadWithBodies(
+	world: BattleBoardWorld,
+	bodies: string[],
+	title = "thread-ui テストスレ",
+) {
+	const PostService = getPostService();
+
+	await ensureVerifiedEdgeToken(world);
+
+	const thread = await InMemoryThreadRepo.create({
+		threadKey: Math.floor(Date.now() / 1000).toString(),
+		boardId: TEST_BOARD_ID,
+		title,
+		createdBy: world.currentUserId ?? "system",
+	});
+	world.currentThreadId = thread.id;
+	world.currentThreadTitle = thread.title;
+
+	for (const body of bodies) {
+		const result = await PostService.createPost({
+			threadId: thread.id,
+			body,
+			edgeToken: world.currentEdgeToken!,
+			ipHash: world.currentIpHash,
+			isBotWrite: false,
+		});
+		assert("success" in result && result.success, `レス作成に失敗しました: ${body}`);
+	}
+
+	const posts = await InMemoryPostRepo.findByThreadId(thread.id);
+	viewedThreadPosts = posts;
+	await loadCurrentThreadWebPosts(world);
+	popupStackState = [];
+	simulatedPostFormBody = "";
+	return posts;
+}
+
+function normalizeEscapedNewlines(text: string) {
+	return text.replace(/\\n/g, "\n");
+}
 
 // ---------------------------------------------------------------------------
 // When: スレッド作成
@@ -1657,6 +1764,10 @@ Given(
 		paginationPostResult = await PostService.getPostList(this.currentThreadId, {
 			latestCount,
 		});
+		pollingEnabledForCurrentView = true;
+		pollingLastPostNumber =
+			paginationPostResult[paginationPostResult.length - 1]?.postNumber ?? 0;
+		polledFreshPosts = [];
 		this.lastResult = { type: "success", data: paginationPostResult };
 	},
 );
@@ -1681,6 +1792,20 @@ When(
 			isBotWrite: false,
 		});
 		if ("success" in result && result.success) {
+			if (pollingEnabledForCurrentView) {
+				const allPosts = await PostService.getPostList(this.currentThreadId);
+				polledFreshPosts = getFreshItemsAfterPostNumber(
+					allPosts,
+					pollingLastPostNumber,
+				);
+				if (polledFreshPosts.length > 0) {
+					pollingLastPostNumber =
+						polledFreshPosts[polledFreshPosts.length - 1]?.postNumber ??
+						pollingLastPostNumber;
+				}
+			} else {
+				polledFreshPosts = [];
+			}
 			this.lastResult = { type: "success", data: result };
 		} else if ("success" in result && !result.success) {
 			this.lastResult = {
@@ -1703,7 +1828,12 @@ When(
  */
 Then(
 	"ポーリングによりレス{int}が自動的に画面に追加される",
-	(_postNumber: number) => "pending",
+	(postNumber: number) => {
+		assert(
+			polledFreshPosts.some((post) => post.postNumber === postNumber),
+			`ポーリング対象にレス${postNumber}が含まれていません`,
+		);
+	},
 );
 
 /**
@@ -1720,6 +1850,10 @@ Given(
 		paginationPostResult = await PostService.getPostList(this.currentThreadId, {
 			range: { start: 1, end: 100 },
 		});
+		pollingEnabledForCurrentView = false;
+		pollingLastPostNumber =
+			paginationPostResult[paginationPostResult.length - 1]?.postNumber ?? 0;
+		polledFreshPosts = [];
 		this.lastResult = { type: "success", data: paginationPostResult };
 	},
 );
@@ -1733,7 +1867,13 @@ Given(
  * See: features/thread.feature @pagination
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("画面は更新されない", () => "pending");
+Then("画面は更新されない", () => {
+	assert.strictEqual(
+		polledFreshPosts.length,
+		0,
+		"過去ページ表示では新着レスが画面追加対象にならないはずです",
+	);
+});
 
 // ---------------------------------------------------------------------------
 // アンカーポップアップシナリオ用ステップ定義
@@ -1751,7 +1891,9 @@ Then("画面は更新されない", () => "pending");
  */
 Given(
 	"スレッドにレス1 {string} とレス2 {string} が存在する",
-	(_a: string, _b: string) => "pending",
+	async function (this: BattleBoardWorld, body1: string, body2: string) {
+		await createThreadWithBodies(this, [body1, body2], "anchor_popup テスト");
+	},
 );
 
 /**
@@ -1763,7 +1905,19 @@ Given(
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When("レス2の本文中の {string} をクリックする", (_anchor: string) => "pending");
+When(
+	"レス2の本文中の {string} をクリックする",
+	async function (this: BattleBoardWorld, anchor: string) {
+		await loadCurrentThreadWebPosts(this);
+		const targetPostNumber = Number(anchor.replace(">>", ""));
+		popupStackState = openAnchorPopup(
+			popupPostsByNumber,
+			popupStackState,
+			targetPostNumber,
+			{ x: 100, y: 200 },
+		);
+	},
+);
 
 /**
  * レス1の内容がポップアップで表示される。
@@ -1774,7 +1928,14 @@ When("レス2の本文中の {string} をクリックする", (_anchor: string) 
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("レス1の内容がポップアップで表示される", () => "pending");
+Then("レス1の内容がポップアップで表示される", () => {
+	assert(popupStackState.length > 0, "ポップアップが表示されていません");
+	assert.strictEqual(
+		popupStackState[popupStackState.length - 1]?.postNumber,
+		1,
+		"レス1のポップアップが最前面に表示されていません",
+	);
+});
 
 /**
  * ポップアップにはレス番号、表示名、日次ID、本文が含まれる。
@@ -1787,7 +1948,15 @@ Then("レス1の内容がポップアップで表示される", () => "pending")
  */
 Then(
 	"ポップアップにはレス番号、表示名、日次ID、本文が含まれる",
-	() => "pending",
+	() => {
+		const popup = popupStackState[popupStackState.length - 1];
+		assert(popup, "ポップアップが表示されていません");
+		assert(popup.post, "ポップアップのレス本文が取得できていません");
+		assert.strictEqual(popup.post.postNumber, 1, "レス番号が一致しません");
+		assert(popup.post.displayName.length > 0, "表示名が空です");
+		assert(popup.post.dailyId.length > 0, "日次IDが空です");
+		assert(popup.post.body.length > 0, "本文が空です");
+	},
 );
 
 /**
@@ -1801,7 +1970,13 @@ Then(
  */
 Given(
 	"スレッドにレス1、レス2 {string}、レス3 {string} が存在する",
-	(_a: string, _b: string) => "pending",
+	async function (this: BattleBoardWorld, body2: string, body3: string) {
+		await createThreadWithBodies(
+			this,
+			["こんにちは", body2, body3],
+			"anchor_popup 多段テスト",
+		);
+	},
 );
 
 /**
@@ -1813,7 +1988,19 @@ Given(
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When("レス3の {string} をクリックする", (_anchor: string) => "pending");
+When(
+	"レス3の {string} をクリックする",
+	async function (this: BattleBoardWorld, anchor: string) {
+		await loadCurrentThreadWebPosts(this);
+		const targetPostNumber = Number(anchor.replace(">>", ""));
+		popupStackState = openAnchorPopup(
+			popupPostsByNumber,
+			popupStackState,
+			targetPostNumber,
+			{ x: 100, y: 200 },
+		);
+	},
+);
 
 /**
  * 表示されたポップアップ内の "{string}" をクリックする。
@@ -1826,7 +2013,15 @@ When("レス3の {string} をクリックする", (_anchor: string) => "pending"
  */
 When(
 	"表示されたポップアップ内の {string} をクリックする",
-	(_anchor: string) => "pending",
+	(anchor: string) => {
+		const targetPostNumber = Number(anchor.replace(">>", ""));
+		popupStackState = openAnchorPopup(
+			popupPostsByNumber,
+			popupStackState,
+			targetPostNumber,
+			{ x: 150, y: 250 },
+		);
+	},
 );
 
 /**
@@ -1838,7 +2033,13 @@ When(
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("2つのポップアップが重なって表示される", () => "pending");
+Then("2つのポップアップが重なって表示される", () => {
+	assert.strictEqual(
+		popupStackState.length,
+		2,
+		`ポップアップ数が 2 ではありません: ${popupStackState.length}`,
+	);
+});
 
 /**
  * 最前面にレス1のポップアップが表示される。
@@ -1849,7 +2050,13 @@ Then("2つのポップアップが重なって表示される", () => "pending")
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("最前面にレス1のポップアップが表示される", () => "pending");
+Then("最前面にレス1のポップアップが表示される", () => {
+	assert.strictEqual(
+		popupStackState[popupStackState.length - 1]?.postNumber,
+		1,
+		"最前面のポップアップがレス1ではありません",
+	);
+});
 
 /**
  * 2つのポップアップが重なって表示されている。
@@ -1860,7 +2067,23 @@ Then("最前面にレス1のポップアップが表示される", () => "pendin
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Given("2つのポップアップが重なって表示されている", () => "pending");
+Given("2つのポップアップが重なって表示されている", async function (
+	this: BattleBoardWorld,
+) {
+	await createThreadWithBodies(
+		this,
+		["こんにちは", ">>1 返信", ">>2 さらに返信"],
+		"anchor_popup close テスト",
+	);
+	popupStackState = openAnchorPopup(popupPostsByNumber, [], 2, {
+		x: 100,
+		y: 200,
+	});
+	popupStackState = openAnchorPopup(popupPostsByNumber, popupStackState, 1, {
+		x: 150,
+		y: 250,
+	});
+});
 
 /**
  * ポップアップの外側をクリックする。
@@ -1871,7 +2094,9 @@ Given("2つのポップアップが重なって表示されている", () => "pe
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When("ポップアップの外側をクリックする", () => "pending");
+When("ポップアップの外側をクリックする", () => {
+	popupStackState = closeTopAnchorPopup(popupStackState);
+});
 
 /**
  * 最前面のポップアップが閉じる。
@@ -1882,7 +2107,13 @@ When("ポップアップの外側をクリックする", () => "pending");
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("最前面のポップアップが閉じる", () => "pending");
+Then("最前面のポップアップが閉じる", () => {
+	assert.strictEqual(
+		popupStackState.length,
+		1,
+		`ポップアップ数が 1 ではありません: ${popupStackState.length}`,
+	);
+});
 
 /**
  * 背面のポップアップは残る。
@@ -1893,7 +2124,13 @@ Then("最前面のポップアップが閉じる", () => "pending");
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("背面のポップアップは残る", () => "pending");
+Then("背面のポップアップは残る", () => {
+	assert.strictEqual(
+		popupStackState[0]?.postNumber,
+		2,
+		"背面ポップアップのレス番号が期待と異なります",
+	);
+});
 
 // Note: "スレッドに3件のレスが存在する" は "スレッドに{int}件のレスが存在する" (L1357) にマッチする。
 // @anchor_popup シナリオでは次の When ステップが pending を返すため、
@@ -1909,7 +2146,19 @@ Then("背面のポップアップは残る", () => "pending");
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When("レスの本文中の {string} をクリックする", (_anchor: string) => "pending");
+When(
+	"レスの本文中の {string} をクリックする",
+	async function (this: BattleBoardWorld, anchor: string) {
+		await loadCurrentThreadWebPosts(this);
+		const targetPostNumber = Number(anchor.replace(">>", ""));
+		popupStackState = openAnchorPopup(
+			popupPostsByNumber,
+			popupStackState,
+			targetPostNumber,
+			{ x: 100, y: 200 },
+		);
+	},
+);
 
 /**
  * ポップアップは表示されない。
@@ -1920,7 +2169,9 @@ When("レスの本文中の {string} をクリックする", (_anchor: string) =
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("ポップアップは表示されない", () => "pending");
+Then("ポップアップは表示されない", () => {
+	assert.strictEqual(popupStackState.length, 0, "ポップアップが表示されています");
+});
 
 // ---------------------------------------------------------------------------
 // レス番号表示シナリオ用ステップ定義
@@ -1938,7 +2189,14 @@ Then("ポップアップは表示されない", () => "pending");
  */
 Given(
 	"スレッドにレス番号{int}のレスが存在する",
-	(_postNumber: number) => "pending",
+	async function (this: BattleBoardWorld, postNumber: number) {
+		const bodies = Array.from({ length: postNumber }, (_, index) => `レス${index + 1}`);
+		await createThreadWithBodies(
+			this,
+			bodies,
+			`post_number_display_${postNumber}`,
+		);
+	},
 );
 
 /**
@@ -1950,7 +2208,12 @@ Given(
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("レス番号が {string} と表示される", (_label: string) => "pending");
+Then("レス番号が {string} と表示される", (label: string) => {
+	assert(
+		viewedThreadPosts.some((post) => String(post.postNumber) === label),
+		`レス番号 ${label} が表示対象に含まれていません`,
+	);
+});
 
 /**
  * レス番号に {string} は付与されない。
@@ -1961,7 +2224,12 @@ Then("レス番号が {string} と表示される", (_label: string) => "pending
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("レス番号に {string} は付与されない", (_prefix: string) => "pending");
+Then("レス番号に {string} は付与されない", (prefix: string) => {
+	assert(
+		viewedThreadPosts.every((post) => !String(post.postNumber).includes(prefix)),
+		`レス番号表示に ${prefix} が含まれています`,
+	);
+});
 
 /**
  * 書き込みフォームが空である。
@@ -1972,7 +2240,9 @@ Then("レス番号に {string} は付与されない", (_prefix: string) => "pen
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Given("書き込みフォームが空である", () => "pending");
+Given("書き込みフォームが空である", () => {
+	simulatedPostFormBody = "";
+});
 
 /**
  * レス番号 "{string}" をクリックする。
@@ -1983,7 +2253,12 @@ Given("書き込みフォームが空である", () => "pending");
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When("レス番号 {string} をクリックする", (_postNumber: string) => "pending");
+When("レス番号 {string} をクリックする", (postNumber: string) => {
+	simulatedPostFormBody = insertPostReference(
+		simulatedPostFormBody,
+		`>>${postNumber}`,
+	);
+});
 
 /**
  * 書き込みフォームに {string} が挿入される。
@@ -1994,7 +2269,14 @@ When("レス番号 {string} をクリックする", (_postNumber: string) => "pe
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("書き込みフォームに {string} が挿入される", (_text: string) => "pending");
+Then("書き込みフォームに {string} が挿入される", (text: string) => {
+	const expected = normalizeEscapedNewlines(text);
+	assert.strictEqual(
+		simulatedPostFormBody,
+		expected,
+		`書き込みフォーム内容が "${expected}" ではなく "${simulatedPostFormBody}" です`,
+	);
+});
 
 /**
  * 書き込みフォームに {string} と入力されている。
@@ -2007,7 +2289,9 @@ Then("書き込みフォームに {string} が挿入される", (_text: string) 
  */
 Given(
 	"書き込みフォームに {string} と入力されている",
-	(_text: string) => "pending",
+	(text: string) => {
+		simulatedPostFormBody = text;
+	},
 );
 
 /**
@@ -2019,7 +2303,14 @@ Given(
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then("書き込みフォームの内容が {string} になる", (_text: string) => "pending");
+Then("書き込みフォームの内容が {string} になる", (text: string) => {
+	const expected = normalizeEscapedNewlines(text);
+	assert.strictEqual(
+		simulatedPostFormBody,
+		expected,
+		`書き込みフォーム内容が "${expected}" ではなく "${simulatedPostFormBody}" です`,
+	);
+});
 
 // ---------------------------------------------------------------------------
 // 画像URLサムネイル表示シナリオ用ステップ定義
@@ -2346,8 +2637,10 @@ Then(
  * See: features/thread.feature @fab
  */
 Given("スレッドを表示している", async function (this: BattleBoardWorld) {
-	// DOM 操作シナリオのためサービス層では pending
-	return "pending";
+	if (!this.currentThreadId) {
+		await createThreadWithBodies(this, ["こんにちは"], "fab テスト");
+	}
+	activeFabPanel = null;
 });
 
 /**
@@ -2358,7 +2651,7 @@ Given("スレッドを表示している", async function (this: BattleBoardWorl
 When(
 	"フローティングメニューの書き込みボタンをタップする",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		activeFabPanel = "post";
 	},
 );
 
@@ -2370,7 +2663,11 @@ When(
 Then(
 	"ボトムシートで書き込みフォームが表示される",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		assert.strictEqual(
+			activeFabPanel,
+			"post",
+			"書き込みフォーム用のボトムシートが開いていません",
+		);
 	},
 );
 
@@ -2382,7 +2679,10 @@ Then(
 Given(
 	"ボトムシートで書き込みフォームが表示されている",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		if (!this.currentThreadId) {
+			await createThreadWithBodies(this, ["こんにちは"], "fab close テスト");
+		}
+		activeFabPanel = "post";
 	},
 );
 
@@ -2392,7 +2692,7 @@ Given(
  * See: features/thread.feature @fab
  */
 When("ボトムシートの外側をタップする", async function (this: BattleBoardWorld) {
-	return "pending";
+	activeFabPanel = null;
 });
 
 /**
@@ -2401,7 +2701,7 @@ When("ボトムシートの外側をタップする", async function (this: Batt
  * See: features/thread.feature @fab
  */
 Then("ボトムシートが閉じる", async function (this: BattleBoardWorld) {
-	return "pending";
+	assert.strictEqual(activeFabPanel, null, "ボトムシートが閉じていません");
 });
 
 /**
@@ -2412,7 +2712,7 @@ Then("ボトムシートが閉じる", async function (this: BattleBoardWorld) {
 When(
 	"フローティングメニューの検索ボタンをタップする",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		activeFabPanel = "search";
 	},
 );
 
@@ -2424,7 +2724,11 @@ When(
 Then(
 	"ボトムシートで検索フォームが表示される",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		assert.strictEqual(
+			activeFabPanel,
+			"search",
+			"検索ボトムシートが開いていません",
+		);
 	},
 );
 
@@ -2436,7 +2740,7 @@ Then(
 When(
 	"フローティングメニューの画像ボタンをタップする",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		activeFabPanel = "image";
 	},
 );
 
@@ -2448,7 +2752,11 @@ When(
 Then(
 	"ボトムシートで画像アップロードフォームが表示される",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		assert.strictEqual(
+			activeFabPanel,
+			"image",
+			"画像アップロード用ボトムシートが開いていません",
+		);
 	},
 );
 
@@ -2460,7 +2768,7 @@ Then(
 When(
 	"フローティングメニューの設定ボタンをタップする",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		activeFabPanel = "settings";
 	},
 );
 
@@ -2472,6 +2780,10 @@ When(
 Then(
 	"ボトムシートで設定パネルが表示される",
 	async function (this: BattleBoardWorld) {
-		return "pending";
+		assert.strictEqual(
+			activeFabPanel,
+			"settings",
+			"設定パネル用ボトムシートが開いていません",
+		);
 	},
 );

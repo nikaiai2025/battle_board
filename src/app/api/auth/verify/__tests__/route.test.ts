@@ -21,6 +21,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/services/auth-service", () => ({
 	hashIp: vi.fn((ip: string) => `hashed:${ip}`),
 	verifyAuth: vi.fn(),
+	verifyEdgeToken: vi.fn(),
+	issueEdgeTokenForUser: vi.fn(),
+	issueEdgeToken: vi.fn(),
+	issueAuthCode: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -122,6 +126,12 @@ describe("POST /api/auth/verify", () => {
 				success: true,
 				writeToken: "abcdef1234567890abcdef1234567890",
 			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
+			});
 
 			const req = makeRequest({ turnstileToken: "valid-turnstile" });
 			const res = await POST(req);
@@ -140,6 +150,12 @@ describe("POST /api/auth/verify", () => {
 				success: true,
 				writeToken: undefined,
 			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
+			});
 
 			const req = makeRequest({ turnstileToken: "valid-turnstile" });
 			const res = await POST(req);
@@ -157,6 +173,12 @@ describe("POST /api/auth/verify", () => {
 				success: true,
 				writeToken: "test-write-token",
 			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
+			});
 
 			const req = makeRequest({ turnstileToken: "valid-turnstile" });
 			const res = await POST(req);
@@ -170,6 +192,12 @@ describe("POST /api/auth/verify", () => {
 			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
 				success: true,
 				writeToken: "test-token",
+			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
 			});
 			mockHeaders("192.168.1.100");
 
@@ -274,6 +302,12 @@ describe("POST /api/auth/verify", () => {
 				success: true,
 				writeToken: "senbra-write-token",
 			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-senbra-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
+			});
 
 			const req = makeRequest({
 				turnstileToken: "valid-turnstile",
@@ -296,6 +330,12 @@ describe("POST /api/auth/verify", () => {
 				success: true,
 				writeToken: "token",
 			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-senbra-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
+			});
 
 			const req = makeRequest({
 				turnstileToken: "some-turnstile",
@@ -315,6 +355,12 @@ describe("POST /api/auth/verify", () => {
 			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
 				success: true,
 				writeToken: "token",
+			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-senbra-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
 			});
 
 			const req = makeRequest({
@@ -337,6 +383,12 @@ describe("POST /api/auth/verify", () => {
 				success: true,
 				writeToken: "token",
 			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-browser-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
+			});
 
 			const req = makeRequest({
 				turnstileToken: "valid-turnstile",
@@ -350,6 +402,59 @@ describe("POST /api/auth/verify", () => {
 				expect.any(String),
 			);
 		});
+
+		it("senbra channel の edge-token で認証成功した場合は web token に正規化して Cookie を上書きする", async () => {
+			mockCookies(undefined);
+			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
+				success: true,
+				writeToken: "senbra-write-token",
+			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-senbra-001",
+				authorIdSeed: "seed-001",
+				channel: "senbra",
+			});
+			vi.mocked(AuthService.issueEdgeTokenForUser).mockResolvedValue({
+				token: "normalized-web-token",
+				userId: "user-senbra-001",
+			});
+
+			const req = makeRequest({
+				turnstileToken: "valid-turnstile",
+				edgeToken: "senbra-edge-token",
+			});
+			const res = await POST(req);
+
+			expect(AuthService.issueEdgeTokenForUser).toHaveBeenCalledWith(
+				"user-senbra-001",
+				"web",
+			);
+			expect(res.headers.get("set-cookie")).toContain("normalized-web-token");
+		});
+
+		it("web channel の edge-token では追加発行せず既存 Cookie を維持する", async () => {
+			mockCookies(undefined);
+			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
+				success: true,
+				writeToken: "web-write-token",
+			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-web-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
+			});
+
+			const req = makeRequest({
+				turnstileToken: "valid-turnstile",
+				edgeToken: "web-edge-token",
+			});
+			const res = await POST(req);
+
+			expect(AuthService.issueEdgeTokenForUser).not.toHaveBeenCalled();
+			expect(res.headers.get("set-cookie")).toContain("web-edge-token");
+		});
 	});
 
 	// =========================================================================
@@ -361,6 +466,12 @@ describe("POST /api/auth/verify", () => {
 			vi.mocked(AuthService.verifyAuth).mockResolvedValue({
 				success: true,
 				writeToken: "test-write-token",
+			});
+			vi.mocked(AuthService.verifyEdgeToken).mockResolvedValue({
+				valid: true,
+				userId: "user-001",
+				authorIdSeed: "seed-001",
+				channel: "web",
 			});
 
 			// code フィールドなしで送信

@@ -53,7 +53,7 @@ test.describe("認証UI連結フロー（ローカル限定）", () => {
 	}) => {
 		// Step 1: トップページにアクセス
 		await page.goto("/");
-		await expect(page).toHaveTitle(/BattleBoard/i);
+		await expect(page).toHaveTitle(/ボットちゃんねる/i);
 		await expect(page.locator("#thread-create-form")).toBeVisible();
 
 		// Step 2: スレッド作成フォームに入力して送信（未認証）
@@ -86,10 +86,15 @@ test.describe("認証UI連結フロー（ローカル限定）", () => {
 		await page.locator("#post-submit-btn").click();
 
 		// Step 7: レスが表示される
+		const replyPost = page
+			.locator('article[id^="post-"]')
+			.filter({ hasText: TEST_REPLY_BODY })
+			.first();
+
 		await expect(page.locator(`text=${TEST_REPLY_BODY}`)).toBeVisible({
 			timeout: 15_000,
 		});
-		await expect(page.locator("#post-2")).toBeVisible();
-		await expect(page.locator("#post-2")).toContainText(TEST_REPLY_BODY);
+		await expect(replyPost).toBeVisible();
+		await expect(replyPost).toContainText(TEST_REPLY_BODY);
 	});
 });

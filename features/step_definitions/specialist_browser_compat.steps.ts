@@ -2059,11 +2059,17 @@ Then(
 let g4EdgeToken: string | null = null;
 let g4UserId: string | null = null;
 let g4WriteToken: string | null = null;
+let g4AuthUrl: string | null = null;
+let g4OriginalUserCount: number | null = null;
+let g4NormalizedWebEdgeToken: string | null = null;
 
 Before(() => {
 	g4EdgeToken = null;
 	g4UserId = null;
 	g4WriteToken = null;
+	g4AuthUrl = null;
+	g4OriginalUserCount = null;
+	g4NormalizedWebEdgeToken = null;
 });
 
 import {
@@ -2096,6 +2102,251 @@ Given(
 		seedDummyPost(userId);
 	},
 );
+
+/**
+ * ユーザーが専ブラから認証ページ URL を受け取っている。
+ * 専ブラ向け channel=senbra の edge-token を発行し、/auth/verify 用 URL を構築する。
+ *
+ * See: features/specialist_browser_compat.feature @専ブラの認証URLを通常ブラウザで開いた場合は同一ユーザーのWeb導線へ正規化される
+ */
+Given(
+	"ユーザーが専ブラから認証ページURL {string} を受け取っている",
+	async function (this: BattleBoardWorld, authPathTemplate: string) {
+		const AuthService = getAuthService();
+		const { token, userId } = await AuthService.issueEdgeToken(
+			DEFAULT_IP_HASH,
+			"senbra",
+		);
+		g4EdgeToken = token;
+		g4UserId = userId;
+		g4AuthUrl = authPathTemplate.replace("<edge-token>", token);
+		g4OriginalUserCount = InMemoryUserRepo._count();
+		this.currentEdgeToken = token;
+		this.currentUserId = userId;
+		this.currentIpHash = DEFAULT_IP_HASH;
+		seedDummyPost(userId);
+	},
+);
+
+/**
+ * 専ブラの未認証書き込みに対して認証ページ URL が返されている。
+ * user_registration.feature 側の同義ステップ。
+ *
+ * See: features/user_registration.feature @専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+ */
+Given(
+	"専ブラの未認証書き込みに対して認証ページURLが返されている",
+	async function (this: BattleBoardWorld) {
+		const AuthService = getAuthService();
+		const { token, userId } = await AuthService.issueEdgeToken(
+			DEFAULT_IP_HASH,
+			"senbra",
+		);
+		g4EdgeToken = token;
+		g4UserId = userId;
+		g4AuthUrl = `/auth/verify?token=${token}`;
+		g4OriginalUserCount = InMemoryUserRepo._count();
+		this.currentEdgeToken = token;
+		this.currentUserId = userId;
+		this.currentIpHash = DEFAULT_IP_HASH;
+		seedDummyPost(userId);
+	},
+);
+
+/**
+ * 認証ページ URL に専ブラユーザーの edge-token が含まれていることを確認する。
+ *
+ * See: features/user_registration.feature @専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+ */
+Given(
+	"そのURLには専ブラユーザーの edge-token が含まれている",
+	async function () {
+		assert(g4AuthUrl, "認証ページURLが設定されていません");
+		assert(g4EdgeToken, "専ブラユーザーの edge-token が設定されていません");
+		assert(
+			g4AuthUrl.includes(g4EdgeToken),
+			`認証ページURLに edge-token が含まれることを期待しました: ${g4AuthUrl}`,
+		);
+		const verifyRecord = await InMemoryUserRepo.findById(g4UserId!);
+		assert(verifyRecord, "専ブラユーザーが存在しません");
+	},
+);
+
+/**
+ * 通常ブラウザで認証ページ URL を開き Turnstile 認証を完了する。
+ * verifyAuth 後、senbra token を同一 user_id の web token に正規化する。
+ *
+ * See: features/specialist_browser_compat.feature @専ブラの認証URLを通常ブラウザで開いた場合は同一ユーザーのWeb導線へ正規化される
+ * See: features/user_registration.feature @専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+ */
+async function normalizeSenbraTokenToWeb(
+	world: BattleBoardWorld,
+): Promise<void> {
+	const AuthService = getAuthService();
+	assert(g4EdgeToken, "正規化対象の senbra edge-token がありません");
+	assert(g4AuthUrl, "認証ページURLが設定されていません");
+
+	InMemoryTurnstileClient.setStubResult(true);
+	await AuthService.issueAuthCode(DEFAULT_IP_HASH, g4EdgeToken);
+
+	const verifyResult = await AuthService.verifyAuth(
+		g4EdgeToken,
+		"dummy-turnstile-token",
+		DEFAULT_IP_HASH,
+	);
+	assert(verifyResult.success, "Turnstile 認証の完了に失敗しました");
+
+	const tokenStatus = await AuthService.verifyEdgeToken(g4EdgeToken, DEFAULT_IP_HASH);
+	assert(tokenStatus.valid, "認証後の senbra edge-token が有効である必要があります");
+	assert.strictEqual(
+		tokenStatus.channel,
+		"senbra",
+		"正規化前 token は senbra channel である必要があります",
+	);
+
+	const normalized = await AuthService.issueEdgeTokenForUser(
+		tokenStatus.userId,
+		"web",
+	);
+	g4NormalizedWebEdgeToken = normalized.token;
+	world.currentEdgeToken = normalized.token;
+	world.currentUserId = normalized.userId;
+	world.lastResult = {
+		type: "success",
+		data: { normalizedToken: normalized.token, redirectPath: "/mypage" },
+	};
+}
+
+When(
+	"通常ブラウザでそのURLを開き Turnstile 認証を完了する",
+	async function (this: BattleBoardWorld) {
+		await normalizeSenbraTokenToWeb(this);
+	},
+);
+
+When(
+	"通常ブラウザで認証ページを開いて Turnstile 認証を完了する",
+	async function (this: BattleBoardWorld) {
+		await normalizeSenbraTokenToWeb(this);
+	},
+);
+
+/**
+ * 専ブラで保持していた user_id と同一の user_id が認証される。
+ *
+ * See: features/specialist_browser_compat.feature @専ブラの認証URLを通常ブラウザで開いた場合は同一ユーザーのWeb導線へ正規化される
+ */
+Then(
+	"専ブラで保持していた user_id と同一の user_id が認証される",
+	async function () {
+		assert(g4UserId, "専ブラユーザーの user_id がありません");
+		assert(g4NormalizedWebEdgeToken, "web 用 edge-token Cookie が発行されていません");
+		const AuthService = getAuthService();
+		const verifyResult = await AuthService.verifyEdgeToken(
+			g4NormalizedWebEdgeToken,
+			DEFAULT_IP_HASH,
+		);
+		assert(verifyResult.valid, "正規化後の web edge-token は有効である必要があります");
+		assert.strictEqual(
+			verifyResult.userId,
+			g4UserId,
+			"通常ブラウザで認証された user_id は専ブラユーザーと同一である必要があります",
+		);
+	},
+);
+
+/**
+ * 通常ブラウザには web 用 edge-token Cookie が発行される。
+ *
+ * See: features/specialist_browser_compat.feature @専ブラの認証URLを通常ブラウザで開いた場合は同一ユーザーのWeb導線へ正規化される
+ */
+Then(
+	"通常ブラウザには web 用 edge-token Cookie が発行される",
+	async function () {
+		assert(g4NormalizedWebEdgeToken, "web 用 edge-token Cookie が発行されていません");
+		const AuthService = getAuthService();
+		const status = await AuthService.getLayoutAuthStatus(g4NormalizedWebEdgeToken);
+		assert.strictEqual(status.channel, "web", "通常ブラウザには web token が発行される必要があります");
+		assert.strictEqual(status.isAuthenticated, true, "通常ブラウザ側は認証済みである必要があります");
+	},
+);
+
+/**
+ * 同一 user_id に対する web 用 edge-token Cookie が発行される。
+ * user_registration.feature 側の同義ステップ。
+ *
+ * See: features/user_registration.feature @専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+ */
+Then(
+	"同一 user_id に対する web 用 edge-token Cookie が発行される",
+	async function () {
+		assert(g4UserId, "元の user_id が設定されていません");
+		assert(g4NormalizedWebEdgeToken, "web 用 edge-token Cookie が発行されていません");
+		const AuthService = getAuthService();
+		const verifyResult = await AuthService.verifyEdgeToken(
+			g4NormalizedWebEdgeToken,
+			DEFAULT_IP_HASH,
+		);
+		assert(verifyResult.valid, "正規化後 token は有効である必要があります");
+		assert.strictEqual(
+			verifyResult.userId,
+			g4UserId,
+			"web 用 edge-token は元の専ブラユーザーと同一 user_id に紐付く必要があります",
+		);
+		assert.strictEqual(
+			verifyResult.channel,
+			"web",
+			"正規化後 token は web channel である必要があります",
+		);
+	},
+);
+
+/**
+ * マイページまたは本登録導線へ遷移できる。
+ *
+ * See: features/specialist_browser_compat.feature @専ブラの認証URLを通常ブラウザで開いた場合は同一ユーザーのWeb導線へ正規化される
+ */
+Then(
+	"マイページまたは本登録導線へ遷移できる",
+	function (this: BattleBoardWorld) {
+		assert.strictEqual(
+			this.lastResult?.type,
+			"success",
+			"通常ブラウザでの認証完了後は遷移可能状態である必要があります",
+		);
+	},
+);
+
+/**
+ * マイページまたは本登録ページへ遷移できる。
+ * user_registration.feature 側の同義ステップ。
+ *
+ * See: features/user_registration.feature @専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+ */
+Then(
+	"マイページまたは本登録ページへ遷移できる",
+	function (this: BattleBoardWorld) {
+		assert.strictEqual(
+			this.lastResult?.type,
+			"success",
+			"通常ブラウザでの認証完了後は遷移可能状態である必要があります",
+		);
+	},
+);
+
+/**
+ * 新しい仮ユーザーが作成されていないことを確認する。
+ *
+ * See: features/user_registration.feature @専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+ */
+Then("新しい仮ユーザーは作成されない", function () {
+	assert.notStrictEqual(g4OriginalUserCount, null, "初期ユーザー件数が未設定です");
+	assert.strictEqual(
+		InMemoryUserRepo._count(),
+		g4OriginalUserCount,
+		"正規化フローで新しい仮ユーザーは作成されない必要があります",
+	);
+});
 
 /**
  * bbs.cgi に書き込みを POST する（G4: 未認証の専ブラからの初回書き込み）。

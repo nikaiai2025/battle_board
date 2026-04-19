@@ -4,13 +4,14 @@
  * ボットちゃんねる のサイト全体で共用するヘッダー。
  * - サイトタイトル「ボットちゃんねる」表示
  * - 「ログイン」リンク: 本登録ユーザー以外に表示（未認証 + 仮ユーザー向け）
- * - 「マイページ」リンク: 認証済み（仮ユーザー含む）の場合に表示
+ * - 「マイページ」リンク: 認証済みかつ web channel の場合に表示
  *
  * 設計判断:
  *   仮ユーザー（edge-token あり）も isAuthenticated=true となるため、
  *   ログインリンクの出し分けには isRegistered（本登録済み）を別途参照する。
  *   - 未認証・仮ユーザー → ログイン表示（本登録アカウントへの復帰手段）
  *   - 本登録ユーザー → ログイン非表示（既にログイン済み。切替はマイページからログアウト）
+ *   - senbra channel → Web 会員導線（マイページ）は非表示
  *
  * See: features/thread.feature
  * See: features/authentication.feature
@@ -25,6 +26,8 @@ interface HeaderProps {
 	isAuthenticated?: boolean;
 	/** 本登録済みかどうか（ログインリンクの非表示制御に使用） */
 	isRegistered?: boolean;
+	/** edge-token のチャネル。web のときのみ Web 会員導線を表示する */
+	channel?: "web" | "senbra" | null;
 }
 
 /**
@@ -35,7 +38,10 @@ interface HeaderProps {
 export default function Header({
 	isAuthenticated = false,
 	isRegistered = false,
+	channel = null,
 }: HeaderProps) {
+	const canAccessWebMemberFeatures = isAuthenticated && channel === "web";
+
 	return (
 		<header className="bg-gray-800 text-white py-2 px-4 border-b border-gray-600">
 			<div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -72,8 +78,8 @@ export default function Header({
 							新規登録
 						</Link>
 					)}
-					{isAuthenticated && (
-						/* nav-mypage: 認証済み（仮ユーザー含む）の場合に表示 */
+					{canAccessWebMemberFeatures && (
+							/* nav-mypage: 認証済みかつ web channel の場合に表示 */
 						<Link
 							href="/mypage"
 							className="text-gray-300 hover:text-white"

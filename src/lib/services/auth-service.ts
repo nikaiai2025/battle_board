@@ -211,25 +211,50 @@ export async function verifyEdgeToken(
  * @param token - Cookie から読み取った edge-token 文字列
  * @returns isAuthenticated: 認証済み（マイページ表示用）
  *          isRegistered: 本登録済み（ログインリンク非表示用）
+ *          channel: edge-token の発行チャネル
  */
 export async function getLayoutAuthStatus(token: string): Promise<{
 	isAuthenticated: boolean;
 	isRegistered: boolean;
+	channel: "web" | "senbra" | null;
 }> {
 	const edgeToken = await EdgeTokenRepository.findByToken(token);
 	if (!edgeToken) {
-		return { isAuthenticated: false, isRegistered: false };
+		return { isAuthenticated: false, isRegistered: false, channel: null };
 	}
 
 	const user = await UserRepository.findById(edgeToken.userId);
 	if (!user || !user.isVerified) {
-		return { isAuthenticated: false, isRegistered: false };
+		return { isAuthenticated: false, isRegistered: false, channel: null };
 	}
 
 	return {
 		isAuthenticated: true,
 		isRegistered: user.supabaseAuthId !== null,
+		channel: edgeToken.channel,
 	};
+}
+
+/**
+ * 既存ユーザーに対して新しい edge-token を発行する。
+ *
+ * 新規ユーザー作成や初期通貨付与は行わず、既に存在する user_id にだけ token を紐付ける。
+ * `/api/auth/verify` の senbra -> web 正規化や、既存ユーザーのログイン系導線で使用する。
+ *
+ * See: features/user_registration.feature @専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+ * See: features/specialist_browser_compat.feature @専ブラの認証URLを通常ブラウザで開いた場合は同一ユーザーのWeb導線へ正規化される
+ *
+ * @param userId - 既存ユーザーの UUID
+ * @param channel - 新しいトークンのチャネル
+ * @returns 発行したトークンとユーザー ID
+ */
+export async function issueEdgeTokenForUser(
+	userId: string,
+	channel: "web" | "senbra" = "web",
+): Promise<{ token: string; userId: string }> {
+	const token = crypto.randomUUID();
+	await EdgeTokenRepository.create(userId, token, channel);
+	return { token, userId };
 }
 
 /**
@@ -259,12 +284,10 @@ export async function issueEdgeToken(
 	if (ipBannedFlag) {
 		throw new Error("IP_BANNED: このIPアドレスからの新規登録はできません");
 	}
-	// CSPRNG でトークンを生成（暗号学的に安全）
-	const token = crypto.randomUUID();
-
 	// ユーザーレコードを作成する
 	// 後方互換のため users.auth_token にも同じ値を書き込む（移行期間中の二重書き込み）
 	// See: docs/architecture/components/user-registration.md §14 マイグレーション戦略 フェーズ2
+	const token = crypto.randomUUID();
 	const user = await UserRepository.create({
 		authToken: token,
 		authorIdSeed: ipHash,

@@ -10,8 +10,8 @@
  *      （ASCIIとして読み取り → URLデコードでrawバイト取得 → Shift-JISデコード）
  *   3. BbsCgiParserでBbsCgiParsedRequestに変換する
  *   4. D-08 §6 認証判定フローに従って認証を処理する:
- *      ① edge-token Cookie 検証（既存）
- *      ② mail欄の #pat_<32hex> パターン検出 → loginWithPat() → 新edge-token発行
+ *      ① mail欄の #pat_<32hex> パターン検出 → loginWithPat() → 必要時のみedge-token発行
+ *      ② edge-token Cookie 検証（既存）
  *      ③ mail欄の #<32hex> パターン検出（write_token、既存）
  *      ④ 未認証（既存）
  *   5. mail欄から PAT パターンを除去する（DAT漏洩防止）
@@ -28,7 +28,8 @@
  * See: features/specialist_browser_compat.feature @認証完了後にwrite_tokenをメール欄に貼り付けて書き込みが成功する
  * See: features/specialist_browser_compat.feature @無効なwrite_tokenでは書き込みが拒否される
  * See: features/user_registration.feature @専ブラのmail欄にPATを設定して書き込みできる
- * See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
+ * See: features/user_registration.feature @PAT 入力時に同一ユーザーの Cookie が有効ならその Cookie を再利用する
+ * See: features/user_registration.feature @PAT 入力時に別ユーザーの Cookie が有効でも PAT を正として上書きする
  * See: features/user_registration.feature @無効な PAT では書き込みが拒否される
  * See: docs/specs/openapi.yaml > /test/bbs.cgi
  * See: docs/architecture/components/senbra-adapter.md §6 エンコーディング変換の境界
@@ -286,47 +287,25 @@ export async function POST(req: NextRequest): Promise<Response> {
 	// Step 6: D-08 §6 認証判定フローに従って認証を処理する
 	// 上から順に判定し、最初に成功した方式で認証する。
 	//
-	// ① edge-token Cookie あり → verifyEdgeToken（既存）
-	// ② mail欄に #pat_ パターン → loginWithPat() → 新edge-token発行
+	// ① mail欄に #pat_ パターン → loginWithPat() → 必要時のみ新edge-token発行
+	// ② edge-token Cookie あり → verifyEdgeToken（既存）
 	// ③ mail欄に #<32hex> パターン → verifyWriteToken（既存）
 	// ④ 未認証（既存）
 	//
 	// See: docs/architecture/components/user-registration.md §6 認証判定フロー（改訂版）
 
-	// ① edge-token Cookie 検証
-	// Cookie が有効な場合: mail欄に PAT が含まれていても認証には使わず除去のみ行う
-	// See: docs/architecture/components/user-registration.md §8.3 専ブラでの使われ方（Cookie有効・mail欄PAT）
-	const edgeTokenFromCookie = parsed.edgeToken;
-	if (edgeTokenFromCookie) {
-		// edge-tokenをverifyEdgeTokenで検証する（PostServiceへの委譲前の事前確認用）
-		// NOTE: PostService.createPost/createThread が内部でも verifyEdgeToken を呼ぶが、
-		// ここでは mail 欄 PAT 除去を先行処理するために参照する。
-		// 実際の認証判定はPostServiceに委譲するため、ここではPAT除去のみ行う。
-
-		// DAT漏洩防止: mail欄からPATを除去してPostServiceに渡す
-		// See: docs/architecture/components/user-registration.md §6 ※ Cookie認証成功時もPATを除去
-		const cleanedMail = removePat(parsed.mail);
-		const parsedWithCleanMail = { ...parsed, mail: cleanedMail };
-
-		// Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
-		const subject = decodeHtmlNumericReferences(
-			bodyParams.get("subject") ?? "",
-		);
-		if (subject.trim() !== "") {
-			return handleCreateThread(parsedWithCleanMail, subject, ipHash);
-		}
-		return handleCreatePost(parsedWithCleanMail, ipHash);
-	}
-
-	// ② mail欄の #pat_<32hex> パターン検出 → loginWithPat()
+	// ① mail欄の #pat_<32hex> パターン検出 → loginWithPat()
 	// PAT判定はwrite_token判定より前に実行すること
 	// See: docs/architecture/components/user-registration.md §6 ② mail欄に #pat_ プレフィクスあり？
 	// See: タスク指示書 補足・制約 — PAT判定はwrite_token判定より前に実行すること
 	const detectedPat = extractPat(parsed.mail);
 
 	if (detectedPat !== null) {
-		// loginWithPat: PAT検証 + 新edge-token発行
-		const patResult = await loginWithPat(detectedPat);
+		// loginWithPat: PAT検証 + Cookie所有者との照合 + 必要時のみ新edge-token発行
+		const patResult = await loginWithPat(
+			detectedPat,
+			parsed.edgeToken ?? undefined,
+		);
 
 		if (!patResult.valid) {
 			// 無効なPAT: エラーレスポンスを返す
@@ -366,6 +345,22 @@ export async function POST(req: NextRequest): Promise<Response> {
 		// 書き込み完了後: 新たに発行したedge-token CookieをSet-Cookieで返す
 		// See: features/user_registration.feature @edge-token Cookie が発行される
 		return setEdgeTokenCookie(finalResponse, newEdgeToken);
+	}
+
+	// ② edge-token Cookie 検証
+	const edgeTokenFromCookie = parsed.edgeToken;
+	if (edgeTokenFromCookie) {
+		const cleanedMail = removePat(parsed.mail);
+		const parsedWithCleanMail = { ...parsed, mail: cleanedMail };
+
+		// Step 7: subjectパラメータの有無でスレッド作成 or 書き込みを分岐する
+		const subject = decodeHtmlNumericReferences(
+			bodyParams.get("subject") ?? "",
+		);
+		if (subject.trim() !== "") {
+			return handleCreateThread(parsedWithCleanMail, subject, ipHash);
+		}
+		return handleCreatePost(parsedWithCleanMail, ipHash);
 	}
 
 	// ③ mail欄から write_token を検出する

@@ -719,20 +719,11 @@ export default function MypagePage() {
 						data-testid="pat-display"
 						className="bg-muted border border-border rounded px-3 py-2 font-mono text-sm break-all"
 					>
-						{mypageInfo.patToken}
+						{patCopyValue}
 					</div>
 
-					{/* コピー用文字列（#pat_ プレフィックス付き）
-              See: docs/architecture/components/user-registration.md §8.2 マイページ表示
-              See: docs/architecture/components/user-registration.md §6 認証判定フロー */}
 					<div className="text-xs text-muted-foreground">
-						専ブラのメール欄に以下を設定：
-					</div>
-					<div
-						data-testid="pat-copy-value"
-						className="bg-muted border border-border rounded px-3 py-2 font-mono text-sm break-all text-green-800 dark:text-green-400"
-					>
-						{patCopyValue}
+						専ブラのメール欄にそのまま設定してください。
 					</div>
 
 					{/* コピーボタン */}

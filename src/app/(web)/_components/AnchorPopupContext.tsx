@@ -24,20 +24,16 @@ import {
 	useState,
 } from "react";
 import type { Post } from "./PostItem";
+import {
+	closeTopAnchorPopup,
+	openAnchorPopup,
+	type PopupEntry,
+} from "./thread-ui-logic";
+export type { PopupEntry } from "./thread-ui-logic";
 
 // ---------------------------------------------------------------------------
 // 型定義
 // ---------------------------------------------------------------------------
-
-/** ポップアップの1エントリ */
-export interface PopupEntry {
-	/** 参照先レス番号 */
-	postNumber: number;
-	/** 参照先レスデータ（null = 存在しないレス） */
-	post: Post | null;
-	/** ポップアップ表示位置 */
-	position: { x: number; y: number };
-}
 
 /** AnchorPopupContext の型 */
 export interface AnchorPopupContextType {
@@ -119,13 +115,9 @@ export function AnchorPopupProvider({
 	 */
 	const openPopup = useCallback(
 		(postNumber: number, position: { x: number; y: number }) => {
-			// allPosts にレスが存在しない場合は何もしない（暫定決定）
-			const post = allPosts.get(postNumber) ?? null;
-			if (post === null) {
-				return;
-			}
-
-			setPopupStack((prev) => [...prev, { postNumber, post, position }]);
+			setPopupStack((prev) =>
+				openAnchorPopup(allPosts, prev, postNumber, position),
+			);
 		},
 		[allPosts],
 	);
@@ -137,10 +129,7 @@ export function AnchorPopupProvider({
 	 * シナリオ: ポップアップの外側をクリックすると最前面のポップアップが閉じる
 	 */
 	const closeTopPopup = useCallback(() => {
-		setPopupStack((prev) => {
-			if (prev.length === 0) return prev;
-			return prev.slice(0, -1);
-		});
+		setPopupStack((prev) => closeTopAnchorPopup(prev));
 	}, []);
 
 	/**

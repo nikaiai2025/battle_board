@@ -26,6 +26,7 @@ import { Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
 import {
 	InMemoryEdgeTokenRepo,
+	InMemoryPostRepo,
 	InMemorySupabaseClient,
 	InMemoryThreadRepo,
 	InMemoryUserRepo,
@@ -58,6 +59,14 @@ declare module "../support/world" {
 		deviceBEdgeToken: string | null;
 		/** 2台目デバイスのユーザーID */
 		deviceBUserId: string | null;
+		/** PAT 所有者のユーザーID */
+		patOwnerUserId: string | null;
+		/** PAT 認証前に Cookie に入っていた edge-token */
+		previousPatCookieEdgeToken: string | null;
+		/** PAT 認証前の Cookie 所有者 userId */
+		previousPatCookieUserId: string | null;
+		/** PAT 認証で既存 Cookie を再利用したか */
+		patReusedCurrentToken: boolean | null;
 	}
 }
 
@@ -723,6 +732,106 @@ Given(
 );
 
 // ---------------------------------------------------------------------------
+// Given: 専ブラの edge-token Cookie が別ユーザーに紐付いている
+// See: features/user_registration.feature @PAT入力時に別ユーザーのCookieが有効でもPATを正として上書きする
+// ---------------------------------------------------------------------------
+
+/**
+ * PAT 所有者とは別ユーザーの Cookie を保持している状態を作る。
+ *
+ * See: features/user_registration.feature @PAT入力時に別ユーザーのCookieが有効でもPATを正として上書きする
+ */
+Given(
+	"専ブラの edge-token Cookie が別ユーザーに紐付いている",
+	async function (this: BattleBoardWorld) {
+		await setupVerifiedUser(this);
+		await completeUserRegistration(this, "email");
+		assert(this.currentPatToken, "PAT が発行されていません");
+		this.patOwnerUserId = this.currentUserId;
+
+		// Cookie 側を別ユーザーに差し替える
+		await setupVerifiedUser(this);
+		assert(this.currentEdgeToken, "別ユーザーの edge-token Cookie が必要です");
+
+		this.previousPatCookieEdgeToken = this.currentEdgeToken;
+		const cookieOwner = await InMemoryEdgeTokenRepo.findByToken(
+			this.currentEdgeToken,
+		);
+		this.previousPatCookieUserId = cookieOwner?.userId ?? null;
+
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: Math.floor(Date.now() / 1000).toString(),
+			boardId: TEST_BOARD_ID,
+			title: "PAT 別ユーザー上書きテスト用スレッド",
+			createdBy: this.currentUserId!,
+		});
+		this.currentThreadId = thread.id;
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Given: メール欄に本来の本登録ユーザーの PAT が設定されている
+// See: features/user_registration.feature @PAT入力時に別ユーザーのCookieが有効でもPATを正として上書きする
+// ---------------------------------------------------------------------------
+
+/**
+ * PAT 所有者の PAT が mail 欄に設定されていることを確認する。
+ *
+ * See: features/user_registration.feature @PAT入力時に別ユーザーのCookieが有効でもPATを正として上書きする
+ */
+Given(
+	"メール欄に本来の本登録ユーザーの PAT が設定されている",
+	function (this: BattleBoardWorld) {
+		assert(this.currentPatToken, "PAT が設定されていません");
+		assert(this.patOwnerUserId, "PAT 所有者が設定されていません");
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Given: 専ブラの edge-token Cookie が有効である
+// See: features/user_registration.feature @無効なPATは有効なCookieがあっても優先して拒否される
+// ---------------------------------------------------------------------------
+
+/**
+ * 有効な Cookie を持つ専ブラユーザーを用意する。
+ *
+ * See: features/user_registration.feature @無効なPATは有効なCookieがあっても優先して拒否される
+ */
+Given(
+	"専ブラの edge-token Cookie が有効である",
+	async function (this: BattleBoardWorld) {
+		await setupVerifiedUser(this);
+
+		const thread = await InMemoryThreadRepo.create({
+			threadKey: Math.floor(Date.now() / 1000).toString(),
+			boardId: TEST_BOARD_ID,
+			title: "無効 PAT 優先拒否テスト用スレッド",
+			createdBy: this.currentUserId!,
+		});
+		this.currentThreadId = thread.id;
+		this.previousPatCookieEdgeToken = this.currentEdgeToken;
+		this.previousPatCookieUserId = this.currentUserId;
+	},
+);
+
+// ---------------------------------------------------------------------------
+// Given: メール欄に無効な PAT が設定されている
+// See: features/user_registration.feature @無効なPATは有効なCookieがあっても優先して拒否される
+// ---------------------------------------------------------------------------
+
+/**
+ * 無効な PAT を mail 欄に設定する。
+ *
+ * See: features/user_registration.feature @無効なPATは有効なCookieがあっても優先して拒否される
+ */
+Given(
+	"メール欄に無効な PAT が設定されている",
+	function (this: BattleBoardWorld) {
+		this.currentPatToken = "0000000000000000000000000000000z";
+	},
+);
+
+// ---------------------------------------------------------------------------
 // Given: 本登録ユーザーがマイページで PAT を再発行する
 // See: features/user_registration.feature @PATを再発行すると旧PATが無効になる
 // ---------------------------------------------------------------------------
@@ -1235,21 +1344,47 @@ When("bbs.cgi に書き込みを POST する", async function (this: BattleBoard
 	const RegistrationService = getRegistrationService();
 	const PostService = getPostService();
 
-	// edge-token がない場合は PAT フォールバック認証を試みる
-	// （実際の bbs.cgi ルートハンドラーの動作をシミュレートする）
-	// See: docs/architecture/components/user-registration.md §6 認証判定フロー
+	// 現在の bbs.cgi 実装に合わせて認証順は PAT → Cookie とする。
+	// See: src/app/(senbra)/test/bbs.cgi/route.ts
+	const previousEdgeToken = this.currentEdgeToken;
+	this.previousPatCookieEdgeToken = previousEdgeToken;
+	if (previousEdgeToken) {
+		const previousTokenRecord = await InMemoryEdgeTokenRepo.findByToken(
+			previousEdgeToken,
+		);
+		this.previousPatCookieUserId = previousTokenRecord?.userId ?? null;
+	} else {
+		this.previousPatCookieUserId = null;
+	}
+
 	let effectiveEdgeToken = this.currentEdgeToken;
-	if (!effectiveEdgeToken && this.currentPatToken) {
-		// PAT 認証を試みる
+	let patUserId: string | null = null;
+	let reusedCurrentToken = false;
+
+	if (this.currentPatToken) {
 		const authResult = await RegistrationService.loginWithPat(
 			this.currentPatToken,
+			this.currentEdgeToken ?? undefined,
 		);
-		if (authResult.valid) {
-			// PAT 認証成功 → 新しい edge-token を設定
-			this.currentEdgeToken = authResult.edgeToken;
-			effectiveEdgeToken = authResult.edgeToken;
-			this.currentUserId = authResult.userId;
+		if (!authResult.valid) {
+			this.patReusedCurrentToken = false;
+			this.lastResult = {
+				type: "error",
+				message: "PAT 認証失敗",
+				code: "PAT_INVALID",
+			};
+			return;
 		}
+
+		patUserId = authResult.userId;
+		reusedCurrentToken = authResult.reusedCurrentToken;
+		this.patOwnerUserId = authResult.userId;
+		this.patReusedCurrentToken = authResult.reusedCurrentToken;
+		this.currentEdgeToken = authResult.edgeToken;
+		this.currentUserId = authResult.userId;
+		effectiveEdgeToken = authResult.edgeToken;
+	} else {
+		this.patReusedCurrentToken = null;
 	}
 
 	// 書き込みを実行する
@@ -1264,7 +1399,13 @@ When("bbs.cgi に書き込みを POST する", async function (this: BattleBoard
 	if ("success" in postResult && postResult.success) {
 		this.lastResult = {
 			type: "success",
-			data: { postResult, usedCookieAuth: !!this.currentEdgeToken },
+			data: {
+				postResult,
+				usedCookieAuth: !!this.currentEdgeToken && !this.currentPatToken,
+				patUserId,
+				reusedCurrentToken,
+				previousEdgeToken,
+			},
 		};
 	} else if ("authRequired" in postResult && postResult.authRequired) {
 		this.lastResult = {
@@ -1981,6 +2122,31 @@ Then(
 	},
 );
 
+/**
+ * マイページに "#pat_<PAT>" 形式の PAT が表示されることを確認する。
+ *
+ * See: features/user_registration.feature @本登録完了時にPATが自動発行される
+ */
+Then(
+	"マイページに {string} 形式の PAT と専ブラでの設定方法が表示される",
+	async function (this: BattleBoardWorld, displayFormat: string) {
+		assert.strictEqual(
+			displayFormat,
+			"#pat_<PAT>",
+			`想定外の PAT 表示形式です: ${displayFormat}`,
+		);
+		assert(this.currentUserId, "ユーザーIDが設定されていません");
+		const MypageService = getMypageService();
+		const mypageInfo = await MypageService.getMypage(this.currentUserId);
+		assert(mypageInfo?.patToken, "PAT が表示されていません");
+		assert.strictEqual(
+			`#pat_${mypageInfo.patToken}`,
+			`#pat_${this.currentPatToken ?? mypageInfo.patToken}`,
+			"PAT は #pat_<token> 形式で表示される必要があります",
+		);
+	},
+);
+
 // ---------------------------------------------------------------------------
 // Then: PAT が常に表示されている
 // See: features/user_registration.feature @マイページでPATを確認できる
@@ -2001,6 +2167,50 @@ Then("PAT が常に表示されている", async function (this: BattleBoardWorl
 		"本登録ユーザーのマイページには PAT が常に表示されることを期待しました",
 	);
 });
+
+/**
+ * 本登録ユーザーの PAT が "#pat_<PAT>" 形式で表示されることを確認する。
+ *
+ * See: features/user_registration.feature @マイページでPATを確認できる
+ */
+Then(
+	"{string} 形式の PAT が常に表示されている",
+	async function (this: BattleBoardWorld, displayFormat: string) {
+		assert.strictEqual(
+			displayFormat,
+			"#pat_<PAT>",
+			`想定外の PAT 表示形式です: ${displayFormat}`,
+		);
+		assert(this.currentUserId, "ユーザーIDが設定されていません");
+		const MypageService = getMypageService();
+		const mypageInfo = await MypageService.getMypage(this.currentUserId);
+		assert(mypageInfo?.patToken, "PAT が表示されていません");
+		assert.strictEqual(
+			`#pat_${mypageInfo.patToken}`,
+			`#pat_${this.currentPatToken ?? mypageInfo.patToken}`,
+			"PAT は #pat_<token> 形式で表示される必要があります",
+		);
+	},
+);
+
+/**
+ * PAT の生トークン単体は UI に別表示しない前提をサービス層レベルで確認する。
+ *
+ * See: features/user_registration.feature @マイページでPATを確認できる
+ */
+Then(
+	"PAT の素のトークン文字列は別表示されない",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentUserId, "ユーザーIDが設定されていません");
+		const MypageService = getMypageService();
+		const mypageInfo = await MypageService.getMypage(this.currentUserId);
+		assert(mypageInfo?.patToken, "PAT が表示されていません");
+		assert(
+			!mypageInfo.patToken.startsWith("#pat_"),
+			"サービス層の PAT 値はプレフィックスなしの生トークンを保持する想定です",
+		);
+	},
+);
 
 // ---------------------------------------------------------------------------
 // Then: PAT の最終使用日時が表示される
@@ -2045,6 +2255,123 @@ Then("PAT が検証される", function (this: BattleBoardWorld) {
 		`PAT 検証が成功することを期待しましたが "${this.lastResult.type}" でした`,
 	);
 });
+
+/**
+ * PAT 所有者と Cookie 所有者が比較された前提を確認する。
+ *
+ * See: features/user_registration.feature @PAT入力時に同一ユーザーのCookieが有効ならそのCookieを再利用する
+ */
+Then(
+	"PAT の所有者と edge-token Cookie の所有者が照合される",
+	function (this: BattleBoardWorld) {
+		assert(this.patOwnerUserId, "PAT 所有者が設定されていません");
+		assert(
+			this.previousPatCookieUserId !== undefined,
+			"Cookie 所有者の userId が取得されていません",
+		);
+	},
+);
+
+/**
+ * 同一ユーザーのときは既存 Cookie が再利用されることを確認する。
+ *
+ * See: features/user_registration.feature @PAT入力時に同一ユーザーのCookieが有効ならそのCookieを再利用する
+ */
+Then(
+	"同一ユーザーであるため既存の edge-token Cookie が再利用される",
+	function (this: BattleBoardWorld) {
+		assert.strictEqual(
+			this.previousPatCookieUserId,
+			this.patOwnerUserId,
+			"PAT 所有者と Cookie 所有者は同一である必要があります",
+		);
+		assert.strictEqual(
+			this.currentEdgeToken,
+			this.previousPatCookieEdgeToken,
+			"同一ユーザー時は既存の edge-token Cookie が再利用される必要があります",
+		);
+		assert.strictEqual(
+			this.patReusedCurrentToken,
+			true,
+			"reusedCurrentToken=true を期待しました",
+		);
+	},
+);
+
+/**
+ * PAT 所有者が最終的な投稿者として採用されることを確認する。
+ *
+ * See: features/user_registration.feature @PAT入力時に別ユーザーのCookieが有効でもPATを正として上書きする
+ */
+Then(
+	"PAT の所有者がその書き込みの投稿者として採用される",
+	function (this: BattleBoardWorld) {
+		assert(this.patOwnerUserId, "PAT 所有者が設定されていません");
+		assert.strictEqual(
+			this.currentUserId,
+			this.patOwnerUserId,
+			"PAT 所有者が投稿者として採用される必要があります",
+		);
+	},
+);
+
+/**
+ * 別ユーザー Cookie は PAT 所有者向けの新しい値で上書きされることを確認する。
+ *
+ * See: features/user_registration.feature @PAT入力時に別ユーザーのCookieが有効でもPATを正として上書きする
+ */
+Then(
+	"専ブラの edge-token Cookie は PAT 所有者向けの新しい値で上書きされる",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentEdgeToken, "新しい edge-token Cookie が設定されていません");
+		assert(
+			this.previousPatCookieEdgeToken,
+			"比較対象の以前の edge-token Cookie が設定されていません",
+		);
+		assert.notStrictEqual(
+			this.currentEdgeToken,
+			this.previousPatCookieEdgeToken,
+			"別ユーザー Cookie は新しい値で上書きされる必要があります",
+		);
+		const tokenRecord = await InMemoryEdgeTokenRepo.findByToken(
+			this.currentEdgeToken,
+		);
+		assert.strictEqual(
+			tokenRecord?.userId,
+			this.patOwnerUserId,
+			"新しい edge-token Cookie は PAT 所有者に紐付く必要があります",
+		);
+		assert.strictEqual(
+			this.patReusedCurrentToken,
+			false,
+			"別ユーザー Cookie の場合は再利用されない必要があります",
+		);
+	},
+);
+
+/**
+ * 書き込みが PAT 所有者名義で保存されることを確認する。
+ *
+ * See: features/user_registration.feature @PAT入力時に別ユーザーのCookieが有効でもPATを正として上書きする
+ */
+Then(
+	"書き込みは PAT 所有者として処理される",
+	async function (this: BattleBoardWorld) {
+		assert(this.currentThreadId, "スレッドが設定されていません");
+		assert(this.patOwnerUserId, "PAT 所有者が設定されていません");
+		const posts = await InMemoryPostRepo.findByThreadId(this.currentThreadId);
+		assert(posts.length > 0, "書き込みが存在しません");
+		const targetPost = [...posts]
+			.reverse()
+			.find((post) => post.body === "bbs.cgi からの書き込み");
+		assert(targetPost, "PAT 所有者による対象書き込みが見つかりません");
+		assert.strictEqual(
+			targetPost.authorId,
+			this.patOwnerUserId,
+			"対象書き込みは PAT 所有者として保存される必要があります",
+		);
+	},
+);
 
 // ---------------------------------------------------------------------------
 // Then: 書き込みが本登録ユーザーとしてスレッドに追加される

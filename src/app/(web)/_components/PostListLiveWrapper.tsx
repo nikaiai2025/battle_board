@@ -30,6 +30,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAnchorPopupContext } from "./AnchorPopupContext";
 import PostItem, { type Post } from "./PostItem";
+import { getFreshItemsAfterPostNumber } from "./thread-ui-logic";
 
 // ---------------------------------------------------------------------------
 // 定数
@@ -113,7 +114,10 @@ export default function PostListLiveWrapper({
 			const allPosts: Post[] = data.posts ?? [];
 
 			// lastPostNumber より大きいpost_numberのレスだけを新着として追加
-			const freshPosts = allPosts.filter((p) => p.postNumber > lastPostNumber);
+			const freshPosts = getFreshItemsAfterPostNumber(
+				allPosts,
+				lastPostNumber,
+			);
 
 			if (freshPosts.length > 0) {
 				// 新着レスを AnchorPopupContext の allPosts キャッシュに追加する。

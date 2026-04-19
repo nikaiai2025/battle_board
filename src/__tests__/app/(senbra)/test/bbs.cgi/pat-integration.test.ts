@@ -252,6 +252,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				valid: true,
 				userId: USER_ID,
 				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
 			});
 			setupPostSuccess();
 
@@ -261,7 +262,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 			);
 
 			// loginWithPat が正しいPATで呼ばれること
-			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT);
+			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT, undefined);
 			// edge-token Cookie が発行されること
 			const setCookie = res.headers.get("Set-Cookie");
 			expect(setCookie).toContain("edge_token=");
@@ -288,13 +289,14 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				valid: true,
 				userId: USER_ID,
 				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
 			});
 			setupPostSuccess();
 
 			const req = createBbsCgiRequest({});
 			await POST(req as unknown as import("next/server").NextRequest);
 
-			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT);
+			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT, undefined);
 		});
 
 		it("正常: PAT認証成功時、mail欄からPATが除去されてPostServiceに渡される（DAT漏洩防止）", async () => {
@@ -318,6 +320,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				valid: true,
 				userId: USER_ID,
 				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
 			});
 			setupPostSuccess();
 
@@ -351,6 +354,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				valid: true,
 				userId: USER_ID,
 				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
 			});
 			setupPostSuccess();
 
@@ -383,6 +387,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				valid: true,
 				userId: USER_ID,
 				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
 			});
 			setupPostSuccess();
 
@@ -392,6 +397,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 			// loginWithPat が呼ばれること（大文字/小文字は normalize される）
 			expect(mockLoginWithPat).toHaveBeenCalledWith(
 				VALID_PAT.toUpperCase().toLowerCase(),
+				undefined,
 			);
 		});
 
@@ -455,15 +461,13 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 
 	// =========================================================================
 	// ① edge-token Cookie あり + mail欄に PAT がある場合
-	// D-08 §6 ※ Cookie認証成功時でもPATを除去する
-	// See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
-	// See: docs/architecture/components/user-registration.md §8.3 専ブラでの使われ方（Cookie有効・mail欄PAT）
+	// D-08 §6 改訂: PAT を最優先で評価し、Cookie 所有者との整合を照合する
+	// See: features/user_registration.feature @PAT 入力時に同一ユーザーの Cookie が有効ならその Cookie を再利用する
+	// See: features/user_registration.feature @PAT 入力時に別ユーザーの Cookie が有効でも PAT を正として上書きする
 	// =========================================================================
 
-	describe("① Cookie有効 + mail欄にPAT（PAT除去のみ）", () => {
-		it("正常: Cookie有効の場合、PATで認証せず loginWithPat は呼ばれない", async () => {
-			// See: features/user_registration.feature @PAT認証後は Cookie で認証され PAT は認証処理に使われない
-			// See: docs/architecture/components/user-registration.md §8.3 Cookie有効・mail欄PAT
+	describe("① Cookie有効 + mail欄にPAT", () => {
+		it("正常: 同一ユーザーの Cookie が有効なら loginWithPat に currentEdgeToken を渡して再利用する", async () => {
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,
@@ -478,22 +482,67 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				mail: `sage#pat_${VALID_PAT}`,
 				edgeToken: VALID_EDGE_TOKEN,
 			});
-			mockVerifyEdgeToken.mockResolvedValue({
+			mockLoginWithPat.mockResolvedValue({
 				valid: true,
 				userId: USER_ID,
-				authorIdSeed: "seed-001",
+				edgeToken: VALID_EDGE_TOKEN,
+				reusedCurrentToken: true,
 			});
 			setupPostSuccess();
 
 			const req = createBbsCgiRequest({}, `edge_token=${VALID_EDGE_TOKEN}`);
-			await POST(req as unknown as import("next/server").NextRequest);
+			const res = await POST(
+				req as unknown as import("next/server").NextRequest,
+			);
 
-			// Cookie認証が成功しているのでPAT認証は行われない
-			expect(mockLoginWithPat).not.toHaveBeenCalled();
+			expect(mockLoginWithPat).toHaveBeenCalledWith(
+				VALID_PAT,
+				VALID_EDGE_TOKEN,
+			);
+			expect(res.headers.get("Set-Cookie")).toContain(VALID_EDGE_TOKEN);
+		});
+
+		it("正常: 別ユーザーの Cookie が有効でも PAT 所有者向けの新しい token で上書きする", async () => {
+			setupDecodeFormData({
+				bbs: BOARD_ID,
+				key: THREAD_KEY,
+				MESSAGE: "テスト書き込み",
+				mail: `sage#pat_${VALID_PAT}`,
+			});
+			mockBbsCgiParserParseRequest.mockReturnValue({
+				boardId: BOARD_ID,
+				threadKey: THREAD_KEY,
+				message: "テスト書き込み",
+				name: "",
+				mail: `sage#pat_${VALID_PAT}`,
+				edgeToken: VALID_EDGE_TOKEN,
+			});
+			mockLoginWithPat.mockResolvedValue({
+				valid: true,
+				userId: USER_ID,
+				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
+			});
+			setupPostSuccess();
+
+			const req = createBbsCgiRequest({}, `edge_token=${VALID_EDGE_TOKEN}`);
+			const res = await POST(
+				req as unknown as import("next/server").NextRequest,
+			);
+
+			expect(mockLoginWithPat).toHaveBeenCalledWith(
+				VALID_PAT,
+				VALID_EDGE_TOKEN,
+			);
+			expect(mockPostServiceCreatePost).toHaveBeenCalledWith(
+				expect.objectContaining({
+					edgeToken: NEW_EDGE_TOKEN,
+				}),
+			);
+			expect(res.headers.get("Set-Cookie")).toContain(NEW_EDGE_TOKEN);
 		});
 
 		it("正常: Cookie有効 + mail欄にPATがある場合でも、mail欄からPATが除去されてPostServiceに渡される", async () => {
-			// See: docs/architecture/components/user-registration.md §6 ※ Cookie認証成功でもPATを除去
 			setupDecodeFormData({
 				bbs: BOARD_ID,
 				key: THREAD_KEY,
@@ -508,22 +557,53 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				mail: `sage#pat_${VALID_PAT}`,
 				edgeToken: VALID_EDGE_TOKEN,
 			});
-			mockVerifyEdgeToken.mockResolvedValue({
+			mockLoginWithPat.mockResolvedValue({
 				valid: true,
 				userId: USER_ID,
-				authorIdSeed: "seed-001",
+				edgeToken: VALID_EDGE_TOKEN,
+				reusedCurrentToken: true,
 			});
 			setupPostSuccess();
 
 			const req = createBbsCgiRequest({}, `edge_token=${VALID_EDGE_TOKEN}`);
 			await POST(req as unknown as import("next/server").NextRequest);
 
-			// PostServiceに渡されるemailにPATが含まれないこと
 			expect(mockPostServiceCreatePost).toHaveBeenCalledWith(
 				expect.objectContaining({
 					email: expect.not.stringContaining(`#pat_${VALID_PAT}`),
 				}),
 			);
+		});
+
+		it("異常: 無効な PAT は有効な Cookie があっても優先して拒否される", async () => {
+			setupDecodeFormData({
+				bbs: BOARD_ID,
+				key: THREAD_KEY,
+				MESSAGE: "テスト書き込み",
+				mail: `sage#pat_${INVALID_PAT}`,
+			});
+			mockBbsCgiParserParseRequest.mockReturnValue({
+				boardId: BOARD_ID,
+				threadKey: THREAD_KEY,
+				message: "テスト書き込み",
+				name: "",
+				mail: `sage#pat_${INVALID_PAT}`,
+				edgeToken: VALID_EDGE_TOKEN,
+			});
+			mockLoginWithPat.mockResolvedValue({ valid: false });
+
+			const req = createBbsCgiRequest({}, `edge_token=${VALID_EDGE_TOKEN}`);
+			const res = await POST(
+				req as unknown as import("next/server").NextRequest,
+			);
+
+			expect(mockLoginWithPat).toHaveBeenCalledWith(
+				INVALID_PAT,
+				VALID_EDGE_TOKEN,
+			);
+			expect(res.status).toBe(200);
+			expect(mockPostServiceCreatePost).not.toHaveBeenCalled();
+			expect(mockVerifyWriteToken).not.toHaveBeenCalled();
 		});
 	});
 
@@ -584,6 +664,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				valid: true,
 				userId: USER_ID,
 				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
 			});
 			setupPostSuccess();
 
@@ -591,7 +672,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 			await POST(req as unknown as import("next/server").NextRequest);
 
 			// write_token として処理されず、PATとして処理される
-			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT);
+			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT, undefined);
 			expect(mockVerifyWriteToken).not.toHaveBeenCalled();
 		});
 	});
@@ -664,7 +745,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 			await POST(req as unknown as import("next/server").NextRequest);
 
 			// 先頭32文字のPATでloginWithPatが呼ばれること
-			expect(mockLoginWithPat).toHaveBeenCalledWith(extractedPat);
+			expect(mockLoginWithPat).toHaveBeenCalledWith(extractedPat, undefined);
 		});
 
 		it("エッジケース: hex以外の文字を含むPATは認識されない（不正文字）", async () => {
@@ -785,6 +866,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 				valid: true,
 				userId: USER_ID,
 				edgeToken: NEW_EDGE_TOKEN,
+				reusedCurrentToken: false,
 			});
 			setupPostSuccess();
 
@@ -792,7 +874,7 @@ describe("POST /test/bbs.cgi — PAT認証統合", () => {
 			await POST(req as unknown as import("next/server").NextRequest);
 
 			// PAT認証が行われ、write_token認証は行われない
-			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT);
+			expect(mockLoginWithPat).toHaveBeenCalledWith(VALID_PAT, undefined);
 			expect(mockVerifyWriteToken).not.toHaveBeenCalled();
 		});
 	});

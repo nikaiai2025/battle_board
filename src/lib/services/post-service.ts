@@ -304,6 +304,29 @@ async function resolveAuth(
 	};
 }
 
+/**
+ * 未使用の threadKey を生成する。
+ * 基本は現在時刻の UNIX 秒を使い、同一秒で衝突した場合だけ次秒へ順送りする。
+ *
+ * thread_key は 10 桁 UNIX タイムスタンプ制約を維持する必要があるため、
+ * ランダムサフィックスは付けず近傍秒で再試行する。
+ *
+ * See: features/integration/crud.feature @統合テスト：スレッド一覧が実DBから正しく取得される
+ */
+async function generateUniqueThreadKey(): Promise<string> {
+	const baseUnixTime = Math.floor(Date.now() / 1000);
+
+	for (let offset = 0; offset < 60; offset += 1) {
+		const candidate = (baseUnixTime + offset).toString();
+		const existingThread = await ThreadRepository.findByThreadKey(candidate);
+		if (!existingThread) {
+			return candidate;
+		}
+	}
+
+	throw new Error("thread_key を生成できませんでした");
+}
+
 // ---------------------------------------------------------------------------
 // 書き込み処理
 // ---------------------------------------------------------------------------
@@ -982,8 +1005,8 @@ export async function createThread(
 	}
 
 	// Step 3: threadKey 生成（10 桁 UNIX タイムスタンプ）
-	// See: タスク指示書 > 補足・制約 > threadKey は Math.floor(Date.now() / 1000).toString()
-	const threadKey = Math.floor(Date.now() / 1000).toString();
+	// 同一秒で既存スレッドと衝突した場合は次秒へ順送りする。
+	const threadKey = await generateUniqueThreadKey();
 
 	// createdBy の決定
 	// BOT書き込み時は posts.author_id と同様に NULL を設定する

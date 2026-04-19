@@ -94,16 +94,10 @@ BeforeAll(async function () {
 Before(async function (this: BattleBoardWorld) {
   const client = createTestAdminClient()
 
-  // 外部キー制約の依存順序に従ってTRUNCATEする（子テーブルから削除）
-  // TRUNCATE ... CASCADE を使用することで依存関係を自動処理する
-  const { error } = await client.rpc('truncate_all_test_tables')
-
-  if (error) {
-    // RPC が存在しない場合は個別に TRUNCATE する
-    // NOTE: Supabase JS v2 は raw SQL 実行に対応していないため、
-    // テーブルを依存順序で個別削除する
-    await truncateTablesSequentially(client)
-  }
+  // RPC 依存はやめ、毎回明示順序で全件削除する。
+  // 現在のローカル DB には truncate_all_test_tables RPC が存在しないため、
+  // 条件分岐は cleanup 漏れの温床になる。
+  await truncateTablesSequentially(client)
 
   // World 状態をリセットする
   this.reset()
@@ -122,32 +116,45 @@ Before(async function (this: BattleBoardWorld) {
 async function truncateTablesSequentially(
   client: ReturnType<typeof createClient>
 ): Promise<void> {
-  // 末端テーブル（依存先がない子テーブル）
-  const leafTables = ['bot_posts', 'accusations', 'incentive_logs', 'auth_codes', 'admin_users']
-  for (const table of leafTables) {
-    const { error } = await client.from(table).delete().gte('created_at', '1970-01-01')
-    if (error && error.code !== 'PGRST116') {
-      // created_at がないテーブル（bot_posts）向けのフォールバック
-      // bot_posts は post_id が PRIMARY KEY なので別の方法で削除
-      if (table === 'bot_posts') {
-        // bot_postsはcreated_atがないため、全件削除には別アプローチ
-        // post_idで全件削除（UUIDは '' より大きいため全件マッチ）
-        await client.from(table).delete().neq('post_id', '00000000-0000-0000-0000-000000000000')
-      }
+  const allUuid = '00000000-0000-0000-0000-000000000000'
+
+  const deletePlan: Array<{
+    table: string
+    mode: 'uuid' | 'serial'
+    column: string
+  }> = [
+    { table: 'bot_posts', mode: 'uuid', column: 'post_id' },
+    { table: 'attacks', mode: 'uuid', column: 'id' },
+    { table: 'grass_reactions', mode: 'uuid', column: 'id' },
+    { table: 'accusations', mode: 'uuid', column: 'id' },
+    { table: 'pending_tutorials', mode: 'uuid', column: 'id' },
+    { table: 'pending_async_commands', mode: 'uuid', column: 'id' },
+    { table: 'incentive_logs', mode: 'uuid', column: 'id' },
+    { table: 'auth_codes', mode: 'uuid', column: 'id' },
+    { table: 'admin_users', mode: 'uuid', column: 'id' },
+    { table: 'user_copipe_entries', mode: 'serial', column: 'id' },
+    { table: 'user_bot_vocabularies', mode: 'serial', column: 'id' },
+    { table: 'edge_tokens', mode: 'uuid', column: 'id' },
+    { table: 'posts', mode: 'uuid', column: 'id' },
+    { table: 'currencies', mode: 'uuid', column: 'user_id' },
+    { table: 'bots', mode: 'uuid', column: 'id' },
+    { table: 'threads', mode: 'uuid', column: 'id' },
+    { table: 'users', mode: 'uuid', column: 'id' },
+  ]
+
+  for (const step of deletePlan) {
+    const query = client.from(step.table).delete()
+    const result =
+      step.mode === 'uuid'
+        ? await query.neq(step.column, allUuid)
+        : await query.gte(step.column, 0)
+
+    if (result.error && result.error.code !== 'PGRST116') {
+      throw new Error(
+        `[integration-hooks] ${step.table} のクリーンアップに失敗しました: ${result.error.message}`
+      )
     }
   }
-
-  // 中間テーブル
-  const midTables = ['posts', 'currencies', 'bots']
-  for (const table of midTables) {
-    await client.from(table).delete().gte('created_at', '1970-01-01')
-  }
-
-  // threads テーブル
-  await client.from('threads').delete().gte('created_at', '1970-01-01')
-
-  // users テーブル（ルート）
-  await client.from('users').delete().gte('created_at', '1970-01-01')
 }
 
 // ---------------------------------------------------------------------------

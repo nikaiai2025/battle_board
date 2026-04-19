@@ -62,6 +62,7 @@ const { mockSupabaseAuth, mockUserRepository, mockEdgeTokenRepository } =
 
 		const mockEdgeTokenRepository = {
 			create: vi.fn(),
+			findByToken: vi.fn(),
 			deleteByToken: vi.fn(),
 		};
 
@@ -101,6 +102,8 @@ vi.mock(
 	"../../../lib/infrastructure/repositories/edge-token-repository",
 	() => ({
 		create: (...args: unknown[]) => mockEdgeTokenRepository.create(...args),
+		findByToken: (...args: unknown[]) =>
+			mockEdgeTokenRepository.findByToken(...args),
 		deleteByToken: (...args: unknown[]) =>
 			mockEdgeTokenRepository.deleteByToken(...args),
 	}),
@@ -981,6 +984,7 @@ describe("RegistrationService", () => {
 			if (result.valid) {
 				expect(result.userId).toBe(USER_ID);
 				expect(result.edgeToken).toBeDefined();
+				expect(result.reusedCurrentToken).toBe(false);
 			}
 		});
 
@@ -1001,6 +1005,87 @@ describe("RegistrationService", () => {
 			);
 		});
 
+		it("正常: currentEdgeToken が同一ユーザーなら既存 token を再利用する", async () => {
+			mockUserRepository.findByPatToken.mockResolvedValue(
+				createRegisteredUser(),
+			);
+			mockUserRepository.updatePatLastUsedAt.mockResolvedValue(undefined);
+			mockEdgeTokenRepository.findByToken.mockResolvedValue({
+				id: "edge-token-id-001",
+				userId: USER_ID,
+				token: EDGE_TOKEN,
+				channel: "senbra",
+				createdAt: new Date(),
+				lastUsedAt: new Date(),
+			});
+
+			const result = await RegistrationService.loginWithPat(
+				PAT_TOKEN,
+				EDGE_TOKEN,
+			);
+
+			expect(result).toEqual({
+				valid: true,
+				userId: USER_ID,
+				edgeToken: EDGE_TOKEN,
+				reusedCurrentToken: true,
+			});
+			expect(mockEdgeTokenRepository.create).not.toHaveBeenCalled();
+		});
+
+		it("正常: currentEdgeToken が別ユーザーなら PAT 所有者向けに新しい token を発行する", async () => {
+			mockUserRepository.findByPatToken.mockResolvedValue(
+				createRegisteredUser(),
+			);
+			mockUserRepository.updatePatLastUsedAt.mockResolvedValue(undefined);
+			mockEdgeTokenRepository.findByToken.mockResolvedValue({
+				id: "edge-token-id-002",
+				userId: "other-user-id",
+				token: EDGE_TOKEN,
+				channel: "senbra",
+				createdAt: new Date(),
+				lastUsedAt: new Date(),
+			});
+			mockEdgeTokenRepository.create.mockResolvedValue({});
+
+			const result = await RegistrationService.loginWithPat(
+				PAT_TOKEN,
+				EDGE_TOKEN,
+			);
+
+			expect(result.valid).toBe(true);
+			if (result.valid) {
+				expect(result.userId).toBe(USER_ID);
+				expect(result.edgeToken).not.toBe(EDGE_TOKEN);
+				expect(result.reusedCurrentToken).toBe(false);
+			}
+			expect(mockEdgeTokenRepository.create).toHaveBeenCalledWith(
+				USER_ID,
+				expect.any(String),
+				"senbra",
+			);
+		});
+
+		it("正常: currentEdgeToken が存在しなくても PAT 所有者向けに新しい token を発行する", async () => {
+			mockUserRepository.findByPatToken.mockResolvedValue(
+				createRegisteredUser(),
+			);
+			mockUserRepository.updatePatLastUsedAt.mockResolvedValue(undefined);
+			mockEdgeTokenRepository.findByToken.mockResolvedValue(null);
+			mockEdgeTokenRepository.create.mockResolvedValue({});
+
+			const result = await RegistrationService.loginWithPat(
+				PAT_TOKEN,
+				"missing-edge-token",
+			);
+
+			expect(result.valid).toBe(true);
+			if (result.valid) {
+				expect(result.reusedCurrentToken).toBe(false);
+			}
+			expect(mockEdgeTokenRepository.create).toHaveBeenCalledTimes(1);
+		});
+
 		it("異常系: 無効な PAT の場合は valid: false を返す", async () => {
 			// See: features/user_registration.feature @無効なPATでは書き込みが拒否される
 			mockUserRepository.findByPatToken.mockResolvedValue(null);
@@ -1008,6 +1093,7 @@ describe("RegistrationService", () => {
 			const result = await RegistrationService.loginWithPat("invalid-pat");
 
 			expect(result).toEqual({ valid: false });
+			expect(mockEdgeTokenRepository.findByToken).not.toHaveBeenCalled();
 			expect(mockEdgeTokenRepository.create).not.toHaveBeenCalled();
 		});
 	});

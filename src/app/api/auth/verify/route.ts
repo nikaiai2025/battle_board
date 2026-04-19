@@ -178,12 +178,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 	if (result.writeToken) {
 		responseBody.writeToken = result.writeToken;
 	}
+
+	let responseEdgeToken = edgeToken;
+	const verifiedEdgeToken = await AuthService.verifyEdgeToken(edgeToken, ipHash);
+	if (verifiedEdgeToken.valid && verifiedEdgeToken.channel === "senbra") {
+		const normalized = await AuthService.issueEdgeTokenForUser(
+			verifiedEdgeToken.userId,
+			"web",
+		);
+		responseEdgeToken = normalized.token;
+	}
 	const response = NextResponse.json(responseBody, { status: 200 });
 
 	// edge-token Cookie を更新（HttpOnly, Secure, SameSite=Lax）
 	// 認証成功時に明示的に Cookie を設定し直す（有効期限の更新等）
 	// See: src/lib/constants/cookie-names.ts
-	response.cookies.set(EDGE_TOKEN_COOKIE, edgeToken, {
+	response.cookies.set(EDGE_TOKEN_COOKIE, responseEdgeToken, {
 		httpOnly: true,
 		secure: process.env.NODE_ENV === "production",
 		sameSite: "lax",
