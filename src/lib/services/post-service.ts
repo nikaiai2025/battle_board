@@ -1080,23 +1080,25 @@ export async function createThread(
 	// IncentiveService 側の重複ガード（ON CONFLICT DO NOTHING）により二重付与は発生しない
 	// See: features/incentive.feature @スレッド作成時のボーナス
 	// See: docs/architecture/components/incentive.md §5 インセンティブ失敗は書き込みを巻き戻さない
-	try {
-		const threadCreationContext: PostContext = {
-			postId: postResult.postId,
-			threadId: thread.id,
-			userId: authResult.userId ?? "",
-			postNumber: postResult.postNumber,
-			createdAt: firstPostCreatedAt,
-		};
-		await IncentiveService.evaluateOnPost(threadCreationContext, {
-			isThreadCreation: true,
-		});
-	} catch (err) {
-		// インセンティブ失敗は書き込みを巻き戻さない
-		console.error(
-			"[PostService] IncentiveService.evaluateOnPost (thread_creation) failed:",
-			err,
-		);
+	if (!isBotWrite && authResult.userId) {
+		try {
+			const threadCreationContext: PostContext = {
+				postId: postResult.postId,
+				threadId: thread.id,
+				userId: authResult.userId,
+				postNumber: postResult.postNumber,
+				createdAt: firstPostCreatedAt,
+			};
+			await IncentiveService.evaluateOnPost(threadCreationContext, {
+				isThreadCreation: true,
+			});
+		} catch (err) {
+			// インセンティブ失敗は書き込みを巻き戻さない
+			console.error(
+				"[PostService] IncentiveService.evaluateOnPost (thread_creation) failed:",
+				err,
+			);
+		}
 	}
 
 	return {

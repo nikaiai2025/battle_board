@@ -1756,6 +1756,33 @@ describe("PostService", () => {
 				expect(result.thread).toBeDefined();
 				expect(result.firstPost).toBeDefined();
 			});
+
+			it("BOTスレッド作成では thread_creation の IncentiveService を呼ばない", async () => {
+				vi.mocked(ThreadRepository.create).mockResolvedValue(mockThread);
+				vi.mocked(PostRepository.createWithAtomicNumber).mockResolvedValue(
+					mockPost,
+				);
+				vi.mocked(ThreadRepository.incrementPostCount).mockResolvedValue(
+					undefined,
+				);
+				vi.mocked(ThreadRepository.updateLastPostAt).mockResolvedValue(
+					undefined,
+				);
+
+				const result = await createThread(
+					{
+						boardId: "livebot",
+						title: "BOT新スレ",
+						firstPostBody: "自動投稿です",
+					},
+					null,
+					"bot-thread-seed",
+					true,
+				);
+
+				expect(result.success).toBe(true);
+				expect(vi.mocked(IncentiveService.evaluateOnPost)).not.toHaveBeenCalled();
+			});
 		});
 
 		// -----------------------------------------------------------------------

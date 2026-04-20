@@ -19,8 +19,8 @@ import { NextResponse } from "next/server";
 import { verifyInternalApiKey } from "@/lib/middleware/internal-api-auth";
 import { createBotService } from "@/lib/services/bot-service";
 
-/** 1回のAPI呼び出しで処理するBOTの上限数（Vercel 10秒タイムアウト対策） */
-const MAX_BOTS_PER_EXECUTION = 5;
+/** 1回のAPI呼び出しで処理するBOTの上限数（Workers負荷制御） */
+const MAX_BOTS_PER_EXECUTION = 2;
 
 /**
  * BOT投稿を実行する。

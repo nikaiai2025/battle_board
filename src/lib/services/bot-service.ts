@@ -393,6 +393,9 @@ export interface AoriResult {
 	error?: string;
 }
 
+/** 1回の実行で処理する aori pending の上限数（Workers負荷制御） */
+const MAX_AORI_COMMANDS_PER_EXECUTION = 2;
+
 /**
  * Strategy 解決関数の型（DI用）。
  * テスト時にモックの Strategy を注入するために使用する。
@@ -1438,9 +1441,10 @@ export class BotService {
 			return { processed: 0, results: [] };
 		}
 
+		const commandsToProcess = pendingList.slice(0, MAX_AORI_COMMANDS_PER_EXECUTION);
 		const results: AoriResult[] = [];
 
-		for (const pending of pendingList) {
+		for (const pending of commandsToProcess) {
 			try {
 				// Step 1: 煽り BOT 新規作成（使い切り設定）
 				// isActive: true + nextPostAt: null で「攻撃可能だが定期投稿しない」状態にする。
@@ -1529,7 +1533,7 @@ export class BotService {
 			}
 		}
 
-		return { processed: pendingList.length, results };
+		return { processed: commandsToProcess.length, results };
 	}
 
 	// ---------------------------------------------------------------------------

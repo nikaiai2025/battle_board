@@ -22,6 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockGetActiveBotsDueForPost = vi.fn();
 const mockExecuteBotPost = vi.fn();
 const mockProcessPendingTutorials = vi.fn();
+const mockProcessAoriCommands = vi.fn();
 const mockVerifyInternalApiKey = vi.fn();
 
 vi.mock("@/lib/services/bot-service", () => ({
@@ -29,6 +30,7 @@ vi.mock("@/lib/services/bot-service", () => ({
 		getActiveBotsDueForPost: mockGetActiveBotsDueForPost,
 		executeBotPost: mockExecuteBotPost,
 		processPendingTutorials: mockProcessPendingTutorials,
+		processAoriCommands: mockProcessAoriCommands,
 	})),
 }));
 
@@ -67,6 +69,10 @@ describe("POST /api/internal/bot/execute", () => {
 		// processPendingTutorials のデフォルト戻り値（既存テストへの影響を避けるため）
 		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
 		mockProcessPendingTutorials.mockResolvedValue({
+			processed: 0,
+			results: [],
+		});
+		mockProcessAoriCommands.mockResolvedValue({
 			processed: 0,
 			results: [],
 		});
@@ -144,7 +150,7 @@ describe("POST /api/internal/bot/execute", () => {
 		expect(body.results[0].skipped).toBe(true);
 	});
 
-	it("投稿対象BOTが5体を超える場合、5体までしか処理しない（タイムアウト対策）", async () => {
+	it("投稿対象BOTが2体を超える場合、2体までしか処理しない（負荷制御）", async () => {
 		mockVerifyInternalApiKey.mockReturnValue(true);
 		const bots = Array.from({ length: 8 }, (_, i) => ({
 			id: `bot-${String(i + 1).padStart(3, "0")}`,
@@ -162,8 +168,8 @@ describe("POST /api/internal/bot/execute", () => {
 
 		const body = await response.json();
 		expect(body.totalDue).toBe(8);
-		expect(body.processed).toBe(5);
-		expect(body.results.length).toBe(5);
+		expect(body.processed).toBe(2);
+		expect(body.results.length).toBe(2);
 	});
 
 	// =========================================================================
