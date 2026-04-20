@@ -38,6 +38,8 @@ interface PostFormProps {
 	threadId: string;
 	/** insertText が実行された時のコールバック（FABパネル自動展開用） */
 	onTextInserted?: () => void;
+	/** 複数フォームを同一画面に置く場合のID接頭辞 */
+	idPrefix?: string;
 }
 
 /**
@@ -50,7 +52,11 @@ interface PostFormProps {
  * See: docs/specs/screens/thread-view.yaml > post-form
  * See: features/thread.feature @post_number_display
  */
-export default function PostForm({ threadId, onTextInserted }: PostFormProps) {
+export default function PostForm({
+	threadId,
+	onTextInserted,
+	idPrefix,
+}: PostFormProps) {
 	const router = useRouter();
 	const [body, setBody] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -195,12 +201,18 @@ export default function PostForm({ threadId, onTextInserted }: PostFormProps) {
 		register(insertText);
 	}, [register, insertText]);
 
+	const formId = idPrefix ? `${idPrefix}-post-form` : "post-form";
+	const bodyInputId = idPrefix ? `${idPrefix}-post-body-input` : "post-body-input";
+	const submitButtonId = idPrefix
+		? `${idPrefix}-post-submit-btn`
+		: "post-submit-btn";
+
 	return (
 		<>
 			{/* post-form: 書き込みフォーム
           See: docs/specs/screens/thread-view.yaml > post-form */}
 			<form
-				id="post-form"
+				id={formId}
 				onSubmit={handleSubmit}
 				className="border border-border rounded p-3 bg-muted"
 			>
@@ -208,7 +220,7 @@ export default function PostForm({ threadId, onTextInserted }: PostFormProps) {
 					{/* post-body-input: 本文入力エリア
               See: docs/specs/screens/thread-view.yaml > post-body-input */}
 					<textarea
-						id="post-body-input"
+						id={bodyInputId}
 						value={body}
 						onChange={(e) => setBody(e.target.value)}
 						placeholder="本文を入力（コマンド例: !tell >>5）"
@@ -228,7 +240,7 @@ export default function PostForm({ threadId, onTextInserted }: PostFormProps) {
 				{/* post-submit-btn: 書き込みボタン
             See: docs/specs/screens/thread-view.yaml > post-submit-btn */}
 				<button
-					id="post-submit-btn"
+					id={submitButtonId}
 					type="submit"
 					disabled={isSubmitting}
 					className="bg-gray-700 text-white text-sm py-1.5 px-4 rounded hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"

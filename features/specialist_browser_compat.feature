@@ -1,5 +1,5 @@
 # features/specialist_browser_compat.feature
-# ステータス: 承認済み v4
+# ステータス: レビュー中ドラフト v5
 #
 # NOTE: このファイルはユーザーストーリーではなく「プロトコル準拠の制約条件」を
 # Gherkin形式で記述したもの。5ch専用ブラウザ（ChMate, Siki等）との互換性を
@@ -135,6 +135,13 @@ Feature: 5ch専用ブラウザ互換性
     And 専ブラがWebブラウザとCookieを共有している
     When bbs.cgiに書き込みをPOSTする
     Then 書き込みがスレッドに追加される
+
+  Scenario: 専ブラの認証URLを通常ブラウザで開いた場合は同一ユーザーのWeb導線へ正規化される
+    Given ユーザーが専ブラから認証ページURL "/auth/verify?token=<edge-token>" を受け取っている
+    When 通常ブラウザでそのURLを開き Turnstile 認証を完了する
+    Then 専ブラで保持していた user_id と同一の user_id が認証される
+    And 通常ブラウザには web 用 edge-token Cookie が発行される
+    And マイページまたは本登録導線へ遷移できる
 
   Scenario: 専ブラがbbs.cgi応答のedge-token Cookieを保存し次回リクエストで送信する
     # 根拠: ChMate等の専ブラはSet-CookieヘッダにSecureやSameSite属性が付与されていると

@@ -1,28 +1,32 @@
 # D-06 画面要素定義書: マイページ
 # ステータス: 運用中
 # 作成日: 2026-03-07
-# 更新日: 2026-03-29
+# 更新日: 2026-04-21
 # 対象: Phase 1 + Phase 2
 
 screen_id: SCR-003
 name: マイページ
 route: /mypage
 description: >
-  ユーザーの通貨残高・アカウント情報・書き込み履歴を表示する。
+  ユーザーの通貨残高・アカウント情報・テーマ設定・書き込み履歴を表示する。
+  仮ユーザーには本登録導線を表示し、本登録ユーザーには PAT 管理を表示する。
   有料ユーザーはユーザーネーム設定が可能。
   通知欄はPhase 2以降で本格利用。
   コピペ管理は独立ページ（/mypage/copipe → mypage-copipe.yaml）に分離。
 
 api_dependencies:
   - GET /api/mypage (getMypage)
+  - PUT /api/mypage/theme (setTheme)
   - PUT /api/mypage/username (setUsername)
   - POST /api/mypage/upgrade (upgradeToPremium)
+  - GET /api/auth/pat (getPat)
+  - POST /api/auth/pat (regeneratePat)
   - GET /api/mypage/history (getPostHistory)
   - GET /api/mypage/notifications (getNotifications)
   - GET /api/currency/balance (getCurrencyBalance)
   - POST /api/auth/logout (logout)
 
-access_control: 認証済みユーザーのみ
+access_control: 認証済みかつ web channel のユーザーのみ
 
 # =============================================
 # 画面要素
@@ -43,6 +47,21 @@ elements:
         format:
           true: "有料ユーザー"
           false: "無料ユーザー"
+
+      - id: account-type-badge
+        type: text
+        source: user.isPermanentUser
+        format:
+          true: "本登録ユーザー"
+          false: "仮ユーザー"
+
+      - id: registration-method
+        type: text
+        condition: user.isPermanentUser == true
+        source: user.registrationType
+        format:
+          email: "認証方法: メールアドレス"
+          discord: "認証方法: Discord"
 
       - id: currency-balance
         type: text
@@ -98,6 +117,55 @@ elements:
               selected: fontId == user.fontId
               locked: "!font.isFree && !user.isPremium"
             action: PUT /api/mypage/theme
+
+  # --- 本登録導線（仮ユーザーのみ） ---
+  - id: registration-section
+    type: section
+    label: 本登録
+    condition: user.isPermanentUser == false
+    children:
+      - id: registration-description
+        type: text
+        content: >
+          メールアドレスまたは Discord アカウントで本登録すると、
+          Cookie を失っても同一ユーザーとして復帰できる。
+      - id: register-email-link
+        type: link
+        label: メールアドレスで本登録
+        href: /register
+        style: button-primary
+      - id: register-discord-link
+        type: link
+        label: Discord で本登録
+        href: /auth/discord
+        style: button-secondary
+
+  # --- PAT 管理（本登録ユーザーのみ） ---
+  - id: pat-section
+    type: section
+    label: 専ブラ連携トークン（PAT）
+    condition: user.isPermanentUser == true
+    children:
+      - id: pat-display
+        type: text
+        source: user.patDisplayValue
+        format: "#pat_<PAT>"
+      - id: pat-copy-btn
+        type: button
+        label: コピー
+        action: client.copy
+      - id: pat-usage-description
+        type: text
+        content: 専ブラのメール欄にそのまま設定する
+      - id: pat-last-used-at
+        type: datetime
+        source: user.patLastUsedAt
+        format: "YYYY/MM/DD HH:mm"
+        emptyState: 未使用
+      - id: pat-regenerate-btn
+        type: button
+        label: PAT を再発行
+        action: POST /api/auth/pat
 
   # --- ユーザーネーム設定 ---
   - id: username-section
@@ -189,7 +257,7 @@ elements:
           - id: history-thread-title
             type: link
             source: postHistory.threadTitle
-            href: "/threads/{postHistory.threadId}"
+            href: "/{postHistory.boardId}/{postHistory.threadKey}/"
           - id: history-body
             type: text
             source: postHistory.body

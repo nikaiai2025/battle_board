@@ -29,12 +29,25 @@ export interface ThreadSummary {
 	id: string;
 	title: string;
 	postCount: number;
+	/** ISO 8601 形式のスレッド作成日時 */
+	createdAt: string;
 	/** ISO 8601 形式の最終投稿日時 */
 	lastPostAt: string;
 	/** 板ID */
 	boardId: string;
 	/** 専ブラ互換キー（10桁 UNIX タイムスタンプ）。ThreadCard のリンク先生成に使用 */
 	threadKey: string;
+	/** トップページ用の最新レスプレビュー */
+	previewPosts?: ThreadPreviewPostSummary[];
+}
+
+export interface ThreadPreviewPostSummary {
+	postNumber: number;
+	displayName: string;
+	body: string;
+	createdAt: string;
+	isDeleted: boolean;
+	isSystemMessage: boolean;
 }
 
 /**
@@ -46,7 +59,4 @@ export interface ThreadSummary {
  * See: features/thread.feature @url_structure
  * See: tmp/workers/bdd-architect_TASK-187/thread_type_consolidation.md §3.1
  */
-export interface ThreadDetail extends ThreadSummary {
-	/** ISO 8601 形式のスレッド作成日時 */
-	createdAt: string;
-}
+export type ThreadDetail = ThreadSummary;

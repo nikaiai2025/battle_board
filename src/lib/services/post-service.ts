@@ -29,9 +29,12 @@ import type { PostWithBotMark } from "../../types/post-with-bot-mark";
 import { DEFAULT_BOARD_ID } from "../domain/constants";
 import type { PostContext } from "../domain/models/incentive";
 import type { Post } from "../domain/models/post";
-import type { Thread, ThreadInput } from "../domain/models/thread";
+import type {
+	Thread,
+	ThreadInput,
+	ThreadWithPreview,
+} from "../domain/models/thread";
 import { parseAnchors } from "../domain/rules/anchor-parser";
-import { parseCommand } from "../domain/rules/command-parser";
 import { generateDailyId } from "../domain/rules/daily-id";
 import { calcMilestonePostBonus } from "../domain/rules/incentive-rules";
 import {
@@ -1121,6 +1124,24 @@ export async function createThread(
  */
 export async function getThreadList(boardId: string): Promise<Thread[]> {
 	return ThreadRepository.findByBoardId(boardId, { onlyActive: true });
+}
+
+/**
+ * スレッド一覧と各スレッドの最新レスプレビューを取得する。
+ * トップページ用の読み取り最適化経路。DB側RPCで1回にまとめて取得する。
+ *
+ * @param boardId - 板 ID
+ * @param previewCount - 各スレッドの最新レス数
+ * @returns プレビュー付き Thread 配列
+ */
+export async function getThreadListWithPreview(
+	boardId: string,
+	previewCount = 5,
+): Promise<ThreadWithPreview[]> {
+	return ThreadRepository.findByBoardIdWithPreview(boardId, {
+		threadLimit: THREAD_LIST_MAX_LIMIT,
+		previewCount,
+	});
 }
 
 /**

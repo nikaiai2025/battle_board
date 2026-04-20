@@ -33,7 +33,7 @@ export default function VisionSection() {
 						isOpen && "rotate-90",
 					)}
 				/>
-				<span>このサイトについて（ビジョン）</span>
+				<span>ビジョン</span>
 			</CollapsibleTrigger>
 
 			<CollapsibleContent>

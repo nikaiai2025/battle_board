@@ -23,7 +23,7 @@
  *
  * Turnstile Site Key:
  * - 環境変数 NEXT_PUBLIC_TURNSTILE_SITE_KEY から取得
- * - 未設定の場合はテスト用のダミーキー（1x00000000000000000000AA）を使用
+ * - 未設定または空文字の場合はテスト用のダミーキー（1x00000000000000000000AA）を使用
  *
  * See: features/authentication.feature @Turnstile通過で認証に成功する
  * See: features/authentication.feature @Turnstile検証に失敗すると認証に失敗する
@@ -34,6 +34,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { resolveTurnstileSiteKey } from "../../_components/turnstile-sitekey";
 
 // Turnstile グローバル型の拡張宣言
 // See: src/app/(web)/_components/AuthModal.tsx（同一パターン）
@@ -155,8 +156,9 @@ function VerifyPageContent() {
 			return;
 		}
 
-		const sitekey =
-			process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "1x00000000000000000000AA";
+		const sitekey = resolveTurnstileSiteKey(
+			process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+		);
 
 		turnstileWidgetIdRef.current = window.turnstile.render(
 			turnstileContainerRef.current,

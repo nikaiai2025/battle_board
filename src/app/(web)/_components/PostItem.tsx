@@ -242,13 +242,13 @@ export default function PostItem({ post }: PostItemProps) {
 		>
 			{/* レスヘッダー行: レス番号・表示名・日次ID・日時
           See: docs/specs/screens/thread-view.yaml > post-header */}
-			<div className="flex flex-wrap items-center gap-2 mb-1">
+			<div className="mb-1 flex flex-wrap items-center gap-2 text-[10px]">
 				{/* post-number: レス番号（数字のみ、クリックでフォームに >>N を挿入）
             See: docs/specs/screens/thread-view.yaml > post-number
             See: features/thread.feature @post_number_display */}
 				<button
 					type="button"
-					className="font-bold text-foreground hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+					className="inline-flex items-center rounded-sm border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold leading-none text-slate-700 shadow-[1px_1px_0_rgba(15,23,42,0.12)] transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
 					onClick={handlePostNumberClick}
 					data-testid={`post-number-btn-${post.postNumber}`}
 				>
@@ -258,7 +258,7 @@ export default function PostItem({ post }: PostItemProps) {
 				{/* post-display-name: 表示名
             See: docs/specs/screens/thread-view.yaml > post-display-name */}
 				<span
-					className={`font-semibold ${
+					className={`text-[10px] font-semibold ${
 						isSystemMessage
 							? "text-red-700 dark:text-red-400"
 							: "text-green-700 dark:text-green-400"
@@ -269,12 +269,14 @@ export default function PostItem({ post }: PostItemProps) {
 
 				{/* post-daily-id: 日次リセットID
             See: docs/specs/screens/thread-view.yaml > post-daily-id */}
-				<span className="text-muted-foreground text-xs">ID:{post.dailyId}</span>
+				<span className="text-muted-foreground text-[10px]">
+					ID:{post.dailyId}
+				</span>
 
 				{/* post-datetime: 書き込み日時（YYYY/MM/DD(ddd) HH:mm:ss）
             See: docs/specs/screens/thread-view.yaml > post-datetime */}
 				<time
-					className="text-muted-foreground text-xs"
+					className="text-muted-foreground text-[10px]"
 					dateTime={post.createdAt}
 				>
 					{formatDateTime(post.createdAt)}
@@ -289,7 +291,7 @@ export default function PostItem({ post }: PostItemProps) {
           See: docs/specs/screens/thread-view.yaml > post-body
           See: features/thread.feature @image_preview */}
 			<div
-				className={`pl-6 whitespace-pre-wrap break-words ${
+				className={`pl-6 whitespace-pre-wrap break-words text-base ${
 					isDeleted ? "text-muted-foreground line-through" : "text-foreground"
 				}`}
 			>

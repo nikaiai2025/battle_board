@@ -19,8 +19,9 @@
  * See: docs/architecture/components/web-ui.md §4 認証フロー（UI観点）
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { resolveTurnstileSiteKey } from "./turnstile-sitekey";
 
 // Turnstile グローバル型の拡張宣言
 declare global {
@@ -101,8 +102,9 @@ export default function AuthModal({
 			return;
 		}
 
-		const sitekey =
-			process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "1x00000000000000000000AA";
+		const sitekey = resolveTurnstileSiteKey(
+			process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+		);
 
 		turnstileWidgetIdRef.current = window.turnstile.render(
 			turnstileContainerRef.current,

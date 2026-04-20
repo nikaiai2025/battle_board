@@ -1,5 +1,5 @@
 # features/user_registration.feature
-# ステータス: 承認済み v1
+# ステータス: レビュー中ドラフト v2
 #
 # 設計背景:
 #   Phase 1-2 では edge-token + Turnstileによる「仮ユーザー」のみが存在した。
@@ -31,8 +31,8 @@ Feature: 本登録・ログイン・専ブラ連携トークン（PAT）
 
   専ブラユーザーとして、パーソナルアクセストークン（PAT）をメール欄に設定する
   ことで、新規端末でも同一ユーザーとして書き込みたい。PAT を設定しておけば
-  Cookie 喪失時に自動的に同一ユーザーへ復帰する保険になるが、Cookie 発行後
-  は除去しても書き込みに支障はない。
+  Cookie 喪失時だけでなく Cookie が別ユーザーへ分岐した場合でも、PAT を正として
+  同一ユーザーへ復帰したい。
 
   # ===========================================
   # 本登録（メール認証）
@@ -98,6 +98,14 @@ Feature: 本登録・ログイン・専ブラ連携トークン（PAT）
     When 本登録を完了する
     And 同じデバイスから書き込みを行う
     Then 書き込みは本登録前と同じ edge-token で処理される
+
+  Scenario: 専ブラ認証リンクから通常ブラウザで認証した後に同一ユーザーで本登録導線へ進める
+    Given 専ブラの未認証書き込みに対して認証ページURLが返されている
+    And そのURLには専ブラユーザーの edge-token が含まれている
+    When 通常ブラウザで認証ページを開いて Turnstile 認証を完了する
+    Then 同一 user_id に対する web 用 edge-token Cookie が発行される
+    And マイページまたは本登録ページへ遷移できる
+    And 新しい仮ユーザーは作成されない
 
   Scenario: Cookie 削除後に非ログイン状態で書き込むと別人として扱われる
     Given 本登録ユーザーが edge-token Cookie を削除する
@@ -176,11 +184,12 @@ Feature: 本登録・ログイン・専ブラ連携トークン（PAT）
   Scenario: 本登録完了時に PAT が自動発行される
     Given 仮ユーザーがマイページを表示している
     When 本登録を完了する
-    Then マイページに PAT と専ブラでの設定方法が表示される
+    Then マイページに "#pat_<PAT>" 形式の PAT と専ブラでの設定方法が表示される
 
   Scenario: マイページで PAT を確認できる
     Given 本登録ユーザーがマイページを表示している
-    Then PAT が常に表示されている
+    Then "#pat_<PAT>" 形式の PAT が常に表示されている
+    And PAT の素のトークン文字列は別表示されない
     And PAT の最終使用日時が表示される
 
   Scenario: 専ブラの mail 欄に PAT を設定して書き込みできる
@@ -192,12 +201,21 @@ Feature: 本登録・ログイン・専ブラ連携トークン（PAT）
     And 書き込みが本登録ユーザーとしてスレッドに追加される
     And メール欄の PAT は書き込みデータに含まれない
 
-  Scenario: PAT 認証後は Cookie で認証され PAT は認証処理に使われない
+  Scenario: PAT 入力時に同一ユーザーの Cookie が有効ならその Cookie を再利用する
     Given 専ブラで PAT による edge-token Cookie が発行済みである
     And メール欄に PAT が設定されたままである
     When bbs.cgi に書き込みを POST する
-    Then edge-token Cookie で認証される
-    And PAT は mail 欄から除去されるが認証処理には使われない
+    Then PAT の所有者と edge-token Cookie の所有者が照合される
+    And 同一ユーザーであるため既存の edge-token Cookie が再利用される
+
+  Scenario: PAT 入力時に別ユーザーの Cookie が有効でも PAT を正として上書きする
+    Given 専ブラの edge-token Cookie が別ユーザーに紐付いている
+    And メール欄に本来の本登録ユーザーの PAT が設定されている
+    When bbs.cgi に書き込みを POST する
+    Then PAT が検証される
+    And PAT の所有者がその書き込みの投稿者として採用される
+    And 専ブラの edge-token Cookie は PAT 所有者向けの新しい値で上書きされる
+    And 書き込みは PAT 所有者として処理される
 
   Scenario: Cookie 喪失時に mail 欄の PAT で自動復帰する
     Given 専ブラの edge-token Cookie が失効している
@@ -205,6 +223,13 @@ Feature: 本登録・ログイン・専ブラ連携トークン（PAT）
     When bbs.cgi に書き込みを POST する
     Then PAT で認証され新しい edge-token Cookie が発行される
     And 本登録ユーザーとして書き込みが処理される
+
+  Scenario: 無効な PAT は有効な Cookie があっても優先して拒否される
+    Given 専ブラの edge-token Cookie が有効である
+    And メール欄に無効な PAT が設定されている
+    When bbs.cgi に書き込みを POST する
+    Then 認証エラーが発生する
+    And 書き込みは処理されない
 
   Scenario: PAT を再発行すると旧 PAT が無効になる
     Given 本登録ユーザーがマイページで PAT を再発行する

@@ -1,17 +1,19 @@
 # D-06 画面要素定義書: スレッド一覧
 # ステータス: 運用中
 # 作成日: 2026-03-07
+# 更新日: 2026-04-21
 # 対象: Phase 1
 
 screen_id: SCR-001
 name: スレッド一覧
-route: /
+route: /{boardId}/
 description: >
-  掲示板のトップページ。最終書き込み日時の新しい順に最大50件のスレッドを表示する。
-  スレッド作成フォームを含む。
+  掲示板の板トップページ。最終書き込み日時の新しい順に最大50件のスレッドを表示する。
+  画面上部にサイト説明と認証案内を表示し、スレッド一覧は
+  「タイトル一覧」と「最新レス付きヘッドライン」の2セクションで構成する。
+  ルート `/` は現状 `/livebot/` へリダイレクトする。
 
 api_dependencies:
-  - GET /api/threads (listThreads)
   - POST /api/threads (createThread)
 
 # =============================================
@@ -39,12 +41,37 @@ elements:
         type: link
         label: マイページ
         href: /mypage
-        condition: 認証済みの場合のみ表示
+        condition: 認証済みかつ web channel の場合のみ表示
+
+  - id: intro-panel
+    type: section
+    label: サイト概要
+    children:
+      - id: intro-heading
+        type: heading
+        content: このサイトは何？
+      - id: intro-description
+        type: text
+        content: >
+          人間とBOTが入り混じる対戦型掲示板です。
+          コマンドやAI機能で遊ぶこともできます。
+          掲示板文化の保全と拡張を目指しています。
+
+  - id: auth-prompt
+    type: component
+    description: 認証案内（認証状態に関わらず常時表示）
+    content: >
+      アカウント登録なしで書き込めます（初回のみ簡単な認証）。
+      メールアドレス・Discordで本登録すると、Cookie喪失時でも同一ユーザーとして復帰できます。
+
+  - id: vision-section
+    type: component
+    description: サイトビジョンの折りたたみ表示
 
   - id: thread-create-form
     type: form
     description: スレッド作成フォーム
-    condition: 認証済みの場合のみ表示
+    condition: 常時表示。未認証送信時は認証モーダルを開く
     fields:
       - id: thread-title-input
         type: text-input
@@ -62,29 +89,100 @@ elements:
         label: スレッドを立てる
         action: POST /api/threads
 
-  - id: thread-list
+  - id: thread-title-list
     type: list
-    description: スレッド一覧（最大50件）
+    description: スレッドタイトル一覧（上位20件を初期表示、残りは折りたたみ）
     emptyMessage: スレッドがありません
     sortOrder: last_post_at DESC
     maxItems: 50
     itemTemplate:
-      - id: thread-title
-        type: link
-        source: thread.title
-        href: "/threads/{thread.id}"
-      - id: thread-post-count
-        type: text
-        source: thread.postCount
-        format: "({postCount})"
-      - id: thread-last-post-at
-        type: datetime
-        source: thread.lastPostAt
-        format: relative  # 「3分前」「1時間前」等
+      - id: thread-title-row
+        type: component
+        children:
+          - id: thread-title
+            type: link
+            source: thread.title
+            href: "/{thread.boardId}/{thread.threadKey}/"
+          - id: thread-post-count
+            type: text
+            source: thread.postCount
+            format: "({postCount})"
+          - id: thread-last-post-at
+            type: datetime
+            source: thread.lastPostAt
+            format: relative
+    progressive_disclosure:
+      initialItems: 20
+      trigger:
+        id: thread-title-list-more
+        type: details-summary
+        label: 更に表示
 
-  - id: auth-prompt
-    type: component
-    description: 認証案内（認証状態に関わらず常時表示）
+  - id: thread-preview-list
+    type: list
+    description: 最新レス付きヘッドライン一覧（上位20件を初期表示、残りは折りたたみ）
+    emptyMessage: スレッドがありません
+    sortOrder: last_post_at DESC
+    maxItems: 50
+    itemTemplate:
+      - id: thread-preview-card
+        type: component
+        children:
+          - id: thread-momentum
+            type: text
+            source: thread.postCount + thread.createdAt
+            description: res/day と生存時間の簡易メタ表示
+          - id: thread-title
+            type: link
+            source: thread.title
+            href: "/{thread.boardId}/{thread.threadKey}/"
+          - id: thread-post-count
+            type: text
+            source: thread.postCount
+            format: "({postCount})"
+          - id: thread-last-post-at
+            type: datetime
+            source: thread.lastPostAt
+            format: relative
+          - id: thread-preview-posts
+            type: list
+            source: thread.previewPosts
+            maxItems: 5
+            itemTemplate:
+              - id: preview-post-number
+                type: text
+                source: previewPost.postNumber
+              - id: preview-post-body
+                type: text
+                source: previewPost.body
+                description: >
+                  削除済みレスは「このレスは削除されました」に置換して表示する。
+          - id: thread-inline-post-form
+            type: form
+            description: スレッド直下の折りたたみ書き込みフォーム
+            fields:
+              - id: thread-inline-body-input
+                type: textarea
+                label: 本文
+              - id: thread-inline-submit-btn
+                type: button
+                label: 書き込む
+                action: POST /api/posts
+    progressive_disclosure:
+      initialItems: 20
+      trigger:
+        id: thread-preview-list-more
+        type: details-summary
+        label: 更に表示
+
+  - id: thread-list-notes
+    type: note
     content: >
-      アカウント登録なしで書き込めます（初回のみ簡単な認証）。
-      メールアドレス・Discordで本登録すると、Cookie喪失時でも同一ユーザーとして復帰できます。
+      スレッド一覧取得は SSR で行う。表示対象スレッドの確定と各スレッドの最新レス抽出は
+      DB 側 RPC `get_active_threads_with_preview(board_id, thread_limit, preview_count)` でまとめて実施し、
+      N+1 と取得タイミング差による不整合を防ぐ。
+
+  - id: thread-list-footer-create-form
+    type: note
+    content: >
+      スレッド作成フォームは一覧セクションの下部に配置する。

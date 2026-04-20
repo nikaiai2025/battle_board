@@ -11,7 +11,11 @@
  *   - ビジネスロジックを含まない薄いデータアクセス層
  */
 
-import type { Thread } from "../../domain/models/thread";
+import type {
+	Thread,
+	ThreadPreviewPost,
+	ThreadWithPreview,
+} from "../../domain/models/thread";
 import { supabaseAdmin } from "../supabase/client";
 
 // ---------------------------------------------------------------------------
@@ -34,6 +38,19 @@ interface ThreadRow {
 	is_pinned: boolean;
 	/** 休眠フラグ。See: supabase/migrations/00018_add_thread_dormancy.sql */
 	is_dormant: boolean;
+}
+
+interface ThreadPreviewPostRow {
+	post_number: number;
+	display_name: string;
+	body: string;
+	created_at: string;
+	is_deleted: boolean;
+	is_system_message: boolean;
+}
+
+interface ThreadWithPreviewRow extends ThreadRow {
+	preview_posts: ThreadPreviewPostRow[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +78,24 @@ function rowToThread(row: ThreadRow): Thread {
 		// is_dormant が未定義（マイグレーション前の行）の場合は false にフォールバック
 		// See: docs/specs/thread_state_transitions.yaml #states.listed (initial: true)
 		isDormant: row.is_dormant ?? false,
+	};
+}
+
+function rowToThreadPreviewPost(row: ThreadPreviewPostRow): ThreadPreviewPost {
+	return {
+		postNumber: row.post_number,
+		displayName: row.display_name,
+		body: row.body,
+		createdAt: new Date(row.created_at),
+		isDeleted: row.is_deleted,
+		isSystemMessage: row.is_system_message,
+	};
+}
+
+function rowToThreadWithPreview(row: ThreadWithPreviewRow): ThreadWithPreview {
+	return {
+		...rowToThread(row),
+		previewPosts: (row.preview_posts ?? []).map(rowToThreadPreviewPost),
 	};
 }
 
@@ -165,6 +200,37 @@ export async function findByBoardId(
 	}
 
 	return (data as ThreadRow[]).map(rowToThread);
+}
+
+/**
+ * 指定板のアクティブスレッド一覧と、各スレッドの最新レスプレビューを一括取得する。
+ * RPC 内で表示対象スレッドの確定と最新レス抽出をまとめて行い、N+1 と取得タイミングの不整合を防ぐ。
+ *
+ * @param boardId - 板 ID
+ * @param options.threadLimit - 取得するスレッド数
+ * @param options.previewCount - 各スレッドの最新レス数
+ * @returns プレビュー付きスレッド配列
+ */
+export async function findByBoardIdWithPreview(
+	boardId: string,
+	options: { threadLimit?: number; previewCount?: number } = {},
+): Promise<ThreadWithPreview[]> {
+	const { data, error } = await supabaseAdmin.rpc(
+		"get_active_threads_with_preview",
+		{
+			p_board_id: boardId,
+			p_thread_limit: options.threadLimit ?? 50,
+			p_preview_count: options.previewCount ?? 5,
+		},
+	);
+
+	if (error) {
+		throw new Error(
+			`ThreadRepository.findByBoardIdWithPreview failed: ${error.message}`,
+		);
+	}
+
+	return (data as ThreadWithPreviewRow[]).map(rowToThreadWithPreview);
 }
 
 /**

@@ -43,6 +43,27 @@ export interface Thread {
 	isDormant: boolean;
 }
 
+/** スレッド一覧プレビュー用の簡略レス情報 */
+export interface ThreadPreviewPost {
+	/** レス番号 */
+	postNumber: number;
+	/** 表示名 */
+	displayName: string;
+	/** 本文 */
+	body: string;
+	/** 作成日時 */
+	createdAt: Date;
+	/** 削除済みフラグ */
+	isDeleted: boolean;
+	/** システムメッセージフラグ */
+	isSystemMessage: boolean;
+}
+
+/** スレッド一覧プレビュー付きのスレッド */
+export interface ThreadWithPreview extends Thread {
+	previewPosts: ThreadPreviewPost[];
+}
+
 /** スレッド作成時の入力型 */
 export interface ThreadInput {
 	/** 板ID */
