@@ -20,7 +20,7 @@
 ## 実装内容
 
 - migration追加
-  - `supabase/migrations/00048_get_active_threads_with_preview.sql`
+- `supabase/migrations/00050_get_active_threads_with_preview.sql`
   - `get_active_threads_with_preview(board_id, thread_limit, preview_count)` を追加
 - repository追加
   - `ThreadRepository.findByBoardIdWithPreview()`
