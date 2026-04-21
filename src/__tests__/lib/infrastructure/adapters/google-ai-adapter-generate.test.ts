@@ -116,6 +116,34 @@ describe("GoogleAiAdapter.generate()", () => {
 			expect(callArgs.config?.tools).toBeUndefined();
 		});
 
+		it("structuredOutput が指定された場合は responseMimeType と responseSchema を渡す", async () => {
+			mockGenerateContent.mockResolvedValue(createSuccessResponse("[\"a\"]"));
+
+			await adapter.generate({
+				systemPrompt: TEST_SYSTEM_PROMPT,
+				userPrompt: TEST_USER_PROMPT,
+				modelId: TEST_MODEL_ID,
+				structuredOutput: {
+					responseMimeType: "application/json",
+					responseSchema: {
+						type: "array",
+						items: { type: "string" },
+						minItems: 1,
+						maxItems: 1,
+					},
+				},
+			});
+
+			const callArgs = mockGenerateContent.mock.calls[0][0];
+			expect(callArgs.config?.responseMimeType).toBe("application/json");
+			expect(callArgs.config?.responseSchema).toEqual({
+				type: "array",
+				items: { type: "string" },
+				minItems: 1,
+				maxItems: 1,
+			});
+		});
+
 		it("systemInstruction と contents が分離されていること（プロンプトインジェクション防止）", async () => {
 			// See: features/command_hiroyuki.feature @スレッド本文がシステムプロンプトと構造的に分離されている
 			// See: CLAUDE.md 横断的制約「ユーザー入力をそのままLLMに渡すことを禁止する」

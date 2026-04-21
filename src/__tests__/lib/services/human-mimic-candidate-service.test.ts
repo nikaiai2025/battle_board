@@ -82,6 +82,7 @@ describe("human-mimic-candidate-service", () => {
 	it("未投稿候補が0件のスレッドでは 10 件の候補を保存する", async () => {
 		const replyCandidateRepository = createReplyCandidateRepository();
 		const posts = [createPost(), createPost({ postNumber: 2, body: "そうですね" })];
+		const googleAiAdapter = createGoogleAiAdapter();
 
 		await runHumanMimicCandidateBatch({
 			threadRepository: {
@@ -93,7 +94,7 @@ describe("human-mimic-candidate-service", () => {
 				findByThreadId: vi.fn().mockResolvedValue(posts),
 			},
 			replyCandidateRepository,
-			googleAiAdapter: createGoogleAiAdapter(),
+			googleAiAdapter,
 		});
 
 		expect(replyCandidateRepository.saveMany).toHaveBeenCalledWith(
@@ -101,6 +102,21 @@ describe("human-mimic-candidate-service", () => {
 			"thread-001",
 			Array.from({ length: 10 }, (_, i) => `候補${i + 1}`),
 			2,
+		);
+		expect(googleAiAdapter.generate).toHaveBeenCalledWith(
+			expect.objectContaining({
+				structuredOutput: {
+					responseMimeType: "application/json",
+					responseSchema: {
+						type: "array",
+						minItems: 10,
+						maxItems: 10,
+						items: {
+							type: "string",
+						},
+					},
+				},
+			}),
 		);
 	});
 
@@ -149,5 +165,13 @@ describe("human-mimic-candidate-service", () => {
 		);
 		expect(parsed).toHaveLength(10);
 		expect(parsed[0]).toBe("a");
+	});
+
+	it("parseHumanMimicCandidates は文字列中の生改行を含む JSON 風配列も解釈する", () => {
+		const parsed = parseHumanMimicCandidates(
+			'["a","1行目\n2行目","c","d","e","f","g","h","i","j"]',
+		);
+		expect(parsed).toHaveLength(10);
+		expect(parsed[1]).toBe("1行目\n2行目");
 	});
 });

@@ -22,6 +22,17 @@ import type {
 const HUMAN_MIMIC_PROFILE_KEY = "human_mimic";
 const DEFAULT_ACTIVE_THREAD_LIMIT = 50;
 const DEFAULT_GENERATION_CONCURRENCY = 3;
+const HUMAN_MIMIC_STRUCTURED_OUTPUT = {
+	responseMimeType: "application/json",
+	responseSchema: {
+		type: "array",
+		minItems: HUMAN_MIMIC_CANDIDATE_COUNT,
+		maxItems: HUMAN_MIMIC_CANDIDATE_COUNT,
+		items: {
+			type: "string",
+		},
+	},
+} as const;
 
 export { buildHumanMimicUserPrompt };
 
@@ -43,12 +54,82 @@ export interface RunHumanMimicCandidateBatchDeps {
 	googleAiAdapter: IGoogleAiAdapter;
 }
 
+function escapeControlCharactersInJsonStrings(input: string): string {
+	let result = "";
+	let inString = false;
+	let isEscaped = false;
+
+	for (const char of input) {
+		if (!inString) {
+			if (char === "\"") {
+				inString = true;
+			}
+			result += char;
+			continue;
+		}
+
+		if (isEscaped) {
+			result += char;
+			isEscaped = false;
+			continue;
+		}
+
+		if (char === "\\") {
+			result += char;
+			isEscaped = true;
+			continue;
+		}
+
+		if (char === "\"") {
+			result += char;
+			inString = false;
+			continue;
+		}
+
+		if (char === "\n") {
+			result += "\\n";
+			continue;
+		}
+
+		if (char === "\r") {
+			result += "\\r";
+			continue;
+		}
+
+		if (char === "\t") {
+			result += "\\t";
+			continue;
+		}
+
+		if (char < " ") {
+			result += `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
+			continue;
+		}
+
+		result += char;
+	}
+
+	return result;
+}
+
 export function parseHumanMimicCandidates(rawText: string): string[] {
 	const trimmed = rawText.trim();
 	const withoutFence = trimmed
 		.replace(/^```(?:json)?\s*/i, "")
 		.replace(/\s*```$/i, "");
-	const parsed = JSON.parse(withoutFence);
+	let parsed: unknown;
+
+	try {
+		parsed = JSON.parse(withoutFence);
+	} catch (error) {
+		const normalized = escapeControlCharactersInJsonStrings(withoutFence);
+
+		if (normalized === withoutFence) {
+			throw error;
+		}
+
+		parsed = JSON.parse(normalized);
+	}
 
 	if (!Array.isArray(parsed)) {
 		throw new Error("AI応答が配列ではありません");
@@ -115,6 +196,7 @@ export async function runHumanMimicCandidateBatch(
 				systemPrompt: HUMAN_MIMIC_SYSTEM_PROMPT,
 				userPrompt,
 				modelId: HUMAN_MIMIC_MODEL_ID,
+				structuredOutput: HUMAN_MIMIC_STRUCTURED_OUTPUT,
 			});
 			const candidates = parseHumanMimicCandidates(aiResult.text);
 

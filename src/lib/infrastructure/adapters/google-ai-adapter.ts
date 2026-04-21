@@ -29,6 +29,11 @@ export interface GoogleAiResult {
 	searchQueries: string[];
 }
 
+export interface GoogleAiStructuredOutputConfig {
+	responseMimeType: string;
+	responseSchema: Record<string, unknown>;
+}
+
 /**
  * Google AI Adapter の DI インターフェース。
  * BDD テストではモック実装に差し替える。
@@ -54,6 +59,7 @@ export interface IGoogleAiAdapter {
 		systemPrompt: string;
 		userPrompt: string;
 		modelId: string;
+		structuredOutput?: GoogleAiStructuredOutputConfig;
 	}): Promise<{ text: string }>;
 }
 
@@ -132,6 +138,7 @@ export class GoogleAiAdapter implements IGoogleAiAdapter {
 		systemPrompt: string;
 		userPrompt: string;
 		modelId: string;
+		structuredOutput?: GoogleAiStructuredOutputConfig;
 	}): Promise<{ text: string }> {
 		let lastError: Error | null = null;
 
@@ -165,6 +172,7 @@ export class GoogleAiAdapter implements IGoogleAiAdapter {
 		systemPrompt: string;
 		userPrompt: string;
 		modelId: string;
+		structuredOutput?: GoogleAiStructuredOutputConfig;
 	}): Promise<{ text: string }> {
 		const ai = new GoogleGenAI({ apiKey: this._pickApiKey() });
 		const response = await ai.models.generateContent({
@@ -172,6 +180,8 @@ export class GoogleAiAdapter implements IGoogleAiAdapter {
 			contents: params.userPrompt,
 			config: {
 				systemInstruction: params.systemPrompt,
+				responseMimeType: params.structuredOutput?.responseMimeType,
+				responseSchema: params.structuredOutput?.responseSchema,
 				// tools は渡さない（Search Grounding 無効）
 			},
 		});
