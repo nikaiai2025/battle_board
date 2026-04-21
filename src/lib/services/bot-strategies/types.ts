@@ -38,6 +38,21 @@ export interface CollectedItem {
 }
 
 /**
+ * 人間模倣ボット用の返信候補。
+ * reply_candidates テーブルのドメイン表現。
+ */
+export interface ReplyCandidate {
+	id: string;
+	botProfileKey: string;
+	threadId: string;
+	body: string;
+	generatedFromPostCount: number;
+	postedPostId: string | null;
+	postedAt: Date | null;
+	createdAt: Date;
+}
+
+/**
  * CollectedTopicRepository の依存インターフェース。
  * ThreadCreatorBehaviorStrategy が投稿候補を検索するために使用する。
  * collection-job.ts が収集結果を保存するために使用する。
@@ -78,6 +93,38 @@ export interface ICollectedTopicRepository {
 }
 
 /**
+ * 人間模倣ボットの reply_candidates 取得・保存インターフェース。
+ */
+export interface IReplyCandidateRepository {
+	countUnpostedByThread(
+		botProfileKey: string,
+		threadId: string,
+	): Promise<number>;
+	saveMany(
+		botProfileKey: string,
+		threadId: string,
+		bodies: string[],
+		generatedFromPostCount: number,
+	): Promise<void>;
+	findThreadIdsWithUnpostedCandidates(
+		botProfileKey: string,
+		threadIds: string[],
+	): Promise<string[]>;
+	findOldestUnpostedByThread(
+		botProfileKey: string,
+		threadId: string,
+	): Promise<Pick<ReplyCandidate, "id" | "threadId" | "body"> | null>;
+	findById(
+		candidateId: string,
+	): Promise<Pick<ReplyCandidate, "id" | "threadId" | "body"> | null>;
+	markAsPosted(
+		candidateId: string,
+		postId: string,
+		postedAt: Date,
+	): Promise<boolean>;
+}
+
+/**
  * AI対話用スレッドの直近レス情報。
  * Phase 4 実装時に詳細を追加する。
  * See: docs/architecture/components/bot.md §2.12.3 AiConversationContentStrategy
@@ -110,7 +157,10 @@ export interface BotProfile {
 	reward: BotProfileReward;
 	fixed_messages: string[];
 	/** v6 拡張: コンテンツ生成方式（未指定時は 'fixed_message'。create_thread 系は不使用）*/
-	content_strategy?: "fixed_message" | "ai_conversation";
+	content_strategy?:
+		| "fixed_message"
+		| "ai_conversation"
+		| "stored_reply_candidate";
 	/** v6 拡張: 行動パターン（未指定時は 'random_thread'）*/
 	behavior_type?: "random_thread" | "create_thread" | "reply";
 	/** v6 拡張: スケジュール設定（未指定時は fixed_interval）*/
@@ -152,6 +202,8 @@ export interface ContentGenerationContext {
 	collectedTopic?: CollectedTopic;
 	/** AI対話用: スレッドの直近レス（Phase 4）*/
 	recentPosts?: RecentPostSummary[];
+	/** 人間模倣ボット用: 選択済み候補ID */
+	selectedReplyCandidateId?: string;
 	/** ユーザー作成ボット用: サニタイズ済みプロンプト（Phase 4）*/
 	sanitizedUserPrompt?: string;
 	/** チュートリアルBOT用: ターゲットレス番号（Phase C）*/
@@ -188,7 +240,12 @@ export interface BehaviorContext {
  * See: docs/architecture/components/bot.md §2.11 BotAction
  */
 export type BotAction =
-	| { type: "post_to_existing"; threadId: string }
+	| {
+			type: "post_to_existing";
+			threadId: string;
+			/** 人間模倣ボット用: 事前生成候補ID */
+			_selectedReplyCandidateId?: string;
+	  }
 	| {
 			type: "create_thread";
 			title: string;
@@ -247,7 +304,7 @@ export interface IThreadRepository {
 	findByBoardId(
 		boardId: string,
 		options?: { limit?: number },
-	): Promise<{ id: string; isPinned?: boolean }[]>;
+	): Promise<{ id: string; title?: string; isPinned?: boolean }[]>;
 }
 
 // ---------------------------------------------------------------------------

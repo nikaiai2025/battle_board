@@ -11,11 +11,13 @@
 
 import type { Bot } from "../../domain/models/bot";
 import type { IUserBotVocabularyRepository } from "../../infrastructure/repositories/user-bot-vocabulary-repository";
+import { CandidateStockBehaviorStrategy } from "./behavior/candidate-stock";
 import { RandomThreadBehaviorStrategy } from "./behavior/random-thread";
 import { ThreadCreatorBehaviorStrategy } from "./behavior/thread-creator";
 import { TutorialBehaviorStrategy } from "./behavior/tutorial";
 import { FixedMessageContentStrategy } from "./content/fixed-message";
 import { NoOpContentStrategy } from "./content/noop";
+import { StoredReplyCandidateContentStrategy } from "./content/stored-reply-candidate";
 import { TutorialContentStrategy } from "./content/tutorial";
 import { FixedIntervalSchedulingStrategy } from "./scheduling/fixed-interval";
 import { ImmediateSchedulingStrategy } from "./scheduling/immediate";
@@ -24,6 +26,7 @@ import type {
 	BotProfile,
 	BotStrategies,
 	ICollectedTopicRepository,
+	IReplyCandidateRepository,
 	IThreadRepository,
 } from "./types";
 
@@ -41,6 +44,8 @@ export interface ResolveStrategiesOptions {
 	botProfiles?: BotProfilesYaml;
 	/** Phase 3: ThreadCreatorBehaviorStrategy が必要とする ICollectedTopicRepository */
 	collectedTopicRepository?: ICollectedTopicRepository;
+	/** 人間模倣ボット用 reply_candidates リポジトリ */
+	replyCandidateRepository?: IReplyCandidateRepository;
 	/** ユーザー語録リポジトリ（語録プール構築に使用。省略時は固定文のみで後方互換動作） */
 	vocabRepo?: IUserBotVocabularyRepository;
 }
@@ -103,6 +108,30 @@ export function resolveStrategies(
 			content: new NoOpContentStrategy(),
 			behavior: new ThreadCreatorBehaviorStrategy(collectedTopicRepo),
 			scheduling: new TopicDrivenSchedulingStrategy(minMinutes, maxMinutes),
+		};
+	}
+
+	if (
+		_profile?.behavior_type === "reply" &&
+		_profile.content_strategy === "stored_reply_candidate"
+	) {
+		const replyCandidateRepo = options.replyCandidateRepository;
+		if (!replyCandidateRepo) {
+			throw new Error(
+				"resolveStrategies: human_mimic には replyCandidateRepository が必要です",
+			);
+		}
+
+		const minMinutes = _profile.scheduling?.min ?? 60;
+		const maxMinutes = _profile.scheduling?.max ?? 120;
+
+		return {
+			content: new StoredReplyCandidateContentStrategy(replyCandidateRepo),
+			behavior: new CandidateStockBehaviorStrategy(
+				options.threadRepository,
+				replyCandidateRepo,
+			),
+			scheduling: new FixedIntervalSchedulingStrategy(minMinutes, maxMinutes),
 		};
 	}
 

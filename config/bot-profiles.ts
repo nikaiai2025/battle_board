@@ -63,6 +63,26 @@ export const botProfilesConfig: BotProfilesYaml = {
 			"うーんこの",
 		],
 	},
+	// 人間模倣ボット: AI が事前生成した reply_candidates 在庫から既存スレッドへ返信する。
+	// HP / 報酬 / 投稿間隔 / 復活ロジックは荒らし役と同一。
+	// See: features/human_mimic_bot.feature
+	human_mimic: {
+		hp: 10,
+		max_hp: 10,
+		reward: {
+			base_reward: 10,
+			daily_bonus: 50,
+			attack_bonus: 5,
+		},
+		content_strategy: "stored_reply_candidate",
+		behavior_type: "reply",
+		scheduling: {
+			type: "fixed_interval",
+			min: 60,
+			max: 120,
+		},
+		fixed_messages: [],
+	},
 	// TASK-270: 煽りBOT（!aori コマンドで召喚される使い切りBOT）
 	// 撃破報酬固定 +10（daily_bonus=0, attack_bonus=0 により常に base_reward=10 が返る）
 	// ファーミング防止: 召喚-10 + 攻撃-5 + 報酬+10 = -5（自作自演は赤字）

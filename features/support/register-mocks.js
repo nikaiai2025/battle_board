@@ -123,6 +123,10 @@ const REPO_MOCKS = [
 		"./in-memory/post-repository.ts",
 	],
 	[
+		"src/lib/infrastructure/repositories/reply-candidate-repository.ts",
+		"./in-memory/reply-candidate-repository.ts",
+	],
+	[
 		"src/lib/infrastructure/repositories/thread-repository.ts",
 		"./in-memory/thread-repository.ts",
 	],

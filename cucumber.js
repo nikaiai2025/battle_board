@@ -110,6 +110,9 @@ module.exports = {
 			// TASK-392: !yomiage コマンド（指定レス音声化） BDD シナリオ追加
 			// See: features/command_yomiage.feature
 			"features/command_yomiage.feature",
+			// 人間模倣ボット BDD シナリオ追加
+			// See: features/human_mimic_bot.feature
+			"features/human_mimic_bot.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -192,6 +195,9 @@ module.exports = {
 			// TASK-395: !yomiage コマンド BDD ステップ定義
 			// See: features/command_yomiage.feature
 			"features/step_definitions/command_yomiage.steps.ts",
+			// 人間模倣ボット BDD ステップ定義
+			// See: features/human_mimic_bot.feature
+			"features/step_definitions/human_mimic_bot.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

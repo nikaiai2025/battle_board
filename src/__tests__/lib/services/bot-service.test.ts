@@ -21,8 +21,10 @@ import {
 	type IBotPostRepository,
 	type IBotRepository,
 	type IPendingTutorialRepository,
+	type ResolveStrategiesFn,
 	type IThreadRepository,
 } from "../../../lib/services/bot-service";
+import type { IReplyCandidateRepository } from "../../../lib/services/bot-strategies/types";
 
 // ---------------------------------------------------------------------------
 // テスト用ヘルパー
@@ -182,6 +184,17 @@ function createMockAttackRepository(
 			createdAt: new Date(),
 		} as Attack),
 		deleteByDateBefore: vi.fn().mockResolvedValue(0),
+	};
+}
+
+function createMockReplyCandidateRepository(): IReplyCandidateRepository {
+	return {
+		countUnpostedByThread: vi.fn().mockResolvedValue(0),
+		saveMany: vi.fn().mockResolvedValue(undefined),
+		findThreadIdsWithUnpostedCandidates: vi.fn().mockResolvedValue([]),
+		findOldestUnpostedByThread: vi.fn().mockResolvedValue(null),
+		findById: vi.fn().mockResolvedValue(null),
+		markAsPosted: vi.fn().mockResolvedValue(true),
 	};
 }
 
@@ -1645,6 +1658,79 @@ describe("BotService", () => {
 
 			expect(result.processed).toBe(0);
 			expect(result.results).toEqual([]);
+		});
+	});
+
+	describe("executeBotPost() with human_mimic candidate stock", () => {
+		it("保存済み候補を投稿し、成功後に候補を投稿済みに更新する", async () => {
+			const bot = createLurkingBot({
+				id: "bot-human-001",
+				botProfileKey: "human_mimic",
+			});
+			const botRepo = createMockBotRepository(bot);
+			const botPostRepo = createMockBotPostRepository();
+			const attackRepo = createMockAttackRepository();
+			const createPost = createMockCreatePostFn({
+				success: true,
+				postId: "post-human-001",
+				postNumber: 12,
+				systemMessages: [],
+			});
+			const replyCandidateRepo = createMockReplyCandidateRepository();
+			(
+				replyCandidateRepo.findById as ReturnType<typeof vi.fn>
+			).mockResolvedValue({
+				id: "candidate-001",
+				threadId: "thread-001",
+				body: "保存済みの候補本文",
+			});
+
+			const resolveStrategiesFn: ResolveStrategiesFn = () => ({
+				content: {
+					generateContent: vi.fn().mockResolvedValue("保存済みの候補本文"),
+				},
+				behavior: {
+					decideAction: vi.fn().mockResolvedValue({
+						type: "post_to_existing",
+						threadId: "thread-001",
+						_selectedReplyCandidateId: "candidate-001",
+					}),
+				},
+				scheduling: {
+					getNextPostDelay: vi.fn().mockReturnValue(60),
+				},
+			});
+
+			const service = new BotService(
+				botRepo,
+				botPostRepo,
+				attackRepo,
+				undefined,
+				createMockThreadRepository([{ id: "thread-001" }]),
+				createPost,
+				resolveStrategiesFn,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				replyCandidateRepo,
+			);
+
+			const result = await service.executeBotPost(bot.id);
+
+			expect(result?.postId).toBe("post-human-001");
+			expect(createPost).toHaveBeenCalledWith(
+				expect.objectContaining({
+					threadId: "thread-001",
+					body: "保存済みの候補本文",
+				}),
+			);
+			expect(replyCandidateRepo.markAsPosted).toHaveBeenCalledWith(
+				"candidate-001",
+				"post-human-001",
+				expect.any(Date),
+			);
 		});
 	});
 });

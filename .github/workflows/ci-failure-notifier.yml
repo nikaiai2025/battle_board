@@ -19,6 +19,7 @@ on:
       - "Newspaper Scheduler"
       - "Hiroyuki Scheduler"
       - "Yomiage Scheduler"
+      - "Human Mimic Candidate Scheduler"
       - "Collect Buzz Topics (Daily Cron)"
     types: [completed]
 

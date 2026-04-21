@@ -64,6 +64,7 @@ import * as InMemoryPendingAsyncCommandRepo from "./in-memory/pending-async-comm
 // See: features/welcome.feature
 import * as InMemoryPendingTutorialRepo from "./in-memory/pending-tutorial-repository";
 import * as InMemoryPostRepo from "./in-memory/post-repository";
+import * as InMemoryReplyCandidateRepo from "./in-memory/reply-candidate-repository";
 import * as InMemorySupabaseClient from "./in-memory/supabase-client";
 import * as InMemoryThreadRepo from "./in-memory/thread-repository";
 import * as InMemoryTurnstileClient from "./in-memory/turnstile-client";
@@ -139,6 +140,7 @@ export function resetAllStores(): void {
 	// pending-async-command リポジトリのリセット（TASK-270 で追加）
 	// See: features/command_aori.feature
 	InMemoryPendingAsyncCommandRepo.reset();
+	InMemoryReplyCandidateRepo.reset();
 	// daily-event リポジトリのリセット（TASK-278 で追加）
 	// See: features/command_livingbot.feature
 	InMemoryDailyEventRepo.reset();
@@ -190,6 +192,7 @@ export {
 	// pending-tutorial リポジトリ（TASK-248 で追加）
 	InMemoryPendingTutorialRepo,
 	InMemoryPostRepo,
+	InMemoryReplyCandidateRepo,
 	InMemorySupabaseClient,
 	InMemoryThreadRepo,
 	InMemoryTurnstileClient,

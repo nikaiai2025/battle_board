@@ -348,6 +348,24 @@ phase2_bots:
       daily_bonus: 50
       attack_bonus: 5
     feature_ref: bot_system.feature#荒らし役ボットはHP 10の潜伏中状態で配置される
+  - name: 人間模倣ボット
+    role: ステルス返信BOT
+    count: 10
+    hp: 10
+    max_hp: 10
+    description: >
+      既存スレッドへ返信する運営ボット。表示・HP・投稿間隔・日次復活ロジックは荒らし役と同一だが、
+      投稿本文は固定文ではなく事前生成された AI回答候補在庫から消費する。
+    behavior:
+      posting_source: reply_candidates（bot_profile_key='human_mimic' で共有）
+      posting_interval: 1-2時間間隔（ランダム）
+      thread_selection: アクティブ50スレのうち未投稿候補があるスレッドからランダムに1件選択
+      thread_creation: 不可（既存スレッドにのみ書き込む）
+    reward_parameters:
+      base_reward: 10
+      daily_bonus: 50
+      attack_bonus: 5
+    feature_ref: human_mimic_bot.feature#人間模倣ボットは10体が並行して活動する
 
 # =============================================
 # 日次リセット処理（JST 0:00）

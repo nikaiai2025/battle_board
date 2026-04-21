@@ -62,10 +62,12 @@ function getVocabRepo(): IUserBotVocabularyRepository | undefined {
 import { resolveStrategies as defaultResolveStrategies } from "./bot-strategies/strategy-resolver";
 import type {
 	BehaviorContext,
+	BotAction,
 	BotProfile,
 	BotStrategies,
 	ContentGenerationContext,
 	ICollectedTopicRepository,
+	IReplyCandidateRepository,
 	IThreadRepository,
 	SchedulingContext,
 } from "./bot-strategies/types";
@@ -409,6 +411,8 @@ export type ResolveStrategiesFn = (
 		botProfiles?: BotProfilesYaml;
 		/** Phase 3: ThreadCreatorBehaviorStrategy が必要とする ICollectedTopicRepository */
 		collectedTopicRepository?: ICollectedTopicRepository;
+		/** 人間模倣ボット用 reply_candidates リポジトリ */
+		replyCandidateRepository?: IReplyCandidateRepository;
 		/** ユーザー語録リポジトリ（語録プール構築に使用。省略時は固定文のみで後方互換動作） */
 		vocabRepo?: IUserBotVocabularyRepository;
 	},
@@ -483,6 +487,8 @@ export class BotService {
 	 * @param collectedTopicRepository - 収集トピックリポジトリ（DI・省略可）
 	 *   ThreadCreatorBehaviorStrategy への DI および markAsPosted 呼び出しに使用する。
 	 *   See: features/curation_bot.feature @キュレーションBOTが蓄積データから新規スレッドを立てる
+	 * @param replyCandidateRepository - 人間模倣ボットの reply_candidates リポジトリ（DI・省略可）
+	 *   CandidateStockBehaviorStrategy / StoredReplyCandidateContentStrategy / 投稿済み更新に使用する。
 	 */
 	constructor(
 		private readonly botRepository: IBotRepository,
@@ -497,6 +503,7 @@ export class BotService {
 		private readonly dailyEventRepository?: IDailyEventRepository,
 		private readonly createThreadFn?: CreateThreadFn,
 		private readonly collectedTopicRepository?: ICollectedTopicRepository,
+		private readonly replyCandidateRepository?: IReplyCandidateRepository,
 	) {
 		// ボットプロファイルデータをキャッシュする
 		// Cloudflare Workers 環境では fs.readFileSync が使えないため、
@@ -1099,6 +1106,7 @@ export class BotService {
 		// threadId 引数が渡された場合は後方互換として post_to_existing に固定する
 		// See: docs/architecture/components/bot.md §2.1 > 外部インターフェースの互換性
 		let resolvedThreadId: string;
+		let action: BotAction | null = null;
 
 		if (threadId !== undefined) {
 			// 後方互換: 呼び出し元が threadId を指定した場合はそちらを優先
@@ -1116,7 +1124,7 @@ export class BotService {
 					tutorialThreadId: contextOverrides.tutorialThreadId,
 				}),
 			};
-			const action = await strategies.behavior.decideAction(behaviorContext);
+			action = await strategies.behavior.decideAction(behaviorContext);
 
 			// skip アクション: 投稿候補なし → next_post_at のみ更新して終了
 			// See: features/curation_bot.feature @蓄積データが存在しない場合は投稿をスキップする
@@ -1214,10 +1222,17 @@ export class BotService {
 		// チュートリアルBOT用: contextOverrides.tutorialTargetPostNumber を ContentGenerationContext に渡す
 		// See: docs/architecture/components/bot.md §2.1 Strategy 委譲版フロー Step 3
 		// See: features/welcome.feature @チュートリアルBOTがスポーンしてユーザーの初回書き込みに!wで反応する
+		const selectedReplyCandidateId =
+			action?.type === "post_to_existing"
+				? action._selectedReplyCandidateId
+				: undefined;
 		const contentContext: ContentGenerationContext = {
 			botId,
 			botProfileKey: bot.botProfileKey,
 			threadId: resolvedThreadId,
+			...(selectedReplyCandidateId && {
+				selectedReplyCandidateId,
+			}),
 			...(contextOverrides?.tutorialTargetPostNumber !== undefined && {
 				tutorialTargetPostNumber: contextOverrides.tutorialTargetPostNumber,
 			}),
@@ -1266,6 +1281,26 @@ export class BotService {
 				`BotService.executeBotPost: bot_posts INSERT に失敗（postId=${result.postId}, botId=${botId}）`,
 				err,
 			);
+		}
+
+		if (selectedReplyCandidateId && this.replyCandidateRepository) {
+			try {
+				const marked = await this.replyCandidateRepository.markAsPosted(
+					selectedReplyCandidateId,
+					result.postId,
+					new Date(Date.now()),
+				);
+				if (!marked) {
+					console.warn(
+						`BotService.executeBotPost: 候補の投稿済み更新が競合で失敗（candidateId=${selectedReplyCandidateId}）`,
+					);
+				}
+			} catch (err) {
+				console.error(
+					`BotService.executeBotPost: 候補の投稿済み更新に失敗（candidateId=${selectedReplyCandidateId}）`,
+					err,
+				);
+			}
 		}
 
 		// Step 9: next_post_at を更新（TDR-010: 次回投稿予定時刻の設定）
@@ -1711,6 +1746,7 @@ export class BotService {
 					this.threadRepository ?? this.createFallbackThreadRepository(),
 				botProfiles: this.botProfiles,
 				collectedTopicRepository: this.collectedTopicRepository,
+				replyCandidateRepository: this.replyCandidateRepository,
 				// See: features/user_bot_vocabulary.feature @ユーザー語録が荒らしBOTの書き込みに使用される
 				vocabRepo: getVocabRepo(),
 			});
@@ -1724,6 +1760,7 @@ export class BotService {
 				this.threadRepository ?? this.createFallbackThreadRepository(),
 			botProfiles: this.botProfiles,
 			collectedTopicRepository: this.collectedTopicRepository,
+			replyCandidateRepository: this.replyCandidateRepository,
 			vocabRepo: getVocabRepo(),
 		});
 	}
@@ -1864,6 +1901,10 @@ export function createBotService(): BotService {
 		collectedTopicRepository,
 	} = require("../infrastructure/repositories/collected-topic-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
+	const {
+		replyCandidateRepository,
+	} = require("../infrastructure/repositories/reply-candidate-repository");
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const PendingTutorialRepository = require("../infrastructure/repositories/pending-tutorial-repository");
 	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const PendingAsyncCommandRepository = require("../infrastructure/repositories/pending-async-command-repository");
@@ -1905,5 +1946,6 @@ export function createBotService(): BotService {
 		undefined, // dailyEventRepository（位置9）— 機能ガード済みのため undefined で可
 		createThread, // createThreadFn（位置10）— キュレーションBOTのスレッド作成に使用
 		collectedTopicRepository, // collectedTopicRepository（位置11）— キュレーションBOTの記事選択に使用
+		replyCandidateRepository, // replyCandidateRepository（位置12）— 人間模倣ボットの候補在庫に使用
 	);
 }

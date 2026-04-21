@@ -15,14 +15,19 @@ import { describe, expect, it, vi } from "vitest";
 import { botProfilesConfig } from "../../../../../config/bot-profiles";
 import type { Bot } from "../../../../lib/domain/models/bot";
 import type { IThreadRepository } from "../../../../lib/services/bot-service";
+import { CandidateStockBehaviorStrategy } from "../../../../lib/services/bot-strategies/behavior/candidate-stock";
 import { RandomThreadBehaviorStrategy } from "../../../../lib/services/bot-strategies/behavior/random-thread";
 import { FixedMessageContentStrategy } from "../../../../lib/services/bot-strategies/content/fixed-message";
+import { StoredReplyCandidateContentStrategy } from "../../../../lib/services/bot-strategies/content/stored-reply-candidate";
 import { FixedIntervalSchedulingStrategy } from "../../../../lib/services/bot-strategies/scheduling/fixed-interval";
 import {
 	type ResolveStrategiesOptions,
 	resolveStrategies,
 } from "../../../../lib/services/bot-strategies/strategy-resolver";
-import type { BotProfile } from "../../../../lib/services/bot-strategies/types";
+import type {
+	BotProfile,
+	IReplyCandidateRepository,
+} from "../../../../lib/services/bot-strategies/types";
 
 // ---------------------------------------------------------------------------
 // テスト用ヘルパー
@@ -70,10 +75,31 @@ function createBotProfile(overrides: Partial<BotProfile> = {}): BotProfile {
 
 /** モック IThreadRepository を生成する */
 function createMockThreadRepository(
-	threads: { id: string }[] = [{ id: "thread-001" }],
+	threads: { id: string; title?: string }[] = [{ id: "thread-001" }],
 ): IThreadRepository {
 	return {
 		findByBoardId: vi.fn().mockResolvedValue(threads),
+	};
+}
+
+function createMockReplyCandidateRepository(): IReplyCandidateRepository {
+	return {
+		countUnpostedByThread: vi.fn().mockResolvedValue(0),
+		saveMany: vi.fn().mockResolvedValue(undefined),
+		findThreadIdsWithUnpostedCandidates: vi
+			.fn()
+			.mockResolvedValue(["thread-001"]),
+		findOldestUnpostedByThread: vi.fn().mockResolvedValue({
+			id: "candidate-001",
+			threadId: "thread-001",
+			body: "候補本文",
+		}),
+		findById: vi.fn().mockResolvedValue({
+			id: "candidate-001",
+			threadId: "thread-001",
+			body: "候補本文",
+		}),
+		markAsPosted: vi.fn().mockResolvedValue(true),
 	};
 }
 
@@ -84,6 +110,7 @@ function createOptions(
 	return {
 		threadRepository: createMockThreadRepository(),
 		botProfiles: botProfilesConfig,
+		replyCandidateRepository: createMockReplyCandidateRepository(),
 		...overrides,
 	};
 }
@@ -138,6 +165,38 @@ describe("resolveStrategies", () => {
 			const result = resolveStrategies(
 				createBot(),
 				createBotProfile(),
+				createOptions(),
+			);
+
+			expect(result.scheduling).toBeInstanceOf(FixedIntervalSchedulingStrategy);
+		});
+	});
+
+	describe("人間模倣ボット解決", () => {
+		it("content は StoredReplyCandidateContentStrategy を返す", () => {
+			const result = resolveStrategies(
+				createBot({ botProfileKey: "human_mimic" }),
+				botProfilesConfig.human_mimic,
+				createOptions(),
+			);
+
+			expect(result.content).toBeInstanceOf(StoredReplyCandidateContentStrategy);
+		});
+
+		it("behavior は CandidateStockBehaviorStrategy を返す", () => {
+			const result = resolveStrategies(
+				createBot({ botProfileKey: "human_mimic" }),
+				botProfilesConfig.human_mimic,
+				createOptions(),
+			);
+
+			expect(result.behavior).toBeInstanceOf(CandidateStockBehaviorStrategy);
+		});
+
+		it("scheduling は FixedIntervalSchedulingStrategy を返す", () => {
+			const result = resolveStrategies(
+				createBot({ botProfileKey: "human_mimic" }),
+				botProfilesConfig.human_mimic,
 				createOptions(),
 			);
 

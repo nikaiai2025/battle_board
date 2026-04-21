@@ -223,7 +223,7 @@ BehaviorStrategy は以下の判別共用体 `BotAction` を返す:
 
 ```typescript
 type BotAction =
-  | { type: 'post_to_existing'; threadId: string }
+  | { type: 'post_to_existing'; threadId: string; _selectedReplyCandidateId?: string }
   | { type: 'create_thread'; title: string; body: string };
 ```
 
@@ -247,6 +247,8 @@ interface ContentGenerationContext {
   collectedTopic?: CollectedTopic;
   /** AI対話用: スレッドの直近レス（文脈理解に使用） */
   recentPosts?: RecentPostSummary[];
+  /** 人間模倣ボット用: 事前生成候補ID */
+  selectedReplyCandidateId?: string;
   /** ユーザー作成ボット用: サニタイズ済みプロンプト */
   sanitizedUserPrompt?: string;
 }
@@ -263,7 +265,7 @@ interface BehaviorContext {
 }
 
 type BotAction =
-  | { type: 'post_to_existing'; threadId: string }
+  | { type: 'post_to_existing'; threadId: string; _selectedReplyCandidateId?: string }
   | { type: 'create_thread'; title: string; body: string }
   | { type: 'skip' };  // 投稿候補なし（キュレーションBOTのデータ枯渇時等）
 
@@ -303,11 +305,13 @@ function resolveStrategies(
 | Strategy インターフェース | 実装クラス | Phase | 対応BOT種別 |
 |---|---|---|---|
 | ContentStrategy | `FixedMessageContentStrategy` | 2 (既存) | 荒らし役 |
+| ContentStrategy | `StoredReplyCandidateContentStrategy` | 2 | 人間模倣ボット |
 | ContentStrategy | `TutorialContentStrategy` | 2 (Sprint-84) | チュートリアルBOT |
 | ContentStrategy | (不使用: `ThreadCreatorBehaviorStrategy` がタイトル・本文を包括) | 3 | キュレーションBOT |
 | ContentStrategy | `AiConversationContentStrategy` | 4 | 常連・火付け役 |
 | ContentStrategy | `UserPromptContentStrategy` | 4 | ユーザー作成ボット |
 | BehaviorStrategy | `RandomThreadBehaviorStrategy` | 2 (既存) | 荒らし役 |
+| BehaviorStrategy | `CandidateStockBehaviorStrategy` | 2 | 人間模倣ボット |
 | BehaviorStrategy | `TutorialBehaviorStrategy` | 2 (Sprint-84) | チュートリアルBOT |
 | BehaviorStrategy | `ThreadCreatorBehaviorStrategy` | 3 | キュレーションBOT |
 | BehaviorStrategy | `ReplyBehaviorStrategy` | 4 | 常連・火付け役 |
@@ -494,7 +498,7 @@ feature v4「>>1 にバズスコアと元ネタURLを書き込む」に厳密準
 
 | フィールド | 型 | 説明 | デフォルト値 |
 |---|---|---|---|
-| `content_strategy` | enum (`fixed_message` / `ai_conversation`) | コンテンツ生成方式 | `fixed_message` |
+| `content_strategy` | enum (`fixed_message` / `ai_conversation` / `stored_reply_candidate`) | コンテンツ生成方式 | `fixed_message` |
 | `behavior_type` | enum (`random_thread` / `create_thread` / `reply`) | 行動パターン | `random_thread` |
 | `scheduling` | object | スケジュール設定 | `{type: fixed_interval, min: 60, max: 120}` |
 | `ai_config` | object | AI API 設定（Phase 4 AI会話BOT用） | `null` |
@@ -762,6 +766,29 @@ RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。
 
 ### 5.6 マイグレーション方針
 
+### 5.6 新規テーブル: reply_candidates（人間模倣ボット）
+
+人間模倣ボットの AI 返信候補在庫。bot 個体ではなく `bot_profile_key='human_mimic'` 単位で共有する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | UUID (PK) | 内部識別子 |
+| `bot_profile_key` | VARCHAR | 候補の所有 BOT 種別。v1 では `human_mimic` 固定 |
+| `thread_id` | UUID (FK -> threads.id) | 対象スレッド |
+| `body` | TEXT NOT NULL | 投稿候補本文 |
+| `generated_from_post_count` | INTEGER | 生成時点のレス数 |
+| `posted_post_id` | UUID NULL | 実際に投稿された post_id |
+| `posted_at` | TIMESTAMPTZ NULL | 投稿済み時刻。NULL = 未投稿 |
+| `created_at` | TIMESTAMPTZ DEFAULT NOW() | 候補生成時刻 |
+
+インデックス:
+- `(thread_id, posted_at, created_at)` — スレッド単位の最古未投稿候補取得
+- `(bot_profile_key, thread_id, posted_at)` — 在庫有無の判定
+
+RLSポリシー: `anon` / `authenticated` ロールからの全操作を DENY。`service_role` のみアクセス可能。
+
+### 5.7 マイグレーション方針
+
 v5 マイグレーション（実施済み）:
 1. `bots` テーブルに `times_attacked` カラムを追加（ALTER TABLE ADD COLUMN ... DEFAULT 0）
 2. `bots` テーブルに `bot_profile_key` カラムを追加（ALTER TABLE ADD COLUMN）
@@ -772,6 +799,10 @@ v5 マイグレーション（実施済み）:
 v6 マイグレーション（Phase 3 実装時）:
 1. `collected_topics` テーブルを新規作成（CREATE TABLE + RLSポリシー + インデックス）
 2. `bots` テーブルにキュレーションBOT用レコードを INSERT（`bot_profile_key` で種別識別）
+
+v6 マイグレーション（人間模倣ボット実装時）:
+1. `reply_candidates` テーブルを新規作成（CREATE TABLE + RLSポリシー + インデックス）
+2. `bots` テーブルに `human_mimic` の active レコードを 10 体 INSERT
 
 v6 マイグレーション（Phase 4 実装時）:
 1. `bots` テーブルに `owner_id`, `bot_type` カラムを追加
@@ -894,3 +925,5 @@ See: tmp/workers/bdd-architect_TASK-386/design.md §2.3
 - 外部API障害の影響を投稿から完全隔離
 - 収集頻度と投稿頻度を独立に制御可能
 - バッファにデータがある限り投稿を継続可能（フォールバック: 当日→前日→スキップ）
+
+人間模倣ボットも同じ方針を取る。6時間ごとの候補生成バッチで `reply_candidates` を補充し、投稿時は保存済み候補だけを使用する。これにより無料枠の Gemini 実行回数を節約しつつ、投稿タイミングを外部 API 障害から分離する。

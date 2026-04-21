@@ -78,6 +78,7 @@ interface PostWithThread {
 const SINGLE_USE_PROFILE_KEYS = ["tutorial", "aori", "hiroyuki"] as const;
 const TARGET_ACTIVE_BOT_COUNT_BY_PROFILE: Record<string, number> = {
 	荒らし役: 10,
+	human_mimic: 10,
 };
 
 function hasTargetActiveBotCount(profileKey: string | null): profileKey is string {
