@@ -2,8 +2,8 @@
  * AAビューワーページ — /copipe
  *
  * 管理者登録分・ユーザー登録分の全AAを一覧表示する。
- * 初期データは Server Component でフェッチし、検索・選択操作は
- * Client Component（CopipeViewerClient）がクライアントサイドで処理する。
+ * 初期データは Server Component でリポジトリを直接呼び出して取得する。
+ * 検索・選択操作は Client Component（CopipeViewerClient）がクライアントサイドで処理する。
  *
  * 認証不要（誰でもアクセス可能）。
  *
@@ -12,6 +12,7 @@
  */
 
 import type { Metadata } from "next";
+import { findAll } from "@/lib/infrastructure/repositories/copipe-repository";
 import CopipeViewerClient from "./_components/CopipeViewerClient";
 
 /** ページメタデータ */
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
 	title: "AAビューワー",
 };
 
-/** AAエントリの型（API レスポンス形式） */
+/** AAエントリの型（クライアントに渡す形式） */
 export interface CopipeEntryItem {
 	id: number;
 	name: string;
@@ -29,8 +30,9 @@ export interface CopipeEntryItem {
 /**
  * AAビューワーページ（Server Component）
  *
- * /api/copipe/list から全件を取得して CopipeViewerClient に渡す。
- * フェッチに失敗した場合はエラーメッセージを表示する。
+ * リポジトリを直接呼び出して全件を取得し CopipeViewerClient に渡す。
+ * Server Component から自身の API ルートを HTTP で呼ぶ anti-pattern を避けるため、
+ * findAll() を直接インポートして使用する。
  *
  * See: features/copipe_viewer.feature
  */
@@ -39,23 +41,14 @@ export default async function CopipeViewerPage() {
 	let fetchError: string | null = null;
 
 	try {
-		// Server Component から API ルートを相対パスで呼べないため絶対URLを組み立てる
-		const baseUrl =
-			process.env.NEXT_PUBLIC_BASE_URL ??
-			(process.env.VERCEL_URL
-				? `https://${process.env.VERCEL_URL}`
-				: "http://localhost:3000");
-		const res = await fetch(`${baseUrl}/api/copipe/list`, {
-			cache: "no-store",
-		});
-		if (res.ok) {
-			const data = (await res.json()) as { entries: CopipeEntryItem[] };
-			entries = data.entries;
-		} else {
-			fetchError = "AA一覧の取得に失敗しました。";
-		}
+		const raw = await findAll();
+		entries = raw.map((e) => ({
+			id: typeof e.id === "number" ? e.id : Number(e.id),
+			name: e.name,
+			content: e.content,
+		}));
 	} catch {
-		fetchError = "サーバーへの接続に失敗しました。";
+		fetchError = "AA一覧の取得に失敗しました。";
 	}
 
 	return (

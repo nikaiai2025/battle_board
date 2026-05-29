@@ -63,7 +63,7 @@ export default function Header({
 						className="text-gray-300 hover:text-white"
 						id="nav-copipe"
 					>
-						AA
+						コピペ(AA)
 					</Link>
 					{/* nav-login: 本登録ユーザー以外に表示
 					    未認証・仮ユーザーが本登録アカウントに復帰するための導線 */}
