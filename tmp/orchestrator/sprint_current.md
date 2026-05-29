@@ -1,48 +1,26 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-04-19
+> 最終更新: 2026-05-30
 
 ## 現在のフェーズ
 
-**Sprint-155 完了 — !yomiage コマンド実装（全9シナリオ）+ 本番障害対応ホットフィックス**（コミット `d406cc3` + ホットフィックス `bb33ba8` / `f1a3ac6` / `b2ae4d0`）
+**Sprint-157 完了 — BOT投稿間隔×10 + スレッド保持数50→20**（コミット `6136709`）
 
-### Sprint-155 進捗
+### Sprint-157 進捗
 
-- **フェーズ**: 全タスク完了・ホットフィックス適用済み・本番稼働中
+- **フェーズ**: 全タスク完了・コミット済み
 - **タスク状況**:
 
 | TASK_ID | 状態 | 担当 | 内容 |
 |---|---|---|---|
-| TASK-390 | ✅ 完了 | bdd-coding | 基盤層（config/yomiage.ts + wav-encoder + yomiage-voice-picker） |
-| TASK-391 | ✅ 完了 | bdd-coding | インフラアダプタ（GeminiTtsAdapter + LitterboxAdapter + AudioCompressor） |
-| TASK-392 | ✅ 完了 | bdd-coding | 同期フェーズ（YomiageHandler + CommandService DI 登録 + commands.yaml） |
-| TASK-393 | ✅ 完了 | bdd-coding | 完了反映フェーズ（YomiageService + Internal API 3ルート） |
-| TASK-394 | ✅ 完了 | bdd-coding | 非同期ワーカー（yomiage-worker.ts + yomiage-scheduler.yml + runbook） |
-| TASK-395 | ✅ 完了 | bdd-coding | BDD ステップ定義（全9シナリオ） |
-| TASK-396 | ✅ 完了 | bdd-coding | config/commands.ts に yomiage エントリ追加（CF Workers 修正） |
-| TASK-397 | ✅ 完了 | bdd-coding | cucumber.js の paths/require に command_yomiage 登録（bdd-gate 指摘修正） |
+| TASK-400 | ✅ 完了 | bdd-coding | post-service.test.ts モック修正（findByThreadKey 追加） |
+| TASK-401 | ✅ 完了 | bdd-coding | BOT投稿間隔×10 + スレッド保持数50→20 |
 
-- **計画書**: `tmp/orchestrator/sprint_155_plan.md`
-
-### Sprint-155 本番障害 & ホットフィックス（2026-04-19）
-
-本番テスト実行時に !yomiage が処理失敗（通貨返却）する障害が発覚。調査・修正を実施。
-
-**根本原因**: `ubuntu-latest` GH Actions ランナーに ffmpeg が同梱されていなかった（設計書 yomiage.md §5.5 の「同梱済み」記述が誤り）。compress ステップが try-catch で例外を捕捉してもログ出力がなく、`/complete(success:false)` 呼び出しで通貨返却された。
-
-**ホットフィックスコミット（人間実施）:**
-| コミット | 内容 |
-|---|---|
-| `bb33ba8` | chore: add yomiage operational logs（ワーカーログ追加） |
-| `f1a3ac6` | fix: install ffmpeg in yomiage workflow（ffmpeg 明示インストール — **根本原因修正**） |
-| `b2ae4d0` | feat: switch yomiage output to mp4 embed（WAV→MP4/AAC変換 + PostItem.tsx 音声プレーヤー埋め込み + url-detector.ts 追加 + feature WAV→MP4 更新） |
-
-**ドキュメント更新（2026-04-19）:**
-- `docs/architecture/components/yomiage.md`: ステータス更新・ffmpeg 明示インストール記述修正・WAV→MP4 全体更新・PostItem.tsx / url-detector.ts ファイルリスト追加・feature 参照 `ドラフト_実装禁止/` → `features/` 直下へ更新
+- **計画書**: `tmp/orchestrator/sprint_157_plan.md`
 
 ---
 
-**Sprint-154 完了 — 荒らし役BOT増殖バグ修正（ロジック + データ訂正の2段階）**（コミット: フェーズ1 `6a24df2` / フェーズ2 `e3db7c2`）
+**Sprint-155〜156 完了（人間主導コミット含む）**
 
 ### Sprint-154 フェーズ1 成果（ロジック修正）
 
@@ -75,13 +53,11 @@ vitest 2306 PASS / cucumber 411 PASS（変更スコープ内）。統合3件・E
 
 ## テスト状況
 
-- vitest: **2344 PASS / 0 failed**（129 files）
-- cucumber-js: 442シナリオ / **420 passed / 0 failed** / 18 pending / 4 undefined
-  - pending 18件: 内訳 — thread-ui 7 + polling 2 + bot-display 2 + FAB 2 + 専ブラインフラ3 + Discord OAuth 2
-  - undefined 4件: thread.feature FAB 関連（UI実装待ち）
-- playwright E2E (ローカル): 63 passed / 1 failed（既知: auth-flow サイトタイトル不一致 — Sprint-108 由来の pre-existing）
-- playwright API: 27テスト / 全PASS
-- **本番スモークテスト (Sprint-152後):** 31/36 PASS（5件はローカル限定テストのスキップ）
+- vitest: **2383 PASS / 0 failed**（133 files）— Sprint-157 品質ゲート確認済み
+- cucumber-js: 461シナリオ / **454 passed / 0 failed** / 7 pending
+  - pending 7件: bot_system.feature UIトグル関連（ブラウザ操作未実装）
+- playwright E2E (ローカル): 未確認（前回 63 passed / 1 failed 既知）
+- playwright API: 未確認（前回 27テスト 全PASS）
 
 ## 人間タスク
 
@@ -91,11 +67,9 @@ vitest 2306 PASS / cucumber 411 PASS（変更スコープ内）。統合3件・E
 
 | # | 次アクション | 内容 | 前提 |
 |---|---|---|---|
-| 1 | ~~キュレーション仕様変更~~ | ~~Sprint-146で完了~~ | ~~完了~~ |
-| 2 | ~~edge-token チャネル分離~~ | ~~Sprint-150で完了~~ | ~~完了~~ |
-| 3 | ~~BOT Strategy Step 4 Phase B~~ | ~~Wikipedia日次急上昇で完了（Sprint-151）~~ | ~~完了~~ |
-| 4 | BOT Strategy Step 4 Phase C | 残り11ソース一括実装（Phase B 実績活用） | Wikipedia BOT 実働確認後 |
-| 5 | 定番記事BOT | 固定リスト型（別featureで管理） | 人間判断待ち |
+| 1 | AA（アスキーアート）共有機能 | ユーザーが登録したAAを他ユーザーも参照できる仕様を検討・実装 | 仕様確定待ち（人間主導） |
+| 2 | TD-GHA-001 対応 | GH Actions Node.js 20→24 対応（期限: 2026-06-02） | 即実施可 |
+| 3 | BOT Strategy Step 4 Phase C | 残り11ソース実装 | 人間判断待ち |
 
 ## BOT Strategy移行 進捗
 
@@ -138,6 +112,8 @@ vitest 2306 PASS / cucumber 411 PASS（変更スコープ内）。統合3件・E
 
 | Sprint | 内容 | ステータス | 計画書 |
 |---|---|---|---|
+| Sprint-157 | BOT投稿間隔×10 + スレッド保持数50→20 | completed | `sprint_157_plan.md` |
+| Sprint-156 | 人間模倣ボット実装・スレッドプレビュー等（人間主導コミット） | completed | — |
 | Sprint-155 | !yomiage コマンド実装（全9シナリオ + CF Workers 修正） | completed | `sprint_155_plan.md` |
 | Sprint-154 | 荒らし役BOT増殖バグ修正（bulkReviveEliminated 冪等化 + データ訂正） | completed | `sprint_154_plan.md` |
 | Sprint-151〜153 | Wikipedia API統合 / Daily Maintenance 500 障害修正 / curation source 4体追加 | completed | `archive/sprint_151_160.md` |
