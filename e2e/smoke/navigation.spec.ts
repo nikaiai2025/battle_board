@@ -675,7 +675,48 @@ test.describe("IP BAN管理 /admin/ip-bans", () => {
 });
 
 // ---------------------------------------------------------------------------
-// (13) 旧スレッドURLリダイレクト /threads/[threadId]
+// (13) AAビューワー /copipe
+// ---------------------------------------------------------------------------
+
+/**
+ * AAビューワーページの到達性・UI要素を検証する。
+ *
+ * 認証不要のページ。全登録AAを一覧表示する。
+ *
+ * See: docs/architecture/bdd_test_strategy.md §10.2.3 各ページでの検証項目
+ * See: src/app/(web)/copipe/page.tsx
+ * See: features/copipe_viewer.feature
+ */
+test.describe("AAビューワー /copipe", () => {
+	test("HTTPステータス200で応答し、主要UI要素が表示される", async ({
+		page,
+	}) => {
+		const jsErrors: string[] = [];
+		page.on("pageerror", (err) => {
+			jsErrors.push(err.message);
+		});
+
+		const response = await page.goto("/copipe");
+		expect(response?.status()).toBe(200);
+
+		await expect(page.locator("main")).toBeVisible();
+
+		// See: src/app/(web)/copipe/page.tsx > h1 "AAビューワー"
+		await expect(page.locator("h1")).toContainText("AAビューワー");
+
+		// See: src/app/(web)/_components/Header.tsx > #nav-copipe
+		await expect(page.locator("#nav-copipe")).toBeVisible();
+		await expect(page.locator("#nav-copipe")).toHaveAttribute(
+			"href",
+			"/copipe",
+		);
+
+		expect(jsErrors).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (14) 旧スレッドURLリダイレクト /threads/[threadId]
 // ---------------------------------------------------------------------------
 
 /**

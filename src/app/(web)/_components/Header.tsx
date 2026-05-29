@@ -56,6 +56,15 @@ export default function Header({
 
 				{/* ナビゲーション */}
 				<nav className="flex items-center gap-4 text-sm">
+					{/* nav-copipe: AAビューワーへのリンク（認証状態によらず常時表示）
+					    See: features/copipe_viewer.feature @ヘッダーナビゲーションにAAビューワーへのリンクが存在する */}
+					<Link
+						href="/copipe"
+						className="text-gray-300 hover:text-white"
+						id="nav-copipe"
+					>
+						AA
+					</Link>
 					{/* nav-login: 本登録ユーザー以外に表示
 					    未認証・仮ユーザーが本登録アカウントに復帰するための導線 */}
 					{!isRegistered && (
@@ -79,7 +88,7 @@ export default function Header({
 						</Link>
 					)}
 					{canAccessWebMemberFeatures && (
-							/* nav-mypage: 認証済みかつ web channel の場合に表示 */
+						/* nav-mypage: 認証済みかつ web channel の場合に表示 */
 						<Link
 							href="/mypage"
 							className="text-gray-300 hover:text-white"

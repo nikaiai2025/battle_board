@@ -87,6 +87,20 @@ export interface ICopipeRepository {
 	 * @returns 部分一致したエントリの配列
 	 */
 	findByContentPartial(query: string): Promise<CopipeEntry[]>;
+
+	/**
+	 * admin + user の全コピペを返す。name の部分一致フィルタ付き（省略時は全件）。
+	 *
+	 * copipe_entries + user_copipe_entries を並列取得してマージする。
+	 * query が指定された場合は name.toLowerCase().includes(query.toLowerCase()) でフィルタする。
+	 *
+	 * See: features/copipe_viewer.feature @AAビューワーページを開くと管理者・ユーザー両方のAAが一覧表示される
+	 * See: features/copipe_viewer.feature @名前で部分一致フィルタリングできる
+	 *
+	 * @param query - 名前のフィルタキーワード（省略時は全件返却）
+	 * @returns マージ後のエントリ配列（query 指定時は部分一致フィルタ済み）
+	 */
+	findAll(query?: string): Promise<CopipeEntry[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +266,52 @@ export async function findByNamePartial(name: string): Promise<CopipeEntry[]> {
 			rowToCopipeEntry(row as CopipeEntryRow),
 		),
 	];
+}
+
+/**
+ * admin + user の全コピペを返す。name の部分一致フィルタ付き（省略時は全件）。
+ *
+ * copipe_entries と user_copipe_entries の両テーブルを並列取得してマージする。
+ * query が指定された場合は name.toLowerCase().includes(query.toLowerCase()) でフィルタする。
+ *
+ * See: features/copipe_viewer.feature @AAビューワーページを開くと管理者・ユーザー両方のAAが一覧表示される
+ * See: features/copipe_viewer.feature @名前で部分一致フィルタリングできる
+ *
+ * @param query - 名前のフィルタキーワード（省略時は全件返却）
+ * @returns マージ後のエントリ配列（query 指定時は部分一致フィルタ済み）
+ */
+export async function findAll(query?: string): Promise<CopipeEntry[]> {
+	// 両テーブルを並列で全件取得してマージする
+	const [adminResult, userResult] = await Promise.all([
+		supabaseAdmin.from("copipe_entries").select("*"),
+		supabaseAdmin.from("user_copipe_entries").select("*"),
+	]);
+
+	if (adminResult.error) {
+		throw new Error(
+			`CopipeRepository.findAll (admin) failed: ${adminResult.error.message}`,
+		);
+	}
+	if (userResult.error) {
+		throw new Error(
+			`CopipeRepository.findAll (user) failed: ${userResult.error.message}`,
+		);
+	}
+
+	// 両テーブルの結果をマージする
+	const allEntries = [
+		...(adminResult.data ?? []).map((row) =>
+			rowToCopipeEntry(row as CopipeEntryRow),
+		),
+		...(userResult.data ?? []).map((row) =>
+			rowToCopipeEntry(row as CopipeEntryRow),
+		),
+	];
+
+	// query が指定された場合は名前の部分一致でフィルタする（大文字小文字を無視）
+	if (!query) return allEntries;
+	const lower = query.toLowerCase();
+	return allEntries.filter((entry) => entry.name.toLowerCase().includes(lower));
 }
 
 /**

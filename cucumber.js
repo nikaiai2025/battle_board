@@ -113,6 +113,9 @@ module.exports = {
 			// 人間模倣ボット BDD シナリオ追加
 			// See: features/human_mimic_bot.feature
 			"features/human_mimic_bot.feature",
+			// TASK-402: AAビューワーページ BDD シナリオ追加
+			// See: features/copipe_viewer.feature
+			"features/copipe_viewer.feature",
 		],
 
 		// ステップ定義と support ファイルを読み込む
@@ -198,6 +201,9 @@ module.exports = {
 			// 人間模倣ボット BDD ステップ定義
 			// See: features/human_mimic_bot.feature
 			"features/step_definitions/human_mimic_bot.steps.ts",
+			// TASK-402: AAビューワーページ BDD ステップ定義
+			// See: features/copipe_viewer.feature
+			"features/step_definitions/copipe_viewer.steps.ts",
 		],
 
 		// TypeScript（CommonJS 互換設定）と tsconfig-paths の登録

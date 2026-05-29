@@ -176,3 +176,23 @@ export async function findByContentPartial(
 	);
 	return [...adminMatches, ...userMatches];
 }
+
+/**
+ * admin + user の全コピペを返す。name の部分一致フィルタ付き（省略時は全件）。
+ *
+ * adminStore と userStore の両方をマージし、query が指定された場合は
+ * name.toLowerCase().includes(query.toLowerCase()) でフィルタする。
+ *
+ * See: src/lib/infrastructure/repositories/copipe-repository.ts > findAll
+ * See: features/copipe_viewer.feature @AAビューワーページを開くと管理者・ユーザー両方のAAが一覧表示される
+ * See: features/copipe_viewer.feature @名前で部分一致フィルタリングできる
+ *
+ * @param query - 名前のフィルタキーワード（省略時は全件返却）
+ * @returns マージ後のエントリ配列（query 指定時は部分一致フィルタ済み）
+ */
+export async function findAll(query?: string): Promise<CopipeEntry[]> {
+	const allEntries = [...adminStore, ...userStore];
+	if (!query) return allEntries;
+	const lower = query.toLowerCase();
+	return allEntries.filter((entry) => entry.name.toLowerCase().includes(lower));
+}

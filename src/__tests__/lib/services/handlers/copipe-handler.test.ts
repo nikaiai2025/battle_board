@@ -58,6 +58,7 @@ function createMockRepo(
 		findByName: async () => [], // 変更: null → []
 		findByNamePartial: async () => [],
 		findByContentPartial: async () => [],
+		findAll: async () => [],
 		...overrides,
 	};
 }
