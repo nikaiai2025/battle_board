@@ -75,6 +75,7 @@ vi.mock("../../../lib/infrastructure/repositories/thread-repository", () => ({
 	countActiveThreads: vi.fn().mockResolvedValue(0),
 	wakeThread: vi.fn().mockResolvedValue(undefined),
 	demoteOldestActiveThread: vi.fn().mockResolvedValue(undefined),
+	findByThreadKey: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../../../lib/infrastructure/repositories/user-repository", () => ({
