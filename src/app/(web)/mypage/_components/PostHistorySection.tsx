@@ -17,7 +17,14 @@
  *   - ページネーションコントロールの表示（totalPages <= 1 の場合は非表示）
  */
 
+import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import { formatDateTime } from "../../../../lib/utils/date";
 
 // ---------------------------------------------------------------------------
@@ -94,6 +101,9 @@ export default function PostHistorySection() {
 		startDate: "",
 		endDate: "",
 	});
+
+	/** セクションの開閉状態（デフォルトは折り畳み） */
+	const [isOpen, setIsOpen] = useState(false);
 
 	// ---------------------------------------------------------------------------
 	// データ取得
@@ -204,212 +214,243 @@ export default function PostHistorySection() {
 	// ---------------------------------------------------------------------------
 
 	return (
-		<section
-			id="post-history"
-			className="bg-card border border-border rounded p-4 space-y-3"
-		>
-			<h2 className="text-base font-bold text-foreground">書き込み履歴</h2>
+		<section id="post-history" className="bg-card border border-border rounded">
+			<Collapsible open={isOpen} onOpenChange={setIsOpen}>
+				<CollapsibleTrigger
+					className={cn(
+						"flex w-full items-center gap-2 px-4 py-3 text-left",
+						"cursor-pointer hover:bg-accent/40 transition-colors rounded",
+					)}
+				>
+					<ChevronRight
+						className={cn(
+							"size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+							isOpen && "rotate-90",
+						)}
+					/>
+					<span className="text-base font-bold text-foreground">
+						書き込み履歴
+					</span>
+				</CollapsibleTrigger>
 
-			{/* =============================
+				<CollapsibleContent>
+					<div className="px-4 pb-4 pt-1 space-y-3">
+						{/* =============================
           検索フォーム
           See: features/mypage.feature @キーワードで書き込み履歴を検索する
           See: features/mypage.feature @日付範囲で書き込み履歴を絞り込む
           See: tmp/workers/bdd-architect_TASK-237/design.md §6.5 検索フォームUI
           ============================= */}
-			<form
-				id="history-search-form"
-				onSubmit={handleSearch}
-				className="space-y-2"
-			>
-				{/* キーワード入力
-            See: tmp/workers/bdd-architect_TASK-237/design.md §6.5 > history-keyword-input */}
-				<input
-					id="history-keyword-input"
-					type="text"
-					value={searchInput.keyword}
-					onChange={(e) =>
-						setSearchInput((prev) => ({ ...prev, keyword: e.target.value }))
-					}
-					placeholder="本文を検索（キーワード）"
-					maxLength={200}
-					className="w-full border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
-				/>
-
-				{/* 日付範囲
-            See: tmp/workers/bdd-architect_TASK-237/design.md §6.5 > history-start-date / history-end-date */}
-				<div className="flex items-center gap-2 flex-wrap">
-					<input
-						id="history-start-date"
-						type="date"
-						value={searchInput.startDate}
-						onChange={(e) =>
-							setSearchInput((prev) => ({
-								...prev,
-								startDate: e.target.value,
-							}))
-						}
-						className="border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
-					/>
-					<span className="text-muted-foreground text-sm">〜</span>
-					<input
-						id="history-end-date"
-						type="date"
-						value={searchInput.endDate}
-						onChange={(e) =>
-							setSearchInput((prev) => ({ ...prev, endDate: e.target.value }))
-						}
-						className="border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
-					/>
-				</div>
-
-				{/* 検索・クリアボタン */}
-				<div className="flex gap-2">
-					{/* history-search-btn
-              See: tmp/workers/bdd-architect_TASK-237/design.md §6.5 > history-search-btn */}
-					<button
-						id="history-search-btn"
-						type="submit"
-						className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-					>
-						検索
-					</button>
-					{/* クリアボタン: 検索条件が適用中のときのみ表示 */}
-					{isSearchActive && (
-						<button
-							id="history-clear-btn"
-							type="button"
-							onClick={handleClearSearch}
-							className="px-4 py-1.5 bg-muted text-foreground text-sm rounded hover:bg-accent"
+						<form
+							id="history-search-form"
+							onSubmit={handleSearch}
+							className="space-y-2"
 						>
-							クリア
-						</button>
-					)}
-				</div>
-			</form>
+							{/* キーワード入力
+            See: tmp/workers/bdd-architect_TASK-237/design.md §6.5 > history-keyword-input */}
+							<input
+								id="history-keyword-input"
+								type="text"
+								value={searchInput.keyword}
+								onChange={(e) =>
+									setSearchInput((prev) => ({
+										...prev,
+										keyword: e.target.value,
+									}))
+								}
+								placeholder="本文を検索（キーワード）"
+								maxLength={200}
+								className="w-full border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+							/>
 
-			{/* =============================
+							{/* 日付範囲
+            See: tmp/workers/bdd-architect_TASK-237/design.md §6.5 > history-start-date / history-end-date */}
+							<div className="flex items-center gap-2 flex-wrap">
+								<input
+									id="history-start-date"
+									type="date"
+									value={searchInput.startDate}
+									onChange={(e) =>
+										setSearchInput((prev) => ({
+											...prev,
+											startDate: e.target.value,
+										}))
+									}
+									className="border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+								/>
+								<span className="text-muted-foreground text-sm">〜</span>
+								<input
+									id="history-end-date"
+									type="date"
+									value={searchInput.endDate}
+									onChange={(e) =>
+										setSearchInput((prev) => ({
+											...prev,
+											endDate: e.target.value,
+										}))
+									}
+									className="border border-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+								/>
+							</div>
+
+							{/* 検索・クリアボタン */}
+							<div className="flex gap-2">
+								{/* history-search-btn
+              See: tmp/workers/bdd-architect_TASK-237/design.md §6.5 > history-search-btn */}
+								<button
+									id="history-search-btn"
+									type="submit"
+									className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+								>
+									検索
+								</button>
+								{/* クリアボタン: 検索条件が適用中のときのみ表示 */}
+								{isSearchActive && (
+									<button
+										id="history-clear-btn"
+										type="button"
+										onClick={handleClearSearch}
+										className="px-4 py-1.5 bg-muted text-foreground text-sm rounded hover:bg-accent"
+									>
+										クリア
+									</button>
+								)}
+							</div>
+						</form>
+
+						{/* =============================
           書き込み一覧 / メッセージ
           See: features/mypage.feature @自分の書き込み履歴を確認できる
           ============================= */}
-			{isLoading ? (
-				<p className="text-muted-foreground text-sm">読み込み中...</p>
-			) : posts.length === 0 ? (
-				isSearchActive ? (
-					/* 検索条件あり + 0件
+						{isLoading ? (
+							<p className="text-muted-foreground text-sm">読み込み中...</p>
+						) : posts.length === 0 ? (
+							isSearchActive ? (
+								/* 検索条件あり + 0件
               See: features/mypage.feature @検索結果が0件の場合はメッセージが表示される
               See: tmp/workers/bdd-architect_TASK-237/design.md §6.6 検索結果メッセージ */
-					<p
-						id="no-search-results-message"
-						className="text-muted-foreground text-sm"
-					>
-						該当する書き込みはありません
-					</p>
-				) : (
-					/* 検索条件なし + 0件（まだ書き込みなし）
+								<p
+									id="no-search-results-message"
+									className="text-muted-foreground text-sm"
+								>
+									該当する書き込みはありません
+								</p>
+							) : (
+								/* 検索条件なし + 0件（まだ書き込みなし）
               See: features/mypage.feature @書き込み履歴が0件の場合はメッセージが表示される */
-					<p id="no-posts-message" className="text-muted-foreground text-sm">
-						まだ書き込みがありません
-					</p>
-				)
-			) : (
-				<>
-					{/* 件数表示 */}
-					<p className="text-xs text-muted-foreground">全 {total} 件</p>
+								<p
+									id="no-posts-message"
+									className="text-muted-foreground text-sm"
+								>
+									まだ書き込みがありません
+								</p>
+							)
+						) : (
+							<>
+								{/* 件数表示 */}
+								<p className="text-xs text-muted-foreground">全 {total} 件</p>
 
-					{/* 書き込み一覧
+								{/* 書き込み一覧
               See: features/mypage.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる */}
-					<ul id="post-history-list" className="space-y-2">
-						{posts.map((post) => (
-							<li
-								key={post.id}
-								className="border-b border-border pb-2 last:border-b-0"
-							>
-								{/* スレッドタイトル（スレッドへのリンク）
+								<ul id="post-history-list" className="space-y-2">
+									{posts.map((post) => (
+										<li
+											key={post.id}
+											className="border-b border-border pb-2 last:border-b-0"
+										>
+											{/* スレッドタイトル（スレッドへのリンク）
                     See: features/mypage.feature @各書き込みのスレッド名、本文、書き込み日時が含まれる
                     See: tmp/workers/bdd-architect_TASK-237/design.md §6.4 > history-thread-title */}
-								<div className="text-xs text-muted-foreground mb-0.5">
-									<a
-										href={`/threads/${post.threadId}`}
-										className="font-medium text-blue-600 hover:underline"
-									>
-										{post.threadTitle}
-									</a>
-									<span className="ml-2">{formatDateTime(post.createdAt)}</span>
-								</div>
-								<p className="text-sm text-foreground line-clamp-2">
-									{post.body}
-								</p>
-							</li>
-						))}
-					</ul>
-				</>
-			)}
+											<div className="text-xs text-muted-foreground mb-0.5">
+												<a
+													href={`/threads/${post.threadId}`}
+													className="font-medium text-blue-600 hover:underline"
+												>
+													{post.threadTitle}
+												</a>
+												<span className="ml-2">
+													{formatDateTime(post.createdAt)}
+												</span>
+											</div>
+											<p className="text-sm text-foreground line-clamp-2">
+												{post.body}
+											</p>
+										</li>
+									))}
+								</ul>
+							</>
+						)}
 
-			{/* =============================
+						{/* =============================
           ページネーションコントロール
           totalPages <= 1 の場合は非表示
           See: features/mypage.feature @書き込み履歴が50件以下の場合は全件表示される（ページネーション非表示）
           See: features/mypage.feature @書き込み履歴が50件を超える場合はページネーションで表示される
           See: tmp/workers/bdd-architect_TASK-237/design.md §6.4 ページネーションUI
           ============================= */}
-			{totalPages > 1 && (
-				<nav
-					id="history-pagination"
-					aria-label="書き込み履歴のページネーション"
-					className="flex items-center gap-1 flex-wrap pt-1"
-				>
-					{/* 前へボタン: 1ページ目では非活性 */}
-					<button
-						id="history-page-prev"
-						type="button"
-						onClick={() => handlePageChange(currentPage - 1)}
-						disabled={currentPage <= 1}
-						className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-					>
-						前へ
-					</button>
+						{totalPages > 1 && (
+							<nav
+								id="history-pagination"
+								aria-label="書き込み履歴のページネーション"
+								className="flex items-center gap-1 flex-wrap pt-1"
+							>
+								{/* 前へボタン: 1ページ目では非活性 */}
+								<button
+									id="history-page-prev"
+									type="button"
+									onClick={() => handlePageChange(currentPage - 1)}
+									disabled={currentPage <= 1}
+									className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+								>
+									前へ
+								</button>
 
-					{/* ページ番号ボタン
+								{/* ページ番号ボタン
               See: tmp/workers/bdd-architect_TASK-237/design.md §6.4 > history-page-{n} */}
-					{Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-						<button
-							key={page}
-							id={`history-page-${page}`}
-							type="button"
-							onClick={() => handlePageChange(page)}
-							disabled={page === currentPage}
-							aria-current={page === currentPage ? "page" : undefined}
-							className={
-								page === currentPage
-									? "px-3 py-1 text-sm border border-blue-500 rounded bg-blue-600 text-white font-bold cursor-default"
-									: "px-3 py-1 text-sm border border-border rounded hover:bg-accent"
-							}
-						>
-							{page}
-						</button>
-					))}
+								{Array.from({ length: totalPages }, (_, i) => i + 1).map(
+									(page) => (
+										<button
+											key={page}
+											id={`history-page-${page}`}
+											type="button"
+											onClick={() => handlePageChange(page)}
+											disabled={page === currentPage}
+											aria-current={page === currentPage ? "page" : undefined}
+											className={
+												page === currentPage
+													? "px-3 py-1 text-sm border border-blue-500 rounded bg-blue-600 text-white font-bold cursor-default"
+													: "px-3 py-1 text-sm border border-border rounded hover:bg-accent"
+											}
+										>
+											{page}
+										</button>
+									),
+								)}
 
-					{/* 次へボタン: 最終ページでは非活性 */}
-					<button
-						id="history-page-next"
-						type="button"
-						onClick={() => handlePageChange(currentPage + 1)}
-						disabled={currentPage >= totalPages}
-						className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-					>
-						次へ
-					</button>
+								{/* 次へボタン: 最終ページでは非活性 */}
+								<button
+									id="history-page-next"
+									type="button"
+									onClick={() => handlePageChange(currentPage + 1)}
+									disabled={currentPage >= totalPages}
+									className="px-3 py-1 text-sm border border-border rounded hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+								>
+									次へ
+								</button>
 
-					{/* ページ情報テキスト
+								{/* ページ情報テキスト
               See: tmp/workers/bdd-architect_TASK-237/design.md §6.4 > history-page-info */}
-					<span
-						id="history-page-info"
-						className="text-xs text-muted-foreground ml-1"
-					>
-						全{totalPages}ページ
-					</span>
-				</nav>
-			)}
+								<span
+									id="history-page-info"
+									className="text-xs text-muted-foreground ml-1"
+								>
+									全{totalPages}ページ
+								</span>
+							</nav>
+						)}
+					</div>
+				</CollapsibleContent>
+			</Collapsible>
 		</section>
 	);
 }

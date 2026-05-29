@@ -45,6 +45,7 @@ import {
 	isTemporaryUser,
 } from "@/lib/domain/rules/mypage-display-rules";
 import type { MypageInfo } from "@/lib/services/mypage-service";
+import CollapsibleSection from "./_components/CollapsibleSection";
 import FontPickerModal from "./_components/FontPickerModal";
 import PostHistorySection from "./_components/PostHistorySection";
 
@@ -511,17 +512,43 @@ export default function MypagePage() {
 			<h1 className="text-xl font-bold text-foreground">マイページ</h1>
 
 			{/* =============================
-          アカウント情報セクション
+          コピペ管理（AA）セクション — 最優先で目立つ位置に配置
+          See: features/user_copipe.feature
+          ============================= */}
+			<section
+				id="copipe-section"
+				className="bg-card border-2 border-primary/60 rounded p-4 shadow-sm"
+			>
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div>
+						<h2 className="text-base font-bold text-foreground">
+							コピペ管理（AA）
+						</h2>
+						<p className="text-sm text-muted-foreground mt-1">
+							コピペ（AA）の登録・編集・削除はコピペ管理ページで行えます。
+						</p>
+					</div>
+					<a
+						href="/mypage/copipe"
+						className="inline-block px-5 py-2.5 bg-primary text-primary-foreground text-sm font-bold rounded hover:opacity-90 transition-opacity whitespace-nowrap"
+					>
+						コピペ管理ページへ
+					</a>
+				</div>
+			</section>
+
+			{/* =============================
+          アカウント情報セクション（折り畳み）
+          草カウント・機能解放ボタンを統合
           See: features/mypage.feature @マイページに基本情報が表示される
           See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される
           See: features/user_registration.feature @本登録ユーザーのマイページにアカウント種別と認証方法が表示される
           ============================= */}
-			<section
-				id="account-info"
-				className="bg-card border border-border rounded p-4 space-y-2"
+			<CollapsibleSection
+				title="アカウント情報"
+				sectionId="account-info"
+				headingAddon={`${mypageInfo.grassIcon} ${mypageInfo.grassCount}本`}
 			>
-				<h2 className="text-base font-bold text-foreground">アカウント情報</h2>
-
 				{/* アカウント種別（仮ユーザー / 本登録ユーザー）
             See: features/user_registration.feature @仮ユーザーのマイページに本登録案内が表示される */}
 				<div className="text-sm text-muted-foreground">
@@ -572,19 +599,86 @@ export default function MypagePage() {
 					<span className="font-medium">連続書き込み: </span>
 					{mypageInfo.streakDays}日
 				</div>
-			</section>
+
+				{/* 草カウント（アカウント情報に統合）
+            grass-count-display: 草カウントの表示要素（"{grassIcon} {grassCount}本" フォーマット）
+            See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる */}
+				<div className="text-sm text-muted-foreground">
+					<span className="font-medium">草カウント: </span>
+					<span id="grass-count-display" className="font-bold text-green-600">
+						{mypageInfo.grassIcon} {mypageInfo.grassCount}本
+					</span>
+				</div>
+
+				{/* =============================
+            機能解放ボタン（旧・有料プラン／課金。アカウント情報に統合）
+            See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
+            See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
+            See: features/user_registration.feature @仮ユーザーは課金できない
+            See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
+            ============================= */}
+				<div
+					id="upgrade-section"
+					className="pt-2 border-t border-border space-y-2"
+				>
+					<p className="text-sm text-muted-foreground">
+						機能を解放するとユーザーネームが設定でき、配色・文字フォントも変更できます。（※有料プラン扱いとする構想があったが、未実装）
+					</p>
+
+					{/* 仮ユーザーへの本登録必要メッセージ
+              See: features/user_registration.feature @仮ユーザーは課金できない */}
+					{isTemporaryUser(mypageInfo) && (
+						<p
+							data-testid="registration-required-message"
+							className="text-amber-700 text-xs"
+						>
+							本登録が必要です。下の「本登録」セクションからメールアドレスまたは
+							Discord で登録してください。
+						</p>
+					)}
+
+					{upgradeError && (
+						<p id="upgrade-error" className="text-red-600 text-xs">
+							{upgradeError}
+						</p>
+					)}
+
+					{/* upgrade-button: 機能解放ボタン
+              本登録済み無料ユーザーのみ有効。
+              有料ユーザーおよび仮ユーザーは disabled。
+              See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
+              See: features/user_registration.feature @仮ユーザーは課金できない */}
+					<button
+						data-testid="upgrade-button"
+						id="upgrade-button"
+						type="button"
+						onClick={() => {
+							void handleUpgrade();
+						}}
+						disabled={!upgradeEnabled || isUpgrading}
+						className={
+							upgradeEnabled
+								? "px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
+								: "px-4 py-1.5 bg-gray-300 text-muted-foreground text-sm rounded cursor-not-allowed"
+						}
+					>
+						{mypageInfo.isPremium
+							? "解放済み"
+							: isUpgrading
+								? "処理中..."
+								: upgradeEnabled
+									? "機能解放ボタン（モック）"
+									: "機能解放ボタン（本登録が必要）"}
+					</button>
+				</div>
+			</CollapsibleSection>
 
 			{/* =============================
-          テーマ設定セクション
+          テーマ設定セクション（折り畳み）
           See: features/theme.feature @マイページにテーマ設定セクションが表示される
           See: docs/specs/screens/mypage.yaml @theme-section
           ============================= */}
-			<section
-				data-testid="theme-section"
-				className="bg-card border border-border rounded p-4 space-y-4"
-			>
-				<h2 className="text-base font-bold text-foreground">テーマ設定</h2>
-
+			<CollapsibleSection title="テーマ設定" testId="theme-section">
 				{/* テーマ一覧
             See: features/theme.feature @テーマ一覧とフォント一覧が表示される */}
 				<div>
@@ -656,7 +750,7 @@ export default function MypagePage() {
 						}}
 					/>
 				</div>
-			</section>
+			</CollapsibleSection>
 
 			{/* =============================
           本登録セクション（仮ユーザーのみ表示）
@@ -705,14 +799,10 @@ export default function MypagePage() {
           See: docs/architecture/components/user-registration.md §8.2 マイページ表示
           ============================= */}
 			{isPermanentUser(mypageInfo) && (
-				<section
-					data-testid="pat-section"
-					className="bg-card border border-border rounded p-4 space-y-3"
+				<CollapsibleSection
+					title="専ブラ連携トークン（PAT）"
+					testId="pat-section"
 				>
-					<h2 className="text-base font-bold text-foreground">
-						専ブラ連携トークン（PAT）
-					</h2>
-
 					{/* PAT 表示
               See: features/user_registration.feature @マイページでPATを確認できる */}
 					<div
@@ -762,7 +852,7 @@ export default function MypagePage() {
 							? "再発行中..."
 							: "再発行（現在のトークンは無効になります）"}
 					</button>
-				</section>
+				</CollapsibleSection>
 			)}
 
 			{/* =============================
@@ -787,14 +877,10 @@ export default function MypagePage() {
           See: features/mypage.feature @有料ユーザーはマイページでユーザーネームを設定できる
           See: features/mypage.feature @無料ユーザーはユーザーネームを設定できない
           ============================= */}
-			<section
-				id="username-section"
-				className="bg-card border border-border rounded p-4 space-y-3"
+			<CollapsibleSection
+				title="ユーザーネーム設定"
+				sectionId="username-section"
 			>
-				<h2 className="text-base font-bold text-foreground">
-					ユーザーネーム設定
-				</h2>
-
 				{mypageInfo.isPremium ? (
 					/* 有料ユーザー: ユーザーネーム設定フォーム */
 					<form
@@ -841,106 +927,19 @@ export default function MypagePage() {
 						ユーザーネームの設定は有料ユーザー限定の機能です
 					</p>
 				)}
-			</section>
+			</CollapsibleSection>
 
-			{/* =============================
-          課金セクション（モック）
-          See: features/mypage.feature @無料ユーザーが課金ボタンで有料ステータスに切り替わる
-          See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
-          See: features/user_registration.feature @仮ユーザーは課金できない
-          See: features/user_registration.feature @本登録済みの無料ユーザーは課金できる
-          ============================= */}
-			<section
-				id="upgrade-section"
-				className="bg-card border border-border rounded p-4 space-y-2"
-			>
-				<h2 className="text-base font-bold text-foreground">
-					有料プラン※未実装。今は全員有料プラン扱い
-				</h2>
-				<p className="text-sm text-muted-foreground">
-					有料プランに加入するとユーザーネームが設定できます。配色・文字フォントも変更できます。
-				</p>
-
-				{/* 仮ユーザーへの本登録必要メッセージ
-            See: features/user_registration.feature @仮ユーザーは課金できない */}
-				{isTemporaryUser(mypageInfo) && (
-					<p
-						data-testid="registration-required-message"
-						className="text-amber-700 text-xs"
-					>
-						本登録が必要です。上の「本登録」セクションからメールアドレスまたは
-						Discord で登録してください。
-					</p>
-				)}
-
-				{upgradeError && (
-					<p id="upgrade-error" className="text-red-600 text-xs">
-						{upgradeError}
-					</p>
-				)}
-
-				{/* upgrade-button: 課金ボタン
-            本登録済み無料ユーザーのみ有効。
-            有料ユーザーおよび仮ユーザーは disabled。
-            See: features/mypage.feature @既に有料ユーザーの場合は課金ボタンが無効である
-            See: features/user_registration.feature @仮ユーザーは課金できない */}
-				<button
-					data-testid="upgrade-button"
-					id="upgrade-button"
-					type="button"
-					onClick={() => {
-						void handleUpgrade();
-					}}
-					disabled={!upgradeEnabled || isUpgrading}
-					className={
-						upgradeEnabled
-							? "px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
-							: "px-4 py-1.5 bg-gray-300 text-muted-foreground text-sm rounded cursor-not-allowed"
-					}
-				>
-					{mypageInfo.isPremium
-						? "加入済み"
-						: isUpgrading
-							? "処理中..."
-							: upgradeEnabled
-								? "有料プランに加入する（モック）"
-								: "有料プランに加入する（本登録が必要）"}
-				</button>
-			</section>
-
-			{/* =============================
-          草カウントセクション
-          See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる
-          See: features/mypage.feature @草カウントが0の場合はデフォルト表示になる
-          See: src/lib/domain/rules/grass-icon.ts @getGrassIcon
-          ============================= */}
-			<section
-				id="grass-section"
-				className="bg-card border border-border rounded p-4"
-			>
-				<h2 className="text-base font-bold text-foreground mb-2">草カウント</h2>
-				{/* grass-count-display: 草カウントの表示要素（"{grassIcon} {grassCount}本" フォーマット）
-          See: features/mypage.feature @マイページで自分の草カウントとアイコンを確認できる */}
-				<p
-					id="grass-count-display"
-					className="text-2xl font-bold text-green-600"
-				>
-					{mypageInfo.grassIcon} {mypageInfo.grassCount}本
-				</p>
-			</section>
+			{/* 草カウント・機能解放ボタン（旧・課金/有料プラン）は「アカウント情報」セクションに統合済み */}
 
 			{/* =============================
           語録管理セクション
           See: features/user_bot_vocabulary.feature @マイページから語録を登録する
           See: features/user_bot_vocabulary.feature @マイページに自分の登録語録と有効期限が表示される
           ============================= */}
-			<section
-				data-testid="vocabulary-section"
-				className="bg-card border border-border rounded p-4 space-y-3"
+			<CollapsibleSection
+				title="語録管理（荒らしBOT）"
+				testId="vocabulary-section"
 			>
-				<h2 className="text-base font-bold text-foreground">
-					語録管理（荒らしBOT）
-				</h2>
 				<p className="text-sm text-muted-foreground">
 					荒らしBOTに使わせたい語録を登録できます（1件20ポイント、24時間で自動失効）。
 					登録した語録は管理者の固定文と合わせた語録プールに追加され、荒らしBOTがランダムに選んで書き込みます。
@@ -1018,26 +1017,9 @@ export default function MypagePage() {
 						</ul>
 					)}
 				</div>
-			</section>
+			</CollapsibleSection>
 
-			{/* =============================
-          コピペ管理セクション（独立ページへのリンク）
-          See: features/user_copipe.feature
-          ============================= */}
-			<section className="bg-card border border-border rounded p-4">
-				<h2 className="text-base font-bold text-foreground">
-					コピペ管理（AA）
-				</h2>
-				<p className="text-sm text-muted-foreground mt-1">
-					コピペ（AA）の登録・編集・削除はコピペ管理ページで行えます。
-				</p>
-				<a
-					href="/mypage/copipe"
-					className="inline-block mt-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-				>
-					コピペ管理ページへ
-				</a>
-			</section>
+			{/* コピペ管理（AA）はページ上部に移動済み */}
 
 			{/* =============================
           書き込み履歴セクション
