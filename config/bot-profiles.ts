@@ -78,8 +78,8 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "reply",
 		scheduling: {
 			type: "fixed_interval",
-			min: 60,
-			max: 120,
+			min: 600,
+			max: 1200,
 		},
 		fixed_messages: [],
 	},
@@ -142,8 +142,8 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "create_thread",
 		scheduling: {
 			type: "topic_driven",
-			min_interval_minutes: 720,
-			max_interval_minutes: 1440,
+			min_interval_minutes: 7200,
+			max_interval_minutes: 14400,
 		},
 		collection: {
 			adapter: "subject_txt",
@@ -156,7 +156,7 @@ export const botProfilesConfig: BotProfilesYaml = {
 	// データソース: Wikimedia REST API (pageviews top)
 	//   https://wikimedia.org/api/rest_v1/metrics/pageviews/top/ja.wikipedia/all-access/{YYYY}/{MM}/{DD}
 	// 報酬パラメータはコピペBOT（同HP:100）と同等。
-	// 投稿間隔: 720〜1440分（12〜24時間、ランダム）
+	// 投稿間隔: 7200〜14400分（120〜240時間、ランダム）
 	// メタページ（メインページ / 特別:検索 等）は WikipediaAdapter 内で除外
 	// See: features/curation_bot.feature
 	// See: config/bot_profiles.yaml (正本)
@@ -172,8 +172,8 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "create_thread",
 		scheduling: {
 			type: "topic_driven",
-			min_interval_minutes: 720,
-			max_interval_minutes: 1440,
+			min_interval_minutes: 7200,
+			max_interval_minutes: 14400,
 		},
 		collection: {
 			adapter: "wikipedia",
@@ -199,8 +199,8 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "create_thread",
 		scheduling: {
 			type: "topic_driven",
-			min_interval_minutes: 720,
-			max_interval_minutes: 1440,
+			min_interval_minutes: 7200,
+			max_interval_minutes: 14400,
 		},
 		collection: {
 			adapter: "subject_txt",
@@ -224,8 +224,8 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "create_thread",
 		scheduling: {
 			type: "topic_driven",
-			min_interval_minutes: 720,
-			max_interval_minutes: 1440,
+			min_interval_minutes: 7200,
+			max_interval_minutes: 14400,
 		},
 		collection: {
 			adapter: "subject_txt",
@@ -249,8 +249,8 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "create_thread",
 		scheduling: {
 			type: "topic_driven",
-			min_interval_minutes: 720,
-			max_interval_minutes: 1440,
+			min_interval_minutes: 7200,
+			max_interval_minutes: 14400,
 		},
 		collection: {
 			adapter: "subject_txt",
@@ -274,8 +274,8 @@ export const botProfilesConfig: BotProfilesYaml = {
 		behavior_type: "create_thread",
 		scheduling: {
 			type: "topic_driven",
-			min_interval_minutes: 720,
-			max_interval_minutes: 1440,
+			min_interval_minutes: 7200,
+			max_interval_minutes: 14400,
 		},
 		collection: {
 			adapter: "subject_txt",

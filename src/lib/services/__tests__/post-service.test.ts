@@ -249,7 +249,7 @@ describe("PostService", () => {
 		vi.mocked(ThreadRepository.demoteOldestActiveThread).mockResolvedValue(
 			undefined,
 		);
-		// デフォルトはアクティブスレッド数 < 50（休眠化不要）
+		// デフォルトはアクティブスレッド数 < 20（休眠化不要）
 		vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(1);
 	});
 
@@ -1496,7 +1496,9 @@ describe("PostService", () => {
 			it("同一秒の threadKey 衝突時は未使用の次秒を採番する", async () => {
 				const fixedNow = new Date("2026-03-09T00:00:00Z");
 				const baseThreadKey = Math.floor(fixedNow.getTime() / 1000).toString();
-				const nextThreadKey = (Math.floor(fixedNow.getTime() / 1000) + 1).toString();
+				const nextThreadKey = (
+					Math.floor(fixedNow.getTime() / 1000) + 1
+				).toString();
 
 				vi.useFakeTimers();
 				vi.setSystemTime(fixedNow);
@@ -1781,7 +1783,9 @@ describe("PostService", () => {
 				);
 
 				expect(result.success).toBe(true);
-				expect(vi.mocked(IncentiveService.evaluateOnPost)).not.toHaveBeenCalled();
+				expect(
+					vi.mocked(IncentiveService.evaluateOnPost),
+				).not.toHaveBeenCalled();
 			});
 		});
 
@@ -1887,15 +1891,15 @@ describe("PostService", () => {
 		describe("アクティブスレッド数が上限超過 → 末尾スレッドを休眠化", () => {
 			// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
 
-			it("アクティブ数が50件を超えた場合に demoteOldestActiveThread が呼ばれる", async () => {
-				// Arrange: アクティブスレッド数 = 51（上限超過）
+			it("アクティブ数が20件を超えた場合に demoteOldestActiveThread が呼ばれる", async () => {
+				// Arrange: アクティブスレッド数 = 21（上限超過）
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
-				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(51);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(21);
 
 				// Act
 				const result = await createPost({
 					threadId: "thread-001",
-					body: "51件超過時の書き込み",
+					body: "21件超過時の書き込み",
 					edgeToken: "token-abc",
 					ipHash: "seed-abc",
 					isBotWrite: false,
@@ -1908,35 +1912,35 @@ describe("PostService", () => {
 				);
 			});
 
-			it("アクティブ数がちょうど50件の場合は demoteOldestActiveThread が呼ばれない", async () => {
-				// Arrange: アクティブスレッド数 = 50（上限ちょうど）
+			it("アクティブ数がちょうど20件の場合は demoteOldestActiveThread が呼ばれない", async () => {
+				// Arrange: アクティブスレッド数 = 20（上限ちょうど）
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
-				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(50);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(20);
 
 				// Act
 				await createPost({
 					threadId: "thread-001",
-					body: "50件ちょうどの書き込み",
+					body: "20件ちょうどの書き込み",
 					edgeToken: "token-abc",
 					ipHash: "seed-abc",
 					isBotWrite: false,
 				});
 
-				// Assert: demoteOldestActiveThread は呼ばれない（> 50 が条件）
+				// Assert: demoteOldestActiveThread は呼ばれない（> 20 が条件）
 				expect(
 					ThreadRepository.demoteOldestActiveThread,
 				).not.toHaveBeenCalled();
 			});
 
-			it("アクティブ数が49件の場合は demoteOldestActiveThread が呼ばれない", async () => {
-				// Arrange: アクティブスレッド数 = 49（上限未満）
+			it("アクティブ数が19件の場合は demoteOldestActiveThread が呼ばれない", async () => {
+				// Arrange: アクティブスレッド数 = 19（上限未満）
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(mockThread);
-				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(49);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(19);
 
 				// Act
 				await createPost({
 					threadId: "thread-001",
-					body: "49件の書き込み",
+					body: "19件の書き込み",
 					edgeToken: "token-abc",
 					ipHash: "seed-abc",
 					isBotWrite: false,
@@ -1954,10 +1958,10 @@ describe("PostService", () => {
 			// 休眠スレッドが復活 → アクティブ数が上限超過 → 末尾スレッドを休眠化
 
 			it("isDormant=true のスレッドへの書き込みでアクティブ数が上限を超えた場合、両方の処理が行われる", async () => {
-				// Arrange: 休眠中スレッド + 復活後にアクティブ数 = 51
+				// Arrange: 休眠中スレッド + 復活後にアクティブ数 = 21
 				const dormantThread = { ...mockThread, isDormant: true };
 				vi.mocked(ThreadRepository.findById).mockResolvedValue(dormantThread);
-				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(51);
+				vi.mocked(ThreadRepository.countActiveThreads).mockResolvedValue(21);
 
 				// Act
 				const result = await createPost({
@@ -2052,9 +2056,9 @@ describe("PostService", () => {
 			});
 
 			it("アクティブスレッドのみ取得する（onlyActive:true を使用）", async () => {
-				// See: features/thread.feature @スレッド一覧には最新50件のみ表示される
+				// See: features/thread.feature @スレッド一覧には最新20件のみ表示される
 				// is_dormant=false のスレッドのみ返す（休眠管理はDB側が担保）
-				const activeThreads = Array.from({ length: 50 }, (_, i) => ({
+				const activeThreads = Array.from({ length: 20 }, (_, i) => ({
 					...mockThread,
 					id: `thread-${i + 1}`,
 					isDormant: false,
@@ -2065,7 +2069,7 @@ describe("PostService", () => {
 
 				const result = await getThreadList("livebot");
 
-				expect(result).toHaveLength(50);
+				expect(result).toHaveLength(20);
 				expect(ThreadRepository.findByBoardId).toHaveBeenCalledWith("livebot", {
 					onlyActive: true,
 				});

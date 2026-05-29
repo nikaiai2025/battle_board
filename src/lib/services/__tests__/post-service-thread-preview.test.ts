@@ -94,7 +94,7 @@ describe("PostService getThreadListWithPreview", () => {
 		expect(ThreadRepository.findByBoardIdWithPreview).toHaveBeenCalledWith(
 			"livebot",
 			{
-				threadLimit: 50,
+				threadLimit: 20,
 				previewCount: 5,
 			},
 		);
@@ -108,7 +108,7 @@ describe("PostService getThreadListWithPreview", () => {
 		expect(ThreadRepository.findByBoardIdWithPreview).toHaveBeenCalledWith(
 			"livebot",
 			{
-				threadLimit: 50,
+				threadLimit: 20,
 				previewCount: 5,
 			},
 		);

@@ -138,7 +138,10 @@ async function createThreadWithBodies(
 			ipHash: world.currentIpHash,
 			isBotWrite: false,
 		});
-		assert("success" in result && result.success, `レス作成に失敗しました: ${body}`);
+		assert(
+			"success" in result && result.success,
+			`レス作成に失敗しました: ${body}`,
+		);
 	}
 
 	const posts = await InMemoryPostRepo.findByThreadId(thread.id);
@@ -417,22 +420,22 @@ Given(
 );
 
 /**
- * 51個のアクティブなスレッドが存在する。
- * 最終書き込み時刻が最も古い51番目のスレッドはデフォルトではリストに含まれない。
+ * 21個のアクティブなスレッドが存在する。
+ * 最終書き込み時刻が最も古い21番目のスレッドはデフォルトではリストに含まれない。
  *
- * 51個作成後に demoteOldestActiveThread を呼び出し、最古スレッドを休眠化する。
- * これにより getThreadList(onlyActive:true) が50件を返す状態を再現する。
+ * 21個作成後に demoteOldestActiveThread を呼び出し、最古スレッドを休眠化する。
+ * これにより getThreadList(onlyActive:true) が20件を返す状態を再現する。
  * See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
  */
 Given(
-	"51個のアクティブなスレッドが存在する",
+	"21個のアクティブなスレッドが存在する",
 	async function (this: BattleBoardWorld) {
 		const now = Date.now();
-		for (let i = 0; i < 51; i++) {
+		for (let i = 0; i < 21; i++) {
 			// i=0 が最も古い（最終書き込み時刻が古い）
-			const lastPostAt = new Date(now - (51 - i) * 60 * 1000);
+			const lastPostAt = new Date(now - (21 - i) * 60 * 1000);
 			const thread = await InMemoryThreadRepo.create({
-				threadKey: (Math.floor(now / 1000) - (51 - i) * 60).toString(),
+				threadKey: (Math.floor(now / 1000) - (21 - i) * 60).toString(),
 				boardId: TEST_BOARD_ID,
 				title: `テストスレッド${i + 1}`,
 				createdBy: this.currentUserId ?? "system",
@@ -446,7 +449,7 @@ Given(
 			}
 		}
 
-		// 51個→50個アクティブ: 最古スレッドを休眠化してアクティブ上限を再現する
+		// 21個→20個アクティブ: 最古スレッドを休眠化してアクティブ上限を再現する
 		// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
 		await InMemoryThreadRepo.demoteOldestActiveThread(TEST_BOARD_ID);
 	},
@@ -454,7 +457,7 @@ Given(
 
 /**
  * スレッド "{string}" は最終書き込み時刻が最も古く一覧に表示されていない。
- * 51個のアクティブなスレッドが存在するシナリオで追加される「低活性スレッド」。
+ * 21個のアクティブなスレッドが存在するシナリオで追加される「低活性スレッド」。
  * このステップは書き込みシナリオで使用するため、ユーザーのセットアップも行う。
  *
  * See: features/thread.feature @一覧外のスレッドに書き込むと一覧に復活する
@@ -477,7 +480,7 @@ Given(
 			await InMemoryUserRepo.updateIsVerified(userId, true);
 		}
 
-		// 51個+1のスレッドのうち最も古い時刻で「低活性スレッド」を作成する
+		// 21個+1のスレッドのうち最も古い時刻で「低活性スレッド」を作成する
 		const veryOldTime = new Date(Date.now() - 200 * 60 * 1000);
 		const thread = await InMemoryThreadRepo.create({
 			threadKey: Math.floor(veryOldTime.getTime() / 1000).toString(),
@@ -491,7 +494,7 @@ Given(
 		(this as any)._lowActivityThreadId = thread.id;
 		(this as any)._lowActivityThreadTitle = title;
 
-		// 追加後のアクティブ数が51件になるため、最古スレッド（このスレッド）を休眠化する
+		// 追加後のアクティブ数が21件になるため、最古スレッド（このスレッド）を休眠化する
 		// これにより「一覧に表示されていない」状態を再現する
 		// See: docs/specs/thread_state_transitions.yaml #transitions listed→unlisted
 		await InMemoryThreadRepo.demoteOldestActiveThread(TEST_BOARD_ID);
@@ -565,11 +568,11 @@ Then(
 	},
 );
 
-Then("表示されるスレッド数は50件である", function (this: BattleBoardWorld) {
+Then("表示されるスレッド数は20件である", function (this: BattleBoardWorld) {
 	assert.strictEqual(
 		threadListResult.length,
-		50,
-		`表示スレッド数が 50 件であることを期待しましたが ${threadListResult.length} 件でした`,
+		20,
+		`表示スレッド数が 20 件であることを期待しましたが ${threadListResult.length} 件でした`,
 	);
 });
 
@@ -578,8 +581,8 @@ Then(
 	function (this: BattleBoardWorld) {
 		assert.strictEqual(
 			threadListResult.length,
-			50,
-			`スレッド一覧が 50 件であることを期待しましたが ${threadListResult.length} 件でした`,
+			20,
+			`スレッド一覧が 20 件であることを期待しましたが ${threadListResult.length} 件でした`,
 		);
 	},
 );
@@ -658,14 +661,14 @@ Then(
 );
 
 Then(
-	"表示されるスレッド数は50件のままである",
+	"表示されるスレッド数は20件のままである",
 	async function (this: BattleBoardWorld) {
 		const PostService = getPostService();
 		const threads = await PostService.getThreadList(TEST_BOARD_ID);
 		assert.strictEqual(
 			threads.length,
-			50,
-			`スレッド一覧が 50 件のままであることを期待しましたが ${threads.length} 件でした`,
+			20,
+			`スレッド一覧が 20 件のままであることを期待しましたが ${threads.length} 件でした`,
 		);
 	},
 );
@@ -677,13 +680,13 @@ Then(
 
 /**
  * スレッド "{string}" は一覧に表示されていない。
- * 50件のアクティブなスレッドを作成してから指定タイトルのスレッドを最古で追加する。
+ * 20件のアクティブなスレッドを作成してから指定タイトルのスレッドを最古で追加する。
  */
 Given(
 	"スレッド {string} は一覧に表示されていない",
 	async function (this: BattleBoardWorld, title: string) {
 		const now = Date.now();
-		for (let i = 0; i < 50; i++) {
+		for (let i = 0; i < 20; i++) {
 			const lastPostAt = new Date(now - (i + 1) * 60 * 1000);
 			const t = await InMemoryThreadRepo.create({
 				threadKey: (Math.floor(now / 1000) - (i + 1) * 60).toString(),
@@ -1946,18 +1949,15 @@ Then("レス1の内容がポップアップで表示される", () => {
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Then(
-	"ポップアップにはレス番号、表示名、日次ID、本文が含まれる",
-	() => {
-		const popup = popupStackState[popupStackState.length - 1];
-		assert(popup, "ポップアップが表示されていません");
-		assert(popup.post, "ポップアップのレス本文が取得できていません");
-		assert.strictEqual(popup.post.postNumber, 1, "レス番号が一致しません");
-		assert(popup.post.displayName.length > 0, "表示名が空です");
-		assert(popup.post.dailyId.length > 0, "日次IDが空です");
-		assert(popup.post.body.length > 0, "本文が空です");
-	},
-);
+Then("ポップアップにはレス番号、表示名、日次ID、本文が含まれる", () => {
+	const popup = popupStackState[popupStackState.length - 1];
+	assert(popup, "ポップアップが表示されていません");
+	assert(popup.post, "ポップアップのレス本文が取得できていません");
+	assert.strictEqual(popup.post.postNumber, 1, "レス番号が一致しません");
+	assert(popup.post.displayName.length > 0, "表示名が空です");
+	assert(popup.post.dailyId.length > 0, "日次IDが空です");
+	assert(popup.post.body.length > 0, "本文が空です");
+});
 
 /**
  * スレッドにレス1、レス2 "{string}"、レス3 "{string}" が存在する。
@@ -2011,18 +2011,15 @@ When(
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-When(
-	"表示されたポップアップ内の {string} をクリックする",
-	(anchor: string) => {
-		const targetPostNumber = Number(anchor.replace(">>", ""));
-		popupStackState = openAnchorPopup(
-			popupPostsByNumber,
-			popupStackState,
-			targetPostNumber,
-			{ x: 150, y: 250 },
-		);
-	},
-);
+When("表示されたポップアップ内の {string} をクリックする", (anchor: string) => {
+	const targetPostNumber = Number(anchor.replace(">>", ""));
+	popupStackState = openAnchorPopup(
+		popupPostsByNumber,
+		popupStackState,
+		targetPostNumber,
+		{ x: 150, y: 250 },
+	);
+});
 
 /**
  * 2つのポップアップが重なって表示される。
@@ -2067,23 +2064,24 @@ Then("最前面にレス1のポップアップが表示される", () => {
  * See: features/thread.feature @anchor_popup
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Given("2つのポップアップが重なって表示されている", async function (
-	this: BattleBoardWorld,
-) {
-	await createThreadWithBodies(
-		this,
-		["こんにちは", ">>1 返信", ">>2 さらに返信"],
-		"anchor_popup close テスト",
-	);
-	popupStackState = openAnchorPopup(popupPostsByNumber, [], 2, {
-		x: 100,
-		y: 200,
-	});
-	popupStackState = openAnchorPopup(popupPostsByNumber, popupStackState, 1, {
-		x: 150,
-		y: 250,
-	});
-});
+Given(
+	"2つのポップアップが重なって表示されている",
+	async function (this: BattleBoardWorld) {
+		await createThreadWithBodies(
+			this,
+			["こんにちは", ">>1 返信", ">>2 さらに返信"],
+			"anchor_popup close テスト",
+		);
+		popupStackState = openAnchorPopup(popupPostsByNumber, [], 2, {
+			x: 100,
+			y: 200,
+		});
+		popupStackState = openAnchorPopup(popupPostsByNumber, popupStackState, 1, {
+			x: 150,
+			y: 250,
+		});
+	},
+);
 
 /**
  * ポップアップの外側をクリックする。
@@ -2170,7 +2168,11 @@ When(
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
 Then("ポップアップは表示されない", () => {
-	assert.strictEqual(popupStackState.length, 0, "ポップアップが表示されています");
+	assert.strictEqual(
+		popupStackState.length,
+		0,
+		"ポップアップが表示されています",
+	);
 });
 
 // ---------------------------------------------------------------------------
@@ -2190,7 +2192,10 @@ Then("ポップアップは表示されない", () => {
 Given(
 	"スレッドにレス番号{int}のレスが存在する",
 	async function (this: BattleBoardWorld, postNumber: number) {
-		const bodies = Array.from({ length: postNumber }, (_, index) => `レス${index + 1}`);
+		const bodies = Array.from(
+			{ length: postNumber },
+			(_, index) => `レス${index + 1}`,
+		);
 		await createThreadWithBodies(
 			this,
 			bodies,
@@ -2226,7 +2231,9 @@ Then("レス番号が {string} と表示される", (label: string) => {
  */
 Then("レス番号に {string} は付与されない", (prefix: string) => {
 	assert(
-		viewedThreadPosts.every((post) => !String(post.postNumber).includes(prefix)),
+		viewedThreadPosts.every(
+			(post) => !String(post.postNumber).includes(prefix),
+		),
 		`レス番号表示に ${prefix} が含まれています`,
 	);
 });
@@ -2287,12 +2294,9 @@ Then("書き込みフォームに {string} が挿入される", (text: string) =
  * See: features/thread.feature @post_number_display
  * See: docs/architecture/bdd_test_strategy.md §7.3
  */
-Given(
-	"書き込みフォームに {string} と入力されている",
-	(text: string) => {
-		simulatedPostFormBody = text;
-	},
-);
+Given("書き込みフォームに {string} と入力されている", (text: string) => {
+	simulatedPostFormBody = text;
+});
 
 /**
  * 書き込みフォームの内容が {string} になる。

@@ -1,7 +1,7 @@
 /**
  * TopicDrivenSchedulingStrategy の単体テスト
  *
- * See: features/curation_bot.feature @BOTの投稿間隔は12時間〜24時間のランダム間隔である
+ * See: features/curation_bot.feature @BOTの投稿間隔は120時間〜240時間のランダム間隔である
  * See: docs/architecture/components/bot.md §2.13.3 TopicDrivenSchedulingStrategy
  */
 import { describe, expect, it } from "vitest";
@@ -14,12 +14,12 @@ const SCHEDULING_CONTEXT = {
 
 describe("TopicDrivenSchedulingStrategy", () => {
 	describe("getNextPostDelay", () => {
-		it("デフォルトで 720〜1440 の範囲内の整数を返す", () => {
+		it("デフォルトで 7200〜14400 の範囲内の整数を返す", () => {
 			const strategy = new TopicDrivenSchedulingStrategy();
 			for (let i = 0; i < 100; i++) {
 				const delay = strategy.getNextPostDelay(SCHEDULING_CONTEXT);
-				expect(delay).toBeGreaterThanOrEqual(720);
-				expect(delay).toBeLessThanOrEqual(1440);
+				expect(delay).toBeGreaterThanOrEqual(7200);
+				expect(delay).toBeLessThanOrEqual(14400);
 				expect(Number.isInteger(delay)).toBe(true);
 			}
 		});
@@ -39,8 +39,8 @@ describe("TopicDrivenSchedulingStrategy", () => {
 			expect(delay).toBe(300);
 		});
 
-		it("100回の試行でmin（720）を少なくとも1回返す（統計的確認）", () => {
-			// 範囲が721通り（720〜1440）あるため、100回で720が出なくても正常だが
+		it("100回の試行でmin（7200）を少なくとも1回返す（統計的確認）", () => {
+			// 範囲が7201通り（7200〜14400）あるため、100回で7200が出なくても正常だが
 			// 広い視点でランダム性を確認する: 最大値と最小値の両端が出ること
 			const strategy = new TopicDrivenSchedulingStrategy();
 			const results = new Set<number>();
@@ -62,8 +62,8 @@ describe("TopicDrivenSchedulingStrategy", () => {
 				botProfileKey: null,
 			});
 			// どちらも同じ範囲に収まることを確認
-			expect(delay1).toBeGreaterThanOrEqual(720);
-			expect(delay2).toBeGreaterThanOrEqual(720);
+			expect(delay1).toBeGreaterThanOrEqual(7200);
+			expect(delay2).toBeGreaterThanOrEqual(7200);
 		});
 	});
 });

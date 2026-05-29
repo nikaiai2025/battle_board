@@ -180,7 +180,9 @@ describe("resolveStrategies", () => {
 				createOptions(),
 			);
 
-			expect(result.content).toBeInstanceOf(StoredReplyCandidateContentStrategy);
+			expect(result.content).toBeInstanceOf(
+				StoredReplyCandidateContentStrategy,
+			);
 		});
 
 		it("behavior は CandidateStockBehaviorStrategy を返す", () => {
@@ -272,7 +274,7 @@ describe("resolveStrategies", () => {
 			}
 		});
 
-		it("scheduling.getNextPostDelay() が 60〜120 の整数を返す", () => {
+		it("scheduling.getNextPostDelay() が 600〜1200 の整数を返す", () => {
 			const result = resolveStrategies(
 				createBot(),
 				createBotProfile(),
@@ -284,8 +286,8 @@ describe("resolveStrategies", () => {
 				botProfileKey: "荒らし役",
 			});
 
-			expect(delay).toBeGreaterThanOrEqual(60);
-			expect(delay).toBeLessThanOrEqual(120);
+			expect(delay).toBeGreaterThanOrEqual(600);
+			expect(delay).toBeLessThanOrEqual(1200);
 			expect(Number.isInteger(delay)).toBe(true);
 		});
 	});

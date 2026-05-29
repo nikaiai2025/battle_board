@@ -1,13 +1,11 @@
 import { Given, Then, When } from "@cucumber/cucumber";
 import assert from "assert";
-import { HUMAN_MIMIC_SYSTEM_PROMPT } from "../../config/human-mimic-prompt";
 import { botProfilesConfig } from "../../config/bot-profiles";
+import { HUMAN_MIMIC_SYSTEM_PROMPT } from "../../config/human-mimic-prompt";
 import { DEFAULT_BOARD_ID } from "../../src/lib/domain/constants";
-import { CandidateStockBehaviorStrategy } from "../../src/lib/services/bot-strategies/behavior/candidate-stock";
 import type { IGoogleAiAdapter } from "../../src/lib/infrastructure/adapters/google-ai-adapter";
-import {
-	runHumanMimicCandidateBatch,
-} from "../../src/lib/services/human-mimic-candidate-service";
+import { CandidateStockBehaviorStrategy } from "../../src/lib/services/bot-strategies/behavior/candidate-stock";
+import { runHumanMimicCandidateBatch } from "../../src/lib/services/human-mimic-candidate-service";
 import {
 	InMemoryBotPostRepo,
 	InMemoryBotRepo,
@@ -38,7 +36,9 @@ function createHumanMimicAiMock(): HumanMimicAiMock {
 			}
 			if (
 				this.failOnThreadTitle &&
-				params.userPrompt.includes(`スレッドタイトル: ${this.failOnThreadTitle}`)
+				params.userPrompt.includes(
+					`スレッドタイトル: ${this.failOnThreadTitle}`,
+				)
 			) {
 				throw new Error("Gemini unavailable");
 			}
@@ -165,7 +165,7 @@ function getAiMock(world: BattleBoardWorld): HumanMimicAiMock {
 }
 
 Given(
-	'スレッド {string} に未投稿の AI回答候補が1件以上存在する',
+	"スレッド {string} に未投稿の AI回答候補が1件以上存在する",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = await seedThreadWithPosts(title, ["元レス"]);
 		(this as any).threadIds = { ...(this as any).threadIds, [title]: threadId };
@@ -181,7 +181,7 @@ Given(
 );
 
 Given(
-	'スレッド {string} に未投稿の AI回答候補が存在する',
+	"スレッド {string} に未投稿の AI回答候補が存在する",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = await seedThreadWithPosts(title, ["元レス"]);
 		(this as any).threadIds = { ...(this as any).threadIds, [title]: threadId };
@@ -197,7 +197,7 @@ Given(
 );
 
 Given(
-	'スレッド {string} に未投稿の AI回答候補が存在しない',
+	"スレッド {string} に未投稿の AI回答候補が存在しない",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = await seedThreadWithPosts(title, ["元レス"]);
 		(this as any).threadIds = { ...(this as any).threadIds, [title]: threadId };
@@ -205,7 +205,7 @@ Given(
 );
 
 Given(
-	'スレッド {string} に複数のレスが存在する',
+	"スレッド {string} に複数のレスが存在する",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = await seedThreadWithPosts(title, [
 			"一件目の書き込み",
@@ -215,26 +215,20 @@ Given(
 	},
 );
 
-Given(
-	"Gemini API が利用不可である",
-	function (this: BattleBoardWorld) {
-		const aiMock = getAiMock(this);
-		aiMock.mode = "success";
-		aiMock.failOnThreadTitle = "A";
-	},
-);
+Given("Gemini API が利用不可である", function (this: BattleBoardWorld) {
+	const aiMock = getAiMock(this);
+	aiMock.mode = "success";
+	aiMock.failOnThreadTitle = "A";
+});
+
+Given("人間模倣ボットが10体存在する", async function (this: BattleBoardWorld) {
+	for (let i = 0; i < 10; i++) {
+		await createHumanMimicBot();
+	}
+});
 
 Given(
-	"人間模倣ボットが10体存在する",
-	async function (this: BattleBoardWorld) {
-		for (let i = 0; i < 10; i++) {
-			await createHumanMimicBot();
-		}
-	},
-);
-
-Given(
-	'スレッド {string} に未投稿の AI回答候補が1件存在する',
+	"スレッド {string} に未投稿の AI回答候補が1件存在する",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = await seedThreadWithPosts(title, ["元レス"]);
 		(this as any).threadIds = { ...(this as any).threadIds, [title]: threadId };
@@ -250,10 +244,11 @@ Given(
 );
 
 Given(
-	'スレッド {string} に未投稿の AI回答候補が10件存在する',
+	"スレッド {string} に未投稿の AI回答候補が10件存在する",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId =
-			(this as any).threadIds?.[title] ?? (await seedThreadWithPosts(title, ["元レス"]));
+			(this as any).threadIds?.[title] ??
+			(await seedThreadWithPosts(title, ["元レス"]));
 		(this as any).threadIds = { ...(this as any).threadIds, [title]: threadId };
 		for (let i = 0; i < 10; i++) {
 			InMemoryReplyCandidateRepo._seed({
@@ -291,16 +286,13 @@ Given(
 	},
 );
 
-Given(
-	"他のアクティブスレッドには未投稿候補が存在しない",
-	async function () {
-		await seedThreadWithPosts("候補なし1", ["元レス"]);
-		await seedThreadWithPosts("候補なし2", ["元レス"]);
-	},
-);
+Given("他のアクティブスレッドには未投稿候補が存在しない", async () => {
+	await seedThreadWithPosts("候補なし1", ["元レス"]);
+	await seedThreadWithPosts("候補なし2", ["元レス"]);
+});
 
 Given(
-	'スレッド {string} に未投稿の AI回答候補が3件存在する',
+	"スレッド {string} に未投稿の AI回答候補が3件存在する",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = await seedThreadWithPosts(title, ["元レス"]);
 		(this as any).threadIds = { ...(this as any).threadIds, [title]: threadId };
@@ -318,17 +310,11 @@ Given(
 	},
 );
 
-Given(
-	"それぞれ作成順が 1件目, 2件目, 3件目 である",
-	function () {},
-);
+Given("それぞれ作成順が 1件目, 2件目, 3件目 である", () => {});
 
-Given(
-	"アクティブスレッドに未投稿の AI回答候補が1件も存在しない",
-	async function () {
-		await seedThreadWithPosts("候補なしだけ", ["元レス"]);
-	},
-);
+Given("アクティブスレッドに未投稿の AI回答候補が1件も存在しない", async () => {
+	await seedThreadWithPosts("候補なしだけ", ["元レス"]);
+});
 
 Given(
 	"管理者が人間模倣ボットを配置する",
@@ -340,15 +326,12 @@ Given(
 	},
 );
 
-Given(
-	"人間模倣ボットが潜伏中である",
-	async function (this: BattleBoardWorld) {
-		(this as any).currentBot = await createHumanMimicBot();
-	},
-);
+Given("人間模倣ボットが潜伏中である", async function (this: BattleBoardWorld) {
+	(this as any).currentBot = await createHumanMimicBot();
+});
 
 Given(
-	'人間模倣ボットがスレッド {string} で潜伏中である',
+	"人間模倣ボットがスレッド {string} で潜伏中である",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = await seedThreadWithPosts(title, ["元レス"]);
 		(this as any).threadIds = { ...(this as any).threadIds, [title]: threadId };
@@ -378,7 +361,7 @@ Given(
 );
 
 When(
-	'候補生成バッチが {string} を処理する',
+	"候補生成バッチが {string} を処理する",
 	async function (this: BattleBoardWorld, title: string) {
 		const threadId = (this as any).threadIds[title];
 		const thread = await InMemoryThreadRepo.findById(threadId);
@@ -390,14 +373,15 @@ When(
 			postRepository: {
 				findByThreadId: (id: string) => InMemoryPostRepo.findByThreadId(id),
 			},
-			replyCandidateRepository: InMemoryReplyCandidateRepo.InMemoryReplyCandidateRepo,
+			replyCandidateRepository:
+				InMemoryReplyCandidateRepo.InMemoryReplyCandidateRepo,
 			googleAiAdapter: aiMock,
 		});
 	},
 );
 
 When(
-	'候補生成バッチが {string} の候補を作成する',
+	"候補生成バッチが {string} の候補を作成する",
 	async function (this: BattleBoardWorld, title: string) {
 		await (this as any).runStep?.();
 		const threadId = (this as any).threadIds[title];
@@ -410,7 +394,8 @@ When(
 			postRepository: {
 				findByThreadId: (id: string) => InMemoryPostRepo.findByThreadId(id),
 			},
-			replyCandidateRepository: InMemoryReplyCandidateRepo.InMemoryReplyCandidateRepo,
+			replyCandidateRepository:
+				InMemoryReplyCandidateRepo.InMemoryReplyCandidateRepo,
 			googleAiAdapter: aiMock,
 		});
 	},
@@ -425,16 +410,14 @@ When(
 			postRepository: {
 				findByThreadId: (id: string) => InMemoryPostRepo.findByThreadId(id),
 			},
-			replyCandidateRepository: InMemoryReplyCandidateRepo.InMemoryReplyCandidateRepo,
+			replyCandidateRepository:
+				InMemoryReplyCandidateRepo.InMemoryReplyCandidateRepo,
 			googleAiAdapter: aiMock,
 		});
 	},
 );
 
-When(
-	"候補在庫を参照する",
-	function () {},
-);
+When("候補在庫を参照する", () => {});
 
 When(
 	"人間模倣ボットが投稿先を決定する",
@@ -452,7 +435,7 @@ When(
 );
 
 When(
-	'人間模倣ボットが {string} に書き込む',
+	"人間模倣ボットが {string} に書き込む",
 	async function (this: BattleBoardWorld, _title: string) {
 		const bot = await createHumanMimicBot();
 		(this as any).currentBot = bot;
@@ -460,14 +443,11 @@ When(
 	},
 );
 
-When(
-	"人間模倣ボットが書き込みを行う",
-	async function (this: BattleBoardWorld) {
-		const bot = await createHumanMimicBot();
-		(this as any).currentBot = bot;
-		(this as any).postResult = await createBotService().executeBotPost(bot.id);
-	},
-);
+When("人間模倣ボットが書き込みを行う", async function (this: BattleBoardWorld) {
+	const bot = await createHumanMimicBot();
+	(this as any).currentBot = bot;
+	(this as any).postResult = await createBotService().executeBotPost(bot.id);
+});
 
 When(
 	"人間模倣ボットがその候補を投稿する",
@@ -487,28 +467,23 @@ When(
 	},
 );
 
-When(
-	"ボットが候補文を1件投稿する",
-	async function (this: BattleBoardWorld) {
-		const bot = (this as any).currentBot ?? (await createHumanMimicBot());
-		(this as any).currentBot = bot;
-		(this as any).postResult = await createBotService().executeBotPost(bot.id);
-	},
-);
+When("ボットが候補文を1件投稿する", async function (this: BattleBoardWorld) {
+	const bot = (this as any).currentBot ?? (await createHumanMimicBot());
+	(this as any).currentBot = bot;
+	(this as any).postResult = await createBotService().executeBotPost(bot.id);
+});
 
-When(
-	"人間模倣ボットの定期実行が行われる",
-	function (this: BattleBoardWorld) {
-		(this as any).generatedDelays = Array.from({ length: 30 }, () =>
-			createBotService().getNextPostDelay("bot-001", "human_mimic"),
-		);
-	},
-);
+When("人間模倣ボットの定期実行が行われる", function (this: BattleBoardWorld) {
+	(this as any).generatedDelays = Array.from({ length: 30 }, () =>
+		createBotService().getNextPostDelay("bot-001", "human_mimic"),
+	);
+});
 
 When(
 	"人間模倣ボットの日次リセットが実行される",
 	async function (this: BattleBoardWorld) {
-		(this as any).dailyResetResult = await createBotService().performDailyReset();
+		(this as any).dailyResetResult =
+			await createBotService().performDailyReset();
 	},
 );
 
@@ -516,7 +491,7 @@ Then("AI API は呼び出されない", function (this: BattleBoardWorld) {
 	assert.strictEqual(getAiMock(this).calls.length, 0);
 });
 
-Then("既存候補はそのまま保持される", function () {
+Then("既存候補はそのまま保持される", () => {
 	assert.strictEqual(InMemoryReplyCandidateRepo._getAll().length >= 1, true);
 });
 
@@ -525,7 +500,7 @@ Then("AI API が1回呼び出される", function (this: BattleBoardWorld) {
 });
 
 Then(
-	'{string} 向けの AI回答候補が10件保存される',
+	"{string} 向けの AI回答候補が10件保存される",
 	function (this: BattleBoardWorld, title: string) {
 		const threadId = (this as any).threadIds[title];
 		const count = InMemoryReplyCandidateRepo._getAll().filter(
@@ -535,15 +510,24 @@ Then(
 	},
 );
 
-Then("AI API にスレッド本文がコンテキストとして渡される", function (this: BattleBoardWorld) {
-	const call = getAiMock(this).calls[0];
-	assert(call.userPrompt.includes("一件目の書き込み"));
-	assert(call.userPrompt.includes("二件目の書き込み"));
-});
+Then(
+	"AI API にスレッド本文がコンテキストとして渡される",
+	function (this: BattleBoardWorld) {
+		const call = getAiMock(this).calls[0];
+		assert(call.userPrompt.includes("一件目の書き込み"));
+		assert(call.userPrompt.includes("二件目の書き込み"));
+	},
+);
 
-Then("AI API に人間模倣用のシステムプロンプトが渡される", function (this: BattleBoardWorld) {
-	assert.strictEqual(getAiMock(this).calls[0].systemPrompt, HUMAN_MIMIC_SYSTEM_PROMPT);
-});
+Then(
+	"AI API に人間模倣用のシステムプロンプトが渡される",
+	function (this: BattleBoardWorld) {
+		assert.strictEqual(
+			getAiMock(this).calls[0].systemPrompt,
+			HUMAN_MIMIC_SYSTEM_PROMPT,
+		);
+	},
+);
 
 Then(
 	"人間模倣候補のスレッド本文はシステムプロンプトとは別メッセージで渡される",
@@ -553,24 +537,38 @@ Then(
 	},
 );
 
-Then('スレッド {string} には新しい候補が保存されない', function (this: BattleBoardWorld, title: string) {
-	const threadId = (this as any).threadIds[title];
-	const count = InMemoryReplyCandidateRepo._getAll().filter((item) => item.threadId === threadId).length;
-	assert.strictEqual(count, 0);
-});
+Then(
+	"スレッド {string} には新しい候補が保存されない",
+	function (this: BattleBoardWorld, title: string) {
+		const threadId = (this as any).threadIds[title];
+		const count = InMemoryReplyCandidateRepo._getAll().filter(
+			(item) => item.threadId === threadId,
+		).length;
+		assert.strictEqual(count, 0);
+	},
+);
 
-Then('スレッド {string} には AI回答候補が10件保存される', function (this: BattleBoardWorld, title: string) {
-	const threadId = (this as any).threadIds[title];
-	const count = InMemoryReplyCandidateRepo._getAll().filter((item) => item.threadId === threadId).length;
-	assert.strictEqual(count, 10);
-});
+Then(
+	"スレッド {string} には AI回答候補が10件保存される",
+	function (this: BattleBoardWorld, title: string) {
+		const threadId = (this as any).threadIds[title];
+		const count = InMemoryReplyCandidateRepo._getAll().filter(
+			(item) => item.threadId === threadId,
+		).length;
+		assert.strictEqual(count, 10);
+	},
+);
 
 Then(
 	"10件の候補は個別BOTではなく人間模倣ボット全体の共有在庫として扱われる",
-	function () {
+	() => {
 		const candidates = InMemoryReplyCandidateRepo._getAll();
 		assert.strictEqual(candidates.length, 10);
-		assert(candidates.every((candidate) => candidate.botProfileKey === "human_mimic"));
+		assert(
+			candidates.every(
+				(candidate) => candidate.botProfileKey === "human_mimic",
+			),
+		);
 	},
 );
 
@@ -589,7 +587,7 @@ Then("1件目の候補が投稿される", async function (this: BattleBoardWorl
 	assert.strictEqual(post.body, "1件目の候補");
 });
 
-Then("2件目と3件目は未投稿のまま残る", function () {
+Then("2件目と3件目は未投稿のまま残る", () => {
 	const remaining = InMemoryReplyCandidateRepo._getAll().filter(
 		(item) => item.postedAt === null,
 	);
@@ -603,14 +601,14 @@ Then("保存済み候補だけが使用される", async function (this: BattleB
 	assert(post.body.includes("候補") || post.body.includes("自然な候補文"));
 });
 
-Then("その候補は投稿済みになる", function () {
+Then("その候補は投稿済みになる", () => {
 	const posted = InMemoryReplyCandidateRepo._getAll().filter(
 		(item) => item.postedAt !== null,
 	);
 	assert.strictEqual(posted.length, 1);
 });
 
-Then("次回以降の選択候補から除外される", function () {
+Then("次回以降の選択候補から除外される", () => {
 	const remaining = InMemoryReplyCandidateRepo._getAll().filter(
 		(item) => item.postedAt === null,
 	);
@@ -622,9 +620,11 @@ Then("投稿はスキップされる", function (this: BattleBoardWorld) {
 });
 
 Then(
-	'人間模倣ボットの表示名は {string} である',
+	"人間模倣ボットの表示名は {string} である",
 	async function (this: BattleBoardWorld, expectedName: string) {
-		const post = await InMemoryPostRepo.findById((this as any).postResult.postId);
+		const post = await InMemoryPostRepo.findById(
+			(this as any).postResult.postId,
+		);
 		assert(post);
 		assert.strictEqual(post.displayName, expectedName);
 	},
@@ -636,27 +636,32 @@ Then("偽装日次リセットIDが表示される", async function (this: Battl
 	assert(post.dailyId.length > 0);
 });
 
-Then("表示フォーマットは人間の書き込みと同一である", async function (this: BattleBoardWorld) {
-	const post = await InMemoryPostRepo.findById((this as any).postResult.postId);
-	assert(post);
-	assert.strictEqual(post.isSystemMessage, false);
-});
+Then(
+	"表示フォーマットは人間の書き込みと同一である",
+	async function (this: BattleBoardWorld) {
+		const post = await InMemoryPostRepo.findById(
+			(this as any).postResult.postId,
+		);
+		assert(post);
+		assert.strictEqual(post.isSystemMessage, false);
+	},
+);
 
-Then("人間模倣ボットは10体が存在する", async function () {
+Then("人間模倣ボットは10体が存在する", async () => {
 	const bots = (await InMemoryBotRepo.findAll()).filter(
 		(bot) => bot.botProfileKey === "human_mimic",
 	);
 	assert.strictEqual(bots.length, 10);
 });
 
-Then("人間模倣ボットはそれぞれ異なる日次リセットIDを持つ", async function () {
+Then("人間模倣ボットはそれぞれ異なる日次リセットIDを持つ", async () => {
 	const bots = (await InMemoryBotRepo.findAll()).filter(
 		(bot) => bot.botProfileKey === "human_mimic",
 	);
 	assert.strictEqual(new Set(bots.map((bot) => bot.dailyId)).size, bots.length);
 });
 
-Then("各ボットのHPは 10 である", async function () {
+Then("各ボットのHPは 10 である", async () => {
 	const bots = (await InMemoryBotRepo.findAll()).filter(
 		(bot) => bot.botProfileKey === "human_mimic",
 	);
@@ -664,32 +669,35 @@ Then("各ボットのHPは 10 である", async function () {
 });
 
 Then(
-	"人間模倣ボットの書き込み間隔は1時間以上2時間以下のランダムな値である",
+	"人間模倣ボットの書き込み間隔は10時間以上20時間以下のランダムな値である",
 	function (this: BattleBoardWorld) {
 		const delays: number[] = (this as any).generatedDelays;
-		assert(delays.every((delay) => delay >= 60 && delay <= 120));
+		assert(delays.every((delay) => delay >= 600 && delay <= 1200));
 		assert(new Set(delays).size > 1);
 	},
 );
 
-Then("人間模倣ボットの状態が「潜伏中」に復帰する", async function () {
+Then("人間模倣ボットの状態が「潜伏中」に復帰する", async () => {
 	const bots = (await InMemoryBotRepo.findAll()).filter(
 		(bot) => bot.botProfileKey === "human_mimic" && bot.isActive,
 	);
 	assert(bots.length >= 1);
 });
 
-Then("人間模倣ボットのHPが初期値 10 にリセットされる", async function () {
+Then("人間模倣ボットのHPが初期値 10 にリセットされる", async () => {
 	const bots = (await InMemoryBotRepo.findAll()).filter(
 		(bot) => bot.botProfileKey === "human_mimic" && bot.isActive,
 	);
 	assert(bots.some((bot) => bot.hp === 10));
 });
 
-Then("人間模倣ボットに新しい偽装IDが割り当てられる", async function (this: BattleBoardWorld) {
-	const oldBot = (this as any).eliminatedBot;
-	const bots = (await InMemoryBotRepo.findAll()).filter(
-		(bot) => bot.botProfileKey === "human_mimic" && bot.isActive,
-	);
-	assert(bots.some((bot) => bot.dailyId !== oldBot.dailyId));
-});
+Then(
+	"人間模倣ボットに新しい偽装IDが割り当てられる",
+	async function (this: BattleBoardWorld) {
+		const oldBot = (this as any).eliminatedBot;
+		const bots = (await InMemoryBotRepo.findAll()).filter(
+			(bot) => bot.botProfileKey === "human_mimic" && bot.isActive,
+		);
+		assert(bots.some((bot) => bot.dailyId !== oldBot.dailyId));
+	},
+);

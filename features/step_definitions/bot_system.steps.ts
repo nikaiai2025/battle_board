@@ -919,7 +919,7 @@ Then(
 
 // ---------------------------------------------------------------------------
 // 荒らし役ボット: 間隔（GitHub Actions 連携シナリオ — pending）
-// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+// See: features/bot_system.feature @荒らし役ボットは10〜20時間間隔で書き込む
 // ---------------------------------------------------------------------------
 
 Given("荒らし役ボットが潜伏中である", async function (this: BattleBoardWorld) {
@@ -929,7 +929,7 @@ Given("荒らし役ボットが潜伏中である", async function (this: Battle
 });
 
 When("ボットの定期実行が行われる", async function (this: BattleBoardWorld) {
-	// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+	// See: features/bot_system.feature @荒らし役ボットは10〜20時間間隔で書き込む
 	// See: docs/architecture/components/bot.md §2.1 書き込み実行（GitHub Actionsから呼び出し）
 	const botService = createBotService();
 	const delay = botService.getNextPostDelay();
@@ -939,15 +939,15 @@ When("ボットの定期実行が行われる", async function (this: BattleBoar
 });
 
 Then(
-	"各ボットの書き込み間隔は1時間以上2時間以下のランダムな値である",
+	"各ボットの書き込み間隔は10時間以上20時間以下のランダムな値である",
 	async function (this: BattleBoardWorld) {
-		// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+		// See: features/bot_system.feature @荒らし役ボットは10〜20時間間隔で書き込む
 		// See: docs/architecture/components/bot.md §2.1 書き込み実行
 		const delay = (this as unknown as Record<string, unknown>)
 			.nextPostDelayMinutes as number | undefined;
 		assert(delay !== undefined, "書き込み間隔が設定されていません");
-		assert(delay >= 60, `書き込み間隔が60分未満です: ${delay}分`);
-		assert(delay <= 120, `書き込み間隔が120分を超えています: ${delay}分`);
+		assert(delay >= 600, `書き込み間隔が600分未満です: ${delay}分`);
+		assert(delay <= 1200, `書き込み間隔が1200分を超えています: ${delay}分`);
 	},
 );
 

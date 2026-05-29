@@ -21,8 +21,8 @@ import {
 	type IBotPostRepository,
 	type IBotRepository,
 	type IPendingTutorialRepository,
-	type ResolveStrategiesFn,
 	type IThreadRepository,
+	type ResolveStrategiesFn,
 } from "../../../lib/services/bot-service";
 import type { IReplyCandidateRepository } from "../../../lib/services/bot-strategies/types";
 
@@ -624,33 +624,33 @@ describe("BotService", () => {
 	// =========================================================================
 
 	describe("getNextPostDelay()", () => {
-		it("返値が 60 以上 120 以下の整数である", () => {
-			// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+		it("返値が 600 以上 1200 以下の整数である", () => {
+			// See: features/bot_system.feature @荒らし役ボットは10〜20時間間隔で書き込む
 			const service = createService();
 			const delay = service.getNextPostDelay();
-			expect(delay).toBeGreaterThanOrEqual(60);
-			expect(delay).toBeLessThanOrEqual(120);
+			expect(delay).toBeGreaterThanOrEqual(600);
+			expect(delay).toBeLessThanOrEqual(1200);
 			expect(Number.isInteger(delay)).toBe(true);
 		});
 
-		it("100回呼び出しても常に 60〜120 の範囲内である（境界値）", () => {
-			// See: features/bot_system.feature @荒らし役ボットは1〜2時間間隔で書き込む
+		it("100回呼び出しても常に 600〜1200 の範囲内である（境界値）", () => {
+			// See: features/bot_system.feature @荒らし役ボットは10〜20時間間隔で書き込む
 			const service = createService();
 			for (let i = 0; i < 100; i++) {
 				const delay = service.getNextPostDelay();
-				expect(delay).toBeGreaterThanOrEqual(60);
-				expect(delay).toBeLessThanOrEqual(120);
+				expect(delay).toBeGreaterThanOrEqual(600);
+				expect(delay).toBeLessThanOrEqual(1200);
 			}
 		});
 
 		it("複数回呼び出した場合、必ずしも同じ値ではない（ランダム性の確認）", () => {
-			// 確率論的テスト: 100回中すべて同じ値になる確率は約 (1/61)^99 ≒ 0 なので実質安全
+			// 確率論的テスト: 100回中すべて同じ値になる確率は約 (1/601)^99 ≒ 0 なので実質安全
 			const service = createService();
 			const values = new Set<number>();
 			for (let i = 0; i < 100; i++) {
 				values.add(service.getNextPostDelay());
 			}
-			// 61種類の値のうち少なくとも2種類は出現するはず
+			// 601種類の値のうち少なくとも2種類は出現するはず
 			expect(values.size).toBeGreaterThan(1);
 		});
 	});

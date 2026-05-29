@@ -602,8 +602,8 @@ Then(
 );
 
 // ---------------------------------------------------------------------------
-// S8: BOTの投稿間隔は12時間〜24時間のランダム間隔である
-// See: features/curation_bot.feature @BOTの投稿間隔は12時間〜24時間のランダム間隔である
+// S8: BOTの投稿間隔は120時間〜240時間のランダム間隔である
+// See: features/curation_bot.feature @BOTの投稿間隔は120時間〜240時間のランダム間隔である
 // ---------------------------------------------------------------------------
 
 Given(
@@ -637,15 +637,15 @@ When("次回投稿タイミングを決定する", async function (this: BattleB
 });
 
 Then(
-	"12時間以上24時間以内のランダムな間隔が設定される",
+	"120時間以上240時間以内のランダムな間隔が設定される",
 	async function (this: BattleBoardWorld) {
 		const delays: number[] = (this as any)._schedulingDelays;
 		assert(delays, "スケジューリング結果が未設定です");
 
 		for (const delay of delays) {
 			assert(
-				delay >= 720 && delay <= 1440,
-				`投稿間隔が範囲外です: ${delay}分（720〜1440分を期待。12〜24時間）`,
+				delay >= 7200 && delay <= 14400,
+				`投稿間隔が範囲外です: ${delay}分（7200〜14400分を期待。120〜240時間）`,
 			);
 		}
 

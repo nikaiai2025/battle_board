@@ -133,8 +133,8 @@ export interface CreateThreadResult {
 /** 表示名のデフォルト値。See: docs/requirements/ubiquitous_language.yaml #名無しさん */
 const DEFAULT_DISPLAY_NAME = "名無しさん";
 
-/** スレッド一覧の最大取得件数。See: features/thread.feature @最新50件 */
-const THREAD_LIST_MAX_LIMIT = 50;
+/** スレッド一覧の最大取得件数。See: features/thread.feature @最新20件 */
+const THREAD_LIST_MAX_LIMIT = 20;
 
 // ---------------------------------------------------------------------------
 // CommandService インスタンス管理

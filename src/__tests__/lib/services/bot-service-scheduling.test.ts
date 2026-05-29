@@ -535,14 +535,14 @@ describe("BotService next_post_at スケジューリング", () => {
 			await service.performDailyReset();
 
 			// updateNextPostAt に渡された Date が妥当であること
-			// getNextPostDelay は 60-120 分を返すため、そのレンジ内であること
+			// getNextPostDelay は 600-1200 分を返すため、そのレンジ内であること
 			const call = (botRepo.updateNextPostAt as ReturnType<typeof vi.fn>).mock
 				.calls[0];
 			expect(call).toBeDefined();
 			const nextPostAtDate = call[1] as Date;
 			const diffMinutes = (nextPostAtDate.getTime() - FIXED_NOW) / (60 * 1000);
-			expect(diffMinutes).toBeGreaterThanOrEqual(60);
-			expect(diffMinutes).toBeLessThanOrEqual(120);
+			expect(diffMinutes).toBeGreaterThanOrEqual(600);
+			expect(diffMinutes).toBeLessThanOrEqual(1200);
 		});
 
 		it("複数の eliminated BOTが復活した場合、全てに next_post_at が設定される", async () => {
