@@ -1,8 +1,25 @@
 # スプリント状況サマリー
 
-> 最終更新: 2026-05-30
+> 最終更新: 2026-06-10
 
 ## 現在のフェーズ
+
+**Sprint-159 完了 — AAビューワーUI改善**（コミット `d32c97b`）
+
+### Sprint-159 進捗
+
+- **フェーズ**: 全タスク完了・コミット済み
+- **タスク状況**:
+
+| TASK_ID | 状態 | 担当 | 内容 |
+|---|---|---|---|
+| TASK-403 | ✅ 完了 | bdd-coding | AAビューワーUI改善（ポップアップ削除・ソース/ソートトグル追加） |
+
+- **計画書**: なし（単一タスクのため省略）
+
+---
+
+**Sprint-158 完了 — AAビューワーページ新設**（コミット `fb1923a`）
 
 **Sprint-157 完了 — BOT投稿間隔×10 + スレッド保持数50→20**（コミット `6136709`）
 
@@ -53,8 +70,8 @@ vitest 2306 PASS / cucumber 411 PASS（変更スコープ内）。統合3件・E
 
 ## テスト状況
 
-- vitest: **2383 PASS / 0 failed**（133 files）— Sprint-157 品質ゲート確認済み
-- cucumber-js: 461シナリオ / **454 passed / 0 failed** / 7 pending
+- vitest: **2383 PASS / 0 failed**（133 files）— Sprint-159 品質ゲート確認済み
+- cucumber-js: 464シナリオ / **457 passed / 0 failed** / 7 pending
   - pending 7件: bot_system.feature UIトグル関連（ブラウザ操作未実装）
 - playwright E2E (ローカル): 未確認（前回 63 passed / 1 failed 既知）
 - playwright API: 未確認（前回 27テスト 全PASS）

@@ -3,12 +3,12 @@
 /**
  * AAビューワー クライアントコンポーネント
  *
- * 検索バーへの入力・ソースフィルター・ソート順の選択に応じてクライアントサイドで
+ * 検索バーへの入力・表示モードの選択に応じてクライアントサイドで
  * エントリをフィルタリング・ソートし、選択したAAのプレビュー・クリップボードコピーを提供する。
  *
  * レイアウト:
  *   - モバイル: 上にリスト・下にプレビューの縦並び（flex-col）
- *   - デスクトップ（md以上）: 左カラム（検索バー + AA名リスト）+ 右エリア（プレビュー）の横並び
+ *   - デスクトップ（md以上）: 左カラム（ToggleGroup + 検索バー + AA名リスト）+ 右エリア（プレビュー）の横並び
  *
  * See: features/copipe_viewer.feature @AAビューワーページを開くと管理者・ユーザー両方のAAが一覧表示される
  * See: features/copipe_viewer.feature @名前で部分一致フィルタリングできる
@@ -16,6 +16,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CopipeEntryItem } from "../page";
 
 /** AA プレビューに使用する等幅フォントスタック */
@@ -24,11 +25,13 @@ const AA_FONT_STYLE: React.CSSProperties = {
 	whiteSpace: "pre",
 };
 
-/** ソースフィルター: "user" = ユーザー投稿、"admin" = 運営登録 */
-type SourceFilter = "user" | "admin";
-
-/** ソート順: "newest" = 新着順（createdAt 降順）、"name" = 名前順（昇順） */
-type SortOrder = "newest" | "name";
+/**
+ * 表示モード（ソースフィルター + ソート順を1変数に統合）:
+ * - "user-newest" — ユーザー投稿、createdAt 降順（新着）
+ * - "user-name"   — ユーザー投稿、name 昇順（名前順）
+ * - "admin"       — 運営登録、name 昇順
+ */
+type ViewMode = "user-newest" | "user-name" | "admin";
 
 interface CopipeViewerClientProps {
 	/** サーバーから渡された初期エントリ一覧 */
@@ -36,7 +39,7 @@ interface CopipeViewerClientProps {
 }
 
 /**
- * CopipeViewerClient — 検索・フィルター・ソート・選択・コピー機能を提供するクライアントコンポーネント
+ * CopipeViewerClient — 検索・表示モード切替・選択・コピー機能を提供するクライアントコンポーネント
  *
  * See: features/copipe_viewer.feature
  */
@@ -46,20 +49,22 @@ export default function CopipeViewerClient({
 	const [query, setQuery] = useState("");
 	const [selected, setSelected] = useState<CopipeEntryItem | null>(null);
 	const [copied, setCopied] = useState(false);
-	// ソースフィルター: 初期値はユーザー投稿
-	const [sourceFilter, setSourceFilter] = useState<SourceFilter>("user");
-	// ソート順: 初期値は新着順
-	const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+	// 表示モード: 初期値は「ユーザー投稿（新着）」
+	const [viewMode, setViewMode] = useState<ViewMode>("user-newest");
 
 	/**
 	 * フィルタリング・ソートロジック（クライアントサイド）:
-	 * 1. sourceFilter でエントリを絞り込む
+	 * 1. viewMode でソースを絞り込む
 	 * 2. query で名前の部分一致フィルタを適用する
-	 * 3. sortOrder でソートする
+	 * 3. viewMode でソートする
+	 *
+	 * See: features/copipe_viewer.feature @AAビューワーページを開くと管理者・ユーザー両方のAAが一覧表示される
 	 */
 	const filtered = initialEntries
 		// 1. ソースフィルター
-		.filter((e) => e.source === sourceFilter)
+		.filter((e) =>
+			viewMode === "admin" ? e.source === "admin" : e.source === "user",
+		)
 		// 2. 名前の部分一致フィルター
 		.filter((e) =>
 			query.trim() === ""
@@ -68,7 +73,7 @@ export default function CopipeViewerClient({
 		)
 		// 3. ソート
 		.sort((a, b) => {
-			if (sortOrder === "newest") {
+			if (viewMode === "user-newest") {
 				// createdAt 降順（新しいものが上）
 				return (
 					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -95,47 +100,43 @@ export default function CopipeViewerClient({
 		}
 	}
 
+	/**
+	 * ToggleGroup の値変更ハンドラ
+	 * @base-ui/react の ToggleGroup は value を string[] で返すため引数型は string[]。
+	 * 空配列（選択解除）の場合は現在値を維持する。
+	 */
+	function handleViewModeChange(values: string[]) {
+		if (values.length > 0) {
+			const v = values[0];
+			if (v === "user-newest" || v === "user-name" || v === "admin") {
+				setViewMode(v);
+			}
+		}
+		// 空配列（選択解除）は無視して現在値を維持する
+	}
+
 	return (
 		<div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-10rem)]">
-			{/* 左カラム: トグル + 検索バー + AA名リスト */}
+			{/* 左カラム: ToggleGroup + 検索バー + AA名リスト */}
 			<div className="flex flex-col w-full md:w-64 shrink-0 gap-2">
-				{/* ソースフィルター + ソート順トグル */}
-				<div className="flex items-center justify-between gap-2">
-					{/* ソースフィルター（左側） */}
-					<div className="flex gap-1">
-						<Button
-							size="sm"
-							variant={sourceFilter === "user" ? "default" : "outline"}
-							onClick={() => setSourceFilter("user")}
-						>
-							ユーザー投稿
-						</Button>
-						<Button
-							size="sm"
-							variant={sourceFilter === "admin" ? "default" : "outline"}
-							onClick={() => setSourceFilter("admin")}
-						>
-							運営登録
-						</Button>
-					</div>
-					{/* ソート順（右側） */}
-					<div className="flex gap-1">
-						<Button
-							size="sm"
-							variant={sortOrder === "newest" ? "default" : "outline"}
-							onClick={() => setSortOrder("newest")}
-						>
-							新着
-						</Button>
-						<Button
-							size="sm"
-							variant={sortOrder === "name" ? "default" : "outline"}
-							onClick={() => setSortOrder("name")}
-						>
-							名前順
-						</Button>
-					</div>
-				</div>
+				{/* 表示モード選択 ToggleGroup（3択択一）
+				    See: features/copipe_viewer.feature */}
+				<ToggleGroup
+					value={[viewMode]}
+					onValueChange={handleViewModeChange}
+					className="w-full"
+					spacing={0}
+				>
+					<ToggleGroupItem value="user-newest" className="flex-1 text-xs">
+						ユーザー投稿（新着）
+					</ToggleGroupItem>
+					<ToggleGroupItem value="user-name" className="flex-1 text-xs">
+						ユーザー投稿（名前順）
+					</ToggleGroupItem>
+					<ToggleGroupItem value="admin" className="flex-1 text-xs">
+						運営登録
+					</ToggleGroupItem>
+				</ToggleGroup>
 
 				{/* 検索バー */}
 				<input
