@@ -3,12 +3,12 @@
 /**
  * AAビューワー クライアントコンポーネント
  *
- * 検索バーへの入力に応じてクライアントサイドでエントリをフィルタリングし、
- * 選択したAAのプレビュー・クリップボードコピーを提供する。
+ * 検索バーへの入力・ソースフィルター・ソート順の選択に応じてクライアントサイドで
+ * エントリをフィルタリング・ソートし、選択したAAのプレビュー・クリップボードコピーを提供する。
  *
  * レイアウト:
- *   - デスクトップ（md以上）: 左カラム（検索バー + AA名リスト）+ 右エリア（プレビュー）
- *   - モバイル: リスト表示 → 選択でシート（Sheet）にプレビュー表示
+ *   - モバイル: 上にリスト・下にプレビューの縦並び（flex-col）
+ *   - デスクトップ（md以上）: 左カラム（検索バー + AA名リスト）+ 右エリア（プレビュー）の横並び
  *
  * See: features/copipe_viewer.feature @AAビューワーページを開くと管理者・ユーザー両方のAAが一覧表示される
  * See: features/copipe_viewer.feature @名前で部分一致フィルタリングできる
@@ -16,12 +16,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-} from "@/components/ui/sheet";
 import type { CopipeEntryItem } from "../page";
 
 /** AA プレビューに使用する等幅フォントスタック */
@@ -30,13 +24,19 @@ const AA_FONT_STYLE: React.CSSProperties = {
 	whiteSpace: "pre",
 };
 
+/** ソースフィルター: "user" = ユーザー投稿、"admin" = 運営登録 */
+type SourceFilter = "user" | "admin";
+
+/** ソート順: "newest" = 新着順（createdAt 降順）、"name" = 名前順（昇順） */
+type SortOrder = "newest" | "name";
+
 interface CopipeViewerClientProps {
 	/** サーバーから渡された初期エントリ一覧 */
 	initialEntries: CopipeEntryItem[];
 }
 
 /**
- * CopipeViewerClient — 検索・選択・コピー機能を提供するクライアントコンポーネント
+ * CopipeViewerClient — 検索・フィルター・ソート・選択・コピー機能を提供するクライアントコンポーネント
  *
  * See: features/copipe_viewer.feature
  */
@@ -45,21 +45,42 @@ export default function CopipeViewerClient({
 }: CopipeViewerClientProps) {
 	const [query, setQuery] = useState("");
 	const [selected, setSelected] = useState<CopipeEntryItem | null>(null);
-	const [sheetOpen, setSheetOpen] = useState(false);
 	const [copied, setCopied] = useState(false);
+	// ソースフィルター: 初期値はユーザー投稿
+	const [sourceFilter, setSourceFilter] = useState<SourceFilter>("user");
+	// ソート順: 初期値は新着順
+	const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
 
-	// クライアントサイドフィルタリング（入力のたびに state 更新）
-	const filtered =
-		query.trim() === ""
-			? initialEntries
-			: initialEntries.filter((e) =>
-					e.name.toLowerCase().includes(query.toLowerCase()),
+	/**
+	 * フィルタリング・ソートロジック（クライアントサイド）:
+	 * 1. sourceFilter でエントリを絞り込む
+	 * 2. query で名前の部分一致フィルタを適用する
+	 * 3. sortOrder でソートする
+	 */
+	const filtered = initialEntries
+		// 1. ソースフィルター
+		.filter((e) => e.source === sourceFilter)
+		// 2. 名前の部分一致フィルター
+		.filter((e) =>
+			query.trim() === ""
+				? true
+				: e.name.toLowerCase().includes(query.toLowerCase()),
+		)
+		// 3. ソート
+		.sort((a, b) => {
+			if (sortOrder === "newest") {
+				// createdAt 降順（新しいものが上）
+				return (
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 				);
+			}
+			// name 昇順（アルファベット・五十音順）
+			return a.name.localeCompare(b.name, "ja");
+		});
 
-	/** エントリを選択する。モバイルではシートを開く */
+	/** エントリを選択する */
 	function handleSelect(entry: CopipeEntryItem) {
 		setSelected(entry);
-		setSheetOpen(true);
 		setCopied(false);
 	}
 
@@ -75,9 +96,47 @@ export default function CopipeViewerClient({
 	}
 
 	return (
-		<div className="flex gap-4 h-[calc(100vh-10rem)]">
-			{/* 左カラム: 検索バー + AA名リスト */}
+		<div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-10rem)]">
+			{/* 左カラム: トグル + 検索バー + AA名リスト */}
 			<div className="flex flex-col w-full md:w-64 shrink-0 gap-2">
+				{/* ソースフィルター + ソート順トグル */}
+				<div className="flex items-center justify-between gap-2">
+					{/* ソースフィルター（左側） */}
+					<div className="flex gap-1">
+						<Button
+							size="sm"
+							variant={sourceFilter === "user" ? "default" : "outline"}
+							onClick={() => setSourceFilter("user")}
+						>
+							ユーザー投稿
+						</Button>
+						<Button
+							size="sm"
+							variant={sourceFilter === "admin" ? "default" : "outline"}
+							onClick={() => setSourceFilter("admin")}
+						>
+							運営登録
+						</Button>
+					</div>
+					{/* ソート順（右側） */}
+					<div className="flex gap-1">
+						<Button
+							size="sm"
+							variant={sortOrder === "newest" ? "default" : "outline"}
+							onClick={() => setSortOrder("newest")}
+						>
+							新着
+						</Button>
+						<Button
+							size="sm"
+							variant={sortOrder === "name" ? "default" : "outline"}
+							onClick={() => setSortOrder("name")}
+						>
+							名前順
+						</Button>
+					</div>
+				</div>
+
 				{/* 検索バー */}
 				<input
 					type="search"
@@ -115,8 +174,8 @@ export default function CopipeViewerClient({
 				</div>
 			</div>
 
-			{/* 右エリア: プレビュー（デスクトップのみ表示） */}
-			<div className="hidden md:flex flex-col flex-1 border border-border rounded-md bg-card overflow-hidden">
+			{/* 右エリア: プレビュー（モバイル・デスクトップ共通で表示） */}
+			<div className="flex flex-col flex-1 border border-border rounded-md bg-card overflow-hidden">
 				{selected ? (
 					<>
 						{/* プレビューヘッダー */}
@@ -145,35 +204,6 @@ export default function CopipeViewerClient({
 					</div>
 				)}
 			</div>
-
-			{/* モバイル用シート: 選択したAAのプレビュー */}
-			<Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-				<SheetContent side="bottom" className="h-[70vh] flex flex-col">
-					<SheetHeader>
-						<SheetTitle className="text-left">
-							{selected?.name ?? "AAプレビュー"}
-						</SheetTitle>
-					</SheetHeader>
-					{selected && (
-						<>
-							<div className="flex justify-end pb-2">
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => void handleCopy(selected.content)}
-								>
-									{copied ? "コピーしました✓" : "コピー"}
-								</Button>
-							</div>
-							<div className="flex-1 overflow-auto">
-								<p className="text-sm min-w-[40ch]" style={AA_FONT_STYLE}>
-									{selected.content}
-								</p>
-							</div>
-						</>
-					)}
-				</SheetContent>
-			</Sheet>
 		</div>
 	);
 }

@@ -3,7 +3,7 @@
  *
  * 管理者登録分・ユーザー登録分の全AAを一覧表示する。
  * 初期データは Server Component でリポジトリを直接呼び出して取得する。
- * 検索・選択操作は Client Component（CopipeViewerClient）がクライアントサイドで処理する。
+ * 検索・選択・フィルタリング・ソート操作は Client Component（CopipeViewerClient）がクライアントサイドで処理する。
  *
  * 認証不要（誰でもアクセス可能）。
  *
@@ -12,7 +12,7 @@
  */
 
 import type { Metadata } from "next";
-import { findAll } from "@/lib/infrastructure/repositories/copipe-repository";
+import { findAllWithSource } from "@/lib/infrastructure/repositories/copipe-repository";
 import CopipeViewerClient from "./_components/CopipeViewerClient";
 
 /** ページメタデータ */
@@ -20,11 +20,17 @@ export const metadata: Metadata = {
 	title: "AAビューワー",
 };
 
-/** AAエントリの型（クライアントに渡す形式） */
+/**
+ * AAエントリの型（クライアントに渡す形式）
+ * source: "admin" = 運営登録、"user" = ユーザー投稿
+ * createdAt: ISO8601文字列（クライアントサイドでのソートに使用）
+ */
 export interface CopipeEntryItem {
 	id: number;
 	name: string;
 	content: string;
+	source: "admin" | "user";
+	createdAt: string; // ISO8601
 }
 
 /**
@@ -32,7 +38,7 @@ export interface CopipeEntryItem {
  *
  * リポジトリを直接呼び出して全件を取得し CopipeViewerClient に渡す。
  * Server Component から自身の API ルートを HTTP で呼ぶ anti-pattern を避けるため、
- * findAll() を直接インポートして使用する。
+ * findAllWithSource() を直接インポートして使用する。
  *
  * See: features/copipe_viewer.feature
  */
@@ -41,11 +47,16 @@ export default async function CopipeViewerPage() {
 	let fetchError: string | null = null;
 
 	try {
-		const raw = await findAll();
+		const raw = await findAllWithSource();
 		entries = raw.map((e) => ({
 			id: typeof e.id === "number" ? e.id : Number(e.id),
 			name: e.name,
 			content: e.content,
+			source: e.source,
+			createdAt:
+				e.createdAt instanceof Date
+					? e.createdAt.toISOString()
+					: String(e.createdAt),
 		}));
 	} catch {
 		fetchError = "AA一覧の取得に失敗しました。";

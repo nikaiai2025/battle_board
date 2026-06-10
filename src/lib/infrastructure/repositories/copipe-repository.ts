@@ -367,3 +367,57 @@ export async function findByContentPartial(
 		),
 	];
 }
+
+// ---------------------------------------------------------------------------
+// source 付き全件取得（AAビューワー用）
+// ---------------------------------------------------------------------------
+
+/**
+ * copipe_entries は "admin"、user_copipe_entries は "user" として source を付与したエントリ。
+ * AAビューワーページでのソースフィルタリングに使用する。
+ */
+export interface CopipeEntryWithSource extends CopipeEntry {
+	source: "admin" | "user";
+}
+
+/**
+ * admin + user の全コピペを source 情報付きで返す。
+ *
+ * copipe_entries から取得したものは source: "admin"、
+ * user_copipe_entries から取得したものは source: "user" を付与する。
+ * 既存の findAll() は変更せず後方互換性を維持する。
+ *
+ * See: features/copipe_viewer.feature @AAビューワーページを開くと管理者・ユーザー両方のAAが一覧表示される
+ *
+ * @returns source 付きエントリの配列（admin 分 → user 分の順）
+ */
+export async function findAllWithSource(): Promise<CopipeEntryWithSource[]> {
+	// 両テーブルを並列で全件取得する
+	const [adminResult, userResult] = await Promise.all([
+		supabaseAdmin.from("copipe_entries").select("*"),
+		supabaseAdmin.from("user_copipe_entries").select("*"),
+	]);
+
+	if (adminResult.error) {
+		throw new Error(
+			`CopipeRepository.findAllWithSource (admin) failed: ${adminResult.error.message}`,
+		);
+	}
+	if (userResult.error) {
+		throw new Error(
+			`CopipeRepository.findAllWithSource (user) failed: ${userResult.error.message}`,
+		);
+	}
+
+	// admin エントリに source: "admin" を付与する
+	const adminEntries: CopipeEntryWithSource[] = (adminResult.data ?? []).map(
+		(row) => ({ ...rowToCopipeEntry(row as CopipeEntryRow), source: "admin" }),
+	);
+
+	// user エントリに source: "user" を付与する
+	const userEntries: CopipeEntryWithSource[] = (userResult.data ?? []).map(
+		(row) => ({ ...rowToCopipeEntry(row as CopipeEntryRow), source: "user" }),
+	);
+
+	return [...adminEntries, ...userEntries];
+}
