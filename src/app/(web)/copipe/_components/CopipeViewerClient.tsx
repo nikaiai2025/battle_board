@@ -127,13 +127,24 @@ export default function CopipeViewerClient({
 					className="w-full"
 					spacing={0}
 				>
-					<ToggleGroupItem value="user-newest" className="flex-1 text-xs">
-						ユーザー投稿（新着）
+					<ToggleGroupItem
+						value="user-newest"
+						className="flex-1 flex-col h-auto py-1.5 text-xs leading-tight"
+					>
+						<span>ユーザー投稿</span>
+						<span className="text-muted-foreground">（新着）</span>
 					</ToggleGroupItem>
-					<ToggleGroupItem value="user-name" className="flex-1 text-xs">
-						ユーザー投稿（名前順）
+					<ToggleGroupItem
+						value="user-name"
+						className="flex-1 flex-col h-auto py-1.5 text-xs leading-tight"
+					>
+						<span>ユーザー投稿</span>
+						<span className="text-muted-foreground">（名前順）</span>
 					</ToggleGroupItem>
-					<ToggleGroupItem value="admin" className="flex-1 text-xs">
+					<ToggleGroupItem
+						value="admin"
+						className="flex-1 h-auto py-1.5 text-xs leading-tight"
+					>
 						運営登録
 					</ToggleGroupItem>
 				</ToggleGroup>
