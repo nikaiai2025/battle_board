@@ -21,7 +21,7 @@ import type { CopipeEntryItem } from "../page";
 
 /** AA プレビューに使用する等幅フォントスタック */
 const AA_FONT_STYLE: React.CSSProperties = {
-	fontFamily: '"MS Gothic", "Osaka-Mono", "Noto Sans Mono", monospace',
+	fontFamily: "var(--font-aa)",
 	whiteSpace: "pre",
 };
 
